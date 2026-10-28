@@ -21,6 +21,8 @@
   </header>
 
   <main>
+    <p id="majBanner" class="warn" hidden><span id="majBannerTxt"></span>
+      <button id="btnMajBanner" class="btn small">Mettre à jour</button></p>
     <p id="rappel" class="warn" hidden><span id="rappelTxt"></span> Exportez une sauvegarde chiffrée, à garder hors du téléphone.
       <button id="btnRappel" class="btn small">Exporter</button></p>
 
@@ -92,6 +94,16 @@
         <button id="btnWipe" class="btn danger small">Tout effacer</button>
       </div>
     </section>
+
+    <section class="card" id="secMaj">
+      <h2><span class="n">6</span> Application</h2>
+      <p class="muted" id="majVer"></p>
+      <p id="majState" class="muted"></p>
+      <div class="row">
+        <button id="btnMajCheck" class="btn ghost small">Rechercher une mise à jour</button>
+        <button id="btnMajGo" class="btn small" hidden>Mettre à jour</button>
+      </div>
+    </section>
   </main>
   </div>
 
@@ -107,6 +119,7 @@
   <script src="eb.js"></script>
   <script src="coffre.js"></script>
   <script src="app.js"></script>
+  <script src="maj.js"></script>
   <script src="verrou.js"></script>
 </body>
 </html>

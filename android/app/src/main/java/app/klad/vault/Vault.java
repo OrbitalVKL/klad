@@ -297,13 +297,16 @@ final class Vault {
 
     // ------------------------------------------------------------ empreinte
 
-    /** Chiffreur prêt pour l'activation (nouvelle clé empreinte). doFinal après BiometricPrompt. */
+    /**
+     * Chiffreur prêt pour l'activation (nouvelle clé empreinte).
+     * Ni updateAAD ni doFinal avant BiometricPrompt : pour une clé exigeant l'empreinte à chaque usage,
+     * Android refuse toute opération avant l'authentification (erreur mise de côté puis levée par doFinal).
+     */
     synchronized Cipher bioEncrypter() throws GeneralSecurityException, IOException {
         deleteKey(KEY_BIO);
         newKey(KEY_BIO, true);
         Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
         c.init(Cipher.ENCRYPT_MODE, getKey(KEY_BIO));
-        c.updateAAD(Coffre.AAD_BIO);
         return c;
     }
 
@@ -314,7 +317,7 @@ final class Vault {
     }
 
     /**
-     * Déchiffreur prêt pour le déverrouillage. null si l'empreinte a été invalidée (nouvelle empreinte enregistrée) :
+     * Déchiffreur prêt pour le déverrouillage (updateAAD et doFinal après BiometricPrompt). null si l'empreinte a été invalidée (nouvelle empreinte enregistrée) :
      * l'enveloppe est alors supprimée et l'état « invalidee » est mémorisé.
      */
     synchronized Cipher bioDecrypter() throws GeneralSecurityException, IOException {
@@ -326,9 +329,7 @@ final class Vault {
             return null;
         }
         try {
-            Cipher c = Coffre.initOpen(k, env);
-            c.updateAAD(Coffre.AAD_BIO);
-            return c;
+            return Coffre.initOpen(k, env);
         } catch (KeyPermanentlyInvalidatedException e) {
             invalidateBio();
             return null;

@@ -13,8 +13,8 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, reprise du prototype, `verrou.js` = verrou, premier lancement, section Sécurité, `app.js` = écran principal. |
-| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et le plugin local `vault/KladVaultPlugin` (coffre). |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, reprise du prototype, `verrou.js` = verrou, premier lancement, section Sécurité, `maj.js` = mise à jour depuis l'appli, `app.js` = écran principal. |
+| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre) et `update/KladUpdatePlugin` (mise à jour). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
@@ -58,6 +58,16 @@ La sauvegarde exportée (section *Sécurité › Exporter*, sélecteur de fichie
 **Code oublié** : désinstaller l'appli, la réinstaller, choisir « Restaurer une sauvegarde » et saisir la phrase.
 
 Au premier lancement de la 0.2, les données du prototype (stockées en clair) sont reprises, chiffrées, relues pour vérification, puis effacées.
+
+## Mise à jour depuis l'appli
+
+À chaque déverrouillage (et par *Application › Rechercher une mise à jour*), Klad lit la dernière publication du dépôt (`api.github.com/repos/<compte>/<dépôt>/releases/latest`, lecture anonyme). Si elle est plus récente, un bandeau propose **Mettre à jour** :
+
+1. téléchargement de l'APK de la publication (adresse `https://github.com/…/releases/download/…` uniquement) ;
+2. vérification de son empreinte SHA-256 avec celle publiée par GitHub, puis de l'APK : même identifiant d'appli, version plus récente, même certificat de signature ;
+3. installation par le service d'installation d'Android, qui demande confirmation. Le coffre et les données sont conservés.
+
+La première fois, Android demande d'autoriser Klad à « installer des applis inconnues » ; Klad ouvre ce réglage. Disponible à partir de la 0.2.1 (la 0.2.0 se met à jour à la main).
 
 ## Mise en ligne
 

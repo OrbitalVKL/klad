@@ -31,15 +31,34 @@ test('identifiant d\'appli et version hors des fichiers versionnés', () => {
 });
 
 test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
-  const files = ['MainActivity.java', 'vault/KladVaultPlugin.java', 'vault/Vault.java', 'vault/Coffre.java'];
+  const files = ['MainActivity.java', 'vault/KladVaultPlugin.java', 'vault/Vault.java', 'vault/Coffre.java',
+    'update/KladUpdatePlugin.java', 'update/Maj.java'];
   for (const f of files) {
     const x = read(JAVA + f);
-    assert.match(x, /^package app\.klad(\.vault)?;/m, f);
+    assert.match(x, /^package app\.klad(\.vault|\.update)?;/m, f);
     assert.doesNotMatch(x, /io\.github\./, f);
   }
   const main = read(JAVA + 'MainActivity.java');
   assert.match(main, /FLAG_SECURE/);
   assert.match(main, /registerPlugin\(KladVaultPlugin\.class\)/);
+  assert.match(main, /registerPlugin\(KladUpdatePlugin\.class\)/);
+});
+
+test('empreinte : aucune opération sur la clé avant BiometricPrompt', () => {
+  // updateAAD avant l'authentification fait échouer doFinal (« Erreur inattendue » de la 0.2.0).
+  const v = read(JAVA + 'vault/Vault.java');
+  const body = name => v.slice(v.indexOf('Cipher ' + name + '()'), v.indexOf('\n    }\n', v.indexOf('Cipher ' + name + '()')));
+  for (const n of ['bioEncrypter', 'bioDecrypter']) assert.doesNotMatch(body(n), /updateAAD|doFinal/, n);
+  const p = read(JAVA + 'vault/KladVaultPlugin.java');
+  assert.match(p, /onAuthenticationSucceeded[\s\S]*c\.updateAAD\(Coffre\.AAD_BIO\)/);
+  assert.match(p, /answered\.getAndSet\(true\)/);
+});
+
+test('mise à jour : permission d\'installation, contrôles du plugin', () => {
+  assert.match(read(MAN), /android\.permission\.REQUEST_INSTALL_PACKAGES/);
+  const u = read(JAVA + 'update/KladUpdatePlugin.java');
+  for (const re of [/Maj\.allowedUrl\(url\)/, /Maj\.sameDigest\(/, /getPackageArchiveInfo/, /versionCode\(apk\) <= versionCode\(me\)/,
+    /mine\.equals\(theirs\)/, /PackageInstaller\.SessionParams/, /RECEIVER_NOT_EXPORTED/]) assert.match(u, re);
 });
 
 test('coffre natif : réglages des clés Keystore', () => {
