@@ -33,6 +33,7 @@
     if (a.unseen) L.push({ cle: 'nonvues', texte: pluriel(a.unseen, 'opération') + ' à voir', niveau: 'info' });
     if (a.unclassified) L.push({ cle: 'nonclassees', texte: pluriel(a.unclassified, 'opération non classée', 'opérations non classées') + ' (3 derniers mois)', niveau: 'info' });
     if (a.toMatch) L.push({ cle: 'rapprocher', texte: pluriel(a.toMatch, 'prélèvement') + ' de portefeuille à rapprocher', niveau: 'info' });
+    if (e.observations) L.push({ cle: 'observations', texte: pluriel(e.observations, 'observation') + ' à faire', niveau: 'caut' });
     if (a.accountsToCheck) L.push({ cle: 'comptes', texte: pluriel(a.accountsToCheck, 'compte') + ' à vérifier ou à réassocier', niveau: 'caut' });
     for (const sid of Object.keys(S.modele.connexions)) {
       const cx = S.modele.connexions[sid];

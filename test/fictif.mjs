@@ -32,6 +32,7 @@ export function repriseFictive(fin) {
     if ((+m.slice(5, 7) - 1) % 3 === 0) add('r2', d(6), -45000, 'PRLV SYNDIC FICTIF');
     add('r1', d(6), -2500, 'LIBRAIRIE FICTIVE');
     add('r1', d(16), -8900, 'BOUTIQUE EN LIGNE FICTIVE');
+    add('r0', d(28), -10000, 'VIR LIVRET FICTIF');
   }
   // règlement de la carte sur le courant, le 25
   for (let k = -9; k <= 0; k++) { const m = moisDe(fin, k); add('r0', m + '-25', -11400, 'PRLV CARTE FICTIVE'); }
@@ -54,7 +55,8 @@ export function repriseFictive(fin) {
       ['PERSONNE A', 'revenu', 'Apports compte commun', 'Personne A', null],
       ['PERSONNE B', 'revenu', 'Apports compte commun', 'Personne B', null],
       ['PRLV CARTE', 'interne', 'Virements internes', 'Règlement carte', null],
-      ['LIBRAIRIE|BOUTIQUE', 'depense', 'Shopping', 'Achats', null]
+      ['LIBRAIRIE|BOUTIQUE', 'depense', 'Shopping', 'Achats', null],
+      ['VIR LIVRET', 'epargne', 'Épargne', 'Livret', null]
     ] },
     rules: [],
     seen: { cut: jour(fin, -30), k: {} },
@@ -77,11 +79,21 @@ export function repriseFictive(fin) {
       { id: 'v1', who: 'g', from: 'Courant', amt: 800, day: 2, use: 'fixes', label: 'Virement permanent' },
       { id: 'v2', who: 's', from: 'Autre compte', amt: 600, day: 3, use: 'tout', label: 'Virement personne B' }
     ],
+    fisc: {
+      avis: { [String(+fin.slice(0, 4) - 1)]: { rev: +fin.slice(0, 4) - 1, parts: 2, sal: { g: 30000, s: 20000 }, ded: { g: 3000, s: 2000 }, fr: { g: false, s: false }, fonc: 0, rcm: 0,
+        rni: 45000, irBar: 2600, decote: 0, prop: 0, cred: 0, irNet: 2600, pas: 2400, ps: 0, solde: 200, rfr: 45000, tmi: 11, tmoy: 5.2, per: { g: 3000, s: 2000 } } },
+      bs: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].filter(k => k < +fin.slice(5, 7)).map(k => ['b' + k, { p: 'g', emp: 'Société fictive', m: fin.slice(0, 4) + '-' + pad(k), pay: fin.slice(0, 4) + '-' + pad(k) + '-27', ni: 2600, pas: 140, taux: 5.4, type: 'perso' }])),
+      hyp: {}, soldeBy: {} },
+    tf: { surf: 50, ach: '2024-03-01', baseM2: 30, basePk: 0, tCom: 40, tSpe: 1, tTeom: 8, exoCom: 0, reval: 1.5, pg: 50, h2ok: 'oui', avis: {} },
+    livret: { base: 1500, date: moisDe(fin, -3) + '-01' },
     appels: { H: { lab: 'Copropriété fictive', to: 'SYNDIC FICTIF', iban: '', items: [[moisDe(fin, -6) + '-01', 'charges', 450], [moisDe(fin, -3) + '-01', 'charges', 450], [moisDe(fin, 0) + '-01', 'charges', 450]],
       stmt: { at: moisDe(fin, -1) + '-20', solde: 0 } } },
     klad: { salaire: { compte: 'r0', motif: 'SOCIETE FICTIVE', paie: 'PAIE', min: 1000, minCycle: 500 },
       commun: { moi: 'Personne A', autre: 'Personne B', motifAutre: 'PERSONNE B' }, cartes: { r3: { motif: 'PRLV CARTE' } },
       appels: { motif: 'SYNDIC', ordre: ['H'], H: 'SYNDIC' },
+      livret: { compte: 'r0', motif: 'VIR LIVRET' },
+      observations: { secondaire: 'r1', principal: 'r0', motifPret: 'ECH PRET', salaireMin: 1000 },
+      pee: { plan: { emp: 'Société fictive', entree: '2025-01-01', anc: 3, abTaux: 100, abPlaf: 500, dispo: 5 } },
       equilibre: { apport: { moi: 5000, autre: 15000 },
         regles: [['PERSONNE B', 'vs', 'credit'], ['PERSONNE A', 'vg', 'credit'], ['.', 'rf', 'credit'], ['ECH PRET', 'pc', 'debit'], ['SYNDIC', 'ch', 'debit'], ['ENERGIE|BOX', 'en', 'debit'], ['.', 'ot', 'debit']],
         ops: [[moisDe(fin, -12) + '-02', 'VIR PERSONNE A', 800, 'vg'], [moisDe(fin, -12) + '-03', 'VIR PERSONNE B', 600, 'vs'], [moisDe(fin, -12) + '-05', 'ECH PRET', -950, 'pc']],

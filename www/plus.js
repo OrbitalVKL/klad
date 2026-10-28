@@ -321,6 +321,9 @@
     if (s0.budget && (s0.budget.v || 1) < 2 && s0.carnet != null && window.KladCommun) {
       try { window.KladCommun.importer(s0, s0.carnet); } catch (e) { A.log('err', 'Compte commun : ' + (e.message || e)); }
     }
+    if (s0.budget && (s0.budget.v || 1) < 3 && s0.carnet != null && window.KladFisc) {
+      try { window.KladFisc.importer(s0, s0.carnet); } catch (e) { A.log('err', 'Impôts : ' + (e.message || e)); }
+    }
     A.changed('import');
     reprendreClassement(s0).then(() => { if (st.relire && A.etat() === s0) A.synchro('relecture'); });
   });

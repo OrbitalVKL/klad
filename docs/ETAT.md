@@ -5,9 +5,9 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.7.0** — Lot 7 : compte commun (marge réelle, fin de mois, virements et ordres permanents, virement ponctuel,
-trésorerie 12 mois, appels de fonds, impôts, d'où vient le solde), équilibre des apports, résumé Grafit `commun` et
-`OVERDRAFT_RISK`. (0.6.0 — Lot 6 : budget par cycle, reste à vivre, contrats, échéances, tendance.)
+**0.8.0** — Lot 8 : impôts du foyer et taxe foncière, épargne (livret, PEE), observations et recommandations,
+résultats d'une période, répartition. (0.7.0 — Lot 7 : compte commun et équilibre des apports ; 0.6.0 — Lot 6 :
+budget par cycle, reste à vivre, contrats, échéances, tendance.)
 
 Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts enchaînés sans validation intermédiaire
 (décisions par défaut notées dans chaque section « Décisions »).
@@ -22,7 +22,7 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
 | 5 | Classement, opérations vues, carte à débit différé, paiements en ligne, réassociation, « À vérifier » | 0.5 | fait |
 | 6 | Budget par cycle (salaire), reste à vivre, contrats et charges fixes, tendance ; Grafit : `month`, reste à vivre, `upcoming` | 0.6 | fait |
 | 7 | Module compte commun + équilibre ; Grafit : `commun` | 0.7 | fait |
-| 8 | Impôts, épargne salariale, taxe foncière | 0.8 | à faire |
+| 8 | Impôts, épargne salariale, taxe foncière, livret, observations, résultats, répartition | 0.8 | fait |
 | 9 | Extras (IMAP, Claude), reprise définitive, bascule | 0.9 → 1.0 | à faire |
 
 ## Ce qui est fait (résumé)
@@ -42,6 +42,13 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- Lot 8 (0.8) : chiffres identiques à l'ancienne version (parité `outils/parite/lot8.mjs` : impôts avis et estimation,
+  partage, régularisations, taxe foncière, livret, résultats perso et commun ; 0 écart). Observations : mêmes règles,
+  formulations génériques (noms de comptes et de contrats tirés des données) ; règles propres au propriétaire rendues
+  génériques (contrat à montant 0 encore prélevé ; prélèvement mensuel du commun absent depuis 45 jours ; compte
+  secondaire désigné par le complément). Écrans dans Plus (Observations, Impôts, Épargne) et Budget › Résultats.
+  Pas de lecture de mail, de Drive ni d'analyse par Claude (Lot 9).
 
 - Compte commun (0.7) : chiffres identiques à l'ancienne version (parité `outils/parite/commun.mjs` dans klad-ref :
   0 écart). Noms des personnes, motifs (virements de l'autre personne, syndic, prêteurs), apports initiaux, historique
@@ -76,7 +83,17 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
   complément ou du carnet, surchargés par `S.budget.reglages` ; jamais dans le code.
 - Reste à vivre : colonne « comptes courants » prioritaire pour Grafit (`left_to_live_basis` = `accounts`), sinon `budget`.
 
-## Points d'appui pour le Lot 8
+## Points d'appui pour le Lot 9
+
+- Impôts : `KladFisc` (`contexte`, `annee`, `partage`, `regularisations`, `alertes`, `taxeFonciere`, `pee`, `livret`) ;
+  bulletins (`S.budget.fisc.bs`) et avis (`fisc.avis`) au format de l'ancienne version : la lecture automatique (Drive,
+  Claude) du Lot 9 doit produire ces objets (`{ p, emp, m, pay, ni, pas, taux, type, brut }`, avis `{ rev, sal, ded, … }`).
+- Appels de fonds : `S.budget.appels[cp].items`, `mails`, `pdfs` (format de l'ancienne version) ; lecture des mails au Lot 9.
+- Observations : `KladObservations.audit(B)` (points), `observations(B, scope)` (à faire, masqués, infos).
+- Réglages du carnet encore inexploités : `excl` (opérations exceptionnelles, vide chez le propriétaire), `fuel`
+  (calculateur carburant), `eq.mG/mS` (recalculés), `autoFiles` (soldes de l'ancienne synchro).
+
+## Points d'appui pour le Lot 8 (historique)
 
 - Compte commun : `KladCommun` (`tresorerie`, `origine`, `plan`, `finDeMois`, `margeReelle`, `appels`, `equilibre`,
   `impots`) ; rendu `KladVuesCommun`. Bloc `budget` en version 2 (appels, équilibre importés).

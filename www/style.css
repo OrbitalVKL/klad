@@ -382,3 +382,23 @@ details.ccard > summary span { font-size: 13px; text-align: right; }
 .eqbar i.s { justify-content: flex-end; }
 .eqbar em { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .6; }
 .ordre-e { border-top: 1px solid var(--line); padding: 6px 0; }
+
+/* ------------------------------------------------------------ Lot 8 : impôts, épargne, observations, résultats */
+.kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0; }
+.kpi { background: var(--bg); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.kpi b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.kpi small { color: var(--muted); font-size: 11.5px; }
+.obsl { list-style: none; padding: 0; margin: 6px 0; }
+.obsl li.obs { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.obsl li.obs > .chip { flex: none; margin-top: 2px; }
+.obsl li.obs p { margin: 3px 0 0; color: var(--muted); }
+.list li.proj { color: var(--muted); font-style: italic; }
+.defile-seg { overflow-x: auto; }
+.defile-seg button { flex: none; white-space: nowrap; }
+table.fisct td { white-space: nowrap; }
+.resl li { align-items: center; }
+.split { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin: 6px 0 4px; }
+.split span { display: block; }
+ol.ecarts { padding-left: 20px; font-size: 13px; }
+ol.ecarts li { margin: 4px 0; }
+.obsl li.obs.warn, .obsl li.obs.bad { background: var(--warn-bg); border-radius: 10px; padding: 8px; border-top: 0; margin-top: 4px; }
