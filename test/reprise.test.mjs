@@ -95,12 +95,12 @@ test('import : comptes créés, réglages repris, frontière, ids par empreinte 
     { id: c.id + ':r:C', compte: c.id, date: '2026-10-20', montant: -300, libelle: 'AVANT', statut: 'comptabilisee', source: 'eb' }];
   const rep = R.valider(fichier());
   const st = R.appliquer(S, rep, { r0: c.id, r1: 'creer', r3: 'creer', r5: 'creer' }, { now: NOW });
-  assert.deepEqual(json(st), { comptes: 4, crees: 3, operations: 5, ebRetirees: 2, ignores: 0 });
+  assert.deepEqual(json(st), { comptes: 4, crees: 3, operations: 5, ebRetirees: 1, ignores: 0 });
   assert.equal(c.frontiere, '2026-10-25');
   assert.equal(c.libelle, 'COURANT');
   assert.equal(c.aVerifier, undefined);
   assert.deepEqual(json(S.ops[c.id]).map(o => [o.date, o.montant, o.source]),
-    [['2026-10-26', -100, 'eb'], ['2026-10-25', 250000, 'reprise'], ['2023-01-03', -1250, 'reprise'], ['2023-01-03', -1250, 'reprise']]);
+    [['2026-10-26', -100, 'eb'], ['2026-10-25', -200, 'eb'], ['2026-10-25', 250000, 'reprise'], ['2023-01-03', -1250, 'reprise'], ['2023-01-03', -1250, 'reprise']]);
   const boul = json(S.ops[c.id]).filter(o => o.date === '2023-01-03').map(o => o.id);
   assert.equal(new Set(boul).size, 2);
   assert.ok(boul.every(id => id.startsWith(c.id + ':k:')));
@@ -111,8 +111,8 @@ test('import : comptes créés, réglages repris, frontière, ids par empreinte 
   assert.equal(livret.source.type, 'manuel');
   assert.equal(S.ops[joint.id][0].id, joint.id + ':x:ancien-42');
   assert.deepEqual(json(S.carnet), { budget: { reglage: 'opaque' } });
-  // une récupération Enable Banking ultérieure ignore ce qui précède la frontière
-  assert.equal(M.debutRecuperation(S, c), '2026-10-26');
+  // une récupération Enable Banking ultérieure part de la frontière et ignore ce qui la précède
+  assert.equal(M.debutRecuperation(S, c, NOW), '2026-10-25');
   assert.equal(M.integrer(S, c.id, [{ booking_date: '2026-10-24', transaction_amount: { amount: '9.99' }, credit_debit_indicator: 'DBIT', remittance_information: ['VIEUX'], status: 'BOOK' }], NOW).ignorees, 1);
 });
 
@@ -144,4 +144,14 @@ test('import : deux comptes de la reprise vers le même compte Klad refusé', ()
   const rep = R.valider(fichier());
   assert.throws(() => R.appliquer(S, rep, { r0: c.id, r1: c.id, r3: 'ignorer', r5: 'ignorer' }, { now: NOW }), /même compte Klad/);
   assert.equal(Object.keys(S.ops).length, 0);
+});
+
+test('import : opérations Enable Banking du jour de la frontière déjà dans la reprise retirées, les autres gardées', () => {
+  const { S, c } = etat();
+  S.ops[c.id] = [
+    { id: c.id + ':h:x:0', compte: c.id, date: '2026-10-25', montant: 250000, libelle: 'SALAIRE FICTIF OCTOBRE', statut: 'comptabilisee', source: 'eb' },
+    { id: c.id + ':h:y:0', compte: c.id, date: '2026-10-25', montant: -300, libelle: 'CB SOIR', statut: 'comptabilisee', source: 'eb' }];
+  const st = R.appliquer(S, R.valider(fichier()), { r0: c.id, r1: 'ignorer', r3: 'ignorer', r5: 'ignorer' }, { now: NOW });
+  assert.equal(st.ebRetirees, 1);
+  assert.deepEqual(json(S.ops[c.id]).filter(o => o.date === '2026-10-25').map(o => [o.montant, o.source]).sort(), [[-300, 'eb'], [250000, 'reprise']]);
 });

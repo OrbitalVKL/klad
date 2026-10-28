@@ -2,7 +2,7 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 0.3 — modèle de données et reprise (Lot 3).** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 0.3.1 — modèle de données et reprise (Lot 3, correctif).** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
@@ -64,7 +64,7 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 - **IBAN** : jamais gardé en entier. Une empreinte salée (HMAC-SHA256, sel aléatoire dans le coffre) retrouve le compte d'une session à l'autre ; seuls les 4 derniers caractères sont affichés.
 - **Identifiants** : `<compte>:r:<référence bancaire>` ; sans référence, empreinte (date, montant, libellé normalisé) + rang parmi les identiques du même jour.
 - **En cours → comptabilisée** : même compte, même montant, dates à 4 jours au plus, libellés dont l'un prolonge l'autre ou partageant une référence (10 caractères au moins, dont un chiffre) ; on garde la comptabilisée. Deux libellés portant chacun des références différentes ne sont jamais fusionnés. Une opération en cours disparue est retirée 10 jours après sa date.
-- **Récupération** : au déverrouillage si la dernière date de plus de 2 h, par la pastille de l'en-tête ou en tirant vers le bas. Par compte, depuis la dernière date comptabilisée − 5 jours (la plus longue période acceptée par la banque pour un nouveau compte). Les en-têtes « utilisateur présent » (`Psu-Ip-Address`, `Psu-User-Agent`, `Psu-Accept-Language`) sont envoyés s'ils couvrent ceux qu'exige la banque, sinon aucun ; l'adresse IP est celle du téléphone (aucun service tiers) ; s'ils sont refusés, un nouvel essai a lieu sans eux.
+- **Récupération** : au déverrouillage si la dernière date de plus de 2 h, par la pastille de l'en-tête ou en tirant vers le bas. Par compte, depuis la dernière date comptabilisée − 5 jours, jamais avant la frontière de reprise ni après aujourd'hui (la plus longue période acceptée par la banque pour un nouveau compte). Les en-têtes « utilisateur présent » (`Psu-Ip-Address`, `Psu-User-Agent`, `Psu-Accept-Language`) sont envoyés s'ils couvrent ceux qu'exige la banque, sinon aucun ; l'adresse IP est celle du téléphone (aucun service tiers) ; s'ils sont refusés, un nouvel essai a lieu sans eux.
 - **Accès bancaire** : alerte 14 jours avant expiration ; « Renouveler » relance l'autorisation auprès de la même banque et réassocie les comptes par leur empreinte.
 - **Événement « données changées »** (`KladModele.surChangement`) : émis après une synchro, un import ou un réglage ; point d'accroche du futur résumé.
 - **Migration 0.2 → 0.3** : au premier déverrouillage, les données 0.2 sont converties, écrites, relues et comparées ; l'ancien format n'est supprimé qu'ensuite. En cas d'échec, rien n'est effacé et la conversion est retentée au déverrouillage suivant.
@@ -83,8 +83,8 @@ Fichier JSON produit hors du dépôt depuis l'ancienne version, choisi par *Plus
 ```
 
 - Montants en centimes entiers signés ; `status` : `comptabilisee` (par défaut) ou `en_cours`. Champs facultatifs par opération : `id` (identifiant stable de l'ancienne version, 64 caractères au plus), `value_date`, `counterparty`.
-- Aperçu (opérations et période par compte), association de chaque compte à un compte Klad (proposée d'après l'import précédent, la fin d'IBAN, puis le libellé), création d'un compte manuel, ou « ignorer ».
-- **Frontière** : par compte, la reprise fait foi jusqu'à sa dernière date incluse ; les opérations Enable Banking à cette date ou avant sont ignorées.
+- Aperçu (opérations et période par compte), association de chaque compte à un compte Klad (proposée d'après l'import précédent, la fin d'IBAN, puis le libellé ; sans correspondance : « Créer un compte manuel »), ou « ignorer » ; le nombre de comptes ignorés est signalé avant confirmation.
+- **Frontière** : par compte, la reprise fait foi jusqu'à sa dernière date incluse. Les opérations Enable Banking d'avant cette date sont ignorées ; celles du jour même sont gardées, sauf si elles sont déjà dans la reprise (même jour, même montant, libellés compatibles, une pour une) : rien n'est perdu d'une journée d'export.
 - **Rejouable** : un nouvel import remplace toutes les opérations de reprise.
 - Fichier refusé avec un message qui ne cite que des numéros (« opération n° 12 : montant non entier »).
 

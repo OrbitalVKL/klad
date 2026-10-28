@@ -139,20 +139,56 @@ test('opération en cours disparue sans comptabilisée : retirée 10 jours aprè
   assert.equal(ops(S, c).length, 1);
 });
 
-test('frontière : opérations Enable Banking à la frontière ou avant ignorées ; début de récupération', () => {
+test('frontière dans le passé : avant ignorées, jour même accepté sans reprise ; début de récupération', () => {
   const { S, c } = etat();
-  assert.equal(M.debutRecuperation(S, c), null);                 // nouveau compte : la plus longue période
+  assert.equal(M.debutRecuperation(S, c, NOW), null);            // nouveau compte : la plus longue période
   c.frontiere = '2026-10-10';
-  assert.equal(M.debutRecuperation(S, c), '2026-10-11');
+  assert.equal(M.debutRecuperation(S, c, NOW), '2026-10-10');    // la frontière elle-même
   const st = M.integrer(S, c.id, [eb('2026-10-09', -100, 'A'), eb('2026-10-10', -200, 'B'), eb('2026-10-11', -300, 'C'), enCours('2026-10-10', -50, 'D')], NOW);
-  assert.equal(st.ignorees, 3);
-  assert.deepEqual(resume(S, c), [['2026-10-11', -300, 'comptabilisee', 'C']]);
+  assert.equal(st.ignorees, 1);                                   // veille de la frontière
+  assert.deepEqual(resume(S, c), [['2026-10-11', -300, 'comptabilisee', 'C'], ['2026-10-10', -200, 'comptabilisee', 'B'], ['2026-10-10', -50, 'en_cours', 'D']]);
   M.integrer(S, c.id, [eb('2026-10-25', -300, 'E')], NOW);
-  assert.equal(M.debutRecuperation(S, c), '2026-10-20');         // dernière comptabilisée − 5 jours
+  assert.equal(M.debutRecuperation(S, c, NOW), '2026-10-20');    // dernière comptabilisée − 5 jours
   c.frontiere = '2026-10-22';
-  assert.equal(M.debutRecuperation(S, c), '2026-10-23');
-  assert.equal(M.appliquerFrontiere(S, c.id), 1);
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-22', ramenee: false });
+  assert.equal(M.appliquerFrontiere(S, c.id), 2);                 // B et C (D, en cours disparue, déjà retirée)
   assert.deepEqual(resume(S, c), [['2026-10-25', -300, 'comptabilisee', 'E']]);
+});
+
+test('frontière = aujourd\'hui : début de récupération jamais dans le futur', () => {
+  const { S, c } = etat();
+  c.frontiere = '2026-10-28';                                     // reprise exportée le jour même (NOW)
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: false });
+  c.frontiere = '2026-10-29';                                     // date de la reprise en avance (fuseau, horloge)
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: true });
+  c.frontiere = '';
+  M.integrer(S, c.id, [eb('2026-11-10', -300, 'DATE FUTURE')], NOW);   // banque datant une opération dans le futur
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: true });
+});
+
+test('jour de la frontière : dédoublonnage contre les opérations de reprise du même jour', () => {
+  const { S, c } = etat();
+  const rep = (date, montant, libelle, i) => ({ id: c.id + ':k:' + i, compte: c.id, date, montant, libelle, statut: 'comptabilisee', source: 'reprise' });
+  S.ops[c.id] = [rep('2026-10-28', -1250, 'CB BOULANGERIE', 1), rep('2026-10-28', -999, 'CB CAFE', 2), rep('2026-10-28', -999, 'CB CAFE', 3),
+    rep('2026-10-27', -500, 'VEILLE', 4)];
+  c.frontiere = '2026-10-28';
+  const st = M.integrer(S, c.id, [
+    eb('2026-10-28', -1250, 'CB BOULANGERIE 28/10', { entry_reference: 'R1' }),   // prolonge le libellé de la reprise : retrouvée
+    eb('2026-10-28', -999, 'CB CAFE'), eb('2026-10-28', -999, 'CB CAFE'), eb('2026-10-28', -999, 'CB CAFE'),   // 2 dans la reprise, 1 de plus
+    eb('2026-10-28', -4200, 'CB LIBRAIRIE', { entry_reference: 'R2' }),            // plus tard dans la journée : absente de la reprise
+    enCours('2026-10-28', -700, 'CB PHARMACIE'),                                   // en cours du jour : gardée
+    eb('2026-10-27', -500, 'VEILLE')], NOW);                                       // veille : ignorée
+  assert.equal(st.nouvelles, 3); assert.equal(st.reprises, 3); assert.equal(st.ignorees, 4);
+  const eb28 = json(S.ops[c.id]).filter(o => o.source === 'eb').map(o => [o.montant, o.libelle, o.statut]).sort();
+  assert.deepEqual(eb28, [[-4200, 'CB LIBRAIRIE', 'comptabilisee'], [-700, 'CB PHARMACIE', 'en_cours'], [-999, 'CB CAFE', 'comptabilisee']]);
+  // relu à l'identique : rien de plus
+  const st2 = M.integrer(S, c.id, [eb('2026-10-28', -1250, 'CB BOULANGERIE 28/10', { entry_reference: 'R1' }), eb('2026-10-28', -999, 'CB CAFE'),
+    eb('2026-10-28', -999, 'CB CAFE'), eb('2026-10-28', -999, 'CB CAFE'), eb('2026-10-28', -4200, 'CB LIBRAIRIE', { entry_reference: 'R2' })], NOW + 3600e3);
+  assert.equal(st2.nouvelles, 0);
+  assert.equal(S.ops[c.id].length, 4 + 3);
+  // libellés incompatibles ou montant différent : pas un doublon
+  const st3 = M.integrer(S, c.id, [eb('2026-10-28', -1250, 'VIREMENT AUTRE'), eb('2026-10-28', -1251, 'CB BOULANGERIE')], NOW);
+  assert.equal(st3.nouvelles, 2);
 });
 
 test('soldes : dernier de chaque type, historique quotidien, solde affiché, total des comptes courants', () => {

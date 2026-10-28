@@ -127,3 +127,28 @@ test('client Enable Banking : en-têtes transmis, stratégie « longest » sans 
   assert.equal(calls[1].h['Psu-Ip-Address'], undefined);
   assert.equal(calls[2].h['Psu-User-Agent'], 'Klad');
 });
+
+test('synchro : frontière = aujourd\'hui → date de début aujourd\'hui (aucune 422), jour de la frontière dédoublonné', async () => {
+  const { S, a } = etat();
+  S.modele.comptes = S.modele.comptes.filter(c => c.id === a.id);
+  a.frontiere = '2026-10-28';
+  S.ops[a.id] = [{ id: a.id + ':k:1', compte: a.id, date: '2026-10-28', montant: -1250, libelle: 'CB BOULANGERIE', statut: 'comptabilisee', source: 'reprise' }];
+  const cl = faux({ u1: [tx('2026-10-28', -1250, 'CB BOULANGERIE'), tx('2026-10-28', -4200, 'CB LIBRAIRIE')] });
+  const futur = cl.transactions.bind(cl);
+  cl.transactions = async (uid, o) => {          // Enable Banking refuse une date de début dans le futur
+    if (o.dateFrom && o.dateFrom > '2026-10-28') throw Object.assign(new Error('Enable Banking 422 : date_from can not be in the future'), { status: 422 });
+    return futur(uid, o);
+  };
+  const log = [];
+  const r = await Y.synchroniser(S, { client: () => cl, dispo: DISPO, log: (k, m) => log.push(m), now: () => NOW });
+  assert.equal(r.erreurs, 0);
+  assert.equal(cl.appels[1].from, '2026-10-28');
+  assert.deepEqual(json(S.ops[a.id]).map(o => [o.montant, o.source]).sort(), [[-1250, 'reprise'], [-4200, 'eb']]);
+  assert.match(log.join('\n'), /1 déjà dans la reprise/);
+  // frontière en avance sur l'horloge du téléphone : ramenée à aujourd'hui, cause au journal anonyme
+  a.frontiere = '2026-10-29';
+  log.length = 0;
+  const r2 = await Y.synchroniser(S, { client: () => cl, dispo: DISPO, log: (k, m) => log.push(m), now: () => NOW });
+  assert.equal(r2.erreurs, 0);
+  assert.match(log.join('\n'), /Banque A · compte 1 : date de début ramenée à aujourd'hui/);
+});
