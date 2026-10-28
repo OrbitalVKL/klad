@@ -4,17 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <title>Klad — prototype</title>
+  <title>Klad</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Écran de verrou, premier lancement, restauration : rempli par verrou.js -->
+  <div id="verrou" class="screen"><div class="panel" id="vPanel"></div></div>
+
+  <div id="appli" hidden>
   <header class="top">
-    <div class="brand"><span class="logo">К</span><div><b>Klad</b><small id="ver">prototype</small></div></div>
-    <button id="btnRefreshAll" class="btn ghost small" hidden>Tout récupérer</button>
+    <div class="brand"><span class="logo">К</span><div><b>Klad</b><small id="ver"></small></div></div>
+    <div class="row tight">
+      <button id="btnRefreshAll" class="btn ghost small" hidden>Tout récupérer</button>
+      <button id="btnLock" class="btn ghost small">Verrouiller</button>
+    </div>
   </header>
 
   <main>
-    <p class="warn">Prototype de faisabilité : la clé et les opérations sont stockées <b>sans chiffrement</b> sur ce téléphone. À n'utiliser que pour le test, puis « Tout effacer ».</p>
+    <p id="rappel" class="warn" hidden><span id="rappelTxt"></span> Exportez une sauvegarde chiffrée, à garder hors du téléphone.
+      <button id="btnRappel" class="btn small">Exporter</button></p>
 
     <section class="card" id="secKey">
       <h2><span class="n">1</span> Clé Enable Banking</h2>
@@ -67,11 +75,29 @@
       <div class="row">
         <button id="btnCopyLog" class="btn ghost small">Copier le journal</button>
         <button id="btnClearLog" class="btn ghost small">Vider</button>
+      </div>
+    </section>
+
+    <section class="card" id="secSecu">
+      <h2><span class="n">5</span> Sécurité</h2>
+      <p class="muted" id="vaultInfo"></p>
+      <div class="row"><div class="grow">Empreinte<small id="bioState" class="muted block"></small></div><button id="btnBio" class="btn ghost small">Activer</button></div>
+      <div class="row"><div class="grow">Code à 6 chiffres</div><button id="btnPin" class="btn ghost small">Changer</button></div>
+      <h3>Sauvegarde</h3>
+      <p class="muted">Fichier chiffré par votre phrase de récupération, à garder hors du téléphone. <span id="sauvState"></span></p>
+      <div class="row">
+        <button id="btnExport" class="btn small">Exporter</button>
+        <button id="btnRestore" class="btn ghost small">Restaurer</button>
         <span class="grow"></span>
         <button id="btnWipe" class="btn danger small">Tout effacer</button>
       </div>
     </section>
   </main>
+  </div>
+
+  <div id="modal" class="screen modal" hidden><div class="panel" id="mPanel"></div></div>
+  <!-- Masque posé dès le passage en arrière-plan : rien de lisible au retour, avant le verrouillage éventuel -->
+  <div id="masque" class="screen masque" hidden><span class="logo big">К</span></div>
 
   <div id="toast" role="status" aria-live="polite"></div>
 
@@ -79,6 +105,8 @@
   <script src="vendor/capacitor.js"></script>
   <script src="anon.js"></script>
   <script src="eb.js"></script>
+  <script src="coffre.js"></script>
   <script src="app.js"></script>
+  <script src="verrou.js"></script>
 </body>
 </html>

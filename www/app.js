@@ -1,10 +1,9 @@
-// Klad — page de test du prototype (étape 2).
-// Import de la clé, liste des banques, connexion, retour par lien profond klad://eb, comptes, soldes, opérations.
+// Klad — écran principal : clé Enable Banking, banques, connexion, retour klad://eb, comptes, soldes, opérations.
+// L'état S est fourni déverrouillé par verrou.js (KladApp.open) ; chaque modification est rechiffrée par verrou.js.
 (function () {
   'use strict';
 
   const CFG = window.KLAD_CONFIG || {};
-  const STORE = 'klad.proto.v1';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -13,30 +12,28 @@
   const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const plugin = name => (capX && capX.registerPlugin) ? capX.registerPlugin(name)
     : (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
-  const AppP = isNative ? plugin('App') : null;
   const BrowserP = isNative ? plugin('Browser') : null;
 
-  // ------------------------------------------------------------ état (localStorage, non chiffré : prototype)
-  const blank = () => ({ appId: '', pem: '', redirectUrl: '', sessions: {}, pending: {}, data: {}, log: [], banks: {}, alias: {}, logV: 2 });
-  let S;
-  try { S = Object.assign(blank(), JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { S = blank(); }
-  if (S.logV !== 2) { S.log = []; S.logV = 2; }        // journal des versions précédentes : pouvait contenir des noms
-  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { toast('Stockage impossible : ' + e.message, true); } };
+  // ------------------------------------------------------------ état (déchiffré par verrou.js, en mémoire seulement)
+  let S = null;
+  let hooks = {};
+  const save = () => { if (hooks.save) hooks.save(); };
+  const saveLog = () => { if (hooks.saveLog) hooks.saveLog(); };
 
   function defaultRedirect() {
     if (!CFG.owner) return '';
     return KladEB.redirectUrlFor(CFG.owner, CFG.repo || 'klad');
   }
-  if (!S.redirectUrl) S.redirectUrl = defaultRedirect();
 
   // ------------------------------------------------------------ journal anonyme (ni noms, ni montants, ni identifiants)
   const bankLabel = name => KladAnon.bankAlias(S.alias, name);
   function log(kind, msg) {
+    if (!S) return;
     const t = new Date();
     const hh = t.toTimeString().slice(0, 8);
     S.log.push(hh + (kind === 'err' ? ' ✗ ' : kind === 'ok' ? ' ✓ ' : ' · ') + KladAnon.scrub(msg));
     if (S.log.length > 300) S.log = S.log.slice(-300);
-    save(); renderLog();
+    saveLog(); renderLog();
   }
   function renderLog() { const el = $('log'); el.textContent = S.log.join('\n'); el.scrollTop = el.scrollHeight; }
 
@@ -172,7 +169,7 @@
   // ------------------------------------------------------------ retour bancaire (klad://eb?code=…&state=…)
   let handled = {};
   async function handleReturn(url) {
-    if (!url || handled[url]) return;
+    if (!S || !url || handled[url]) return;
     handled[url] = true;
     let u;
     try { u = new URL(url); } catch (e) { log('err', 'Lien de retour illisible'); return; }
@@ -329,29 +326,30 @@
     }
   }
   $('btnCopyLog').addEventListener('click', () => copy('Klad ' + (CFG.version || '') + ' (' + (CFG.build || 'dev') + ')\n' + S.log.join('\n'), 'Journal copié.'));
-  $('btnClearLog').addEventListener('click', () => { S.log = []; save(); renderLog(); });
-  $('btnWipe').addEventListener('click', ev => {
-    if (!confirmInline(ev.target, 'Appuyer encore pour tout effacer')) return;
-    try { localStorage.removeItem(STORE); } catch (e) { /* rien */ }
-    S = blank(); S.redirectUrl = defaultRedirect(); save();
-    bankList = []; renderAll(); toast('Tout est effacé. Pensez à déconnecter les accès dans les banques si besoin.');
-  });
+  $('btnClearLog').addEventListener('click', () => { S.log = []; saveLog(); renderLog(); });
 
-  // ------------------------------------------------------------ démarrage
+  // ------------------------------------------------------------ ouverture (après déverrouillage)
   function renderAll() { renderKey(); renderBanks(); renderSessions(); renderLog(); }
 
-  $('ver').textContent = 'prototype ' + (CFG.version || 'dev') + (isNative ? '' : ' · navigateur');
+  $('ver').textContent = (CFG.version || 'dev') + (isNative ? '' : ' · navigateur');
   $('dateFrom').value = daysAgo(90);
-  // nettoie les autorisations restées en suspens plus d'une heure
-  Object.keys(S.pending).forEach(k => { if (Date.now() - (S.pending[k].ts || 0) > 3600e3) delete S.pending[k]; });
-  save();
-  renderAll();
 
-  if (AppP) {
-    AppP.addListener('appUrlOpen', ev => handleReturn(ev && ev.url));
-    AppP.getLaunchUrl().then(r => r && r.url && handleReturn(r.url)).catch(() => {});
-  } else if (location.search.indexOf('code=') >= 0 || location.search.indexOf('error=') >= 0) {
-    handleReturn(location.href);   // essai dans un navigateur
+  function open(state, h) {
+    S = state; hooks = h || {};
+    if (!S.redirectUrl) S.redirectUrl = defaultRedirect();
+    // nettoie les autorisations restées en suspens plus d'une heure
+    Object.keys(S.pending).forEach(k => { if (Date.now() - (S.pending[k].ts || 0) > 3600e3) delete S.pending[k]; });
+    save();
+    renderAll();
   }
-  log('info', 'Démarrage ' + (isNative ? 'Android' : 'navigateur') + ', ' + Object.keys(S.sessions).length + ' session(s)');
+
+  // Verrouillage : l'état et tout ce qui était affiché sont effacés.
+  function close() {
+    S = null; hooks = {}; bankList = []; handled = {};
+    ['sessions', 'banks', 'appInfo', 'keyState', 'log'].forEach(id => { $(id).textContent = ''; });
+    ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch'].forEach(id => { $(id).value = ''; });
+    $('btnRefreshAll').hidden = true;
+  }
+
+  window.KladApp = { open, close, handleReturn, log, toast, copy, confirmInline, busy, fmtDate };
 })();

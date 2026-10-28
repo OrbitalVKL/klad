@@ -1,0 +1,244 @@
+// Klad — chiffrement des données (WebCrypto), phrase de récupération, sauvegarde, migration du prototype.
+// Fonctions pures, testées dans node (test/coffre.test.mjs). Aucun appel réseau, aucune donnée en clair écrite.
+//
+// La clé de données (DEK) vient du coffre natif KladVault après déverrouillage. Elle est importée ici en clé
+// WebCrypto NON extractible : aucun script ne peut la relire. Les blocs chiffrés sont confiés au plugin, qui les
+// écrit dans noBackupFilesDir.
+(function (g) {
+  'use strict';
+
+  const subtle = () => g.crypto.subtle;
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  // ------------------------------------------------------------ base64
+  function toB64(bytes) {
+    const a = new Uint8Array(bytes);
+    let s = '';
+    for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function fromB64(s) {
+    const bin = atob(String(s || ''));
+    const a = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    return a;
+  }
+  function random(n) { const a = new Uint8Array(n); g.crypto.getRandomValues(a); return a; }
+
+  function fail(code, msg) { const e = new Error(msg); e.code = code; return e; }
+
+  // ------------------------------------------------------------ clé de données
+  async function importDek(bytes) {
+    if (!bytes || bytes.length !== 32) throw fail('cle', 'Clé de données invalide.');
+    try { return await subtle().importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); }
+    finally { bytes.fill(0); }
+  }
+
+  // ------------------------------------------------------------ blocs chiffrés (format v1)
+  // « KLD » | version (1 octet) | IV aléatoire (12 octets) | texte chiffré + étiquette GCM (16 octets).
+  // Données associées : en-tête + nom du bloc → un bloc ne peut être ni modifié, ni pris pour un autre.
+  const MAGIC = [0x4b, 0x4c, 0x44];
+  const BLOC_V = 1;
+  const IV = 12;
+  const BLOCS = ['cle', 'comptes', 'journal', 'sauvegarde'];
+
+  function blocAad(version, name) {
+    const n = enc.encode('klad.bloc:' + name);
+    const a = new Uint8Array(4 + n.length);
+    a.set(MAGIC, 0); a[3] = version; a.set(n, 4);
+    return a;
+  }
+
+  async function seal(key, name, obj) {
+    if (BLOCS.indexOf(name) < 0) throw fail('nom', 'Bloc inconnu : ' + name);
+    const iv = random(IV);
+    const ct = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: blocAad(BLOC_V, name) },
+      key, enc.encode(JSON.stringify(obj))));
+    const out = new Uint8Array(4 + IV + ct.length);
+    out.set(MAGIC, 0); out[3] = BLOC_V; out.set(iv, 4); out.set(ct, 4 + IV);
+    return out;
+  }
+
+  async function open(key, name, bytes) {
+    const b = new Uint8Array(bytes);
+    if (b.length < 4 + IV + 16 || b[0] !== MAGIC[0] || b[1] !== MAGIC[1] || b[2] !== MAGIC[2])
+      throw fail('format', 'Bloc « ' + name + ' » : format inconnu.');
+    if (b[3] !== BLOC_V) throw fail('version', 'Bloc « ' + name + ' » : version ' + b[3] + ' non prise en charge.');
+    let plain;
+    try {
+      plain = await subtle().decrypt({ name: 'AES-GCM', iv: b.subarray(4, 4 + IV), additionalData: blocAad(b[3], name) },
+        key, b.subarray(4 + IV));
+    } catch (e) { throw fail('integrite', 'Bloc « ' + name + ' » illisible (clé différente ou fichier altéré).'); }
+    return JSON.parse(dec.decode(plain));
+  }
+
+  // ------------------------------------------------------------ phrase de récupération
+  // 120 bits aléatoires, écrits en 24 caractères Crockford base32 (sans I, L, O, U), en 6 groupes de 4.
+  const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  const GROUPS = 6;
+
+  function newPhrase() {
+    const bytes = random(15);
+    let bits = 0, acc = 0, out = '';
+    for (const x of bytes) {
+      acc = (acc << 8) | x; bits += 8;
+      while (bits >= 5) { bits -= 5; out += ALPHA[(acc >> bits) & 31]; }
+      acc &= (1 << bits) - 1;
+    }
+    return out.match(/.{4}/g).join('-');
+  }
+
+  // Tolère minuscules, espaces, tirets, O pour 0, I ou L pour 1.
+  function normChars(s) {
+    return String(s || '').toUpperCase().replace(/[\s\-–.]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+  }
+
+  function normPhrase(s) {
+    const x = normChars(s);
+    if (x.length !== GROUPS * 4) throw fail('phrase', 'La phrase compte 24 caractères (6 groupes de 4) ; ici ' + x.length + '.');
+    const bad = x.split('').filter(c => ALPHA.indexOf(c) < 0);
+    if (bad.length) throw fail('phrase', 'Caractère inattendu dans la phrase : ' + bad[0] + '.');
+    return x.match(/.{4}/g).join('-');
+  }
+
+  // Deux groupes distincts à ressaisir (indices 0 à 5, croissants).
+  function pickGroups() {
+    const r = random(2);
+    const a = r[0] % GROUPS;
+    const b = (a + 1 + (r[1] % (GROUPS - 1))) % GROUPS;
+    return [a, b].sort((x, y) => x - y);
+  }
+
+  // answers : { indice: saisie }. Vrai si chaque groupe saisi correspond.
+  function checkGroups(phrase, answers) {
+    const groups = normPhrase(phrase).split('-');
+    const keys = Object.keys(answers || {});
+    return keys.length > 0 && keys.every(i => groups[+i] !== undefined && normChars(answers[i]) === groups[+i]);
+  }
+
+  // ------------------------------------------------------------ clé de sauvegarde (tirée de la phrase)
+  // PBKDF2-SHA256 : avec 120 bits de hasard dans la phrase, un essai exhaustif est hors de portée ;
+  // les itérations ralentissent encore chaque essai. Valeur fixe (lue dans l'en-tête) : la restauration
+  // peut avoir lieu sur un autre téléphone.
+  const SAUV_ITER = 600000;
+
+  async function phraseBits(phrase, salt, iter) {
+    const base = await subtle().importKey('raw', enc.encode(normPhrase(phrase).replace(/-/g, '')), 'PBKDF2', false, ['deriveBits']);
+    return new Uint8Array(await subtle().deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, base, 256));
+  }
+
+  // Contenu du bloc « sauvegarde » : { sel, iter, cle } (+ dernier : date du dernier export).
+  async function newBackupKey(phrase, iter = SAUV_ITER) {
+    const salt = random(16);
+    const bits = await phraseBits(phrase, salt, iter);
+    return { sel: toB64(salt), iter, cle: toB64(bits), dernier: null };
+  }
+
+  // ------------------------------------------------------------ fichier de sauvegarde (format v1, JSON)
+  // { format, v, kdf: { nom, iter, sel }, iv, date, ct }. L'en-tête (tout sauf ct) est la donnée associée.
+  const SAUV_FORMAT = 'klad-sauvegarde';
+  const SAUV_V = 1;
+
+  function headerOf(o) {
+    return { format: o.format, v: o.v, kdf: { nom: o.kdf && o.kdf.nom, iter: o.kdf && o.kdf.iter, sel: o.kdf && o.kdf.sel }, iv: o.iv, date: o.date };
+  }
+
+  async function backupKey(b64bits) {
+    return subtle().importKey('raw', fromB64(b64bits), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  }
+
+  async function exportBackup(bk, payload, now = new Date()) {
+    if (!bk || !bk.cle) throw fail('sauvegarde', 'Clé de sauvegarde absente.');
+    const iv = random(IV);
+    const head = headerOf({ format: SAUV_FORMAT, v: SAUV_V, kdf: { nom: 'PBKDF2-SHA256', iter: bk.iter, sel: bk.sel },
+      iv: toB64(iv), date: now.toISOString().slice(0, 10) });
+    const ct = await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(JSON.stringify(head)) },
+      await backupKey(bk.cle), enc.encode(JSON.stringify(payload)));
+    return JSON.stringify(Object.assign({}, head, { ct: toB64(ct) }));
+  }
+
+  function readBackupHeader(text) {
+    let o;
+    try { o = JSON.parse(text); } catch (e) { throw fail('format', 'Ce fichier n\'est pas une sauvegarde Klad.'); }
+    if (!o || o.format !== SAUV_FORMAT) throw fail('format', 'Ce fichier n\'est pas une sauvegarde Klad.');
+    if (o.v !== SAUV_V) throw fail('version', 'Sauvegarde de version ' + o.v + ' non prise en charge.');
+    if (!o.kdf || o.kdf.nom !== 'PBKDF2-SHA256' || !(o.kdf.iter >= 1) || !o.kdf.sel || !o.iv || !o.ct)
+      throw fail('format', 'Sauvegarde incomplète.');
+    return o;
+  }
+
+  // → { payload, bk } ; bk permet d'exporter de nouveau avec la même phrase.
+  async function importBackup(text, phrase) {
+    const o = readBackupHeader(text);
+    const bits = await phraseBits(phrase, fromB64(o.kdf.sel), o.kdf.iter);
+    const bk = { sel: o.kdf.sel, iter: o.kdf.iter, cle: toB64(bits), dernier: o.date || null };
+    let plain;
+    try {
+      plain = await subtle().decrypt({ name: 'AES-GCM', iv: fromB64(o.iv), additionalData: enc.encode(JSON.stringify(headerOf(o))) },
+        await backupKey(bk.cle), fromB64(o.ct));
+    } catch (e) { throw fail('phrase', 'Phrase incorrecte, ou fichier altéré.'); }
+    return { payload: JSON.parse(dec.decode(plain)), bk };
+  }
+
+  // ------------------------------------------------------------ état de l'appli ↔ blocs
+  const blank = () => ({ appId: '', pem: '', redirectUrl: '', sessions: {}, pending: {}, data: {}, banks: {}, alias: {}, log: [] });
+
+  function split(S) {
+    return {
+      cle: { appId: S.appId || '', pem: S.pem || '', redirectUrl: S.redirectUrl || '' },
+      comptes: { sessions: S.sessions || {}, pending: S.pending || {}, data: S.data || {}, banks: S.banks || {}, alias: S.alias || {} },
+      journal: { log: S.log || [] }
+    };
+  }
+
+  function join(blocks) {
+    const S = blank();
+    for (const n of ['cle', 'comptes', 'journal']) if (blocks && blocks[n]) Object.assign(S, blocks[n]);
+    return S;
+  }
+
+  // ------------------------------------------------------------ migration du prototype (localStorage en clair)
+  const PROTO_KEY = 'klad.proto.v1';
+
+  // store : { get(nom) → objet | null, put(nom, objet) } (blocs chiffrés).
+  // Écrit les blocs, les relit et les compare, puis seulement efface localStorage.
+  async function migrate(storage, store) {
+    let raw;
+    try { raw = storage.getItem(PROTO_KEY); } catch (e) { return null; }
+    if (raw == null) return null;
+    if (await store.get('cle') != null) {            // migration déjà écrite (arrêt avant l'effacement)
+      storage.removeItem(PROTO_KEY);
+      return { deja: true };
+    }
+    let old;
+    try { old = JSON.parse(raw); } catch (e) { old = null; }
+    if (!old || typeof old !== 'object') {
+      storage.removeItem(PROTO_KEY);
+      return { illisible: true };
+    }
+    if (old.logV !== 2) old.log = [];                // journaux antérieurs : pouvaient contenir des noms
+    const parts = split(join({ cle: pick(old, ['appId', 'pem', 'redirectUrl']),
+      comptes: pick(old, ['sessions', 'pending', 'data', 'banks', 'alias']), journal: pick(old, ['log']) }));
+    for (const n of ['cle', 'comptes', 'journal']) await store.put(n, parts[n]);
+    for (const n of ['cle', 'comptes', 'journal']) {
+      const back = await store.get(n);
+      if (JSON.stringify(back) !== JSON.stringify(parts[n])) throw fail('migration', 'Vérification de la reprise impossible : données du prototype conservées.');
+    }
+    storage.removeItem(PROTO_KEY);
+    return { sessions: Object.keys(parts.comptes.sessions).length, cle: !!parts.cle.pem };
+  }
+
+  function pick(o, keys) {
+    const r = {};
+    keys.forEach(k => { if (o[k] !== undefined) r[k] = o[k]; });
+    return r;
+  }
+
+  g.KladCoffre = {
+    toB64, fromB64, importDek, seal, open, BLOCS,
+    newPhrase, normPhrase, pickGroups, checkGroups,
+    SAUV_ITER, newBackupKey, exportBackup, readBackupHeader, importBackup,
+    blank, split, join, PROTO_KEY, migrate
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
