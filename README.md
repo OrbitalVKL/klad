@@ -2,10 +2,12 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 0.3 — modèle de données et reprise (Lot 3).** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 0.4 — lien Grafit (Lot 4).** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
+Depuis la 0.4 : **lien Grafit** (facultatif) — Grafit Mobile, sur le même téléphone, lit un résumé de Klad (soldes, totaux,
+alertes), même Klad verrouillé, sans réseau ni fichier partagé.
 
 Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur fournit sa propre application Enable Banking (production restreinte).
 
@@ -13,14 +15,14 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil et des opérations, `app.js` = coquille (onglets, volets, synchro, banques et accès), `plus.js` = comptes et import de reprise. |
-| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour) et `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent »). |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil et des opérations, `app.js` = coquille (onglets, volets, synchro, banques et accès), `plus.js` = comptes et import de reprise, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
+| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour), `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent ») et `grafit/` (lien Grafit : `GrafitProvider`, plugin `KladGrafitPlugin`, contrôle de l'appelant `Appelant`, configuration `GrafitConfig`). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
 | `.github/workflows/android.yml` | Demande de fusion : vérification légère (tests Node, parcours Chromium, compilation Java et tests JUnit). `main` : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature, publication dans Releases quand la version change. Gradle en cache (`gradle/actions/setup-gradle`). |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
-| `test/` | Tests sans réseau, données fictives (clé, JWT, centimes, modèle, dédoublonnage, frontière, reprise, synchro avec un faux client, migration 0.2, blocs chiffrés, phrase, sauvegarde, rendu, réglages Android) et parcours Chromium (`parcours.test.mjs`, sauté sans Playwright). `npm test`. Tests Java du coffre : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
+| `test/` | Tests sans réseau, données fictives (clé, JWT, centimes, modèle, dédoublonnage, frontière, reprise, synchro avec un faux client, migration 0.2, blocs chiffrés, phrase, sauvegarde, rendu, résumé Grafit, réglages Android) et parcours Chromium (`parcours.test.mjs`, sauté sans Playwright). `npm test`. Tests Java (coffre, lien Grafit) : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
 
 Le dossier `android/` est versionné (code natif). L'identifiant d'appli et la version n'y sont pas écrits : `prepare-android.mjs native` les place dans `android/klad.properties` (non versionné), lu par `android/app/build.gradle`.
 
@@ -47,7 +49,7 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 | Données | Blocs chiffrés AES-GCM (`KLD` + version + IV 96 bits aléatoire ; nom du bloc en donnée associée) dans `noBackupFilesDir`. Le chiffrement se fait en JavaScript (WebCrypto) avec la DEK importée **non extractible** : les données sont de toute façon en clair en mémoire pour l'affichage, la clé ne traverse le pont natif qu'une fois par déverrouillage, et les tests vérifient le vrai code. |
 | Verrou | Après 5 min en arrière-plan, ou par le bouton « Verrouiller » : écritures terminées, puis rechargement de la page (clé et données effacées de la mémoire). Un masque couvre l'écran dès le passage en arrière-plan. Un retour bancaire `klad://eb` reçu appli verrouillée est gardé en mémoire et traité après déverrouillage (`state` vérifié). |
 | Téléphone | `allowBackup="false"` et règles d'extraction qui excluent tout ; `FLAG_SECURE` : pas de capture d'écran, aperçu masqué dans les applis récentes. |
-| Lot 2 (préparé) | Emplacement d'une seconde clé Keystore sans authentification (`klad.resume`), pour un futur « résumé » lisible appli verrouillée. Non utilisée. |
+| Résumé Grafit | Chiffré (AES-GCM) par une seconde clé Keystore **sans authentification** (`klad.resume`) pour rester lisible appli verrouillée ; fichier dans `noBackupFilesDir`. Il ne contient que soldes, totaux et alertes (voir *Lien Grafit*). Supprimé si le lien est désactivé ; la clé est supprimée par « Tout effacer ». |
 
 ### Modèle de données (0.3)
 
@@ -66,7 +68,7 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 - **En cours → comptabilisée** : même compte, même montant, dates à 4 jours au plus, libellés dont l'un prolonge l'autre ou partageant une référence (10 caractères au moins, dont un chiffre) ; on garde la comptabilisée. Deux libellés portant chacun des références différentes ne sont jamais fusionnés. Une opération en cours disparue est retirée 10 jours après sa date.
 - **Récupération** : au déverrouillage si la dernière date de plus de 2 h, par la pastille de l'en-tête ou en tirant vers le bas. Par compte, depuis la dernière date comptabilisée − 5 jours (la plus longue période acceptée par la banque pour un nouveau compte). Les en-têtes « utilisateur présent » (`Psu-Ip-Address`, `Psu-User-Agent`, `Psu-Accept-Language`) sont envoyés s'ils couvrent ceux qu'exige la banque, sinon aucun ; l'adresse IP est celle du téléphone (aucun service tiers) ; s'ils sont refusés, un nouvel essai a lieu sans eux.
 - **Accès bancaire** : alerte 14 jours avant expiration ; « Renouveler » relance l'autorisation auprès de la même banque et réassocie les comptes par leur empreinte.
-- **Événement « données changées »** (`KladModele.surChangement`) : émis après une synchro, un import ou un réglage ; point d'accroche du futur résumé.
+- **Événement « données changées »** (`KladModele.surChangement`) : émis après une synchro, un import, un réglage ou une connexion, regroupé sur 300 ms ; le résumé Grafit s'y abonne.
 - **Migration 0.2 → 0.3** : au premier déverrouillage, les données 0.2 sont converties, écrites, relues et comparées ; l'ancien format n'est supprimé qu'ensuite. En cas d'échec, rien n'est effacé et la conversion est retentée au déverrouillage suivant.
 
 ### Import de la reprise (format `klad-reprise` v1)
@@ -99,6 +101,49 @@ La sauvegarde exportée (section *Sécurité › Exporter*, sélecteur de fichie
 La sauvegarde contient tous les blocs sauf le journal ; une sauvegarde de la 0.2 reste restaurable (convertie à l'ouverture).
 
 Au premier lancement de la 0.2, les données du prototype (stockées en clair) sont reprises, chiffrées, relues pour vérification, puis effacées.
+
+## Lien Grafit
+
+Grafit Mobile (`fr.orbitalvkl.grafit`), installé sur le même téléphone, lit un résumé de Klad : sans réseau, sans fichier
+partagé, même Klad verrouillé. Réglage *Plus › Modules › Lien Grafit*, **désactivé par défaut**.
+
+- **Accès** : `content://<identifiant d'appli>.grafit/summary` (`GrafitProvider`), en lecture seule. Le provider est exporté
+  sans permission (Grafit est une autre appli) et sans délégation d'accès (`grantUriPermissions="false"`). Au début de chaque
+  lecture, il contrôle l'appelant : l'UID appelant (`Binder.getCallingUid()`) doit être celui de `fr.orbitalvkl.grafit`, signé
+  par le certificat d'empreinte SHA-256 `D3FB8A67…BE5E82FC` (`hasSigningCertificate`) ; sinon `SecurityException`. Paquet et
+  empreinte sont regroupés dans `GrafitConfig` (ce ne sont pas des secrets : ils figurent dans tout APK de Grafit).
+  `insert`, `update` et `delete` sont refusés. Aucun autre composant n'est exporté que l'activité principale.
+- **Réponse** : une ligne, colonnes `v` (1), `updated_at` (ms) et `json` (moins de 32 Ko). Sans résumé : `{"v":1,"state":"empty"}`.
+  Le provider ne calcule rien et ne lance jamais de synchro : il relit le dernier résumé enregistré ; Grafit juge la fraîcheur
+  d'après `generated` et `statement_at`.
+- **Écriture** : après une synchro, un import, un réglage ou une connexion, au déverrouillage et à chaque retour au premier plan,
+  seulement si le résumé a changé (à `generated` près). Grafit est prévenu (`notifyChange`). Désactiver le lien, « Tout
+  effacer » ou créer un nouveau coffre efface le résumé.
+
+Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants en ms ; un champ impossible à calculer est omis :
+
+```json
+{ "v": 1, "state": "ok", "generated": 1793260800000, "statement_at": 1793257200000,
+  "accounts": [ { "id": "a1b2c3d4", "label": "COURANT", "kind": "current", "balance": 1234.56, "available": 1200.00, "as_of": "2026-10-28", "stale": false },
+                { "id": "e5f6g7h8", "label": "LIVRET", "kind": "savings", "balance": 5000.00, "manual": true, "as_of": "2026-10-20" } ],
+  "total": { "all": 6234.56, "savings": 5000.00 },
+  "alerts": [ { "level": "info", "code": "STALE", "text": "COURANT · 2 J" } ] }
+```
+
+- `accounts` : comptes visibles, dans l'ordre de Klad ; `id` interne (8 caractères) ; `label` en majuscules sans accents,
+  sans numéro (un compte encore « à vérifier » reçoit un libellé générique : son libellé peut venir de la banque) ;
+  `kind` : `current` (courant, commun), `card` (carte à débit différé), `wallet` (paiement en ligne), `savings` (épargne) ;
+  `balance` = solde affiché, `available` = solde disponible s'il diffère ; `as_of` = date de référence du solde (sinon date
+  de lecture) ; `stale` = relevé de plus de 30 h ; `manual` pour un compte manuel. Carte à débit différé : ni solde ni
+  échéance (Lot 5).
+- `total` : `savings` = comptes épargne ; `all` = courants, commun et épargne, seulement sans carte à débit différé visible.
+  Un total dont un compte n'a pas de solde connu est omis ; les comptes hors euros ne sont pas comptés.
+- `statement_at` : fin de la dernière lecture réussie, tous comptes confondus.
+- `alerts` (textes courts en majuscules, sans montant), triées `crit`, `caut`, `info` : `NEGATIVE_BALANCE` (`crit`, compte
+  courant ou commun débiteur), `BANK_CONSENT_EXPIRING` (`caut`, `crit` à 3 jours ou moins ou expiré, « LIBELLÉ · n J »),
+  `SYNC_FAILED` (`caut`, dernière lecture en erreur), `STALE` (`info`, « LIBELLÉ · n J »).
+- Jamais : IBAN ni fin d'IBAN, identifiant ou jeton, opération, nom de banque, libellé bancaire brut.
+- Prévus aux lots suivants : `month`, `commun`, `upcoming`, `due`, et `main_after_card` (champ générique, sans nom de banque).
 
 ## Mise à jour depuis l'appli
 
@@ -151,5 +196,6 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 6. *Plus › Import de reprise* : choisir le fichier de reprise, vérifier l'association des comptes, importer.
 7. Ensuite, la récupération est automatique au déverrouillage (si la dernière date de plus de 2 h) ; la pastille de l'en-tête indique l'état (✓ heure, ↻, !) et relance une récupération ; tirer vers le bas fait de même. Le **journal** est anonyme (« Banque A · compte 1 », ni noms, ni montants, ni identifiants) et peut être copié pour diagnostic.
 8. *Plus › Sauvegarde* et *Plus › Verrou* : exporter ou restaurer une sauvegarde, changer le code, activer ou désactiver l'empreinte, tout effacer.
+9. *Plus › Modules › Lien Grafit* : partager le résumé avec Grafit (désactivé par défaut).
 
 Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement. Un faux client Enable Banking (`window.KladFauxEB`, utilisé par le parcours Chromium) permet d'essayer la connexion et la synchro sans réseau.

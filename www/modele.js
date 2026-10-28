@@ -499,7 +499,7 @@
   }
 
   // ------------------------------------------------------------ événement « données changées »
-  // Point d'accroche unique (synchro, import, réglage), regroupé : le résumé du Lot 4 s'y abonnera.
+  // Point d'accroche unique (synchro, import, réglage, connexion), regroupé sur 300 ms : le résumé Grafit s'y abonne.
   const abonnes = [];
   let attente = null, causes = new Set();
   function surChangement(fn) { abonnes.push(fn); return () => { const i = abonnes.indexOf(fn); if (i >= 0) abonnes.splice(i, 1); }; }

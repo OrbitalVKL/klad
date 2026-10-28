@@ -224,14 +224,53 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     if (CAPT) { await page.emulateMedia({ colorScheme: 'dark' }); await capture(page, '7-fiche-sombre'); await page.emulateMedia({ colorScheme: 'light' }); }
     await page.locator('#volet [data-fermer]').last().click();
 
-    // verrouiller puis rouvrir : données relues depuis le coffre chiffré
+    // Lien Grafit (faux plugin) : désactivé par défaut ; activé → résumé écrit tout de suite ; renommage suivi
+    const grafit = () => page.evaluate(() => { const j = window.KladLienGrafit.demo(); return j == null ? null : JSON.parse(j); });
+    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    assert.match(await page.locator('#mModules').innerText(), /Lien Grafit désactivé/);
+    await page.locator('#vPlus [data-volet="secModules"]').click();
+    assert.equal(await page.locator('#grafitActif').isChecked(), false);
+    assert.equal(await grafit(), null);
+    await page.locator('#grafitActif').check();
+    await page.waitForFunction(() => window.KladLienGrafit.demo() != null);
+    let r = await grafit();
+    assert.equal(r.state, 'ok');
+    assert.deepEqual(r.accounts.map(x => x.label), ['COURANT', 'CARTE', 'LIVRET A', 'PRET']);
+    assert.deepEqual(r.accounts.map(x => x.kind), ['current', 'card', 'savings', 'savings']);
+    assert.equal(r.accounts[0].balance, -42.5);
+    assert.ok(!('balance' in r.accounts[1]));
+    assert.deepEqual(r.total, { savings: 3999.5 });      // total général omis : carte à débit différé visible
+    assert.ok(r.alerts.some(a => a.code === 'NEGATIVE_BALANCE' && a.level === 'crit' && a.text === 'COURANT'));
+    const brut = JSON.stringify(r);
+    for (const x of ['FR76', '0001', '0002', 'Banque Démo', 'EPICERIE', 'SALAIRE', 'sess-fictive', 'uid-']) assert.ok(!brut.includes(x), x);
+    assert.match(await page.locator('#grafitEtat').innerText(), /Activé/);
+    await capture(page, '8-modules');
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('#vPlus [data-volet="secComptes"]').click();
+    await page.locator('#listeComptes [data-edit]').first().click();
+    await page.fill('#fLibelle', 'Principal');
+    await page.locator('#formCompte [data-a="ok"]').click();
+    await page.waitForFunction(() => /PRINCIPAL/.test(window.KladLienGrafit.demo()));
+    await page.locator('#volet [data-fermer]').last().click();
+
+    // verrouiller puis rouvrir : données relues depuis le coffre chiffré ; le résumé reste lisible appli verrouillée
     await page.locator('.onglets [data-onglet="vPlus"]').click();
     await page.locator('#btnLock').click();
     await page.waitForSelector('.pad');
+    assert.equal((await grafit()).accounts[0].label, 'PRINCIPAL');
     await code();
     await page.waitForSelector('#appli:not([hidden])');
     assert.equal(await nbOps(), n1);
     assert.equal(await page.locator('.ccompte').count(), 4);
+
+    // désactivé → résumé effacé
+    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    assert.match(await page.locator('#mModules').innerText(), /Lien Grafit activé/);
+    await page.locator('#vPlus [data-volet="secModules"]').click();
+    assert.equal(await page.locator('#grafitActif').isChecked(), true);
+    await page.locator('#grafitActif').uncheck();
+    await page.waitForFunction(() => window.KladLienGrafit.demo() == null);
+    assert.match(await page.locator('#log').evaluate(() => window.KladApp.etat().journal.log.join('\n')), /Lien Grafit désactivé/);
     assert.deepEqual(erreurs, []);
   } finally {
     await browser.close();
