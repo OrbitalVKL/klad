@@ -2,10 +2,10 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 0.2 — coffre et chiffrement (Lot 1).** L'appli lit les comptes, soldes et opérations par Enable Banking
-(clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Depuis la 0.2, **plus aucune donnée sensible
-n'est en clair sur le téléphone** : la clé .pem, son identifiant, les sessions bancaires et les opérations sont chiffrés, et
-l'appli s'ouvre par un code à 6 chiffres ou par empreinte.
+**État : version 0.3 — modèle de données et reprise (Lot 3).** L'appli lit les comptes, soldes et opérations par Enable Banking
+(clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
+(code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
+automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
 
 Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur fournit sa propre application Enable Banking (production restreinte).
 
@@ -13,14 +13,14 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, reprise du prototype, `verrou.js` = verrou, premier lancement, section Sécurité, `maj.js` = mise à jour depuis l'appli, `app.js` = écran principal. |
-| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre) et `update/KladUpdatePlugin` (mise à jour). |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil et des opérations, `app.js` = coquille (onglets, volets, synchro, banques et accès), `plus.js` = comptes et import de reprise. |
+| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour) et `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent »). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
-| `.github/workflows/android.yml` | Demande de fusion : vérification légère (tests Node, compilation Java et tests JUnit). `main` : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature, publication dans Releases quand la version change. Gradle en cache (`gradle/actions/setup-gradle`). |
+| `.github/workflows/android.yml` | Demande de fusion : vérification légère (tests Node, parcours Chromium, compilation Java et tests JUnit). `main` : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature, publication dans Releases quand la version change. Gradle en cache (`gradle/actions/setup-gradle`). |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
-| `test/` | Tests sans réseau (clé, JWT, mise en forme, blocs chiffrés, phrase, sauvegarde, reprise, réglages Android). `npm test`. Tests Java du coffre : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
+| `test/` | Tests sans réseau, données fictives (clé, JWT, centimes, modèle, dédoublonnage, frontière, reprise, synchro avec un faux client, migration 0.2, blocs chiffrés, phrase, sauvegarde, rendu, réglages Android) et parcours Chromium (`parcours.test.mjs`, sauté sans Playwright). `npm test`. Tests Java du coffre : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
 
 Le dossier `android/` est versionné (code natif). L'identifiant d'appli et la version n'y sont pas écrits : `prepare-android.mjs native` les place dans `android/klad.properties` (non versionné), lu par `android/app/build.gradle`.
 
@@ -49,6 +49,45 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 | Téléphone | `allowBackup="false"` et règles d'extraction qui excluent tout ; `FLAG_SECURE` : pas de capture d'écran, aperçu masqué dans les applis récentes. |
 | Lot 2 (préparé) | Emplacement d'une seconde clé Keystore sans authentification (`klad.resume`), pour un futur « résumé » lisible appli verrouillée. Non utilisée. |
 
+### Modèle de données (0.3)
+
+| Bloc chiffré | Contenu |
+|---|---|
+| `cle` | Identifiant et clé Enable Banking, adresse de retour. |
+| `modele` | Comptes (id interne aléatoire, libellé, rôle `courant` / `carte_differee` / `paiement_en_ligne` / `epargne` / `commun`, source Enable Banking ou manuelle, rattachement d'une carte à débit différé, ordre, masqué), connexions bancaires, état de synchro, frontières de reprise, index des blocs d'opérations. |
+| `soldes` | Dernier solde de chaque type par compte, historique quotidien. |
+| `ops-<compte>-<année>` | Opérations d'un compte pour une année. Une synchro ne réécrit que les blocs changés (en pratique l'année en cours). |
+| `carnet` | Réglages de l'ancienne version repris tels quels (pour les lots suivants). |
+| `journal`, `sauvegarde` | Journal anonyme ; clé de sauvegarde tirée de la phrase. |
+
+- **Montants** : centimes entiers signés, convertis depuis le texte de la banque sans virgule flottante. Le signe n'est jamais affiché : colonnes Débit / Crédit, « débiteur » pour un solde négatif.
+- **IBAN** : jamais gardé en entier. Une empreinte salée (HMAC-SHA256, sel aléatoire dans le coffre) retrouve le compte d'une session à l'autre ; seuls les 4 derniers caractères sont affichés.
+- **Identifiants** : `<compte>:r:<référence bancaire>` ; sans référence, empreinte (date, montant, libellé normalisé) + rang parmi les identiques du même jour.
+- **En cours → comptabilisée** : même compte, même montant, dates à 4 jours au plus, libellés dont l'un prolonge l'autre ou partageant une référence (10 caractères au moins, dont un chiffre) ; on garde la comptabilisée. Deux libellés portant chacun des références différentes ne sont jamais fusionnés. Une opération en cours disparue est retirée 10 jours après sa date.
+- **Récupération** : au déverrouillage si la dernière date de plus de 2 h, par la pastille de l'en-tête ou en tirant vers le bas. Par compte, depuis la dernière date comptabilisée − 5 jours (la plus longue période acceptée par la banque pour un nouveau compte). Les en-têtes « utilisateur présent » (`Psu-Ip-Address`, `Psu-User-Agent`, `Psu-Accept-Language`) sont envoyés s'ils couvrent ceux qu'exige la banque, sinon aucun ; l'adresse IP est celle du téléphone (aucun service tiers) ; s'ils sont refusés, un nouvel essai a lieu sans eux.
+- **Accès bancaire** : alerte 14 jours avant expiration ; « Renouveler » relance l'autorisation auprès de la même banque et réassocie les comptes par leur empreinte.
+- **Événement « données changées »** (`KladModele.surChangement`) : émis après une synchro, un import ou un réglage ; point d'accroche du futur résumé.
+- **Migration 0.2 → 0.3** : au premier déverrouillage, les données 0.2 sont converties, écrites, relues et comparées ; l'ancien format n'est supprimé qu'ensuite. En cas d'échec, rien n'est effacé et la conversion est retentée au déverrouillage suivant.
+
+### Import de la reprise (format `klad-reprise` v1)
+
+Fichier JSON produit hors du dépôt depuis l'ancienne version, choisi par *Plus › Import de reprise* :
+
+```json
+{ "format": "klad-reprise", "v": 1, "created": "2026-11-01T10:00:00Z", "source": "carnet",
+  "accounts": [ { "ref": "r0", "label": "COURANT", "role": "courant", "iban_last4": "1234" },
+                { "ref": "r3", "label": "CARTE", "role": "carte_differee", "settle": { "account": "r0", "day": 5 } },
+                { "ref": "r5", "label": "LIVRET", "role": "epargne", "manual": true, "balance": { "amount": 500000, "date": "2026-10-20" } } ],
+  "transactions": [ { "account": "r0", "date": "2023-01-03", "amount": -1250, "label": "CB BOULANGERIE", "status": "comptabilisee" } ],
+  "carnet": { } }
+```
+
+- Montants en centimes entiers signés ; `status` : `comptabilisee` (par défaut) ou `en_cours`. Champs facultatifs par opération : `id` (identifiant stable de l'ancienne version, 64 caractères au plus), `value_date`, `counterparty`.
+- Aperçu (opérations et période par compte), association de chaque compte à un compte Klad (proposée d'après l'import précédent, la fin d'IBAN, puis le libellé), création d'un compte manuel, ou « ignorer ».
+- **Frontière** : par compte, la reprise fait foi jusqu'à sa dernière date incluse ; les opérations Enable Banking à cette date ou avant sont ignorées.
+- **Rejouable** : un nouvel import remplace toutes les opérations de reprise.
+- Fichier refusé avec un message qui ne cite que des numéros (« opération n° 12 : montant non entier »).
+
 ### Sauvegarde et phrase de récupération
 
 Au premier lancement, Klad affiche une **phrase de récupération** : 24 caractères (120 bits aléatoires) en 6 groupes de 4, alphabet sans I, L, O, U. Elle est affichée une seule fois, à recopier sur papier, puis vérifiée par la ressaisie de 2 groupes.
@@ -56,6 +95,8 @@ Au premier lancement, Klad affiche une **phrase de récupération** : 24 caract�
 La sauvegarde exportée (section *Sécurité › Exporter*, sélecteur de fichiers Android) est un fichier `.klad` chiffré par une clé tirée de cette phrase (PBKDF2-SHA256, 600 000 itérations ; sel, itérations et IV dans l'en-tête, format versionné). Elle n'est **pas** chiffrée par le code à 6 chiffres, trop court pour résister à des essais hors du téléphone. Un rappel s'affiche si le dernier export date de plus de 30 jours.
 
 **Code oublié** : désinstaller l'appli, la réinstaller, choisir « Restaurer une sauvegarde » et saisir la phrase.
+
+La sauvegarde contient tous les blocs sauf le journal ; une sauvegarde de la 0.2 reste restaurable (convertie à l'ouverture).
 
 Au premier lancement de la 0.2, les données du prototype (stockées en clair) sont reprises, chiffrées, relues pour vérification, puis effacées.
 
@@ -104,9 +145,11 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 
 1. Dans le Control Panel Enable Banking, ajouter l'adresse de retour à l'application.
 2. Installer l'APK. Créer le code (deux saisies), recopier la phrase de récupération, activer l'empreinte si souhaité.
-3. Saisir l'identifiant d'application, choisir le `.pem`, puis **Enregistrer** et **Tester la clé**. Le test vérifie aussi que l'application est active et que l'adresse de retour est bien déclarée.
-4. **Charger** les banques du pays, puis **Connecter**. Après l'accord à la banque, le retour dans Klad crée la session.
-5. **Récupérer** sur chaque compte. Le **journal** est anonyme (ni noms, ni banques, ni montants, ni identifiants : « Banque A · compte 1 ») et peut être copié pour diagnostic.
-6. **Sécurité** : changer le code, activer ou désactiver l'empreinte, exporter ou restaurer une sauvegarde, tout effacer (code demandé ; déconnecter les banques avant).
+3. *Plus › Banques et accès* : saisir l'identifiant d'application, choisir le `.pem`, puis **Enregistrer** et **Tester la clé**. Le test vérifie aussi que l'application est active et que l'adresse de retour est bien déclarée.
+4. **Charger** les banques du pays, puis **Connecter**. Après l'accord à la banque, le retour dans Klad crée la session et lance la première récupération.
+5. *Plus › Comptes* : nommer et typer chaque compte (carte à débit différé : compte et jour de prélèvement), ajouter les comptes manuels, régler l'ordre, masquer.
+6. *Plus › Import de reprise* : choisir le fichier de reprise, vérifier l'association des comptes, importer.
+7. Ensuite, la récupération est automatique au déverrouillage (si la dernière date de plus de 2 h) ; la pastille de l'en-tête indique l'état (✓ heure, ↻, !) et relance une récupération ; tirer vers le bas fait de même. Le **journal** est anonyme (« Banque A · compte 1 », ni noms, ni montants, ni identifiants) et peut être copié pour diagnostic.
+8. *Plus › Sauvegarde* et *Plus › Verrou* : exporter ou restaurer une sauvegarde, changer le code, activer ou désactiver l'empreinte, tout effacer.
 
-Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement.
+Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement. Un faux client Enable Banking (`window.KladFauxEB`, utilisé par le parcours Chromium) permet d'essayer la connexion et la synchro sans réseau.

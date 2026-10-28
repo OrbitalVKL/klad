@@ -20,11 +20,11 @@
 
   const LOCK_MS = 5 * 60e3;          // verrouillage après 5 min en arrière-plan
   const RAPPEL_JOURS = 30;           // rappel d'export mensuel
-  const DATA = ['cle', 'comptes', 'journal'];
   const LAUNCH_SEEN = 'klad.lancement';   // sessionStorage : lien de lancement déjà lu (pas de donnée)
 
   let key = null;          // DEK importée, non extractible
   let S = null;            // état déchiffré
+  let ecrits = {};         // nom de bloc → JSON lu ou écrit : seuls les blocs modifiés sont rechiffrés
   let B = null;            // bloc « sauvegarde » : { sel, iter, cle, dernier }
   let st = {};             // état du coffre natif
   let pendingUrl = null;   // retour bancaire reçu verrouillé : en mémoire seulement
@@ -41,10 +41,13 @@
       const r = await V.readBlob({ name: n });
       return r && r.data ? C.open(key, n, C.fromB64(r.data)) : null;
     },
-    async put(n, o) { await V.writeBlob({ name: n, data: C.toB64(await C.seal(key, n, o)) }); }
+    async put(n, o) { await V.writeBlob({ name: n, data: C.toB64(await C.seal(key, n, o)) }); },
+    async del(n) { await V.deleteBlob({ name: n }); }
   };
 
-  // Écritures regroupées (≤ 0,4 s après la modification) et passées une par une.
+  // Écritures regroupées (≤ 0,4 s après la modification) et passées une par une. Chaque bloc est comparé à ce qui
+  // a été écrit : une synchro ne rechiffre que les blocs changés (en pratique l'année en cours de chaque compte).
+  // « * » : tout l'état ; « journal », « sauvegarde » : ce bloc seulement.
   const dirty = new Set();
   let saveTimer = null;
   let chain = Promise.resolve();
@@ -57,14 +60,35 @@
     const names = [...dirty]; dirty.clear();
     if (!names.length || !key || !S) return chain;
     const k = key;
-    const parts = C.split(S);
-    const snap = { cle: JSON.stringify(parts.cle), comptes: JSON.stringify(parts.comptes), journal: JSON.stringify(parts.journal), sauvegarde: JSON.stringify(B) };
+    const tout = names.indexOf('*') >= 0;
+    const blocs = tout ? KladModele.versBlocs(S) : {};
+    if (names.indexOf('journal') >= 0) blocs.journal = S.journal;
+    if (names.indexOf('sauvegarde') >= 0 && B) blocs.sauvegarde = B;
+    const ecrire = [], effacer = [];
+    for (const n of Object.keys(blocs)) {
+      const j = JSON.stringify(blocs[n]);
+      if (ecrits[n] !== j) { ecrire.push([n, j]); ecrits[n] = j; }
+    }
+    if (tout) for (const n of Object.keys(ecrits)) {
+      if (!(n in blocs) && (/^ops-/.test(n) || n === 'carnet')) { effacer.push(n); delete ecrits[n]; }
+    }
+    if (!ecrire.length && !effacer.length) return chain;
     chain = chain.then(async () => {
-      for (const n of names) await V.writeBlob({ name: n, data: C.toB64(await C.seal(k, n, JSON.parse(snap[n]))) });
+      for (const [n, j] of ecrire) {
+        try { await V.writeBlob({ name: n, data: C.toB64(await C.seal(k, n, JSON.parse(j))) }); }
+        catch (e) { if (ecrits[n] === j) delete ecrits[n]; throw e; }        // réécrit au prochain enregistrement
+      }
+      for (const n of effacer) await V.deleteBlob({ name: n });
     }).catch(e => toast('Enregistrement impossible : ' + (e.message || e), true));
     return chain;
   }
-  const hooks = { save: () => mark(DATA), saveLog: () => mark(['journal']) };
+  // Fichier choisi par le sélecteur Android (reprise) → texte, ou null si annulé.
+  async function choisirFichier() {
+    const r = await V.importFile();
+    if (!r.ok) { if (r.reason !== 'annule') throw new Error('Lecture impossible : ' + explain(r)); return null; }
+    return new TextDecoder().decode(C.fromB64(r.data));
+  }
+  const hooks = { save: () => mark(['*']), saveLog: () => mark(['journal']), flush, choisirFichier };
 
   // ------------------------------------------------------------ affichage
   const vPanel = $('vPanel');
@@ -267,8 +291,9 @@
       key = await C.importDek(C.fromB64(r.dek));
       st = await V.status();
       if (restored) {
-        await store.put('cle', restored.payload.cle || {});
-        await store.put('comptes', restored.payload.comptes || {});
+        const R = await C.depuisSauvegarde(restored.payload);
+        const blocs = KladModele.versBlocs(R);
+        for (const n of Object.keys(blocs)) await store.put(n, blocs[n]);
         B = restored.bk;
         await store.put('sauvegarde', B);
       }
@@ -349,15 +374,27 @@
   }
 
   async function openApp() {
-    const blocks = {};
-    for (const n of DATA) blocks[n] = await store.get(n);
-    S = C.join(blocks);
+    busyScreen('Ouverture…');
+    let r;
+    try { r = await C.charger(store, Date.now()); }
+    catch (e) {
+      if (e.code !== 'migration') throw e;
+      key = null; S = null;
+      screen('<h2>Mise à jour des données</h2><p class="bad">' + esc(e.message) + '</p>' +
+        '<p class="muted">Vos données de la version précédente sont intactes.</p>' +
+        '<div class="col"><button class="btn" data-a="r">Réessayer</button></div>');
+      on(vPanel, 'r', () => location.reload());
+      return;
+    }
+    S = r.S; ecrits = r.ecrits;
     closeModal();
     $('verrou').hidden = true;
     $('appli').hidden = false;
     lockPad = null;
     A().open(S, hooks);
     renderSecu();
+    if (r.migration) A().log('ok', 'Données de la version 0.2 converties : ' + r.migration.sessions + ' session(s), ' + r.migration.comptes +
+      ' compte(s), ' + r.migration.operations + ' opération(s), ' + r.migration.soldes + ' solde(s) ; ancien format supprimé.');
     if (pendingUrl) { const u = pendingUrl; pendingUrl = null; A().handleReturn(u); }
     window.KladMaj.check(true);              // publication plus récente ? (bandeau)
   }
@@ -415,7 +452,7 @@
     clearTimeout(lockTimer);
     lockP = (async () => {
       try { await flush(); } catch (e) { /* déjà signalé */ }
-      key = null; S = null; B = null;
+      key = null; S = null; B = null; ecrits = {};
       A().close();
       closeModal();
       try { st = await V.status(); } catch (e) { /* état précédent */ }
@@ -445,11 +482,13 @@
       'La clé Enable Banking, les banques et les opérations de ce téléphone seront remplacées par celles de la sauvegarde. ' +
       'Les prochaines sauvegardes utiliseront la phrase de ce fichier.', 'Remplacer')) return;
     await flush();
-    const p = res.payload;
-    S = C.join({ cle: p.cle, comptes: p.comptes, journal: { log: S.log } });
+    const N = await C.depuisSauvegarde(res.payload);
+    N.journal = S.journal;
+    S = N;
     B = Object.assign({}, res.bk, { dernier: (B && B.dernier) || res.bk.dernier });
+    A().close();
     A().open(S, hooks);
-    mark(DATA.concat('sauvegarde'));
+    mark(['*', 'sauvegarde']);
     await flush();
     A().log('ok', 'Sauvegarde restaurée.');
     renderSecu();
@@ -459,8 +498,7 @@
   // ------------------------------------------------------------ section « Sécurité »
   async function exportNow() {
     await flush();
-    const parts = C.split(S);
-    const text = await C.exportBackup(B, { app: 'klad', cle: parts.cle, comptes: parts.comptes });
+    const text = await C.exportBackup(B, C.contenuSauvegarde(S));
     const name = 'klad-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.klad';
     const r = await V.exportFile({ name, data: C.toB64(new TextEncoder().encode(text)) });
     if (r.ok) {
@@ -511,7 +549,7 @@
     if (!pin) return;
     const r = await V.wipe({ pin });
     if (!r.ok) return toast(explain(r), true);
-    key = null; S = null; B = null;
+    key = null; S = null; B = null; ecrits = {};
     try { localStorage.removeItem(C.PROTO_KEY); } catch (e) { /* rien */ }
     location.reload();
   }
@@ -527,6 +565,7 @@
     const d = B && B.dernier;
     const days = d ? Math.floor((Date.now() - Date.parse(d)) / 864e5) : null;
     $('sauvState').textContent = d ? 'Dernier export le ' + fmtDate(d) + '.' : 'Aucune sauvegarde exportée pour l\'instant.';
+    $('mSauv').textContent = d ? 'Dernier export le ' + fmtDate(d) : 'Aucune sauvegarde exportée';
     const late = days == null || days >= RAPPEL_JOURS;
     $('rappel').hidden = !late;
     $('rappelTxt').textContent = d ? 'Dernière sauvegarde il y a ' + days + ' jours.' : 'Aucune sauvegarde exportée.';

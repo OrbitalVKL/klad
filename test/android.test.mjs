@@ -32,16 +32,21 @@ test('identifiant d\'appli et version hors des fichiers versionnés', () => {
 
 test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
   const files = ['MainActivity.java', 'vault/KladVaultPlugin.java', 'vault/Vault.java', 'vault/Coffre.java',
-    'update/KladUpdatePlugin.java', 'update/Maj.java'];
+    'update/KladUpdatePlugin.java', 'update/Maj.java', 'reseau/KladReseauPlugin.java', 'reseau/Adresse.java'];
   for (const f of files) {
     const x = read(JAVA + f);
-    assert.match(x, /^package app\.klad(\.vault|\.update)?;/m, f);
+    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau)?;/m, f);
     assert.doesNotMatch(x, /io\.github\./, f);
   }
   const main = read(JAVA + 'MainActivity.java');
   assert.match(main, /FLAG_SECURE/);
   assert.match(main, /registerPlugin\(KladVaultPlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladUpdatePlugin\.class\)/);
+  assert.match(main, /registerPlugin\(KladReseauPlugin\.class\)/);
+  // adresse IP pour l'en-tête Psu-Ip-Address : aucune requête vers un service tiers
+  const r = read(JAVA + 'reseau/KladReseauPlugin.java') + read(JAVA + 'reseau/Adresse.java');
+  assert.match(r, /NetworkInterface\.getNetworkInterfaces\(\)/);
+  assert.doesNotMatch(r, /https?:\/\/|URL\(|HttpURLConnection/);
 });
 
 test('empreinte : aucune opération sur la clé avant BiometricPrompt', () => {
@@ -72,7 +77,8 @@ test('coffre natif : réglages des clés Keystore', () => {
 });
 
 test('aucune donnée en clair dans localStorage', () => {
-  for (const f of ['www/app.js', 'www/verrou.js']) assert.doesNotMatch(read(f), /localStorage\.setItem/, f);
+  for (const f of ['www/app.js', 'www/verrou.js', 'www/plus.js', 'www/modele.js', 'www/sync.js', 'www/reprise.js', 'www/vues.js'])
+    assert.doesNotMatch(read(f), /localStorage\.setItem/, f);
 });
 
 test('workflow : cache Gradle, vérification légère des demandes de fusion, un seul appel Gradle sur main', () => {
@@ -81,5 +87,6 @@ test('workflow : cache Gradle, vérification légère des demandes de fusion, un
   assert.match(w, /if: env\.IS_PR == 'true'[\s\S]*?run: \.\/gradlew --no-daemon testDebugUnitTest\n/);
   assert.match(w, /if: env\.IS_PR != 'true' && env\.HAS_KEY == 'true'[\s\S]*?run: \.\/gradlew --no-daemon testDebugUnitTest assembleRelease\n/);
   assert.doesNotMatch(w, /lint\s*\{|checkReleaseBuilds/);       // lint gardé (lintVitalRelease)
+  assert.match(w, /KLAD_PARCOURS: obligatoire[\s\S]*?node --test test\/parcours\.test\.mjs/);   // parcours Chromium jamais sauté
   assert.doesNotMatch(read('android/app/build.gradle'), /checkReleaseBuilds\s+false/);
 });
