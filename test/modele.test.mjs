@@ -348,3 +348,30 @@ test('événement « données changées » : regroupé, un seul appel par rafale
   await new Promise(r => setTimeout(r, 20));
   assert.equal(recus.length, 1);
 });
+
+test('réassociation manuelle : opérations et soldes repris sans doublon, compte bancaire fusionné, règles suivies', () => {
+  const S = M.vide();
+  S.modele.connexions.s2 = { banque: 'Banque Fictive', pays: 'FR', valid_until: '2027-01-01T00:00:00Z' };
+  const a = M.nouveauCompte(S, { libelle: 'ANCIEN', aReassocier: true, source: { type: 'eb', connexion: 's1', uid: 'old', empreinte: 'e1', fin4: '1111' }, frontiere: '2026-01-10' });
+  const n = M.nouveauCompte(S, { libelle: 'Nouveau', aVerifier: true, source: { type: 'eb', connexion: 's2', uid: 'new', empreinte: 'e2', fin4: '2222' }, sync: { lu: '2026-10-28T08:00:00Z' } });
+  const k = M.nouveauCompte(S, { libelle: 'CARTE', role: 'carte_differee', prelevement: { compte: n.id, jour: 5 } });
+  M.integrer(S, a.id, [eb('2026-10-01', -500, 'CB A', { entry_reference: 'R1' })], NOW);
+  M.integrer(S, n.id, [eb('2026-10-01', -500, 'CB A', { entry_reference: 'R1' }), eb('2026-10-02', -700, 'CB B', { entry_reference: 'R2' }),
+    eb('2026-01-05', -100, 'AVANT FRONTIERE', { entry_reference: 'R0' })], NOW);
+  M.soldesLus(S, n.id, [{ balance_type: 'CLBD', balance_amount: { amount: '12.34' } }], NOW);
+  S.classement = { v: 1, categories: {}, base: [{ motif: 'X', type: 'depense', cat: 'Divers', comptes: [n.id] }], regles: [{ mot: 'CB B', cat: 'Divers', compte: n.id }] };
+  assert.deepEqual(json(M.disponibles(S, a.id).map(c => c.id)), [n.id]);
+  const r = json(M.reassocier(S, a.id, n.id));
+  assert.deepEqual(r, { deplacees: 1, doublons: 2 });
+  assert.equal(M.compte(S, n.id), null);
+  assert.deepEqual(json(S.ops[a.id].map(o => o.id)), [a.id + ':r:R2', a.id + ':r:R1']);
+  assert.equal(S.ops[n.id], undefined);
+  assert.equal(a.aReassocier, undefined);
+  assert.equal(a.source.connexion, 's2');
+  assert.equal(a.source.uid, 'new');
+  assert.equal(M.soldeAffiche(S, a).centimes, 1234);
+  assert.equal(k.prelevement.compte, a.id);
+  assert.deepEqual(json(S.classement.base[0].comptes), [a.id]);
+  assert.equal(S.classement.regles[0].compte, a.id);
+  assert.throws(() => M.reassocier(S, a.id, a.id), /impossible/);
+});

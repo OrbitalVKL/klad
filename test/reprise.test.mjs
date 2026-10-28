@@ -155,3 +155,22 @@ test('import : opérations Enable Banking du jour de la frontière déjà dans l
   assert.equal(st.ebRetirees, 1);
   assert.deepEqual(json(S.ops[c.id]).filter(o => o.date === '2026-10-25').map(o => [o.montant, o.source]).sort(), [[-300, 'eb'], [250000, 'reprise']]);
 });
+
+test('réimport qui ignore un compte déjà repris : signalé avant confirmation ; historique bancaire à relire', () => {
+  const { S, c } = etat();
+  const rep = R.valider(fichier());
+  R.appliquer(S, rep, R.proposer(rep, S), { now: NOW });
+  assert.deepEqual(json(S.modele.reprise.libelles), { r0: 'COURANT', r1: 'JOINT', r3: 'CARTE', r5: 'LIVRET' });
+  const ch = json(R.proposer(rep, S));
+  assert.deepEqual(json(R.ignoresDejaRepris(S, rep, ch)), []);
+  ch.r0 = 'ignorer';
+  assert.deepEqual(json(R.ignoresDejaRepris(S, rep, ch)), [{ ref: 'r0', label: 'COURANT', compte: c.id, eb: true }]);
+  ch.r1 = 'ignorer';
+  assert.equal(R.ignoresDejaRepris(S, rep, ch).length, 2);
+  const joint = S.modele.reprise.map.r1;
+  const st = R.appliquer(S, rep, ch, { now: NOW, relire: [c.id, joint] });
+  assert.equal(st.relire, 1);                         // seul un compte bancaire peut relire son historique
+  assert.equal(c.sync.relire, true);
+  assert.equal(c.frontiere, undefined);
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: null, ramenee: false });
+});

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { charge, json } from './charge.mjs';
 
-const { KladModele: M, KladResume: R } = charge(['anon.js', 'eb.js', 'modele.js', 'resume.js']);
+const { KladModele: M, KladResume: R } = charge(['anon.js', 'eb.js', 'modele.js', 'classement.js', 'resume.js']);
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 const H = n => new Date(NOW - n * 3600e3).toISOString();
 const IBAN1 = 'FR7600000000000000000012345';
@@ -120,7 +120,7 @@ test('centimes → euros sans erreur d\'arrondi', () => {
   assert.equal(R.construire(S, NOW).total.all, 0.3);
 });
 
-test('omissions : carte à débit différé sans solde ; total général omis tant qu\'une carte est visible ; solde inconnu', () => {
+test('omissions : carte à débit différé sans solde ; total général omis tant que la dette d\'une carte visible est inconnue ; solde inconnu', () => {
   const { S, a } = etat();
   const c = M.nouveauCompte(S, { libelle: 'Carte', role: 'carte_differee', prelevement: { compte: a.id, jour: 5 },
     source: { type: 'eb', connexion: 's1', uid: 'uid-fictif-3' }, sync: { lu: H(1) } });
@@ -278,4 +278,49 @@ test('le résumé ne dépend pas d\'un réglage du modèle hors Grafit et ne mod
   R.construire(S, NOW);
   assert.equal(JSON.stringify(S), avant);
   assert.equal(R.signature({ v: 1, generated: 1, a: 2 }), R.signature('{"v":1,"generated":5,"a":2}'));
+});
+
+test('carte à débit différé : dette et date du dernier règlement, total carte comptée en négatif, solde après la carte', () => {
+  const { S, a } = etat();
+  const c = M.nouveauCompte(S, { libelle: 'Carte', role: 'carte_differee', prelevement: { compte: a.id, jour: 5, motif: 'REGLEMENT CARTE' },
+    source: { type: 'eb', connexion: 's1', uid: 'uid-fictif-3' }, sync: { lu: H(1) } });
+  M.soldesLus(S, c.id, [{ balance_type: 'CLBD', balance_amount: { amount: '-321.00' } }], NOW);
+  S.ops[a.id].push({ id: 'p', compte: a.id, date: '2026-10-05', montant: -10000, libelle: 'PRLV REGLEMENT CARTE FICTIVE', statut: 'comptabilisee', source: 'eb' });
+  S.ops[c.id] = [{ id: 'x1', compte: c.id, date: '2026-10-12', montant: -3456, libelle: 'CB LIBRAIRIE FICTIVE', statut: 'comptabilisee', source: 'eb' },
+    { id: 'x2', compte: c.id, date: '2026-10-01', montant: -10000, libelle: 'CB AVANT', statut: 'comptabilisee', source: 'eb' }];
+  const r = resume(S);
+  const carte = r.accounts.find(x => x.id === c.id);
+  assert.deepEqual(carte, { id: c.id, label: 'CARTE', kind: 'card', due: 34.56, due_since: '2026-10-05', stale: false });
+  assert.deepEqual(r.total, { all: 6200, savings: 5000 });
+  assert.equal(r.main_after_card, 1200);
+  // jamais d'opération ni de libellé bancaire dans le résumé
+  const brut = JSON.stringify(r);
+  for (const x of ['LIBRAIRIE', 'REGLEMENT', 'Banque Fictive', '2345', 'DUPONT']) assert.ok(!brut.includes(x), x);
+});
+
+test('« à vérifier » : objet attention (champs nuls omis) et alertes TO_REVIEW, ACCOUNT_CHECK, BACKUP_DUE, UPDATE_AVAILABLE', async () => {
+  const { S } = etat();
+  const ext = { attention: { unseen: 3, unclassified: 0, accountsToCheck: 2 }, sauvegarde: { jours: 40 }, maj: '0.6.0' };
+  let r = json(R.construire(S, NOW, ext));
+  assert.deepEqual(r.attention, { unseen: 3, accounts_to_check: 2, backup_days: 40 });
+  assert.deepEqual(r.alerts, [
+    { level: 'caut', code: 'ACCOUNT_CHECK', text: '2 COMPTES À VÉRIFIER' },
+    { level: 'info', code: 'TO_REVIEW', text: '3 OPÉRATIONS À VOIR' },
+    { level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · 40 J' },
+    { level: 'info', code: 'UPDATE_AVAILABLE', text: 'KLAD 0.6.0' }]);
+  r = json(R.construire(S, NOW, { attention: { unseen: 1, unclassified: 4, accountsToCheck: 1 }, sauvegarde: { jours: null } }));
+  assert.deepEqual(r.attention, { unseen: 1, unclassified: 4, accounts_to_check: 1 });
+  assert.deepEqual(r.alerts.map(x => x.text), ['1 COMPTE À VÉRIFIER', '1 OPÉRATION À VOIR', 'SAUVEGARDE · JAMAIS']);
+  r = json(R.construire(S, NOW, { attention: { unseen: 0, unclassified: 0, accountsToCheck: 0 }, sauvegarde: { jours: 3 } }));
+  assert.deepEqual(r.attention, { backup_days: 3 });
+  assert.deepEqual(r.alerts, []);
+  // un changement de ces nombres (classement, « vu ») réécrit le résumé
+  S.modele.grafit = { actif: true };
+  const ecrits = [];
+  const P = { async lire() { return { json: null }; }, async ecrire(o) { ecrits.push(o.json); return { ok: true }; }, async effacer() { return { ok: true }; } };
+  const lien = R.creerLien(P);
+  assert.equal(await lien.maj(S, NOW, () => ({ attention: { unseen: 2 } })), 'ecrit');
+  assert.equal(await lien.maj(S, NOW + 1000, () => ({ attention: { unseen: 2 } })), 'inchange');
+  assert.equal(await lien.maj(S, NOW + 2000, () => ({ attention: { unseen: 1 } })), 'ecrit');
+  assert.equal(ecrits.length, 2);
 });

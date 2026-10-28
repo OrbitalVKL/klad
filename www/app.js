@@ -8,6 +8,7 @@
   const M = window.KladModele;
   const F = window.KladFormat;
   const Vu = window.KladVues;
+  const KC = window.KladClasse;
   const $ = id => document.getElementById(id);
   const esc = Vu.esc;
 
@@ -41,12 +42,29 @@
   }
   function renderLog() { const el = $('log'); if (!S) return; el.textContent = S.journal.log.join('\n'); el.scrollTop = el.scrollHeight; }
 
-  let toastT;
+  let toastT, toastAction = null;
   function toast(msg, err) {
     const el = $('toast');
+    if (toastAction && !err) return;          // un « Annuler » en cours n'est pas remplacé par un simple message
+    toastAction = null;
     el.textContent = msg; el.className = 'show' + (err ? ' err' : '');
     clearTimeout(toastT); toastT = setTimeout(() => { el.className = ''; }, err ? 6000 : 3000);
   }
+  // Message avec « Annuler » (10 s).
+  function toastAnnuler(msg, fn) {
+    const el = $('toast');
+    el.innerHTML = '<span></span><button type="button" class="lien">Annuler</button>';
+    el.firstChild.textContent = msg;
+    el.className = 'show action';
+    toastAction = fn;
+    clearTimeout(toastT); toastT = setTimeout(() => { el.className = ''; toastAction = null; }, 10000);
+  }
+  $('toast').addEventListener('click', ev => {
+    if (!ev.target.closest('button') || !toastAction) return;
+    const fn = toastAction; toastAction = null;
+    $('toast').className = '';
+    fn();
+  });
 
   // ------------------------------------------------------------ client Enable Banking
   // Dans un navigateur ordinaire, un faux client (données fictives) peut être fourni pour essayer l'interface.
@@ -81,9 +99,24 @@
   // Point unique après une synchro, un import, un réglage ou une connexion (le résumé Grafit s'abonne à KladModele.surChangement).
   function changed(cause) {
     if (!S) return;
+    CTX = null;
     save();
     rendre();
     M.signaler(cause);
+  }
+
+  // ------------------------------------------------------------ classement : contexte (règles compilées, résultats)
+  let CTX = null;
+  function ctx() { if (!CTX && S) CTX = KC.contexte(S, Date.now()); return CTX; }
+
+  // Informations venues du verrou (sauvegarde) et de la mise à jour, pour « À vérifier » et le résumé Grafit.
+  const externe = { sauvegarde: null, maj: null };
+  function infoSauvegarde(v) { externe.sauvegarde = v; if (S) { renderAccueil(); M.signaler('sauvegarde'); } }
+  function infoMaj(version) { if (externe.maj === version) return; externe.maj = version; if (S) { renderAccueil(); M.signaler('maj'); } }
+  // → { attention, sauvegarde, maj, ctx } (lu par le rendu et par le résumé Grafit).
+  function extras(now) {
+    const cx = ctx();
+    return { attention: KC.attention(cx, now), sauvegarde: externe.sauvegarde, maj: externe.maj, ctx: cx };
   }
 
   // ------------------------------------------------------------ onglets
@@ -144,13 +177,22 @@
 
   // ------------------------------------------------------------ rendu
   const rendus = [];            // fonctions de rendu ajoutées par plus.js
-  function rendre() {
+  function renderAccueil() {
     if (!S) return;
     const now = Date.now();
-    $('vAccueil').innerHTML = Vu.accueil(S, now);
+    const ex = extras(now);
+    $('vAccueil').innerHTML = Vu.accueil(S, now, ex);
+    const n = ex.attention.unseen;
+    const b = $('badgeOps');
+    b.hidden = !n; b.textContent = n > 99 ? '99+' : String(n);
+    b.setAttribute('aria-label', n + ' à voir');
+  }
+  function rendre() {
+    if (!S) return;
+    CTX = null;
+    renderAccueil();
     renderFiltre();
     renderOps(true);
-    renderAlertes(now);
     renderPastille();
     renderMenu();
     rendus.forEach(fn => fn());
@@ -166,8 +208,23 @@
     $('mReprise').textContent = r ? 'Importée le ' + F.date(r.importee.slice(0, 10)) + ', ' + r.nb + ' opération(s)' : 'Aucun import';
   }
 
-  // Accueil : un appui sur une carte de compte ouvre ses opérations.
+  // Accueil : un appui sur une carte de compte ouvre ses opérations ; sur une opération, son détail ;
+  // sur une ligne de « À vérifier », l'écran concerné.
+  const AV = { comptes: 'secComptes', banques: 'secBanques', sync: 'secSync', sauvegarde: 'secSauv', maj: 'secMaj' };
   $('vAccueil').addEventListener('click', ev => {
+    const av = ev.target.closest('[data-av]');
+    if (av) {
+      const k = av.dataset.av;
+      if (k === 'nonvues' || k === 'nonclassees') {
+        filtre.nonVues = k === 'nonvues';
+        filtre.cat = k === 'nonclassees' ? '__nc' : '';
+        $('opsCompte').value = ''; $('opsQ').value = '';
+        opsFin = 0; renderOps(true); montrer('vOps');
+      } else if (AV[k]) ouvrirVolet(AV[k]);
+      return;
+    }
+    const op = ev.target.closest('[data-op]');
+    if (op) { ouvrirOp(op.dataset.c, op.dataset.op); return; }
     const b = ev.target.closest('[data-compte]');
     if (!b) return;
     $('opsCompte').value = b.dataset.compte;
@@ -175,28 +232,8 @@
     montrer('vOps');
   });
 
-  // Alertes : accès bancaire bientôt expiré (renouvellement en un appui), comptes à vérifier ou à réassocier.
-  function renderAlertes(now) {
-    const h = [];
-    for (const sid of Object.keys(S.modele.connexions)) {
-      const cx = S.modele.connexions[sid];
-      const a = M.etatAcces(cx, now);
-      if (!a) continue;
-      h.push('<p class="warn">' + (a === 'expire' ? 'Accès expiré' : 'Accès à renouveler avant le ' + esc(F.date(cx.valid_until.slice(0, 10)))) +
-        ' : ' + esc(cx.banque) + '. <button class="btn small" data-renouveler="' + esc(sid) + '">Renouveler</button></p>');
-    }
-    const aVoir = S.modele.comptes.filter(c => c.aVerifier || c.aReassocier).length;
-    if (aVoir) h.push('<p class="warn">' + aVoir + ' compte' + (aVoir > 1 ? 's' : '') + ' à vérifier (libellé, rôle, rattachement). ' +
-      '<button class="btn small" data-volet="secComptes">Comptes</button></p>');
-    $('alertes').innerHTML = h.join('');
-  }
-  $('alertes').addEventListener('click', ev => {
-    const b = ev.target.closest('[data-renouveler]');
-    if (b) renouveler(b.dataset.renouveler, b);
-  });
-
   // ------------------------------------------------------------ opérations (liste par jour, recherche, filtre)
-  const filtre = { compte: '', q: '' };
+  const filtre = { compte: '', q: '', cat: '', nonVues: false };
   let opsListe = [], opsFin = 0;
   function renderFiltre() {
     const sel = $('opsCompte');
@@ -210,13 +247,18 @@
     if (reset) {
       const garde = Math.max(opsFin, 1);
       filtre.compte = $('opsCompte').value; filtre.q = $('opsQ').value.trim();
-      opsListe = Vu.filtrer(S, filtre);
+      const cx = ctx();
+      if (filtre.cat && filtre.cat !== '__nc' && !cx.C.categories[filtre.cat]) filtre.cat = '';
+      opsListe = Vu.filtrer(S, filtre, cx);
       opsFin = 0;
+      const unseen = Vu.filtrer(S, { compte: filtre.compte, nonVues: true }, cx).length;
+      $('opsFiltres').innerHTML = Vu.filtres(S, filtre, cx, { unseen, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
       if (!opsListe.length) {
-        box.innerHTML = '<p class="muted center vide">' + (filtre.q ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</p>';
+        box.innerHTML = '<p class="muted center vide">' + (filtre.nonVues ? 'Toutes les opérations ont été vues.' : filtre.q || filtre.cat ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</p>';
         return;
       }
       box.innerHTML = Vu.entete() + '<div id="opsJours"></div><div id="opsSuite"></div>';
+      $('vOps').style.setProperty('--outils', document.querySelector('#vOps .outils').offsetHeight + 'px');
       plus(30, garde);
       return;
     }
@@ -225,7 +267,7 @@
   function plus(nbJours, auMoins) {
     const jours = $('opsJours');
     if (!jours) return;
-    const opt = { compte: !filtre.compte, annee: new Date().getFullYear() };
+    const opt = { compte: !filtre.compte, annee: new Date().getFullYear(), ctx: ctx() };
     let r;
     do {
       r = Vu.tranche(S, opsListe, opsFin, nbJours, opt);
@@ -234,7 +276,175 @@
     } while (opsFin < auMoins && opsFin < opsListe.length);
     $('opsSuite').innerHTML = opsFin < opsListe.length ? '<button class="btn ghost small" data-suite>Afficher plus</button>' : '';
   }
-  $('opsListe').addEventListener('click', ev => { if (ev.target.closest('[data-suite]')) renderOps(false); });
+  $('opsListe').addEventListener('click', ev => {
+    if (ev.target.closest('[data-suite]')) { renderOps(false); return; }
+    const op = ev.target.closest('[data-op]');
+    if (op && Date.now() - finGeste > 400) ouvrirOp(op.dataset.c, op.dataset.op);
+  });
+  $('opsFiltres').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-f]');
+    if (!b) return;
+    const f = b.dataset.f;
+    if (f === 'nonVues') filtre.nonVues = !filtre.nonVues;
+    else if (f === 'nc') filtre.cat = filtre.cat === '__nc' ? '' : '__nc';
+    else if (f === 'toutVu') {
+      const l = opsListe.filter(o => !KC.vue(S, o));
+      const avant = KC.marquer(S, l, true);
+      if (!avant.length) return;
+      log('info', 'Opérations vues : ' + avant.length + '.');
+      changed('vu');
+      toastAnnuler(avant.length + ' opération(s) marquée(s) vue(s).', () => { KC.annulerVues(avant); changed('vu'); });
+      return;
+    }
+    opsFin = 0; renderOps(true);
+  });
+  $('opsFiltres').addEventListener('change', ev => {
+    if (ev.target.id !== 'opsCat') return;
+    filtre.cat = ev.target.value;
+    opsFin = 0; renderOps(true);
+  });
+
+  // ------------------------------------------------------------ gestes sur une opération
+  // Glisser vers la droite : vue / non vue ; vers la gauche : volet « Classer ». Le détail de l'opération offre les
+  // mêmes actions par boutons. Avec « réduire les animations », la ligne suit le doigt sans animation de retour.
+  let finGeste = 0;
+  (function () {
+    const box = $('opsListe');
+    let G = null;
+    const SEUIL = 90;
+    box.addEventListener('touchstart', ev => {
+      const row = ev.target.closest('.op[data-op]');
+      if (!row || ev.touches.length > 1) { G = null; return; }
+      G = { row, x: ev.touches[0].clientX, y: ev.touches[0].clientY, dx: 0, lock: false };
+    }, { passive: true });
+    box.addEventListener('touchmove', ev => {
+      if (!G) return;
+      const dx = ev.touches[0].clientX - G.x, dy = ev.touches[0].clientY - G.y;
+      if (!G.lock) {
+        if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) G.lock = true;
+        else { if (Math.abs(dy) > 12) G = null; return; }
+      }
+      G.dx = dx;
+      const c = Math.max(-150, Math.min(150, dx));
+      G.row.classList.add('glisse');
+      G.row.classList.toggle('vers-d', c > 0); G.row.classList.toggle('vers-g', c < 0);
+      G.row.classList.toggle('pret', Math.abs(c) >= SEUIL);
+      G.row.style.transform = 'translateX(' + c + 'px)';
+    }, { passive: true });
+    const fin = () => {
+      if (!G) return;
+      const { row, dx, lock } = G;
+      G = null;
+      if (!lock) return;
+      finGeste = Date.now();
+      row.classList.remove('glisse', 'vers-d', 'vers-g', 'pret');
+      row.style.transform = '';
+      if (dx >= SEUIL) basculerVue(row.dataset.c, row.dataset.op);
+      else if (dx <= -SEUIL) ouvrirClasser(row.dataset.c, row.dataset.op);
+    };
+    box.addEventListener('touchend', fin, { passive: true });
+    box.addEventListener('touchcancel', fin, { passive: true });
+  })();
+
+  const trouverOp = (cid, id) => (S && S.ops[cid] || []).find(o => o.id === id) || null;
+  function basculerVue(cid, id) {
+    const o = trouverOp(cid, id);
+    if (!o) return;
+    const on = !KC.vue(S, o);
+    const avant = KC.marquer(S, [o], on);
+    changed('vu');
+    toastAnnuler(on ? 'Opération marquée vue.' : 'Opération remise en non vue.', () => { KC.annulerVues(avant); changed('vu'); });
+  }
+
+  // ------------------------------------------------------------ détail d'une opération
+  let opCourante = null;            // [compte, id]
+  function ouvrirOp(cid, id) {
+    if (!trouverOp(cid, id)) return;
+    opCourante = [cid, id];
+    ouvrirVolet('secOp');
+  }
+  preparer.secOp = () => {
+    const o = opCourante && trouverOp(opCourante[0], opCourante[1]);
+    if (!o) { $('opDetail').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
+    $('opDetail').innerHTML = Vu.detail(S, o, ctx());
+  };
+  $('opDetail').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-a]');
+    if (!b || !opCourante) return;
+    if (b.dataset.a === 'vue') basculerVue(opCourante[0], opCourante[1]);
+    else if (b.dataset.a === 'classer') ouvrirClasser(opCourante[0], opCourante[1], true);
+  });
+
+  // ------------------------------------------------------------ volet « Classer »
+  let cls = null;                   // { cid, id, st }
+  function ouvrirClasser(cid, id, empiler) {
+    const o = trouverOp(cid, id);
+    if (!o) return;
+    const r = KC.classer(ctx(), o);
+    const cat = r.cat;
+    const mot = KC.suggestKw(o.libelle);
+    cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: !!mot, mot, compte: false, sens: '', toutes: false }, sub0: r.nc ? cat : r.sub };
+    ouvrirVolet('secClasser', { empiler: !!empiler });
+  }
+  function nbConcernees() {
+    const st = cls.st;
+    if (!st.autres || !st.mot.trim()) return 0;
+    return KC.concernees(S, st.mot, { compte: st.compte ? cls.cid : null, sens: st.sens }).length;
+  }
+  function renderClasser() {
+    const o = cls && trouverOp(cls.cid, cls.id);
+    if (!o) { $('clsCorps').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
+    $('clsCorps').innerHTML = Vu.classer(S, o, ctx(), cls.st, nbConcernees());
+  }
+  function majCompte() {
+    const n = nbConcernees(), st = cls.st;
+    $('clsN').textContent = st.autres ? (st.mot.trim() ? n + ' opération' + (n > 1 ? 's contiennent' : ' contient') + ' « ' + st.mot.trim() + ' »' : 'Saisissez un mot du libellé.') : 'Seule cette opération sera classée.';
+    document.querySelector('#clsCorps [data-a="go"]').textContent = 'Classer en ' + st.cat + (st.autres && n > 1 ? ' (' + n + ')' : '');
+  }
+  preparer.secClasser = o => { if (!o.rendu) renderClasser(); };
+  $('clsCorps').addEventListener('click', ev => {
+    if (!cls) return;
+    const t = ev.target.closest('[data-cat]');
+    if (t) {
+      const old = cls.st.cat;
+      cls.st.cat = t.dataset.cat;
+      const sub = $('clsSub').value.trim();
+      cls.st.sub = !sub || sub === old || sub === cls.sub0 ? cls.st.cat : sub;
+      cls.st.mot = $('clsMot').value;
+      renderClasser();
+      return;
+    }
+    if (ev.target.closest('[data-toutes]')) { cls.st.toutes = true; cls.st.sub = $('clsSub').value; cls.st.mot = $('clsMot').value; renderClasser(); return; }
+    if (ev.target.closest('[data-a="go"]')) appliquerClasser();
+  });
+  $('clsCorps').addEventListener('input', ev => {
+    if (!cls) return;
+    if (ev.target.id === 'clsMot') { cls.st.mot = ev.target.value; majCompte(); }
+    if (ev.target.id === 'clsSub') cls.st.sub = ev.target.value;
+  });
+  $('clsCorps').addEventListener('change', ev => {
+    if (!cls) return;
+    const id = ev.target.id;
+    if (id === 'clsAutres' || id === 'clsCompte' || id === 'clsSens') {
+      cls.st.autres = $('clsAutres').checked; cls.st.compte = $('clsCompte').checked; cls.st.sens = $('clsSens').value;
+      cls.st.sub = $('clsSub').value; cls.st.mot = $('clsMot').value;
+      renderClasser();
+    }
+  });
+  function appliquerClasser() {
+    const o = trouverOp(cls.cid, cls.id);
+    if (!o) return;
+    const st = cls.st;
+    if (st.autres && !st.mot.trim()) { toast('Saisissez un mot du libellé.', true); return; }
+    const n = st.autres ? nbConcernees() : 1;
+    const snap = KC.appliquer(S, o, { cat: st.cat, sub: st.sub, mot: st.autres ? st.mot : null, compte: st.autres && st.compte ? cls.cid : null, sens: st.autres ? st.sens : '' });
+    log('info', st.autres ? 'Règle de classement créée (' + n + ' opération(s) concernée(s)).' : 'Opération classée à la main.');
+    fermerVolet();
+    changed('classement');
+    toastAnnuler(st.autres ? n + ' opération(s) classée(s) en « ' + st.cat + ' ».' : 'Opération classée en « ' + st.cat + ' ».', () => {
+      KC.annuler(S, snap); log('info', 'Classement annulé.'); changed('classement');
+    });
+  }
   $('defil').addEventListener('scroll', () => {
     const d = $('defil');
     if (onglet === 'vOps' && opsFin < opsListe.length && d.scrollTop + d.clientHeight > d.scrollHeight - 600) renderOps(false);
@@ -523,7 +733,7 @@
   $('ver').textContent = 'Version ' + (CFG.version || 'dev') + (isNative ? '' : ' · navigateur');
 
   function open(state, h) {
-    S = state; hooks = h || {};
+    S = state; hooks = h || {}; CTX = null;
     if (!S.cle.redirectUrl) S.cle.redirectUrl = defaultRedirect();
     // nettoie les autorisations restées en suspens plus d'une heure
     Object.keys(S.modele.pending).forEach(k => { if (Date.now() - (S.modele.pending[k].ts || 0) > 3600e3) delete S.modele.pending[k]; });
@@ -531,22 +741,44 @@
     montrer('vAccueil');
     rendre();
     premierPlan();
+    preparerClassement(S);
     if (KladSync.aFaire(S, Date.now())) synchro('auto');
+  }
+
+  // Première ouverture de la 0.5 : classement repris du carnet (déjà importé), date de départ des opérations vues.
+  async function preparerClassement(s0) {
+    try {
+      if (!s0.classement && s0.carnet != null && window.KladCarnet.utilisable(s0.carnet)) {
+        const r = await window.KladCarnet.convertir(s0, s0.carnet, { now: Date.now() });
+        if (S !== s0) return;
+        log('ok', 'Classement repris de l\'ancienne version : ' + r.categories + ' catégorie(s), ' + r.base + ' règle(s) de base, ' + r.regles +
+          ' règle(s), ' + r.correctionsRetrouvees + '/' + r.corrections + ' correction(s), ' + r.vuesRetrouvees + '/' + r.vues + ' opération(s) cochée(s).');
+        toast('Classement repris de l\'ancienne version.');
+      }
+      if (S !== s0) return;
+      const init = KC.initialiserVues(s0, Date.now());
+      if (!s0.classement) KC.donnees(s0);
+      if (init || s0.classement) changed('classement');
+    } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
 
   // Verrouillage : l'état et tout ce qui était affiché sont effacés.
   function close() {
-    S = null; hooks = {}; bankList = []; handled = {}; opsListe = []; opsFin = 0;
+    S = null; hooks = {}; bankList = []; handled = {}; opsListe = []; opsFin = 0; CTX = null; cls = null; opCourante = null;
+    filtre.cat = ''; filtre.nonVues = false;
     fermerVolet();
-    ['vAccueil', 'opsListe', 'alertes', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'syncDetail'].forEach(id => { $(id).textContent = ''; });
+    toastAction = null; $('toast').className = '';
+    ['vAccueil', 'opsListe', 'opsFiltres', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
+      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps'].forEach(id => { $(id).textContent = ''; });
+    $('badgeOps').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'opsQ'].forEach(id => { $(id).value = ''; });
     $('opsCompte').innerHTML = '';
     $('pastille').textContent = '—'; $('pastille').className = 'pastille';
   }
 
   window.KladApp = {
-    open, close, handleReturn, log, toast, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
-    ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, etat: () => S, hooks: () => hooks, esc, isNative
+    open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
+    ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, etat: () => S, hooks: () => hooks, esc, isNative,
+    ctx, extras, infoSauvegarde, infoMaj, renouveler
   };
 })();

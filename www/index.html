@@ -20,20 +20,15 @@
 
     <main id="defil">
       <div id="tirer" class="tirer" aria-hidden="true"><span>↻</span></div>
-      <div id="bandeaux">
-        <p id="majBanner" class="warn" hidden><span id="majBannerTxt"></span>
-          <button id="btnMajBanner" class="btn small">Mettre à jour</button></p>
-        <p id="rappel" class="warn" hidden><span id="rappelTxt"></span> Exportez une sauvegarde chiffrée, à garder hors du téléphone.
-          <button id="btnRappel" class="btn small">Exporter</button></p>
-        <div id="alertes"></div>
-      </div>
-
       <section id="vAccueil" class="vue"></section>
 
       <section id="vOps" class="vue" hidden>
         <div class="outils">
-          <input id="opsQ" type="search" placeholder="Rechercher un libellé" autocomplete="off" spellcheck="false">
-          <select id="opsCompte" aria-label="Compte"></select>
+          <div class="rang">
+            <input id="opsQ" type="search" placeholder="Rechercher un libellé" autocomplete="off" spellcheck="false">
+            <select id="opsCompte" aria-label="Compte"></select>
+          </div>
+          <div id="opsFiltres" class="filtres"></div>
         </div>
         <div id="opsListe"></div>
       </section>
@@ -43,6 +38,7 @@
           <li><button data-volet="secBanques">Banques et accès<small id="mBanques"></small></button></li>
           <li><button data-volet="secComptes">Comptes<small id="mComptes"></small></button></li>
           <li><button data-volet="secReprise">Import de reprise<small id="mReprise"></small></button></li>
+          <li><button data-volet="secClassement">Classement<small id="mClassement"></small></button></li>
           <li><button data-volet="secModules">Modules<small id="mModules"></small></button></li>
           <li><button data-volet="secSauv">Sauvegarde<small id="mSauv"></small></button></li>
           <li><button data-volet="secVerrou">Verrou<small>Code, empreinte, effacement</small></button></li>
@@ -55,7 +51,7 @@
 
     <nav class="onglets">
       <button data-onglet="vAccueil" class="on"><span aria-hidden="true">⌂</span>Accueil</button>
-      <button data-onglet="vOps"><span aria-hidden="true">≡</span>Opérations</button>
+      <button data-onglet="vOps"><span aria-hidden="true">≡</span>Opérations<i id="badgeOps" class="badge" hidden></i></button>
       <button data-onglet="vPlus"><span aria-hidden="true">⋯</span>Plus</button>
     </nav>
   </div>
@@ -133,9 +129,10 @@
       <label class="inline"><input id="grafitActif" type="checkbox"> Partager un résumé avec Grafit</label>
       <p id="grafitEtat" class="muted"></p>
       <p class="muted">Grafit, installé sur ce téléphone, lit un résumé de Klad, même Klad verrouillé, sans réseau ni fichier partagé.
-        Le résumé est chiffré sur le téléphone et mis à jour après chaque synchronisation, import ou réglage.</p>
-      <p class="muted"><b>Partagé :</b> libellés et types des comptes, soldes, totaux, heure du dernier relevé, alertes
-        (relevé ancien, lecture en erreur, accès bancaire à renouveler, compte débiteur).</p>
+        Le résumé est chiffré sur le téléphone et mis à jour après chaque synchronisation, import, réglage, classement ou opération vue.</p>
+      <p class="muted"><b>Partagé :</b> libellés et types des comptes, soldes, somme à prélever des cartes, totaux, heure du dernier relevé,
+        nombres « à vérifier » (opérations à voir, non classées, comptes à vérifier, jours depuis la sauvegarde), alertes
+        (relevé ancien, lecture en erreur, accès bancaire à renouveler, compte débiteur, sauvegarde, mise à jour).</p>
       <p class="muted"><b>Jamais partagé :</b> opérations, libellés bancaires, IBAN ou fin d'IBAN, noms de banque,
         identifiants, clé Enable Banking.</p>
       <p class="muted" id="grafitEmpreinte"></p>
@@ -176,6 +173,12 @@
     </section>
 
     <section id="secSync" data-titre="Synchronisation"><div id="syncDetail"></div></section>
+
+    <section id="secOp" data-titre="Opération"><div id="opDetail"></div></section>
+
+    <section id="secClasser" data-titre="Classer"><div id="clsCorps"></div></section>
+
+    <section id="secClassement" data-titre="Classement"><div id="classementCorps"></div></section>
   </div>
 
   <div id="modal" class="screen modal" hidden><div class="panel" id="mPanel"></div></div>
@@ -191,6 +194,8 @@
   <script src="format.js"></script>
   <script src="modele.js"></script>
   <script src="reprise.js"></script>
+  <script src="classement.js"></script>
+  <script src="carnet.js"></script>
   <script src="sync.js"></script>
   <script src="resume.js"></script>
   <script src="coffre.js"></script>

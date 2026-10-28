@@ -70,7 +70,7 @@
       if (ecrits[n] !== j) { ecrire.push([n, j]); ecrits[n] = j; }
     }
     if (tout) for (const n of Object.keys(ecrits)) {
-      if (!(n in blocs) && (/^ops-/.test(n) || n === 'carnet')) { effacer.push(n); delete ecrits[n]; }
+      if (!(n in blocs) && (/^ops-/.test(n) || n === 'carnet' || n === 'classement')) { effacer.push(n); delete ecrits[n]; }
     }
     if (!ecrire.length && !effacer.length) return chain;
     chain = chain.then(async () => {
@@ -568,9 +568,8 @@
     const days = d ? Math.floor((Date.now() - Date.parse(d)) / 864e5) : null;
     $('sauvState').textContent = d ? 'Dernier export le ' + fmtDate(d) + '.' : 'Aucune sauvegarde exportée pour l\'instant.';
     $('mSauv').textContent = d ? 'Dernier export le ' + fmtDate(d) : 'Aucune sauvegarde exportée';
-    const late = days == null || days >= RAPPEL_JOURS;
-    $('rappel').hidden = !late;
-    $('rappelTxt').textContent = d ? 'Dernière sauvegarde il y a ' + days + ' jours.' : 'Aucune sauvegarde exportée.';
+    // « À vérifier » (accueil) et résumé Grafit : jours depuis le dernier export (null : jamais).
+    A().infoSauvegarde({ jours: days, rappel: days == null || days >= RAPPEL_JOURS });
   }
 
   function guard(fn) {
@@ -585,7 +584,6 @@
   $('btnBio').addEventListener('click', guard(toggleBio));
   $('btnPin').addEventListener('click', guard(changePin));
   $('btnExport').addEventListener('click', guard(exportNow));
-  $('btnRappel').addEventListener('click', guard(exportNow));
   $('btnRestore').addEventListener('click', guard(restoreInApp));
   $('btnWipe').addEventListener('click', guard(wipeAll));
 

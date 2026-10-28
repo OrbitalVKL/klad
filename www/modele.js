@@ -93,7 +93,7 @@
   }
 
   function vide() {
-    return { cle: { appId: '', pem: '', redirectUrl: '' }, modele: nouveauModele(), soldes: {}, ops: {}, carnet: null, journal: { log: [] } };
+    return { cle: { appId: '', pem: '', redirectUrl: '' }, modele: nouveauModele(), soldes: {}, ops: {}, carnet: null, classement: null, journal: { log: [] } };
   }
 
   // ------------------------------------------------------------ comptes
@@ -186,8 +186,57 @@
     const M = S.modele;
     M.comptes = M.comptes.filter(c => c.id !== id);
     delete S.ops[id]; delete S.soldes[id];
-    for (const c of M.comptes) if (c.prelevement && c.prelevement.compte === id) delete c.prelevement;
+    for (const c of M.comptes) if (c.prelevement && c.prelevement.compte === id) delete c.prelevement.compte;
     if (M.reprise && M.reprise.map) for (const k of Object.keys(M.reprise.map)) if (M.reprise.map[k] === id) delete M.reprise.map[k];
+    remplacerCompte(S, id, null);
+  }
+
+  // Références à un compte dans le classement (règles) : remplacées par un autre compte, ou retirées (vers null).
+  function remplacerCompte(S, ancien, nouveau) {
+    const C = S.classement;
+    if (!C) return;
+    for (const u of C.regles || []) if (u.compte === ancien) { if (nouveau) u.compte = nouveau; else delete u.compte; }
+    for (const b of C.base || []) if (b.comptes && b.comptes.indexOf(ancien) >= 0) {
+      b.comptes = b.comptes.map(x => x === ancien ? nouveau : x).filter(Boolean);
+      if (!b.comptes.length) delete b.comptes;
+    }
+  }
+
+  // Réassociation manuelle : le compte « à réassocier » (ancien) reprend la source bancaire d'un compte bancaire
+  // disponible (nouveau), créé par une connexion. Les opérations du nouveau rejoignent l'ancien (identifiants refaits ;
+  // une opération déjà présente n'est pas doublée), ses soldes aussi ; le nouveau compte est retiré.
+  // → { deplacees, doublons }.
+  function reassocier(S, ancienId, nouveauId) {
+    const a = compte(S, ancienId), n = compte(S, nouveauId);
+    if (!a || !n || a === n || n.source.type !== 'eb') throw new Error('Réassociation impossible.');
+    const r = { deplacees: 0, doublons: 0 };
+    const list = opsDe(S, a.id);
+    const ids = new Set(list.map(o => o.id));
+    for (const o of S.ops[n.id] || []) {
+      const id = a.id + o.id.slice(n.id.length);
+      if (ids.has(id)) { r.doublons++; continue; }
+      if (a.frontiere && o.source === 'eb' && o.date < a.frontiere) { r.doublons++; continue; }
+      const x = Object.assign({}, o, { id, compte: a.id });
+      if (x.exEnCours && x.exEnCours.indexOf(n.id) === 0) x.exEnCours = a.id + x.exEnCours.slice(n.id.length);
+      list.push(x); ids.add(id); r.deplacees++;
+    }
+    trier(list);
+    if (S.soldes[n.id]) S.soldes[a.id] = S.soldes[n.id];
+    a.source = Object.assign({}, n.source);
+    a.sync = Object.assign({}, n.sync);
+    if (!a.soldeType && n.soldeType) a.soldeType = n.soldeType;
+    delete a.aReassocier;
+    delete S.ops[n.id];
+    remplacerCompte(S, n.id, a.id);
+    for (const c of S.modele.comptes) if (c.prelevement && c.prelevement.compte === n.id) c.prelevement.compte = a.id;
+    supprimerCompte(S, n.id);
+    appliquerFrontiere(S, a.id);
+    return r;
+  }
+  // Comptes bancaires disponibles pour réassocier un compte : comptes d'une connexion active, les nouveaux d'abord.
+  function disponibles(S, id) {
+    return comptesTries(S).filter(c => c.id !== id && c.source.type === 'eb' && !c.aReassocier && S.modele.connexions[c.source.connexion])
+      .sort((x, y) => (y.aVerifier ? 1 : 0) - (x.aVerifier ? 1 : 0));
   }
 
   // ------------------------------------------------------------ opérations
@@ -334,6 +383,7 @@
   // refuse une date future : erreur 422). from null → la plus longue période acceptée par la banque.
   // → { from, ramenee } ; ramenee : la date calculée était dans le futur.
   function bornesRecuperation(S, c, now) {
+    if (c.sync && c.sync.relire) return { from: c.frontiere || null, ramenee: false };     // relecture de tout l'historique
     let max = '';
     for (const o of S.ops[c.id] || []) if (o.source === 'eb' && o.statut === 'comptabilisee' && o.date > max) max = o.date;
     let from = max ? plusJours(max, -5) : null;
@@ -442,6 +492,7 @@
     S.modele.blocs = index;
     b.cle = S.cle; b.modele = S.modele; b.soldes = S.soldes; b.journal = S.journal;
     if (S.carnet != null) b.carnet = { carnet: S.carnet };
+    if (S.classement != null) b.classement = S.classement;
     return b;
   }
 
@@ -459,6 +510,7 @@
     if (blocks.soldes) S.soldes = blocks.soldes;
     if (blocks.journal) S.journal = { log: blocks.journal.log || [] };
     if (blocks.carnet) S.carnet = blocks.carnet.carnet;
+    if (blocks.classement) S.classement = blocks.classement;
     for (const n of Object.keys(blocks)) {
       const m = n.match(BLOC_OPS);
       if (m && blocks[n]) S.ops[m[1]] = (S.ops[m[1]] || []).concat(blocks[n].ops || []);
@@ -534,7 +586,7 @@
   g.KladModele = {
     V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId,
     vide, nouveauModele, compte, comptesTries, comptesDe, opsDe, roleDefaut, nouveauCompte, compteEB, empreinte,
-    associerSession, supprimerCompte, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, bornesRecuperation, debutRecuperation,
+    associerSession, supprimerCompte, remplacerCompte, reassocier, disponibles, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, bornesRecuperation, debutRecuperation,
     appliquerFrontiere, soldePrefere, soldesLus, soldeAffiche, totalCourants, etatAcces, alerteCompte,
     versBlocs, nomsOps, depuisBlocs, BLOC_OPS, depuis02, surChangement, signaler
   };

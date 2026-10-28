@@ -2,12 +2,16 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 0.4 — lien Grafit (Lot 4).** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 0.5 — classement des opérations (Lot 5).** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
 Depuis la 0.4 : **lien Grafit** (facultatif) — Grafit Mobile, sur le même téléphone, lit un résumé de Klad (soldes, totaux,
-alertes), même Klad verrouillé, sans réseau ni fichier partagé.
+alertes), même Klad verrouillé, sans réseau ni fichier partagé. Depuis la 0.5 : **classement** des opérations (catégories,
+règles, corrections, repris de l'ancienne version), **opérations vues**, carte à débit différé (somme à prélever), paiements
+en ligne comptés une seule fois, réassociation manuelle d'un compte, encart **« À vérifier »** sur l'accueil (et dans Grafit).
+
+L'état du projet, les décisions en vigueur et les points d'appui du lot suivant sont tenus dans [`docs/ETAT.md`](docs/ETAT.md).
 
 Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur fournit sa propre application Enable Banking (production restreinte).
 
@@ -15,14 +19,14 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil et des opérations, `app.js` = coquille (onglets, volets, synchro, banques et accès), `plus.js` = comptes et import de reprise, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil (« À vérifier »), des opérations, du détail et du volet « Classer », `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
 | `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour), `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent ») et `grafit/` (lien Grafit : `GrafitProvider`, plugin `KladGrafitPlugin`, contrôle de l'appelant `Appelant`, configuration `GrafitConfig`). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
 | `.github/workflows/android.yml` | Demande de fusion : vérification légère (tests Node, parcours Chromium, compilation Java et tests JUnit). `main` : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature, publication dans Releases quand la version change. Gradle en cache (`gradle/actions/setup-gradle`). |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
-| `test/` | Tests sans réseau, données fictives (clé, JWT, centimes, modèle, dédoublonnage, frontière, reprise, synchro avec un faux client, migration 0.2, blocs chiffrés, phrase, sauvegarde, rendu, résumé Grafit, réglages Android) et parcours Chromium (`parcours.test.mjs`, sauté sans Playwright). `npm test`. Tests Java (coffre, lien Grafit) : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
+| `test/` | Tests sans réseau, données fictives (clé, JWT, centimes, modèle, dédoublonnage, frontière, reprise, réassociation, classement, carnet de l'ancienne version, synchro avec un faux client, migration 0.2, blocs chiffrés, phrase, sauvegarde, rendu, résumé Grafit, réglages Android) et parcours Chromium (`parcours.test.mjs`, sauté sans Playwright). `npm test`. Tests Java (coffre, lien Grafit) : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
 
 Le dossier `android/` est versionné (code natif). L'identifiant d'appli et la version n'y sont pas écrits : `prepare-android.mjs native` les place dans `android/klad.properties` (non versionné), lu par `android/app/build.gradle`.
 
@@ -59,7 +63,8 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 | `modele` | Comptes (id interne aléatoire, libellé, rôle `courant` / `carte_differee` / `paiement_en_ligne` / `epargne` / `commun`, source Enable Banking ou manuelle, rattachement d'une carte à débit différé, ordre, masqué), connexions bancaires, état de synchro, frontières de reprise, index des blocs d'opérations. |
 | `soldes` | Dernier solde de chaque type par compte, historique quotidien. |
 | `ops-<compte>-<année>` | Opérations d'un compte pour une année. Une synchro ne réécrit que les blocs changés (en pratique l'année en cours). |
-| `carnet` | Réglages de l'ancienne version repris tels quels (pour les lots suivants). |
+| `carnet` | Réglages de l'ancienne version repris tels quels (classement repris au Lot 5 ; budget et suivants aux lots suivants). |
+| `classement` | Catégories (nature, icône), règles de base, règles de l'utilisateur, compte rendu de l'import du carnet (0.5). |
 | `journal`, `sauvegarde` | Journal anonyme ; clé de sauvegarde tirée de la phrase. |
 
 - **Montants** : centimes entiers signés, convertis depuis le texte de la banque sans virgule flottante. Le signe n'est jamais affiché : colonnes Débit / Crédit, « débiteur » pour un solde négatif.
@@ -68,6 +73,8 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 - **En cours → comptabilisée** : même compte, même montant, dates à 4 jours au plus, libellés dont l'un prolonge l'autre ou partageant une référence (10 caractères au moins, dont un chiffre) ; on garde la comptabilisée. Deux libellés portant chacun des références différentes ne sont jamais fusionnés. Une opération en cours disparue est retirée 10 jours après sa date.
 - **Récupération** : au déverrouillage si la dernière date de plus de 2 h, par la pastille de l'en-tête ou en tirant vers le bas. Par compte, depuis la dernière date comptabilisée − 5 jours, jamais avant la frontière de reprise ni après aujourd'hui (la plus longue période acceptée par la banque pour un nouveau compte). Les en-têtes « utilisateur présent » (`Psu-Ip-Address`, `Psu-User-Agent`, `Psu-Accept-Language`) sont envoyés s'ils couvrent ceux qu'exige la banque, sinon aucun ; l'adresse IP est celle du téléphone (aucun service tiers) ; s'ils sont refusés, un nouvel essai a lieu sans eux.
 - **Accès bancaire** : alerte 14 jours avant expiration ; « Renouveler » relance l'autorisation auprès de la même banque et réassocie les comptes par leur empreinte.
+- **Classement (0.5)** : voir *Classement des opérations* ci-dessous. Sur chaque opération : `categorie` (correction ponctuelle
+  `{ cat, sub }`) et `vue` (`true` vue, `0` remise en non vue, sinon d'après la date de départ `modele.vues.depuis`).
 - **Événement « données changées »** (`KladModele.surChangement`) : émis après une synchro, un import, un réglage ou une connexion, regroupé sur 300 ms ; le résumé Grafit s'y abonne.
 - **Migration 0.2 → 0.3** : au premier déverrouillage, les données 0.2 sont converties, écrites, relues et comparées ; l'ancien format n'est supprimé qu'ensuite. En cas d'échec, rien n'est effacé et la conversion est retentée au déverrouillage suivant.
 
@@ -87,8 +94,52 @@ Fichier JSON produit hors du dépôt depuis l'ancienne version, choisi par *Plus
 - Montants en centimes entiers signés ; `status` : `comptabilisee` (par défaut) ou `en_cours`. Champs facultatifs par opération : `id` (identifiant stable de l'ancienne version, 64 caractères au plus), `value_date`, `counterparty`.
 - Aperçu (opérations et période par compte), association de chaque compte à un compte Klad (proposée d'après l'import précédent, la fin d'IBAN, puis le libellé ; sans correspondance : « Créer un compte manuel »), ou « ignorer » ; le nombre de comptes ignorés est signalé avant confirmation.
 - **Frontière** : par compte, la reprise fait foi jusqu'à sa dernière date incluse. Les opérations Enable Banking d'avant cette date sont ignorées ; celles du jour même sont gardées, sauf si elles sont déjà dans la reprise (même jour, même montant, libellés compatibles, une pour une) : rien n'est perdu d'une journée d'export.
-- **Rejouable** : un nouvel import remplace toutes les opérations de reprise.
+- **Rejouable** : un nouvel import remplace toutes les opérations de reprise. Un compte repris au dernier import et
+  « ignoré » cette fois est signalé avant confirmation (ses opérations de reprise vont disparaître) ; s'il est bancaire,
+  Klad propose de relire tout son historique bancaire à la synchro suivante.
+- **Carnet** : s'il contient de quoi classer, le classement est repris tout de suite (voir ci-dessous).
 - Fichier refusé avec un message qui ne cite que des numéros (« opération n° 12 : montant non entier »).
+
+### Classement des opérations (0.5)
+
+Aucune règle ni aucun mot-clé propre à l'utilisateur dans le code : règles, enseignes et motifs de libellé sont des données,
+reprises du carnet de l'ancienne version ou créées dans Klad (bloc chiffré `classement`).
+
+- **Catégories** : nom, nature (`fixe`, `courante`, `optionnelle`, `revenu`, `interne`, plus `epargne` et `hors_budget`
+  pour reproduire l'ancienne version), icône. Le type d'une opération (dépense, revenu, interne, épargne, hors budget) vient
+  de la nature de sa catégorie, ou du type d'une règle de base.
+- **Priorité** (celle de l'ancienne version) : correction ponctuelle de l'opération ; règle de l'utilisateur (le mot-clé
+  le plus long contenu dans le libellé, sans casse ni accents ; compte et sens facultatifs) ; règles de base, dans l'ordre
+  (motif, comptes, sens ; une carte ou un portefeuille est vu à travers son compte de prélèvement) ; défaut
+  (« Autres › Non classé », « Autres revenus », achats d'une carte). Puis, sur un compte courant ou commun :
+  - **règlement de carte** (motif réglé dans la fiche de la carte) daté dans la période couverte par le détail de la carte
+    (jusqu'à 45 jours après sa dernière opération) → interne ;
+  - **prélèvement d'un portefeuille** (motif réglé dans sa fiche) dont le montant se retrouve dans son détail, de 2 jours
+    avant à 7 jours après → interne. La dépense comptée est celle du portefeuille, avec le vrai marchand. La recherche porte
+    sur tous les comptes courants et commun ; le rattachement « prélevé sur » est facultatif.
+- **Non classée** : classement par défaut (ou catégorie « Autres »). « À vérifier » compte celles des 90 derniers jours.
+- **Opérations vues** : point bleu, pastille sur l'onglet, filtre « Non vues », « Tout marquer vu » (annulable). Gestes :
+  glisser à droite = vue / non vue, à gauche = « Classer » ; les mêmes actions sont dans le détail de l'opération (appui).
+- **Volet « Classer »** : catégories les plus utilisées (dépenses des 150 derniers jours), sous-catégorie, « Classer aussi
+  les autres » (mot-clé proposé, nombre d'opérations concernées, compte et sens facultatifs), un seul bouton ; annulable.
+- **Carte à débit différé** : dette = opérations de la carte après le dernier règlement débité sur son compte de
+  prélèvement (sans rattachement : sur un compte courant ou commun), hors remboursements (motif facultatif) ; jamais
+  négative. Accueil : « à prélever le JJ/MM » (jour du prélèvement) ; le total des comptes courants déduit la dette.
+  Date de dépense : date de paiement lue dans le libellé (« CARTE JJ/MM … », « PAIEMENT CB JJMM … »), affichée dans le détail.
+- **Réassociation manuelle** (*Plus › Comptes*, compte « à réassocier ») : un compte bancaire disponible est fusionné dans
+  le compte : opérations (identifiants refaits, sans doublon), soldes et source bancaire.
+
+**Import du carnet** (format de l'ancienne version, bloc `carnet` de la reprise, racine ou objet `state`) :
+`cats` (`custom` : natures, `icons`, `renamed`, `removed`), `P.rules` (règles de base `[motif, type, catégorie,
+sous-catégorie, noms de comptes]`), `rules` (`{ kw, cat, sub }`), `singles` et `seen` (`cut`, `k`) indexés par la clé
+d'opération de l'ancienne version. Une clé est retrouvée par l'identifiant stable de la reprise
+(`k` + SHA-256(clé) sur 20 caractères hexadécimaux + `.` + rang : tous les rangs) ou, pour une opération venue de la banque
+après la reprise, par la clé recalculée. Les catégories renommées au fil des versions de l'ancienne version sont suivies.
+Extension facultative `klad` (dans le carnet, ou par un fichier `{ "format": "klad-complement", "v": 1, "klad": { … } }`
+importé dans *Plus › Classement*) : `regles` (règles de base supplémentaires, en tête), `bars` (motif qui sépare bars et
+restaurants), `comptes` (noms de comptes de l'ancienne version, rang = référence `r<rang>`), `cartes` et `portefeuilles`
+(`{ "r3": { "motif": "…", "remboursements": "…" } }`). Sans motif de règlement, Klad le déduit des règles de base
+« à détailler », sinon il reste à choisir dans la fiche du compte (débits récurrents proposés).
 
 ### Sauvegarde et phrase de récupération
 
@@ -116,7 +167,7 @@ partagé, même Klad verrouillé. Réglage *Plus › Modules › Lien Grafit*, *
 - **Réponse** : une ligne, colonnes `v` (1), `updated_at` (ms) et `json` (moins de 32 Ko). Sans résumé : `{"v":1,"state":"empty"}`.
   Le provider ne calcule rien et ne lance jamais de synchro : il relit le dernier résumé enregistré ; Grafit juge la fraîcheur
   d'après `generated` et `statement_at`.
-- **Écriture** : après une synchro, un import, un réglage ou une connexion, au déverrouillage et à chaque retour au premier plan,
+- **Écriture** : après une synchro, un import, un réglage, un classement, une opération vue ou une connexion, au déverrouillage et à chaque retour au premier plan,
   seulement si le résumé a changé (à `generated` près). Grafit est prévenu (`notifyChange`). Désactiver le lien, « Tout
   effacer » ou créer un nouveau coffre efface le résumé.
 
@@ -134,16 +185,24 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
   sans numéro (un compte encore « à vérifier » reçoit un libellé générique : son libellé peut venir de la banque) ;
   `kind` : `current` (courant, commun), `card` (carte à débit différé), `wallet` (paiement en ligne), `savings` (épargne) ;
   `balance` = solde affiché, `available` = solde disponible s'il diffère ; `as_of` = date de référence du solde (sinon date
-  de lecture) ; `stale` = relevé de plus de 30 h ; `manual` pour un compte manuel. Carte à débit différé : ni solde ni
-  échéance (Lot 5).
-- `total` : `savings` = comptes épargne ; `all` = courants, commun et épargne, seulement sans carte à débit différé visible.
-  Un total dont un compte n'a pas de solde connu est omis ; les comptes hors euros ne sont pas comptés.
+  de lecture) ; `stale` = relevé de plus de 30 h ; `manual` pour un compte manuel. Carte à débit différé : pas de solde brut ;
+  `due` = somme à prélever (positive) et `due_since` = date du dernier règlement, si le motif du règlement est connu (0.5).
+- `total` : `savings` = comptes épargne ; `all` = courants, commun et épargne, moins la dette des cartes à débit différé
+  visibles. Un total dont un compte n'a pas de solde (ou une carte pas de dette) connu est omis ; les comptes hors euros ne
+  sont pas comptés.
+- `main_after_card` (0.5) : solde du compte de prélèvement de la première carte à débit différé visible, moins sa dette.
+- `attention` (0.5) : `{ "unseen": n, "unclassified": n, "accounts_to_check": n, "backup_days": n }` — opérations à voir,
+  non classées des 90 derniers jours, comptes à vérifier ou à réassocier, jours depuis la dernière sauvegarde exportée ;
+  chaque champ est omis s'il est nul ou inconnu.
 - `statement_at` : fin de la dernière lecture réussie, tous comptes confondus.
 - `alerts` (textes courts en majuscules, sans montant), triées `crit`, `caut`, `info` : `NEGATIVE_BALANCE` (`crit`, compte
   courant ou commun débiteur), `BANK_CONSENT_EXPIRING` (`caut`, `crit` à 3 jours ou moins ou expiré, « LIBELLÉ · n J »),
-  `SYNC_FAILED` (`caut`, dernière lecture en erreur), `STALE` (`info`, « LIBELLÉ · n J »).
+  `SYNC_FAILED` (`caut`, dernière lecture en erreur), `STALE` (`info`, « LIBELLÉ · n J ») ; depuis la 0.5 :
+  `ACCOUNT_CHECK` (`caut`, « n COMPTES À VÉRIFIER »), `TO_REVIEW` (`info`, « n OPÉRATIONS À VOIR »), `BACKUP_DUE`
+  (`info`, « SAUVEGARDE · n J » à partir de 30 jours, « SAUVEGARDE · JAMAIS »), `UPDATE_AVAILABLE` (`info`, « KLAD x.y.z »).
+  Grafit affiche un code inconnu par son seul texte.
 - Jamais : IBAN ni fin d'IBAN, identifiant ou jeton, opération, nom de banque, libellé bancaire brut.
-- Prévus aux lots suivants : `month`, `commun`, `upcoming`, `due`, et `main_after_card` (champ générique, sans nom de banque).
+- Prévus aux lots suivants : `month`, `upcoming` (Lot 6), `commun` (Lot 7).
 
 ## Mise à jour depuis l'appli
 
@@ -192,10 +251,11 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 2. Installer l'APK. Créer le code (deux saisies), recopier la phrase de récupération, activer l'empreinte si souhaité.
 3. *Plus › Banques et accès* : saisir l'identifiant d'application, choisir le `.pem`, puis **Enregistrer** et **Tester la clé**. Le test vérifie aussi que l'application est active et que l'adresse de retour est bien déclarée.
 4. **Charger** les banques du pays, puis **Connecter**. Après l'accord à la banque, le retour dans Klad crée la session et lance la première récupération.
-5. *Plus › Comptes* : nommer et typer chaque compte (carte à débit différé : compte et jour de prélèvement), ajouter les comptes manuels, régler l'ordre, masquer.
+5. *Plus › Comptes* : nommer et typer chaque compte (carte à débit différé : compte, jour et libellé du prélèvement ; paiement en ligne : libellé des prélèvements), ajouter les comptes manuels, régler l'ordre, masquer, réassocier un compte « à réassocier ».
 6. *Plus › Import de reprise* : choisir le fichier de reprise, vérifier l'association des comptes, importer.
 7. Ensuite, la récupération est automatique au déverrouillage (si la dernière date de plus de 2 h) ; la pastille de l'en-tête indique l'état (✓ heure, ↻, !) et relance une récupération ; tirer vers le bas fait de même. Le **journal** est anonyme (« Banque A · compte 1 », ni noms, ni montants, ni identifiants) et peut être copié pour diagnostic.
 8. *Plus › Sauvegarde* et *Plus › Verrou* : exporter ou restaurer une sauvegarde, changer le code, activer ou désactiver l'empreinte, tout effacer.
 9. *Plus › Modules › Lien Grafit* : partager le résumé avec Grafit (désactivé par défaut).
+10. *Opérations* : appui = détail ; glisser à droite = vue / non vue, à gauche = « Classer » ; filtres non vues, non classées, catégorie. *Plus › Classement* : catégories (nature, icône), règles, reprise du carnet.
 
 Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement. Un faux client Enable Banking (`window.KladFauxEB`, utilisé par le parcours Chromium) permet d'essayer la connexion et la synchro sans réseau.

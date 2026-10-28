@@ -170,10 +170,30 @@
       M().opsDe(S, cid).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
       st.operations += cands.length;
     }
+    // Comptes repris auparavant et ignorés cette fois : historique bancaire à relire en entier à la prochaine synchro.
+    for (const id of (opts && opts.relire) || []) {
+      const c = M().compte(S, id);
+      if (c && c.source.type === 'eb' && !Object.keys(map).some(k => map[k] === id)) { c.sync = Object.assign({}, c.sync, { relire: true }); st.relire = (st.relire || 0) + 1; }
+    }
     S.carnet = rep.carnet;
-    S.modele.reprise = { importee: new Date(now).toISOString(), creee: rep.created, source: rep.source, map, nb: st.operations };
+    const libelles = {};
+    for (const r of rep.comptes) if (map[r.ref]) libelles[r.ref] = r.label;
+    S.modele.reprise = { importee: new Date(now).toISOString(), creee: rep.created, source: rep.source, map, libelles, nb: st.operations };
     return st;
   }
 
-  g.KladReprise = { lire, valider, apercu, proposer, appliquer };
+  // Comptes de la reprise ignorés alors qu'ils avaient été repris au précédent import : leurs opérations de reprise
+  // vont disparaître. → [{ ref, label, compte (id Klad), eb (compte bancaire : historique relisible) }].
+  function ignoresDejaRepris(S, rep, choix) {
+    const avant = (S.modele.reprise && S.modele.reprise.map) || {};
+    const out = [];
+    for (const r of rep.comptes) {
+      if ((choix[r.ref] || 'ignorer') !== 'ignorer') continue;
+      const c = M().compte(S, avant[r.ref]);
+      if (c && (S.ops[c.id] || []).some(o => o.source === 'reprise')) out.push({ ref: r.ref, label: r.label, compte: c.id, eb: c.source.type === 'eb' });
+    }
+    return out;
+  }
+
+  g.KladReprise = { lire, valider, apercu, proposer, appliquer, ignoresDejaRepris };
 })(typeof window !== 'undefined' ? window : globalThis);

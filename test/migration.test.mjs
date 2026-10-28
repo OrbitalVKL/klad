@@ -34,7 +34,7 @@ const ANCIEN = {
 };
 
 test('noms de blocs : liste fixe et ops-<compte>-<année>', async () => {
-  for (const n of ['cle', 'modele', 'soldes', 'carnet', 'journal', 'sauvegarde', 'comptes', 'ops-abcd1234-2023']) assert.equal(C.nomValide(n), true, n);
+  for (const n of ['cle', 'modele', 'soldes', 'carnet', 'classement', 'journal', 'sauvegarde', 'comptes', 'ops-abcd1234-2023']) assert.equal(C.nomValide(n), true, n);
   for (const n of ['ops-abcd123-2023', 'ops-ABCD1234-2023', 'ops-abcd1234-23', '../cle', 'autre']) assert.equal(C.nomValide(n), false, n);
   const k = await C.importDek(crypto.getRandomValues(new Uint8Array(32)));
   const b = await C.seal(k, 'ops-abcd1234-2024', { ops: [] });
@@ -101,6 +101,7 @@ test('sauvegarde v2 : aller-retour sans le journal ; sauvegarde 0.2 (v1) convert
   await st.put('comptes', ANCIEN);
   const { S } = await C.charger(st, NOW);
   S.carnet = { reglage: 'opaque' };
+  S.classement = { v: 1, categories: { 'Fictive': { nature: 'fixe', icone: '🏠' } }, base: [], regles: [{ mot: 'FICTIF', cat: 'Fictive' }] };
   const bk = await C.newBackupKey('ABCD-EFGH-JKMN-PQRS-TVWX-YZ01', 1000);
   const txt = await C.exportBackup(bk, C.contenuSauvegarde(S));
   const { payload } = await C.importBackup(txt, 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ01');
@@ -109,6 +110,7 @@ test('sauvegarde v2 : aller-retour sans le journal ; sauvegarde 0.2 (v1) convert
   const S2 = await C.depuisSauvegarde(payload, NOW);
   assert.deepEqual(json(S2.ops), json(S.ops));
   assert.deepEqual(json(S2.carnet), { reglage: 'opaque' });
+  assert.deepEqual(json(S2.classement), json(S.classement));
   assert.equal(S2.cle.appId, 'app-fictive');
   const S1 = await C.depuisSauvegarde({ app: 'klad', cle: { appId: 'v1', pem: 'P' }, comptes: ANCIEN }, NOW);
   assert.equal(S1.cle.appId, 'v1');
