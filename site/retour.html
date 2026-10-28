@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <title>Klad — retour bancaire</title>
+  <style>
+    :root { --bg:#f4f2ee; --ink:#1b1d22; --muted:#6b6f78; --accent:#b8862b; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#121316; --ink:#ece9e3; --muted:#9a9ea8; --accent:#d4a24a; } }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--ink);
+      font:16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align:center; padding:24px; box-sizing:border-box; }
+    .logo { width:64px; height:64px; margin:0 auto 12px; border-radius:16px; background:#16181c; color:var(--accent);
+      display:grid; place-items:center; font:700 38px/1 Georgia, serif; }
+    a.btn { display:inline-block; margin-top:16px; background:var(--accent); color:#1b1d22; padding:12px 18px; border-radius:10px;
+      text-decoration:none; font-weight:600; }
+    p { color:var(--muted); max-width:360px; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="logo">К</div>
+    <h1 id="t">Retour vers Klad…</h1>
+    <p id="m">Si l'appli ne s'ouvre pas toute seule, appuyez sur le bouton.</p>
+    <a id="go" class="btn" href="#">Revenir dans Klad</a>
+  </div>
+  <script>
+    // Page statique, sans données : transmet code / state (ou l'erreur) à l'appli via le lien profond klad://eb.
+    (function () {
+      var keep = ['code', 'state', 'error', 'error_description'];
+      var src = new URLSearchParams(location.search), q = new URLSearchParams();
+      keep.forEach(function (k) { if (src.has(k)) q.set(k, src.get(k)); });
+      var qs = q.toString();
+      // Identifiant d'appli déduit de l'adresse : <compte>.github.io → io.github.<compte>.klad
+      var owner = location.hostname.split('.')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (/^[0-9_]/.test(owner)) owner = 'u' + owner;
+      var pkg = 'io.github.' + owner + '.klad';
+      var scheme = 'klad://eb?' + qs;
+      var intent = 'intent://eb?' + qs + '#Intent;scheme=klad;package=' + pkg + ';end';
+      var isAndroid = /Android/i.test(navigator.userAgent);
+      var target = isAndroid ? intent : scheme;
+      document.getElementById('go').href = target;
+      if (!qs) {
+        document.getElementById('t').textContent = 'Klad';
+        document.getElementById('m').textContent = 'Cette page sert uniquement au retour après une autorisation bancaire.';
+        document.getElementById('go').style.display = 'none';
+        return;
+      }
+      if (src.has('error')) document.getElementById('t').textContent = 'Autorisation non accordée';
+      // efface code/state de l'historique du navigateur
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      setTimeout(function () { location.href = target; }, 50);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+node_modules/
+android/
+www/vendor/
+*.apk
+*.aab
+*.jks
+*.keystore
+*.pem
+*.p12
+.DS_Store
+*.b64
+*.key
+klad-signature*
+.env

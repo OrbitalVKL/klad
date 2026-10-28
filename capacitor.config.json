@@ -1,0 +1,13 @@
+{
+  "appId": "io.github.compte.klad",
+  "appName": "Klad",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}
