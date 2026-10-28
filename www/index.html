@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Klad — prototype</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">К</span><div><b>Klad</b><small id="ver">prototype</small></div></div>
+    <button id="btnRefreshAll" class="btn ghost small" hidden>Tout récupérer</button>
+  </header>
+
+  <main>
+    <p class="warn">Prototype de faisabilité : la clé et les opérations sont stockées <b>sans chiffrement</b> sur ce téléphone. À n'utiliser que pour le test, puis « Tout effacer ».</p>
+
+    <section class="card" id="secKey">
+      <h2><span class="n">1</span> Clé Enable Banking</h2>
+      <label>Identifiant d'application (kid)
+        <input id="appId" autocomplete="off" spellcheck="false" placeholder="ex. 1a2b3c4d-…">
+      </label>
+      <label>Clé privée (.pem)
+        <input id="pemFile" type="file" accept=".pem,.key,.txt,application/x-pem-file,text/plain,*/*">
+      </label>
+      <details><summary>ou coller le contenu de la clé</summary>
+        <textarea id="pemText" rows="5" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+      </details>
+      <p id="keyState" class="muted"></p>
+      <div class="row">
+        <button id="btnSaveKey" class="btn">Enregistrer</button>
+        <button id="btnTestKey" class="btn ghost">Tester la clé</button>
+      </div>
+      <div id="appInfo"></div>
+      <details class="adv"><summary>Adresse de retour bancaire</summary>
+        <p class="muted">À déclarer dans le Control Panel Enable Banking (Allowed redirect URLs) :</p>
+        <div class="row"><input id="redirectUrl" spellcheck="false"><button id="btnCopyRedirect" class="btn ghost small">Copier</button></div>
+      </details>
+    </section>
+
+    <section class="card" id="secBanks">
+      <h2><span class="n">2</span> Connecter une banque</h2>
+      <div class="row">
+        <select id="country">
+          <option value="FR">France</option>
+          <option value="LU">Luxembourg</option>
+          <option value="BE">Belgique</option>
+          <option value="DE">Allemagne</option>
+        </select>
+        <input id="bankSearch" type="search" placeholder="Rechercher une banque">
+        <button id="btnLoadBanks" class="btn ghost small">Charger</button>
+      </div>
+      <ul id="banks" class="list"></ul>
+    </section>
+
+    <section class="card" id="secAccounts">
+      <h2><span class="n">3</span> Comptes et opérations</h2>
+      <label class="inline">Opérations depuis le <input id="dateFrom" type="date"></label>
+      <div id="sessions"><p class="muted">Aucune banque connectée.</p></div>
+    </section>
+
+    <section class="card" id="secLog">
+      <h2><span class="n">4</span> Journal</h2>
+      <p class="muted">Requêtes et réponses, sans montants ni libellés : peut être copié pour diagnostic.</p>
+      <pre id="log"></pre>
+      <div class="row">
+        <button id="btnCopyLog" class="btn ghost small">Copier le journal</button>
+        <button id="btnClearLog" class="btn ghost small">Vider</button>
+        <span class="grow"></span>
+        <button id="btnWipe" class="btn danger small">Tout effacer</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="vendor/capacitor.js"></script>
+  <script src="eb.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
