@@ -17,9 +17,10 @@
   const BrowserP = isNative ? plugin('Browser') : null;
 
   // ------------------------------------------------------------ état (localStorage, non chiffré : prototype)
-  const blank = () => ({ appId: '', pem: '', redirectUrl: '', sessions: {}, pending: {}, data: {}, log: [], banks: {} });
+  const blank = () => ({ appId: '', pem: '', redirectUrl: '', sessions: {}, pending: {}, data: {}, log: [], banks: {}, alias: {}, logV: 2 });
   let S;
   try { S = Object.assign(blank(), JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { S = blank(); }
+  if (S.logV !== 2) { S.log = []; S.logV = 2; }        // journal des versions précédentes : pouvait contenir des noms
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { toast('Stockage impossible : ' + e.message, true); } };
 
   function defaultRedirect() {
@@ -28,11 +29,12 @@
   }
   if (!S.redirectUrl) S.redirectUrl = defaultRedirect();
 
-  // ------------------------------------------------------------ journal (sans données financières)
+  // ------------------------------------------------------------ journal anonyme (ni noms, ni montants, ni identifiants)
+  const bankLabel = name => KladAnon.bankAlias(S.alias, name);
   function log(kind, msg) {
     const t = new Date();
     const hh = t.toTimeString().slice(0, 8);
-    S.log.push(hh + (kind === 'err' ? ' ✗ ' : kind === 'ok' ? ' ✓ ' : ' · ') + msg);
+    S.log.push(hh + (kind === 'err' ? ' ✗ ' : kind === 'ok' ? ' ✓ ' : ' · ') + KladAnon.scrub(msg));
     if (S.log.length > 300) S.log = S.log.slice(-300);
     save(); renderLog();
   }
@@ -99,13 +101,21 @@
     const a = await client().application();
     const urls = a.redirect_urls || [];
     const okRedirect = S.redirectUrl && urls.indexOf(S.redirectUrl) >= 0;
+    // /application ne dit pas toujours si l'application est active : un appel réel le vérifie.
+    let inactive = a.active === false;
+    if (!inactive) {
+      try { await client().aspsps($('country').value); }
+      catch (e) { if (e.status === 403 && /not active/i.test(e.message)) inactive = true; else throw e; }
+    }
     $('appInfo').innerHTML =
       '<p><span class="ok">✓</span> Clé acceptée : <b>' + esc(a.name || '?') + '</b> ' +
-      '<span class="chip">' + esc(a.environment || '') + '</span> ' + (a.active === false ? '<span class="bad">inactive</span>' : '') + '</p>' +
+      '<span class="chip">' + esc(a.environment || '') + '</span></p>' +
+      (inactive ? '<p class="bad">Application inactive : dans le Control Panel Enable Banking, l\'activer avec « Activate by linking accounts » (relier ses comptes).</p>'
+        : '<p class="ok">✓ Application active.</p>') +
       '<p class="muted">Adresses de retour déclarées : ' + (urls.length ? urls.map(esc).join('<br>') : 'aucune') + '</p>' +
       (okRedirect ? '<p class="ok">✓ L\'adresse de retour de Klad est bien déclarée.</p>'
         : '<p class="bad">L\'adresse de retour de Klad (' + esc(S.redirectUrl || 'non réglée') + ') n\'est pas dans la liste : ajoutez-la dans le Control Panel Enable Banking.</p>');
-    log('info', 'Application « ' + (a.name || '?') + ' » (' + (a.environment || '?') + '), ' + urls.length + ' adresse(s) de retour, retour Klad ' + (okRedirect ? 'déclaré' : 'ABSENT'));
+    log(inactive ? 'err' : 'info', 'Application ' + (a.environment || '?') + (inactive ? ' INACTIVE' : ' active') + ', ' + urls.length + ' adresse(s) de retour, retour Klad ' + (okRedirect ? 'déclaré' : 'ABSENT'));
   }));
 
   $('redirectUrl').addEventListener('change', ev => { S.redirectUrl = ev.target.value.trim(); save(); });
@@ -153,7 +163,7 @@
         redirectUrl: S.redirectUrl, state
       });
       if (!r.url) throw new Error('Pas d\'adresse d\'autorisation renvoyée.');
-      log('info', 'Autorisation lancée : ' + bank.name + ' (' + bank.country + ')');
+      log('info', 'Autorisation lancée : ' + bankLabel(bank.name) + ' (' + bank.country + ')');
       if (BrowserP) await BrowserP.open({ url: r.url });
       else window.location.href = r.url;
     });
@@ -183,7 +193,7 @@
       return;
     }
     await busy(null, async () => {
-      log('info', 'Retour reçu de ' + pend.name + ', création de la session…');
+      log('info', 'Retour reçu de ' + bankLabel(pend.name) + ', création de la session…');
       const s = await client().createSession(p.get('code'));
       delete S.pending[state];
       const accounts = (s.accounts || []).map(a => typeof a === 'string' ? { uid: a } : a).map(a => ({
@@ -200,7 +210,7 @@
         created: new Date().toISOString(), accounts
       };
       save();
-      log('ok', pend.name + ' : session créée, ' + accounts.length + ' compte(s), accès jusqu\'au ' + fmtDate((s.access && s.access.valid_until) || ''));
+      log('ok', bankLabel(pend.name) + ' : session créée, ' + accounts.length + ' compte(s), accès jusqu\'au ' + fmtDate((s.access && s.access.valid_until) || ''));
       toast(pend.name + ' connecté : ' + accounts.length + ' compte(s).');
       renderSessions();
       $('secAccounts').scrollIntoView({ behavior: 'smooth' });
@@ -265,7 +275,7 @@
     const c = client();
     const from = $('dateFrom').value || daysAgo(90);
     const d = S.data[uid] = { from, fetched: null, balances: [], txs: [], error: '' };
-    const label = f.s.bank + ' / ' + (f.a.name || 'compte') + ' ' + maskIban(f.a.iban);
+    const label = KladAnon.accountLabel(S.alias, f.s.bank, f.s.accounts.indexOf(f.a));
     try {
       d.balances = await c.balances(uid);
       log('ok', label + ' : ' + d.balances.length + ' solde(s)');
@@ -291,7 +301,7 @@
       try { await client().deleteSession(id); } catch (e) { if (e.status !== 404) throw e; }
       s.accounts.forEach(a => delete S.data[a.uid]);
       delete S.sessions[id]; save();
-      log('info', s.bank + ' : session supprimée');
+      log('info', bankLabel(s.bank) + ' : session supprimée');
       renderSessions();
     });
   });

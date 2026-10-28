@@ -15,7 +15,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Page de test (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `app.js` = écran. |
+| `www/` | Page de test (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `app.js` = écran. |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
@@ -72,9 +72,9 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 
 1. Dans le Control Panel Enable Banking, ajouter l'adresse de retour à l'application.
 2. Installer l'APK.
-3. Saisir l'identifiant d'application, choisir le `.pem`, puis **Enregistrer** et **Tester la clé**. Le test vérifie aussi que l'adresse de retour est bien déclarée.
+3. Saisir l'identifiant d'application, choisir le `.pem`, puis **Enregistrer** et **Tester la clé**. Le test vérifie aussi que l'application est active et que l'adresse de retour est bien déclarée.
 4. **Charger** les banques du pays, puis **Connecter**. Après l'accord à la banque, le retour dans Klad crée la session.
-5. **Récupérer** sur chaque compte. Le **journal** (sans montants ni libellés) peut être copié pour diagnostic.
+5. **Récupérer** sur chaque compte. Le **journal** est anonyme (ni noms, ni banques, ni montants, ni identifiants : « Banque A · compte 1 ») et peut être copié pour diagnostic.
 6. En fin de test : **Déconnecter** chaque banque, puis **Tout effacer**.
 
 ⚠️ Prototype : la clé et les opérations sont stockées **sans chiffrement**. Le verrou (code, empreinte) et le chiffrement AES-GCM arrivent à l'étape 6.
