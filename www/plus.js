@@ -8,6 +8,8 @@
   const F = window.KladFormat;
   const R = window.KladReprise;
   const Vu = window.KladVues;
+  const KC = window.KladClasse;
+  const CN = window.KladCarnet;
   const $ = id => document.getElementById(id);
   const esc = Vu.esc;
   const S = () => A.etat();
@@ -77,11 +79,17 @@
     const cx = c && !manuel ? S().modele.connexions[c.source.connexion] : null;
     $('formCompte').innerHTML =
       (c && !manuel ? '<p class="muted">' + esc((cx ? cx.banque : 'Banque déconnectée') + (c.source.intitule ? ' · ' + c.source.intitule : '') + (c.source.fin4 ? ' · …' + c.source.fin4 : '')) + '</p>' : '') +
-      (c && c.aReassocier ? '<p class="note">Compte non retrouvé au dernier renouvellement : son historique est gardé ; il sera réassocié s\'il réapparaît à une prochaine connexion.</p>' : '') +
+      (c && c.aReassocier ? '<p class="note">Compte non retrouvé au dernier renouvellement : son historique est gardé ; il sera réassocié s\'il réapparaît à une prochaine connexion, ' +
+        'ou à la main ci-dessous.</p>' + blocReassocier(c) : '') +
       '<label>Libellé court<input id="fLibelle" maxlength="24" autocomplete="off" value="' + esc(c ? c.libelle : '') + '"></label>' +
       '<label>Rôle<select id="fRole">' + optionsRoles(role) + '</select></label>' +
-      '<div id="fPrel" class="grp"><label>Prélevé sur<select id="fPrelCompte">' + optAutres(p.compte) + '</select></label>' +
+      '<div id="fPrel"><div class="grp"><label><span id="fPrelLab">Prélevé sur</span><select id="fPrelCompte">' + optAutres(p.compte) + '</select></label>' +
       '<label id="fJourL">Le (jour du mois)<input id="fJour" type="number" min="1" max="31" inputmode="numeric" value="' + esc(p.jour || '') + '"></label></div>' +
+      '<label><span id="fMotifLab">Libellé du prélèvement</span><input id="fMotif" autocomplete="off" spellcheck="false" maxlength="200" placeholder="mot du libellé" value="' + esc(p.motif || '') + '"></label>' +
+      '<div id="fProps" class="puces"></div>' +
+      '<label id="fRembL">Libellés des remboursements de la carte (facultatif)<input id="fRemb" autocomplete="off" spellcheck="false" maxlength="200" value="' + esc(p.remboursements || '') + '"></label>' +
+      '<p class="muted small">Plusieurs libellés : séparez-les par « | ». Sans majuscules ni accents obligatoires.</p>' +
+      (c && c.role === 'carte_differee' ? etatDette(c) : '') + '</div>' +
       (manuel ? '<div class="grp"><label>Solde<input id="fSolde" inputmode="decimal" autocomplete="off" placeholder="0,00" value="' +
         esc(c && c.solde ? F.versSaisie(c.solde.centimes) : '') + '"></label>' +
         '<label>Sens<select id="fSens"><option value="cre">créditeur</option><option value="deb"' + (c && c.solde && c.solde.centimes < 0 ? ' selected' : '') + '>débiteur</option></select></label>' +
@@ -98,15 +106,61 @@
   function majPrel() {
     const r = $('fRole') && $('fRole').value;
     if (!r) return;
-    $('fPrel').hidden = r !== 'carte_differee' && r !== 'paiement_en_ligne';
-    $('fJourL').hidden = r !== 'carte_differee';
+    const carte = r === 'carte_differee';
+    $('fPrel').hidden = !carte && r !== 'paiement_en_ligne';
+    $('fJourL').hidden = !carte;
+    $('fRembL').hidden = !carte;
+    $('fPrelLab').textContent = carte ? 'Prélevée sur' : 'Prélevé sur (facultatif)';
+    $('fMotifLab').textContent = carte ? 'Libellé du prélèvement de la carte' : 'Libellé des prélèvements du portefeuille';
+    majProps();
+  }
+  // Motifs proposés : débits récurrents du compte de prélèvement (ou des comptes courants).
+  function majProps() {
+    const c = edite ? M.compte(S(), edite) : null;
+    const el = $('fProps');
+    if (!el) return;
+    const tmp = { prelevement: { compte: $('fPrelCompte').value } };
+    const props = c ? KC.propositions(S(), tmp) : [];
+    el.innerHTML = props.length ? '<span class="muted small">Proposés :</span>' + props.map(p => '<button type="button" class="puce" data-motif="' + esc(p.motif) + '">' +
+      esc(p.motif) + ' <b>' + p.n + '</b></button>').join('') : '';
+  }
+  function etatDette(c) {
+    const d = KC.dette(S(), c, Date.now());
+    if (!d) return '<p class="note">Choisissez le libellé du prélèvement de la carte : Klad en déduit la somme à prélever.</p>';
+    return '<p class="muted">À prélever' + (d.le ? ' le ' + esc(F.date(d.le)) : '') + ' : <b>' + esc(F.montant(d.centimes, c.devise)) + '</b> (' + d.n + ' opération(s)' +
+      (d.depuis ? ' depuis le règlement du ' + esc(F.date(d.depuis)) : ', aucun règlement trouvé') + ').</p>';
   }
 
-  $('formCompte').addEventListener('change', ev => { if (ev.target.id === 'fRole') majPrel(); });
+  // ------------------------------------------------------------ réassociation manuelle
+  function blocReassocier(c) {
+    const dispo = M.disponibles(S(), c.id);
+    if (!dispo.length) return '<p class="muted">Aucun compte bancaire disponible : connectez ou renouvelez la banque, puis revenez ici.</p>';
+    return '<div class="grp"><label>Réassocier à<select id="fReass">' + dispo.map(x => '<option value="' + esc(x.id) + '">' + esc(x.libelle +
+      (x.source.fin4 ? ' (…' + x.source.fin4 + ')' : '') + (x.aVerifier ? ' — nouveau' : '')) + '</option>').join('') + '</select></label></div>' +
+      '<p class="muted small">Le compte choisi est fusionné dans celui-ci : ses opérations et ses soldes le rejoignent, sans doublon.</p>' +
+      '<div class="row"><button class="btn small" data-a="reass">Réassocier</button></div>';
+  }
+
+  $('formCompte').addEventListener('change', ev => { if (ev.target.id === 'fRole') majPrel(); if (ev.target.id === 'fPrelCompte') majProps(); });
   $('formCompte').addEventListener('click', ev => {
+    const m = ev.target.closest('[data-motif]');
+    if (m) { $('fMotif').value = m.dataset.motif; return; }
     const b = ev.target.closest('[data-a]');
     if (!b) return;
     if (b.dataset.a === 'ok') enregistrer();
+    else if (b.dataset.a === 'reass') {
+      const cible = $('fReass').value;
+      const n = M.compte(S(), cible);
+      if (!n || !A.confirmInline(b, 'Fusionner « ' + n.libelle + ' » ici ?')) return;
+      try {
+        const r = M.reassocier(S(), edite, cible);
+        A.log('ok', 'Compte réassocié à la main : ' + r.deplacees + ' opération(s) reprise(s), ' + r.doublons + ' doublon(s) écarté(s).');
+        A.toast('Compte réassocié.');
+        A.retourVolet();
+        A.changed('reglage');
+        A.synchro('reassociation');
+      } catch (e) { A.toast(e.message, true); }
+    }
     else if (b.dataset.a === 'del' && A.confirmInline(b, 'Supprimer ce compte et ses opérations ?')) {
       M.supprimerCompte(S(), edite);
       A.log('info', 'Compte manuel supprimé.');
@@ -123,13 +177,18 @@
     let prel = null;
     if (role === 'carte_differee' || role === 'paiement_en_ligne') {
       const cpt = $('fPrelCompte').value;
-      if (!cpt) { msg.textContent = 'Choisissez le compte sur lequel ' + (role === 'carte_differee' ? 'la carte est prélevée.' : 'les paiements sont prélevés.'); return; }
-      prel = { compte: cpt };
+      if (!cpt && role === 'carte_differee') { msg.textContent = 'Choisissez le compte sur lequel la carte est prélevée.'; return; }
+      prel = {};
+      if (cpt) prel.compte = cpt;
       if (role === 'carte_differee') {
         const j = parseInt($('fJour').value, 10);
         if (!(j >= 1 && j <= 31)) { msg.textContent = 'Indiquez le jour du prélèvement (1 à 31).'; return; }
         prel.jour = j;
+        const rb = $('fRemb').value.trim();
+        if (rb) prel.remboursements = rb.slice(0, 200);
       }
+      const mo = $('fMotif').value.trim();
+      if (mo) prel.motif = mo.slice(0, 200);
     }
     let c = edite ? M.compte(S(), edite) : null;
     let solde;
@@ -211,31 +270,163 @@
     majIgnores();
   }
 
-  // Avant confirmation : nombre de comptes de la reprise qui seront ignorés.
+  // Avant confirmation : nombre de comptes de la reprise qui seront ignorés ; avertissement pour un compte déjà repris
+  // (ses opérations de reprise vont disparaître), avec la relecture de l'historique bancaire proposée.
+  function choixCourants() {
+    const choix = {};
+    $('repriseApercu').querySelectorAll('select[data-ref]').forEach(s => { choix[s.dataset.ref] = s.value; });
+    return choix;
+  }
   function majIgnores() {
     const n = [...$('repriseApercu').querySelectorAll('select[data-ref]')].filter(sel => sel.value === 'ignorer').length;
     const el = $('repIgnores');
     if (!el) return;
+    const deja = rep ? R.ignoresDejaRepris(S(), rep, choixCourants()) : [];
     el.hidden = !n;
-    el.textContent = n ? n + ' compte(s) ignoré(s) : ' + (n > 1 ? 'leurs' : 'ses') + ' opérations ne seront pas importées.' : '';
+    el.innerHTML = n ? esc(n + ' compte(s) ignoré(s) : ' + (n > 1 ? 'leurs' : 'ses') + ' opérations ne seront pas importées.') +
+      deja.map(d => '<br><b>Attention</b> : « ' + esc(d.label) + ' » avait été repris au dernier import. Ses opérations de reprise seront retirées ' +
+        'et l\'historique de ce compte aura un trou.' + (d.eb ? '<label class="inline"><input type="checkbox" data-relire="' + esc(d.compte) + '" checked> ' +
+        'Relire tout l\'historique bancaire de ce compte après l\'import</label>' : '')).join('') : '';
   }
   $('repriseApercu').addEventListener('change', ev => { if (ev.target.matches('select[data-ref]')) majIgnores(); });
 
   $('repriseApercu').addEventListener('click', ev => {
     const b = ev.target.closest('[data-a="importer"]');
     if (!b || !rep) return;
-    const choix = {};
-    $('repriseApercu').querySelectorAll('[data-ref]').forEach(s => { choix[s.dataset.ref] = s.value; });
+    const choix = choixCourants();
+    const deja = R.ignoresDejaRepris(S(), rep, choix);
+    if (deja.length && !A.confirmInline(b, 'Confirmer : ' + deja.length + ' compte(s) déjà repris ignoré(s)')) return;
+    const relire = [...$('repriseApercu').querySelectorAll('[data-relire]')].filter(x => x.checked).map(x => x.dataset.relire);
+    const s0 = S();
+    let st;
     try {
-      const st = R.appliquer(S(), rep, choix, { reglages: $('repReglages').checked, now: Date.now() });
-      A.log('ok', 'Reprise importée : ' + st.comptes + ' compte(s) dont ' + st.crees + ' créé(s), ' + st.operations + ' opération(s), ' +
-        st.ebRetirees + ' opération(s) bancaire(s) avant la frontière retirée(s), ' + st.ignores + ' compte(s) ignoré(s).');
-      A.toast('Reprise importée : ' + st.operations + ' opération(s).');
-      rep = null;
-      $('repriseApercu').innerHTML = '';
-      A.changed('import');
+      st = R.appliquer(s0, rep, choix, { reglages: $('repReglages').checked, now: Date.now(), relire });
     } catch (e) {
       $('repMsg').textContent = e.message;
+      return;
+    }
+    A.log('ok', 'Reprise importée : ' + st.comptes + ' compte(s) dont ' + st.crees + ' créé(s), ' + st.operations + ' opération(s), ' +
+      st.ebRetirees + ' opération(s) bancaire(s) avant la frontière retirée(s), ' + st.ignores + ' compte(s) ignoré(s)' +
+      (st.relire ? ', ' + st.relire + ' historique(s) bancaire(s) à relire' : '') + '.');
+    A.toast('Reprise importée : ' + st.operations + ' opération(s).');
+    rep = null;
+    $('repriseApercu').innerHTML = '';
+    A.changed('import');
+    reprendreClassement(s0).then(() => { if (st.relire && A.etat() === s0) A.synchro('relecture'); });
+  });
+
+  // ------------------------------------------------------------ classement (Plus › Classement)
+  async function reprendreClassement(s0) {
+    if (s0.carnet == null || !CN.utilisable(s0.carnet)) return null;
+    try {
+      const r = await CN.convertir(s0, s0.carnet, { now: Date.now() });
+      if (A.etat() !== s0) return null;
+      A.log('ok', 'Classement repris de l\'ancienne version : ' + r.categories + ' catégorie(s), ' + r.base + ' règle(s) de base, ' + r.regles +
+        ' règle(s), ' + r.correctionsRetrouvees + '/' + r.corrections + ' correction(s), ' + r.vuesRetrouvees + '/' + r.vues + ' opération(s) cochée(s).');
+      A.changed('classement');
+      return r;
+    } catch (e) { A.log('err', 'Classement : ' + (e.message || e)); return null; }
+  }
+
+  let catEditee = null;
+  function renderClassement() {
+    const s = S();
+    const C = KC.donnees(s);
+    const cx = A.ctx();
+    const now = Date.now();
+    const lim = M.plusJours(M.jourLocal(now), -365);
+    const nb = {};
+    for (const o of KC.opsVisibles(s)) if (o.date >= lim) { const r = KC.classer(cx, o); nb[r.cat] = (nb[r.cat] || 0) + 1; }
+    const imp = C.import;
+    const r = imp && imp.rapport;
+    const cats = KC.listeCategories(C);
+    const natOpts = v => KC.NATURES.map(n => '<option value="' + n + '"' + (n === v ? ' selected' : '') + '>' + esc(KC.NOMS_NATURES[n]) + '</option>').join('');
+    const pl = (n, m) => n + ' ' + m + (n > 1 ? 's' : '');
+    let h = '<p class="muted">' + (r ? 'Repris de l\'ancienne version le ' + esc(F.date(imp.le.slice(0, 10))) + ' : ' + pl(r.categories, 'catégorie') + ', ' +
+      pl(r.base, 'règle') + ' de base, ' + pl(r.regles, 'règle') + ' personnelle' + (r.regles > 1 ? 's' : '') + ', ' + r.correctionsRetrouvees + ' correction(s) retrouvée(s) sur ' + r.corrections +
+      (r.depuis ? ', opérations vues jusqu\'au ' + esc(F.date(r.depuis)) : '') + '.' : 'Aucun classement repris de l\'ancienne version.') + '</p>';
+    h += '<div class="row">' + (s.carnet != null && CN.utilisable(s.carnet) ? '<button class="btn ghost small" data-a="reprendre">Reprendre depuis l\'ancienne version</button>' : '') +
+      '<button class="btn ghost small" data-a="complement">Importer un complément</button></div>';
+    h += '<h3>Catégories</h3><p class="muted small">Nombre d\'opérations sur 12 mois. Touchez une catégorie pour changer sa nature ou son icône.</p><ul class="list cats">' +
+      cats.map(c => '<li><button class="lien-cat" data-cat="' + esc(c) + '"><span class="ico" aria-hidden="true">' + esc(KC.iconeDe(C, c)) + '</span><span class="grow">' + esc(c) +
+        '<small>' + esc(KC.NOMS_NATURES[KC.natureDe(C, c)]) + '</small></span><span class="muted">' + (nb[c] || 0) + '</span></button>' +
+        (catEditee === c ? '<div class="edcat"><label>Nature<select data-nature="' + esc(c) + '">' + natOpts(KC.natureDe(C, c)) + '</select></label>' +
+          '<div class="icones">' + KC.ICONES.map(i => '<button type="button" data-icone="' + esc(i) + '" aria-label="Icône ' + esc(i) + '"' + (i === KC.iconeDe(C, c) ? ' class="on"' : '') + '>' + esc(i) + '</button>').join('') + '</div></div>' : '') +
+        '</li>').join('') + '</ul>' +
+      '<div class="grp"><label>Nouvelle catégorie<input id="ncNom" maxlength="40" autocomplete="off"></label><label>Nature<select id="ncNature">' + natOpts('optionnelle') + '</select></label></div>' +
+      '<div class="row"><button class="btn small" data-a="nouvelle">Ajouter</button></div>';
+    const regles = C.regles || [];
+    h += '<h3>Vos règles</h3>' + (regles.length ? '<ul class="list">' + regles.map((u, i) => {
+      const cpt = u.compte && M.compte(s, u.compte);
+      const n = KC.concernees(s, u.mot, { compte: u.compte, sens: u.sens }).length;
+      return '<li><div class="grow"><b>' + esc(u.mot) + '</b> → ' + esc(u.cat + (u.sub && u.sub !== u.cat ? ' › ' + u.sub : '')) +
+        '<small>' + esc([cpt ? 'seulement ' + cpt.libelle : '', u.sens === 'debit' ? 'débits' : u.sens === 'credit' ? 'crédits' : '', n + ' opération(s)'].filter(Boolean).join(' · ')) +
+        '</small></div><button class="btn danger small" data-suppr="' + i + '">Supprimer</button></li>';
+    }).join('') + '</ul>' : '<p class="muted">Aucune règle. Classez une opération avec « Classer aussi les autres » pour en créer une.</p>');
+    h += '<p class="muted small">' + (C.base || []).length + ' règle(s) de base, reprises de l\'ancienne version.</p>';
+    $('classementCorps').innerHTML = h;
+  }
+  A.preparer.secClassement = () => renderClassement();
+  A.rendus.push(() => {
+    const C = S().classement;
+    $('mClassement').textContent = C ? KC.listeCategories(C).length + ' catégories, ' + (C.regles || []).length + ' règle(s)' : 'Catégories et règles';
+  });
+
+  $('classementCorps').addEventListener('change', ev => {
+    const n = ev.target.closest('[data-nature]');
+    if (!n) return;
+    const C = KC.donnees(S());
+    C.categories[n.dataset.nature] = Object.assign({}, C.categories[n.dataset.nature], { nature: n.value });
+    A.changed('classement');
+  });
+  $('classementCorps').addEventListener('click', ev => {
+    const s = S();
+    const C = KC.donnees(s);
+    const cat = ev.target.closest('[data-cat]');
+    if (cat) { catEditee = catEditee === cat.dataset.cat ? null : cat.dataset.cat; renderClassement(); return; }
+    const ic = ev.target.closest('[data-icone]');
+    if (ic && catEditee) {
+      C.categories[catEditee] = Object.assign({ nature: KC.natureDe(C, catEditee) }, C.categories[catEditee], { icone: ic.dataset.icone });
+      A.changed('classement'); return;
+    }
+    const sup = ev.target.closest('[data-suppr]');
+    if (sup) {
+      if (!A.confirmInline(sup, 'Confirmer ?')) return;
+      const avant = JSON.stringify(C.regles);
+      C.regles.splice(+sup.dataset.suppr, 1);
+      A.log('info', 'Règle de classement supprimée.');
+      A.changed('classement');
+      A.toastAnnuler('Règle supprimée.', () => { KC.donnees(s).regles = JSON.parse(avant); A.changed('classement'); });
+      return;
+    }
+    const b = ev.target.closest('[data-a]');
+    if (!b) return;
+    if (b.dataset.a === 'nouvelle') {
+      const nom = $('ncNom').value.trim().slice(0, 40);
+      if (!nom) { A.toast('Indiquez un nom de catégorie.', true); return; }
+      const k = KC.fold(nom);
+      const dup = KC.listeCategories(C).find(c => KC.fold(c) === k);
+      if (dup) { A.toast('La catégorie « ' + dup + ' » existe déjà.', true); return; }
+      C.categories[nom] = { nature: $('ncNature').value, icone: KC.iconeDe(C, nom) };
+      A.log('info', 'Catégorie ajoutée.');
+      A.changed('classement');
+    } else if (b.dataset.a === 'reprendre') {
+      if (!A.confirmInline(b, 'Confirmer : règles et corrections reprises à nouveau')) return;
+      reprendreClassement(s).then(r => { if (r) A.toast('Classement repris : ' + r.base + ' règles de base, ' + r.regles + ' règles.'); });
+    } else if (b.dataset.a === 'complement') {
+      A.busy(b, async () => {
+        const h = A.hooks();
+        const texte = h.choisirFichier ? await h.choisirFichier() : null;
+        if (texte == null) return;
+        let o;
+        try { o = JSON.parse(texte); } catch (e) { throw new Error('Fichier illisible (JSON attendu).'); }
+        if (!o || o.format !== 'klad-complement' || o.v !== 1 || !o.klad || typeof o.klad !== 'object') throw new Error('Ce fichier n\'est pas un complément de classement Klad.');
+        if (s.carnet == null || typeof s.carnet !== 'object') throw new Error('Importez d\'abord la reprise de l\'ancienne version.');
+        s.carnet.klad = Object.assign({}, s.carnet.klad, o.klad);
+        A.log('info', 'Complément de classement importé.');
+        const r = await reprendreClassement(s);
+        if (r) A.toast('Complément importé : ' + r.base + ' règles de base.');
+      });
     }
   });
 })();

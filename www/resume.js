@@ -1,4 +1,4 @@
-// Klad — résumé lu par Grafit (Lien Grafit, palier du Lot 4) : construction à partir de l'état déchiffré, et écritures
+// Klad — résumé lu par Grafit (Lien Grafit, paliers des Lots 4 et 5) : construction à partir de l'état déchiffré, et écritures
 // limitées aux vrais changements. Fonctions pures (le plugin est fourni par l'appelant), testées dans node
 // (test/resume.test.mjs).
 //
@@ -9,6 +9,7 @@
   'use strict';
 
   const M = () => g.KladModele;
+  const K = () => g.KladClasse;
   const V = 1;
   const MAX_OCTETS = 32 * 1024 - 1;              // moins de 32 Ko (contrôlé aussi par le plugin natif)
   const PERIME_MS = 30 * 3600e3;                 // relevé de plus de 30 h
@@ -48,7 +49,12 @@
     const r = { id: c.id, label: libelle(c), kind: KINDS[c.role] || 'current' };
     const eb = c.source.type === 'eb';
     const s = M().soldeAffiche(S, c);
-    // Carte à débit différé : le solde brut de la carte n'est pas exposé (sa signification varie selon la banque).
+    // Carte à débit différé : le solde brut de la carte n'est pas exposé (sa signification varie selon la banque) ;
+    // sa dette (somme à prélever, positive) et la date du dernier règlement le sont.
+    if (c.role === 'carte_differee' && enEuros(c) && K()) {
+      const d = K().dette(S, c, now);
+      if (d) { r.due = euros(d.centimes); if (d.depuis) r.due_since = d.depuis; }
+    }
     if (c.role !== 'carte_differee' && s && enEuros(c)) {
       r.balance = euros(s.centimes);
       const itav = eb && S.soldes[c.id] && S.soldes[c.id].types && S.soldes[c.id].types.ITAV;
@@ -63,8 +69,10 @@
     return r;
   }
 
-  function alertes(S, comptes, resumes, now) {
+  function alertes(S, comptes, resumes, now, ext) {
     const out = [];
+    const at = ext && ext.attention;
+    if (at && at.accountsToCheck) out.push({ level: 'caut', code: 'ACCOUNT_CHECK', text: at.accountsToCheck + (at.accountsToCheck > 1 ? ' COMPTES À VÉRIFIER' : ' COMPTE À VÉRIFIER') });
     comptes.forEach((c, i) => {
       const r = resumes[i];
       if ((c.role === 'courant' || c.role === 'commun') && r.balance < 0) out.push({ level: 'crit', code: 'NEGATIVE_BALANCE', text: r.label });
@@ -81,22 +89,32 @@
         out.push({ level: 'info', code: 'STALE', text: lu ? r.label + ' · ' + age(now - lu) : r.label });
       }
     });
+    if (at && at.unseen) out.push({ level: 'info', code: 'TO_REVIEW', text: at.unseen + (at.unseen > 1 ? ' OPÉRATIONS À VOIR' : ' OPÉRATION À VOIR') });
+    const sv = ext && ext.sauvegarde;
+    if (sv && sv.jours == null) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · JAMAIS' });
+    else if (sv && sv.jours >= 30) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · ' + sv.jours + ' J' });
+    if (ext && ext.maj && /^\d+\.\d+\.\d+$/.test(ext.maj)) out.push({ level: 'info', code: 'UPDATE_AVAILABLE', text: 'KLAD ' + ext.maj });
     return out.map((a, i) => [a, i]).sort((x, y) => NIVEAUX[x[0].level] - NIVEAUX[y[0].level] || x[1] - y[1]).map(x => x[0]);
   }
 
-  // Totaux : épargne ; tous comptes (courants, commun, épargne) seulement sans carte à débit différé visible.
-  // Un total dont un compte n'a pas de solde connu est omis. Les comptes hors euros ne sont pas comptés.
-  function totaux(S, comptes) {
-    let ep = 0, nEp = 0, epOk = true, tout = 0, nTout = 0, toutOk = true, carte = false;
+  // Totaux : épargne ; tous comptes (courants, commun, épargne, moins la dette des cartes à débit différé visibles).
+  // Un total dont un compte n'a pas de solde (ou une carte pas de dette) connu est omis. Les comptes hors euros ne sont
+  // pas comptés.
+  function totaux(S, comptes, now) {
+    let ep = 0, nEp = 0, epOk = true, tout = 0, nTout = 0, toutOk = true;
     for (const c of comptes) {
-      if (c.role === 'carte_differee') carte = true;
+      if (c.role === 'carte_differee' && enEuros(c)) {
+        const d = K() ? K().dette(S, c, now) : null;
+        if (d) tout -= d.centimes; else toutOk = false;
+        continue;
+      }
       if (!enEuros(c) || ['courant', 'commun', 'epargne'].indexOf(c.role) < 0) continue;
       const s = M().soldeAffiche(S, c);
       if (s) { tout += s.centimes; nTout++; } else toutOk = false;
       if (c.role === 'epargne') { if (s) { ep += s.centimes; nEp++; } else epOk = false; }
     }
     const t = {};
-    if (!carte && nTout && toutOk) t.all = euros(tout);
+    if (nTout && toutOk) t.all = euros(tout);
     if (nEp && epOk) t.savings = euros(ep);
     return Object.keys(t).length ? t : null;
   }
@@ -111,7 +129,29 @@
     return t || null;
   }
 
-  function construire(S, now) {
+  // Solde du compte de prélèvement de la première carte à débit différé visible, moins la dette de cette carte.
+  function apresCarte(S, comptes, accounts, now) {
+    const i = comptes.findIndex(c => c.role === 'carte_differee' && c.prelevement && c.prelevement.compte);
+    if (i < 0 || accounts[i].due == null) return null;
+    const p = M().compte(S, comptes[i].prelevement.compte);
+    const s = p && enEuros(p) ? M().soldeAffiche(S, p) : null;
+    return s ? euros(s.centimes - Math.round(accounts[i].due * 100)) : null;
+  }
+
+  // « À vérifier » : nombres non nuls et connus seulement.
+  function attention(ext) {
+    const a = (ext && ext.attention) || {};
+    const r = {};
+    if (a.unseen) r.unseen = a.unseen;
+    if (a.unclassified) r.unclassified = a.unclassified;
+    if (a.accountsToCheck) r.accounts_to_check = a.accountsToCheck;
+    const sv = ext && ext.sauvegarde;
+    if (sv && sv.jours) r.backup_days = sv.jours;
+    return Object.keys(r).length ? r : null;
+  }
+
+  // ext (facultatif) : { attention: { unseen, unclassified, accountsToCheck }, sauvegarde: { jours | null }, maj: version }.
+  function construire(S, now, ext) {
     const comptes = visibles(S);
     if (!comptes.length) return { v: V, state: 'empty', generated: now };
     const accounts = comptes.map(c => compteResume(S, c, now));
@@ -119,9 +159,13 @@
     const st = dernierReleve(S);
     if (st) r.statement_at = st;
     r.accounts = accounts;
-    const t = totaux(S, comptes);
+    const t = totaux(S, comptes, now);
     if (t) r.total = t;
-    r.alerts = alertes(S, comptes, accounts, now);
+    const mac = apresCarte(S, comptes, accounts, now);
+    if (mac != null) r.main_after_card = mac;
+    const at = attention(ext);
+    if (at) r.attention = at;
+    r.alerts = alertes(S, comptes, accounts, now, ext);
     // Filet de sécurité (30 comptes tiennent largement) : alertes, puis comptes en trop retirés.
     while (octets(r) > MAX_OCTETS && r.alerts.length) r.alerts.pop();
     while (octets(r) > MAX_OCTETS && r.accounts.length > 1) { r.accounts.pop(); delete r.total; }
@@ -153,7 +197,7 @@
       }
       return connu;
     }
-    function maj(S, now) {
+    function maj(S, now, ext) {
       return enFile(async () => {
         if (!S) return 'rien';
         if (!actif(S)) {
@@ -161,7 +205,7 @@
           await P.effacer(); connu = null;
           return 'efface';
         }
-        const r = construire(S, now);
+        const r = construire(S, now, typeof ext === 'function' ? ext() : ext);
         const sig = signature(r);
         if (await enregistre() === sig) return 'inchange';
         const res = await P.ecrire({ json: JSON.stringify(r) });

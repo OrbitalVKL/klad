@@ -64,7 +64,9 @@ function reprise() {
       { account: 'r0', date: '2023-01-03', amount: -1250, label: 'CB BOULANGERIE', status: 'comptabilisee' },
       { account: 'r0', date: '2023-01-03', amount: -1250, label: 'CB BOULANGERIE', status: 'comptabilisee' },
       { account: 'r0', date: jour(-20), amount: -4500, label: 'CB RESTAURANT', status: 'comptabilisee' }],
-    carnet: { reglages: 'opaques' }
+    // carnet fictif de l'ancienne version : catégories, une règle de base, une règle de l'utilisateur, opérations vues
+    carnet: { cats: { custom: { 'Loisirs': { nat: 'optionnelle' } } }, P: { rules: [['RESTAURANT', 'depense', 'Restaurants & bars', 'Restaurants & bars', null]] },
+      rules: [{ kw: 'EPICERIE', cat: 'Alimentation', sub: 'Courses' }], seen: { cut: jour(-15), k: {} } }
   };
 }
 
@@ -79,7 +81,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 400, height: 820 } });
+    const page = await browser.newPage({ viewport: { width: 400, height: 820 }, hasTouch: true });
     page.setDefaultTimeout(8000);
     const erreurs = [];
     page.on('pageerror', e => erreurs.push(e.message));
@@ -115,7 +117,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.waitForFunction(() => /✓/.test(document.getElementById('pastille').textContent));
     assert.equal(await page.locator('.ccompte').count(), 2);
     assert.match(await page.locator('.carte.grande').innerText(), /42,50\s€ débiteur/);
-    assert.match(await page.locator('#alertes').innerText(), /2 comptes à vérifier/);
+    assert.match(await page.locator('#vAccueil .averif').innerText(), /2 comptes à vérifier ou à réassocier/);
 
     // import de la reprise : association proposée par la fin d'IBAN, livret manuel créé, frontière
     const ouvrirReprise = async () => {
@@ -225,8 +227,70 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.match(await page.locator('#opsListe').innerText(), /Aucune opération/);
     assert.doesNotMatch(await page.locator('body').innerText(), /\u2212/);
 
+    // classement repris du carnet fictif : règle de base (restaurants), règle de l'utilisateur (épicerie)
+    await page.locator('#opsCompte').selectOption('');
+    await page.waitForTimeout(100);
+    const ligneOp = t => page.locator('#opsListe .op', { hasText: t });
+    assert.match(await ligneOp('CB RESTAURANT').innerText(), /Restaurant · COURANT/);
+    assert.match(await ligneOp('CB EPICERIE FICTIVE').innerText(), /Alimentation · Courses/);
+    assert.match(await page.locator('#badgeOps').innerText(), /^3$/);
+    // détail par un appui ; « Marquer vue » (bouton, alternative au geste)
+    await ligneOp('CB CAFE').click();
+    await page.waitForSelector('#opDetail [data-a="classer"]');
+    assert.match(await page.locator('#opDetail').innerText(), /Autres › Non classé/);
+    await page.locator('#opDetail [data-a="vue"]').click();
+    await page.waitForFunction(() => document.getElementById('badgeOps').textContent === '2');
+    // Classer : règle « CAFE » → Bars, puis Annuler
+    await page.locator('#opDetail [data-a="classer"]').click();
+    await page.waitForSelector('#clsCorps [data-a="go"]');
+    await page.locator('#clsCorps [data-toutes]').click();
+    await page.locator('#clsCorps [data-cat="Bars"]').click();
+    assert.equal(await page.locator('#clsAutres').isChecked(), true);
+    await page.fill('#clsMot', 'CAFE');
+    assert.match(await page.locator('#clsN').innerText(), /1 opération contient « CAFE »/);
+    await capture(page, '9-classer');
+    await page.locator('#clsCorps [data-a="go"]').click();
+    await page.waitForSelector('#toast.show.action');
+    assert.match(await ligneOp('CB CAFE').innerText(), /Bars/);
+    assert.deepEqual(await page.evaluate(() => window.KladApp.etat().classement.regles.map(u => u.mot)), ['EPICERIE', 'CAFE']);
+    await page.locator('#toast button').click();
+    await page.waitForTimeout(100);
+    assert.match(await ligneOp('CB CAFE').innerText(), /Autres/);
+    assert.deepEqual(await page.evaluate(() => window.KladApp.etat().classement.regles.map(u => u.mot)), ['EPICERIE']);
+    // gestes : glisser à droite → vue ; à gauche → volet « Classer »
+    const glisser = (t, dx) => ligneOp(t).evaluate((el, dx) => {
+      const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const tc = (cx) => new Touch({ identifier: 1, target: el, clientX: cx, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { touches: [tc(x)], changedTouches: [tc(x)], bubbles: true }));
+      for (let i = 1; i <= 5; i++) el.dispatchEvent(new TouchEvent('touchmove', { touches: [tc(x + dx * i / 5)], changedTouches: [tc(x + dx * i / 5)], bubbles: true }));
+      el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [tc(x + dx)], bubbles: true }));
+    }, dx);
+    await glisser('VIREMENT SALAIRE', 120);
+    await page.waitForFunction(() => document.getElementById('badgeOps').textContent === '1');
+    await glisser('CB EPICERIE FICTIVE', -120);
+    await page.waitForSelector('#clsCorps [data-a="go"]');
+    assert.match(await page.locator('#clsCorps').innerText(), /CB EPICERIE FICTIVE/);
+    await page.locator('#volet [data-fermer]').last().click();
+    // filtre « Non vues », « Tout marquer vu » puis Annuler
+    await page.locator('#opsFiltres [data-f="nonVues"]').click();
+    assert.equal(await page.locator('#opsListe .op').count(), 1);
+    await page.locator('#opsFiltres [data-f="toutVu"]').click();
+    await page.waitForFunction(() => document.getElementById('badgeOps').hidden);
+    assert.match(await page.locator('#opsListe').innerText(), /Toutes les opérations ont été vues/);
+    await page.locator('#toast button').click();
+    await page.waitForFunction(() => document.getElementById('badgeOps').textContent === '1');
+    await page.locator('#opsFiltres [data-f="nonVues"]').click();
+    await page.locator('#opsFiltres [data-f="nc"]').click();
+    assert.ok(await page.locator('#opsListe .op').count() >= 1);
+    await page.locator('#opsFiltres [data-f="nc"]').click();
+    await capture(page, '10-operations-lot5');
+
     await page.locator('.onglets [data-onglet="vPlus"]').click();
     await capture(page, '4-plus');
+    await page.locator('#vPlus [data-volet="secClassement"]').click();
+    assert.match(await page.locator('#classementCorps').innerText(), /Repris de l'ancienne version[\s\S]*Vos règles[\s\S]*EPICERIE/);
+    await capture(page, '11-classement');
+    await page.locator('#volet [data-fermer]').last().click();
     await page.locator('#vPlus [data-volet="secComptes"]').click();
     await capture(page, '5-comptes');
     await page.locator('#listeComptes [data-edit]').nth(1).click();
@@ -249,7 +313,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.deepEqual(r.accounts.map(x => x.kind), ['current', 'card', 'savings', 'savings']);
     assert.equal(r.accounts[0].balance, -42.5);
     assert.ok(!('balance' in r.accounts[1]));
-    assert.deepEqual(r.total, { savings: 3999.5 });      // total général omis : carte à débit différé visible
+    assert.deepEqual(r.total, { savings: 3999.5 });      // total général omis : dette de la carte inconnue (libellé à choisir)
     assert.ok(r.alerts.some(a => a.code === 'NEGATIVE_BALANCE' && a.level === 'crit' && a.text === 'COURANT'));
     const brut = JSON.stringify(r);
     for (const x of ['FR76', '0001', '0002', 'Banque Démo', 'EPICERIE', 'SALAIRE', 'sess-fictive', 'uid-']) assert.ok(!brut.includes(x), x);

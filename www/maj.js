@@ -56,10 +56,10 @@
     let running = false;
 
     const say = (t, err) => { const el = $('majState'); el.textContent = t || ''; el.className = 'muted' + (err ? ' bad' : ''); };
+    // Mise à jour disponible : bouton ici, ligne dans « À vérifier » sur l'accueil (et alerte pour Grafit).
     const showFound = () => {
-      $('majBanner').hidden = !found;
       $('btnMajGo').hidden = !found;
-      if (found) $('majBannerTxt').textContent = 'Klad ' + found.version + ' est disponible.';
+      if (g.KladApp && g.KladApp.infoMaj) g.KladApp.infoMaj(found ? found.version : null);
     };
     const fmtSize = n => n ? ' (' + (n / 1048576).toFixed(1).replace('.', ',') + ' Mo)' : '';
 
@@ -90,7 +90,7 @@
       if (!found || running) return;
       if (!U) { say('Mise à jour possible seulement dans l\'appli Android.', true); return; }
       running = true;
-      $('btnMajGo').disabled = true; $('btnMajBanner').disabled = true;
+      $('btnMajGo').disabled = true;
       try {
         const info = await U.info();
         if (!info.canInstall) {
@@ -117,7 +117,7 @@
         say('Mise à jour impossible : ' + (e.message || e), true);
       } finally {
         running = false;
-        $('btnMajGo').disabled = false; $('btnMajBanner').disabled = false;
+        $('btnMajGo').disabled = false;
       }
     }
 
@@ -127,7 +127,6 @@
 
     $('btnMajCheck').addEventListener('click', async ev => { ev.target.disabled = true; try { await check(false); } finally { ev.target.disabled = false; } });
     $('btnMajGo').addEventListener('click', update);
-    $('btnMajBanner').addEventListener('click', update);
 
     ctx = { check };
     return ctx;
