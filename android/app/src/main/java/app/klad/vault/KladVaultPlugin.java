@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.crypto.Cipher;
 
 /**
@@ -59,6 +60,17 @@ public class KladVaultPlugin extends Plugin {
         r.put("reason", reason);
         if (message != null) r.put("message", message);
         return r;
+    }
+
+    /** Message lisible même quand Android n'en donne pas (nom de l'erreur et de sa cause). */
+    static String describe(Throwable e) {
+        StringBuilder b = new StringBuilder();
+        for (Throwable t = e; t != null && b.length() < 300; t = t.getCause()) {
+            if (b.length() > 0) b.append(" ← ");
+            b.append(t.getClass().getSimpleName());
+            if (t.getMessage() != null) b.append(" : ").append(t.getMessage());
+        }
+        return b.toString();
     }
 
     private static JSObject withDek(byte[] dek) {
@@ -111,7 +123,7 @@ public class KladVaultPlugin extends Plugin {
         try {
             call.resolve(withDek(vault.create(pin)));
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         } finally {
             Arrays.fill(pin, '\0');
         }
@@ -125,7 +137,7 @@ public class KladVaultPlugin extends Plugin {
             Vault.Attempt a = vault.unlock(pin);
             call.resolve(a.dek != null ? withDek(a.dek) : attemptFail(a));
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         } finally {
             Arrays.fill(pin, '\0');
         }
@@ -148,7 +160,7 @@ public class KladVaultPlugin extends Plugin {
             vault.rewrap(dek, pin);
             call.resolve(ok());
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         } finally {
             if (dek != null) Arrays.fill(dek, (byte) 0);
             Arrays.fill(old, '\0');
@@ -171,7 +183,7 @@ public class KladVaultPlugin extends Plugin {
             vault.wipe();
             call.resolve(ok());
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         } finally {
             Arrays.fill(pin, '\0');
         }
@@ -183,8 +195,12 @@ public class KladVaultPlugin extends Plugin {
         void run(Cipher c) throws Exception;
     }
 
-    /** BiometricPrompt avec CryptoObject (fil principal). */
+    /**
+     * BiometricPrompt avec CryptoObject (fil principal). Une seule réponse par appel : une erreur intermédiaire
+     * (visage non reconnu, par exemple) ne doit ni masquer ni doubler la réponse finale.
+     */
     private void prompt(PluginCall call, Cipher cipher, String title, String negative, OnCipher done) {
+        AtomicBoolean answered = new AtomicBoolean(false);
         getActivity().runOnUiThread(() -> {
             BiometricPrompt bp = new BiometricPrompt(
                 getActivity(),
@@ -192,21 +208,25 @@ public class KladVaultPlugin extends Plugin {
                 new BiometricPrompt.AuthenticationCallback() {
                     @Override
                     public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                        if (answered.getAndSet(true)) return;
                         BiometricPrompt.CryptoObject co = result.getCryptoObject();
                         try {
                             if (co == null || co.getCipher() == null) throw new IllegalStateException("Empreinte sans clé");
-                            done.run(co.getCipher());
+                            Cipher c = co.getCipher();
+                            c.updateAAD(Coffre.AAD_BIO);   // seulement maintenant : la clé exige l'empreinte
+                            done.run(c);
                         } catch (Exception e) {
-                            call.resolve(fail("erreur", e.getMessage()));
+                            call.resolve(fail("erreur", describe(e)));
                         }
                     }
 
                     @Override
                     public void onAuthenticationError(int code, CharSequence msg) {
+                        if (answered.getAndSet(true)) return;
                         boolean cancelled = code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
                             || code == BiometricPrompt.ERROR_USER_CANCELED
                             || code == BiometricPrompt.ERROR_CANCELED;
-                        call.resolve(fail(cancelled ? "annule" : "erreur", msg == null ? null : msg.toString()));
+                        call.resolve(fail(cancelled ? "annule" : "erreur", msg == null ? "Empreinte : erreur " + code : msg.toString()));
                     }
                 }
             );
@@ -239,7 +259,7 @@ public class KladVaultPlugin extends Plugin {
                 call.resolve(withDek(dek));
             });
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         }
     }
 
@@ -260,7 +280,7 @@ public class KladVaultPlugin extends Plugin {
             }
             dek = a.dek;
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
             return;
         } finally {
             Arrays.fill(pin, '\0');
@@ -279,7 +299,7 @@ public class KladVaultPlugin extends Plugin {
             });
         } catch (Exception e) {
             Arrays.fill(key, (byte) 0);
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         }
     }
 
@@ -289,7 +309,7 @@ public class KladVaultPlugin extends Plugin {
             vault.disableBio();
             call.resolve(ok());
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         }
     }
 
@@ -351,7 +371,7 @@ public class KladVaultPlugin extends Plugin {
             out.write(Base64.getDecoder().decode(call.getString("data", "")));
             call.resolve(ok());
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         }
     }
 
@@ -384,7 +404,7 @@ public class KladVaultPlugin extends Plugin {
             r.put("data", b64(buf.toByteArray()));
             call.resolve(r);
         } catch (Exception e) {
-            call.resolve(fail("erreur", e.getMessage()));
+            call.resolve(fail("erreur", describe(e)));
         }
     }
 }

@@ -359,6 +359,7 @@
     A().open(S, hooks);
     renderSecu();
     if (pendingUrl) { const u = pendingUrl; pendingUrl = null; A().handleReturn(u); }
+    window.KladMaj.check(true);              // publication plus récente ? (bandeau)
   }
 
   // ------------------------------------------------------------ écran de verrou
@@ -637,5 +638,6 @@
     };
   }
 
+  window.KladMaj.init({ log: (k, m) => { if (key && A()) A().log(k, m); }, toast });
   start();
 })();
