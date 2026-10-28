@@ -783,6 +783,14 @@
           bud = true;
         } catch (e) { log('err', 'Budget : ' + (e.message || e)); }
       }
+      // 0.7 : appels de fonds et équilibre du compte commun repris du carnet (une fois, y compris depuis la 0.6).
+      if (s0.budget && (s0.budget.v || 1) < 2 && s0.carnet != null && window.KladCommun) {
+        try {
+          const r = window.KladCommun.importer(s0, s0.carnet);
+          if (r) log('ok', 'Compte commun repris de l\'ancienne version : ' + r.appels + ' copropriété(s) avec appels de fonds, ' + r.equipements + ' dépense(s) d\'équipement ajoutée(s).');
+          bud = true;
+        } catch (e) { log('err', 'Compte commun : ' + (e.message || e)); }
+      }
       if (init || s0.classement || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
@@ -794,7 +802,7 @@
     fermerVolet();
     toastAction = null; $('toast').className = '';
     ['vAccueil', 'opsListe', 'opsFiltres', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'vBudget', 'posteCorps', 'contratsCorps', 'tendanceCorps', 'ravCorps', 'ajoutCorps'].forEach(id => { $(id).textContent = ''; });
+      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'vBudget', 'posteCorps', 'contratsCorps', 'tendanceCorps', 'ravCorps', 'ajoutCorps', 'virementsCorps', 'equilibreCorps'].forEach(id => { $(id).textContent = ''; });
     $('badgeOps').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'opsQ'].forEach(id => { $(id).value = ''; });
     $('opsCompte').innerHTML = '';

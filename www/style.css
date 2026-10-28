@@ -358,3 +358,27 @@ svg.graph { width: 100%; height: auto; display: block; margin: 8px 0; }
 .bl .nm small.chip { display: inline; font-size: 10.5px; padding: 1px 6px; }
 #toast { visibility: hidden; }
 #toast.show { visibility: visible; }
+
+/* ------------------------------------------------------------ Lot 7 : compte commun, équilibre */
+details.ccard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0 14px; margin: 10px 0; }
+details.ccard > summary { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 12px 0; list-style: none; color: var(--ink); font-size: 14px; }
+details.ccard > summary::-webkit-details-marker { display: none; }
+details.ccard > summary::before { content: "›"; color: var(--muted); margin-right: 6px; transition: transform .15s; display: inline-block; }
+details.ccard[open] > summary::before { transform: rotate(90deg); }
+details.ccard > summary b { flex: 1; }
+details.ccard > summary span { font-size: 13px; text-align: right; }
+.ccb { padding: 0 0 12px; }
+.ccb h4, .feuille h4 { font-size: 13px; color: var(--muted); margin: 14px 0 4px; }
+.cperso { border-top: 1px solid var(--line); padding: 8px 0; }
+.cperso .list li small { display: block; color: var(--muted); font-size: 12px; }
+.cperso .list li .chip { display: inline-block; margin: 2px 4px 0 0; }
+.carte.bsolde.alerte { border-color: var(--bad); }
+.carte.bsolde .rangee { margin-top: 4px; font-size: 13px; }
+.calc .rangee { border-top: 1px dashed var(--line); padding: 6px 0; font-size: 13px; align-items: flex-start; }
+.calc .rangee > span:last-child { text-align: right; white-space: nowrap; }
+.eqbar { position: relative; display: flex; height: 30px; border-radius: 9px; overflow: hidden; margin: 6px 0 12px; }
+.eqbar i { display: flex; align-items: center; padding: 0 8px; font-style: normal; font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; }
+.eqbar i.g { background: var(--nfix); } .eqbar i.s { background: var(--nopt); }
+.eqbar i.s { justify-content: flex-end; }
+.eqbar em { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .6; }
+.ordre-e { border-top: 1px solid var(--line); padding: 6px 0; }

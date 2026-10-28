@@ -5,8 +5,12 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.6.0** — Lot 6 : onglet Budget (perso / commun, cycles de salaire, sections, édition annulable), reste à vivre,
-contrats et échéances sur 31 jours, tendance, résumé Grafit `month` / `upcoming` / `BUDGET_OVER`.
+**0.7.0** — Lot 7 : compte commun (marge réelle, fin de mois, virements et ordres permanents, virement ponctuel,
+trésorerie 12 mois, appels de fonds, impôts, d'où vient le solde), équilibre des apports, résumé Grafit `commun` et
+`OVERDRAFT_RISK`. (0.6.0 — Lot 6 : budget par cycle, reste à vivre, contrats, échéances, tendance.)
+
+Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts enchaînés sans validation intermédiaire
+(décisions par défaut notées dans chaque section « Décisions »).
 
 ## Feuille de route
 
@@ -17,7 +21,7 @@ contrats et échéances sur 31 jours, tendance, résumé Grafit `month` / `upcom
 | 4 | Lien Grafit (résumé v1 : soldes, totaux, alertes) | 0.4 | fait |
 | 5 | Classement, opérations vues, carte à débit différé, paiements en ligne, réassociation, « À vérifier » | 0.5 | fait |
 | 6 | Budget par cycle (salaire), reste à vivre, contrats et charges fixes, tendance ; Grafit : `month`, reste à vivre, `upcoming` | 0.6 | fait |
-| 7 | Module compte commun + équilibre ; Grafit : `commun` | 0.7 | à faire |
+| 7 | Module compte commun + équilibre ; Grafit : `commun` | 0.7 | fait |
 | 8 | Impôts, épargne salariale, taxe foncière | 0.8 | à faire |
 | 9 | Extras (IMAP, Claude), reprise définitive, bascule | 0.9 → 1.0 | à faire |
 
@@ -38,6 +42,13 @@ contrats et échéances sur 31 jours, tendance, résumé Grafit `month` / `upcom
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- Compte commun (0.7) : chiffres identiques à l'ancienne version (parité `outils/parite/commun.mjs` dans klad-ref :
+  0 écart). Noms des personnes, motifs (virements de l'autre personne, syndic, prêteurs), apports initiaux, historique
+  et équipements de l'équilibre : complément (`klad.commun.motifAutre`, `klad.appels`, `klad.equilibre`) ou carnet ;
+  motifs des impôts (administration fiscale) génériques dans le code. Appels de fonds : données du carnet (mails et
+  relevé du syndic déjà connus), aucune lecture de mail (Lot 9). Alerte Grafit `OVERDRAFT_RISK` dès qu'un découvert est
+  prévu sur 12 mois.
 
 - Aucune règle, enseigne, nom de banque, d'employeur ou de personne dans le code : ce sont des données (carnet ou Klad).
 - Priorité de classement identique à l'ancienne version : correction > règle de l'utilisateur (mot le plus long) >
@@ -65,7 +76,13 @@ contrats et échéances sur 31 jours, tendance, résumé Grafit `month` / `upcom
   complément ou du carnet, surchargés par `S.budget.reglages` ; jamais dans le code.
 - Reste à vivre : colonne « comptes courants » prioritaire pour Grafit (`left_to_live_basis` = `accounts`), sinon `budget`.
 
-## Points d'appui pour le Lot 7
+## Points d'appui pour le Lot 8
+
+- Compte commun : `KladCommun` (`tresorerie`, `origine`, `plan`, `finDeMois`, `margeReelle`, `appels`, `equilibre`,
+  `impots`) ; rendu `KladVuesCommun`. Bloc `budget` en version 2 (appels, équilibre importés).
+- Réglages du carnet encore inexploités : `fisc`, `tf`, `livret`, `pee`, `dismiss`, `excl`, `fuel`.
+
+## Points d'appui pour le Lot 7 (historique)
 
 - Budget : `KladBudget.contexte(S, now, ctxClassement)` → B (une fois par affichage, `KladApp.budget()`) ;
   `suivi(B, scope, nav)`, `postes(B, sc)`, `parts(B)` (répartition du commun : `pg` par poste), `reserveCommun(B)`,

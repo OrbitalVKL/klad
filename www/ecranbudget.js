@@ -11,7 +11,9 @@
   const esc = A.esc;
   const S = () => A.etat();
 
-  const ui = { scope: 'perso', nav: null, ouverts: new Set(), tendCat: '', ctrScope: 'perso', edit: null, ajout: null };
+  const KC = window.KladCommun;
+  const VC = window.KladVuesCommun;
+  const ui = { scope: 'perso', nav: null, ouverts: new Set(), cartes: new Set(), tendCat: '', ctrScope: 'perso', edit: null, ajout: null, sim: {} };
 
   function render() {
     const B = A.budget();
@@ -20,6 +22,12 @@
     catch (e) { $('vBudget').innerHTML = '<p class="muted">Budget indisponible.</p>'; A.log('err', 'Budget : ' + (e.message || e)); }
   }
   A.rendus.push(render);
+  // cartes du compte commun : dépliées ou repliées, gardé d'un rendu à l'autre
+  $('vBudget').addEventListener('toggle', ev => {
+    const d = ev.target.closest && ev.target.closest('details[data-cc]');
+    if (!d) return;
+    if (d.open) ui.cartes.add(d.dataset.cc); else ui.cartes.delete(d.dataset.cc);
+  }, true);
 
   function annulable(msg, snap) {
     A.changed('budget');
@@ -152,6 +160,86 @@
   $('tendanceCorps').addEventListener('change', ev => {
     if (ev.target.id === 'tdCat') { ui.tendCat = ev.target.value; A.preparer.secTendance(); }
   });
+  // ------------------------------------------------------------ volet : ordres permanents (compte commun)
+  let ordresBrouillon = null;
+  A.preparer.secVirements = o => {
+    if (o.rendu && ordresBrouillon) return;
+    ordresBrouillon = JSON.parse(JSON.stringify((S().budget && S().budget.virements) || []));
+    renderOrdres();
+  };
+  function renderOrdres() {
+    const B = A.budget();
+    const D = Object.assign({}, B.D, { virements: ordresBrouillon });
+    $('virementsCorps').innerHTML = VC.ordres(Object.assign({}, B, { D }));
+  }
+  function lireOrdres() {
+    for (const el of $('virementsCorps').querySelectorAll('[data-vid]')) {
+      const v = ordresBrouillon.find(x => x.id === el.dataset.vid);
+      if (!v) continue;
+      for (const f of el.querySelectorAll('[data-vf]')) {
+        const k = f.dataset.vf, val = f.value.trim();
+        if (k === 'montant') { const c = F.saisie(val); if (c == null) throw new Error('Montant illisible.'); v.montant = c; }
+        else if (k === 'jour') v.jour = Math.min(31, Math.max(1, parseInt(val, 10) || 1));
+        else v[k] = val;
+      }
+    }
+  }
+  $('virementsCorps').addEventListener('click', ev => {
+    const t = ev.target;
+    try {
+      if (t.closest('[data-vajout]')) { lireOrdres(); ordresBrouillon.push({ id: 'v' + Date.now().toString(36), qui: 'moi', montant: 0, jour: 1, usage: 'fixes', label: 'Nouveau virement', depuis: '' }); renderOrdres(); return; }
+      const sp = t.closest('[data-vsuppr]');
+      if (sp) { lireOrdres(); ordresBrouillon = ordresBrouillon.filter(v => v.id !== sp.dataset.vsuppr); renderOrdres(); return; }
+      if (t.closest('[data-vok]')) {
+        lireOrdres();
+        const D = KB.donnees(S());
+        const avant = JSON.stringify(D.virements || []);
+        D.virements = ordresBrouillon;
+        ordresBrouillon = null;
+        A.log('info', 'Ordres permanents du compte commun modifiés.');
+        A.fermerVolet();
+        A.changed('budget');
+        A.toastAnnuler('Ordres permanents enregistrés.', () => { KB.donnees(S()).virements = JSON.parse(avant); A.changed('budget'); });
+      }
+    } catch (e) { A.toast(e.message || String(e), true); }
+  });
+
+  // ------------------------------------------------------------ volet : équilibre des apports
+  A.preparer.secEquilibre = () => { $('equilibreCorps').innerHTML = VC.equilibre(A.budget(), ui.sim); };
+  $('equilibreCorps').addEventListener('input', ev => {
+    if (ev.target.id !== 'eqSimX' && ev.target.id !== 'eqSimY') return;
+    ui.sim = { x: F.saisie($('eqSimX').value) || 0, y: F.saisie($('eqSimY').value) || 0 };
+    const tmp = document.createElement('div');
+    tmp.innerHTML = VC.equilibre(A.budget(), ui.sim);
+    const out = tmp.querySelector('#eqSimOut');
+    if (out) $('eqSimOut').innerHTML = out.innerHTML;
+  });
+  $('equilibreCorps').addEventListener('change', ev => {
+    const c = ev.target.closest('[data-eqon]');
+    if (!c) return;
+    const avant = KC.basculerEquipement(S(), c.dataset.eqon, c.checked);
+    A.changed('budget');
+    A.toastAnnuler(c.checked ? 'Dépense comptée dans l\'équilibre.' : 'Dépense retirée de l\'équilibre.', () => { KC.annulerEquilibre(S(), avant); A.changed('budget'); });
+  });
+  $('equilibreCorps').addEventListener('click', ev => {
+    const sp = ev.target.closest('[data-eqsuppr]');
+    if (sp) {
+      const avant = KC.retirerEquipement(S(), sp.dataset.eqsuppr);
+      A.changed('budget');
+      A.toastAnnuler('Dépense retirée.', () => { KC.annulerEquilibre(S(), avant); A.changed('budget'); });
+      return;
+    }
+    if (ev.target.closest('[data-eqajout]')) {
+      const lab = $('eqLab').value.trim().slice(0, 80);
+      const m = $('eqMoi').value.trim() ? F.saisie($('eqMoi').value) : 0, a = $('eqAutre').value.trim() ? F.saisie($('eqAutre').value) : 0;
+      if (!lab || m == null || a == null || !(m || a)) { A.toast('Indiquez un libellé et au moins un montant.', true); return; }
+      const avant = KC.ajouterEquipement(S(), { label: lab, date: $('eqDate').value || '', moi: m, autre: a, src: 'manuel' });
+      A.log('info', 'Dépense d\'équipement ajoutée à l\'équilibre.');
+      A.changed('budget');
+      A.toastAnnuler('Dépense ajoutée à l\'équilibre.', () => { KC.annulerEquilibre(S(), avant); A.changed('budget'); });
+    }
+  });
+
   A.preparer.secRav = () => {
     const B = A.budget();
     $('ravCorps').innerHTML = VB.detailRav(B ? KB.suivi(B, 'perso', null).rav : null);

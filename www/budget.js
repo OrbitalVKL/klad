@@ -792,6 +792,6 @@
     V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, nouveau, donnees, importer, reglages, contexte,
     cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
-    shift, finMois, nomMois, eur
+    shift, finMois, nomMois, eur, dernierDebit, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median
   };
 })(typeof window !== 'undefined' ? window : globalThis);
