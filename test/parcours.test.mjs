@@ -461,6 +461,35 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await capture(page, '15-tendance');
     await page.locator('#volet [data-fermer]').last().click();
 
+    // Lot 8 : résultats, impôts, épargne, observations ; « À vérifier » signale les observations à faire
+    await page.locator('.onglets [data-onglet="vBudget"]').click();
+    await page.locator('#vBudget [data-ouvrir="secResultats"]').click();
+    assert.match(await page.locator('#resultatsCorps').innerText(), /Cycle précédent[\s\S]*Solde de la période[\s\S]*Répartition des dépenses/);
+    await capture(page, '17-resultats');
+    await page.locator('#volet [data-fermer]').last().click();
+    for (const [sec, motif] of [['secImpots', /À régulariser entre vous[\s\S]*Taxe foncière/], ['secEpargne', /Livret[\s\S]*Solde estimé[\s\S]*Plan d'épargne entreprise/], ['secObs', /À faire/]]) {
+      await page.locator('.onglets [data-onglet="vPlus"]').click();
+      await page.locator('#vPlus [data-volet="' + sec + '"]').click();
+      const t = await page.locator('#' + sec).innerText();
+      assert.match(t, motif);
+      assert.doesNotMatch(t, /[\u2212-]\s?\d[\d\s\u00a0\u202f]*(,\d\d)? €/);
+      await capture(page, '18-' + sec);
+      await page.locator('#volet [data-fermer]').last().click();
+    }
+    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    await page.locator('#vPlus [data-volet="secImpots"]').click();
+    await page.locator('#impotsCorps summary', { hasText: /^Hypothèses \d{4}/ }).click();
+    await page.locator('#impotsCorps [data-hyp="communG"]').fill('60');
+    await page.locator('#impotsCorps [data-hyp="communG"]').press('Tab');
+    await page.waitForSelector('#toast.show.action');
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.fisc.hyp.communG), 60);
+    await page.locator('#toast button').click();
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.fisc.hyp.communG), 50);
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('.onglets [data-onglet="vAccueil"]').click();
+    assert.match(await page.locator('#vAccueil .averif').innerText(), /observations? à faire/);
+
     // Grafit : month et upcoming
     await page.locator('.onglets [data-onglet="vPlus"]').click();
     await page.locator('#vPlus [data-volet="secModules"]').click();

@@ -118,9 +118,10 @@
   // → { attention, sauvegarde, maj, ctx } (lu par le rendu et par le résumé Grafit).
   function extras(now) {
     const cx = ctx();
-    let rav = null;
+    let rav = null, observations = 0;
     try { const B = budget(); rav = B ? window.KladBudget.suivi(B, 'perso', null).rav || null : null; } catch (e) { rav = null; }
-    return { attention: KC.attention(cx, now), sauvegarde: externe.sauvegarde, maj: externe.maj, ctx: cx, rav, budget: BCTX };
+    try { const B = budget(); observations = B && window.KladObservations ? window.KladObservations.observations(B, 'perso').faire.length : 0; } catch (e) { observations = 0; }
+    return { attention: KC.attention(cx, now), sauvegarde: externe.sauvegarde, maj: externe.maj, ctx: cx, rav, budget: BCTX, observations };
   }
 
   // ------------------------------------------------------------ onglets
@@ -214,7 +215,7 @@
 
   // Accueil : un appui sur une carte de compte ouvre ses opérations ; sur une opération, son détail ;
   // sur une ligne de « À vérifier », l'écran concerné.
-  const AV = { comptes: 'secComptes', banques: 'secBanques', sync: 'secSync', sauvegarde: 'secSauv', maj: 'secMaj' };
+  const AV = { comptes: 'secComptes', banques: 'secBanques', sync: 'secSync', sauvegarde: 'secSauv', maj: 'secMaj', observations: 'secObs' };
   $('vAccueil').addEventListener('click', ev => {
     if (ev.target.closest('[data-rav]')) { ouvrirVolet('secRav'); return; }
     const av = ev.target.closest('[data-av]');
@@ -791,6 +792,14 @@
           bud = true;
         } catch (e) { log('err', 'Compte commun : ' + (e.message || e)); }
       }
+      // 0.8 : impôts, taxe foncière, épargne, livret et points « fait » repris du carnet (une fois).
+      if (s0.budget && (s0.budget.v || 1) < 3 && s0.carnet != null && window.KladFisc) {
+        try {
+          const r = window.KladFisc.importer(s0, s0.carnet);
+          if (r) log('ok', 'Impôts et épargne repris de l\'ancienne version : ' + r.avis + ' avis, ' + r.bulletins + ' bulletin(s).');
+          bud = true;
+        } catch (e) { log('err', 'Impôts : ' + (e.message || e)); }
+      }
       if (init || s0.classement || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
@@ -802,7 +811,7 @@
     fermerVolet();
     toastAction = null; $('toast').className = '';
     ['vAccueil', 'opsListe', 'opsFiltres', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'vBudget', 'posteCorps', 'contratsCorps', 'tendanceCorps', 'ravCorps', 'ajoutCorps', 'virementsCorps', 'equilibreCorps'].forEach(id => { $(id).textContent = ''; });
+      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'vBudget', 'posteCorps', 'contratsCorps', 'tendanceCorps', 'ravCorps', 'ajoutCorps', 'virementsCorps', 'equilibreCorps', 'impotsCorps', 'epargneCorps', 'obsCorps', 'resultatsCorps'].forEach(id => { $(id).textContent = ''; });
     $('badgeOps').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'opsQ'].forEach(id => { $(id).value = ''; });
     $('opsCompte').innerHTML = '';

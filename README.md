@@ -19,7 +19,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `budget.js` = budget par cycle, reste à vivre, contrats, échéances, tendance (calculs), `commun.js` = compte commun (virements, trésorerie, appels de fonds, équilibre), `vbudget.js` = rendu de l'onglet Budget, `vcommun.js` = rendu du compte commun et de l'équilibre, `ecranbudget.js` = onglet Budget (navigation, édition), `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil (« À vérifier »), des opérations, du détail et du volet « Classer », `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `budget.js` = budget par cycle, reste à vivre, contrats, échéances, tendance (calculs), `commun.js` = compte commun (virements, trésorerie, appels de fonds, équilibre), `vbudget.js` = rendu de l'onglet Budget, `vcommun.js` = rendu du compte commun et de l'équilibre, `fisc.js` = impôt du foyer, taxe foncière, PEE, livret, `observations.js` = observations, résultats d'une période, répartition, `vfisc.js` et `ecranfisc.js` = écrans Impôts, Épargne, Observations, Résultats, `ecranbudget.js` = onglet Budget (navigation, édition), `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil (« À vérifier »), des opérations, du détail et du volet « Classer », `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
 | `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour), `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent ») et `grafit/` (lien Grafit : `GrafitProvider`, plugin `KladGrafitPlugin`, contrôle de l'appelant `Appelant`, configuration `GrafitConfig`). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
@@ -65,7 +65,7 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 | `ops-<compte>-<année>` | Opérations d'un compte pour une année. Une synchro ne réécrit que les blocs changés (en pratique l'année en cours). |
 | `carnet` | Réglages de l'ancienne version repris tels quels (classement repris au Lot 5 ; budget et suivants aux lots suivants). |
 | `classement` | Catégories (nature, icône), règles de base, règles de l'utilisateur, compte rendu de l'import du carnet (0.5). |
-| `budget` | Budget par périmètre (postes `f|`, `c|`, `r|`, `m|` : montant, périodicité, part du commun), base de calcul, contrats, virements permanents, réglages du cycle (0.6) ; appels de fonds, équipements de l'équilibre (0.7, `v` = 2). |
+| `budget` | Budget par périmètre (postes `f|`, `c|`, `r|`, `m|` : montant, périodicité, part du commun), base de calcul, contrats, virements permanents, réglages du cycle (0.6) ; appels de fonds, équipements de l'équilibre (0.7, `v` = 2) ; impôts, taxe foncière, PEE, livret, points « fait » (0.8, `v` = 3). |
 | `journal`, `sauvegarde` | Journal anonyme ; clé de sauvegarde tirée de la phrase. |
 
 - **Montants** : centimes entiers signés, convertis depuis le texte de la banque sans virgule flottante. Le signe n'est jamais affiché : colonnes Débit / Crédit, « débiteur » pour un solde négatif.
@@ -198,6 +198,29 @@ personne, syndic, prêteurs), apports initiaux, historique de l'équilibre et é
   reste à combler, qui doit combien de plus, rattrapage par mois (postes « équilibre »), date d'équilibre, simulation
   (ajout mensuel, versement ponctuel), mouvements par sorte.
 
+### Impôts, épargne, observations, résultats (0.8)
+
+Calculs identiques à l'ancienne version (parité mesurée hors du dépôt). Le barème légal est dans le code ; avis
+d'impôt, bulletins de paie déjà lus, hypothèses, logement, plan d'épargne et livret sont des données (`fisc`, `tf`,
+`pee`, `livret`, `dismiss` du carnet ; `klad.fisc`, `klad.tf`, `klad.pee`, `klad.livret`, `klad.observations` du complément).
+
+- **Plus › Impôts** : impôt sur le revenu du foyer (déclaration commune, 2 parts) par année — avis (recalculé et comparé)
+  ou estimation de l'année en cours (bulletins lus, projection jusqu'à décembre, acomptes prélevés sur le commun, taux du
+  foyer) ; solde ou remboursement ; régularisations entre les deux personnes (règle de partage au choix : impôt de chacun
+  seul, taux individualisés, prorata des revenus) ; calcul détaillé ; hypothèses modifiables (annulables) ; avis et
+  barèmes. **Taxe foncière** : estimation par année (base, exonération des premières années, revalorisation), avis saisis,
+  paiement retrouvé sur le commun, part de chacun, déclaration H2.
+- **Plus › Épargne** : livret (solde saisi + virements repérés depuis), plan d'épargne entreprise (encours, versements,
+  abondement, plus-value, rendement annuel, conseils ; fonds, versements et règle d'abondement saisis dans Klad).
+- **Plus › Observations** (et « À vérifier » sur l'accueil) : points à faire et observations, perso et commun —
+  charges récurrentes sur un compte secondaire, relevés en retard, virements du commun et échéance du prêt, contrat
+  résilié encore prélevé, prélèvement mensuel absent, appels de fonds, portefeuille détaillé, opérations à classer,
+  contrats au-dessus du budget, virement ponctuel, ordres à modifier, virements reçus, budget dépassé, balance sur 3 mois,
+  impôts, taxe foncière, régularisations, salaire. « C'est fait » masque un point jusqu'à ce que la situation se reproduise.
+- **Budget › Résultats** : bilan du cycle (ou du mois) précédent ou de la période affichée — revenus, sections, hors
+  budget, solde, épargne réalisée, plus gros écarts — et répartition des dépenses (par nature, par catégorie).
+- Pas de lecture de mail, de Drive ni d'analyse par Claude (bulletins, avis, appels de fonds) : Lot 9.
+
 ### Sauvegarde et phrase de récupération
 
 Au premier lancement, Klad affiche une **phrase de récupération** : 24 caractères (120 bits aléatoires) en 6 groupes de 4, alphabet sans I, L, O, U. Elle est affichée une seule fois, à recopier sur papier, puis vérifiée par la ressaisie de 2 groupes.
@@ -329,6 +352,7 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 11. *Budget* : Perso / Commun, ◀ ▶ entre cycles ; un appui sur un poste montre ses opérations, « Modifier le budget » ouvre
    le volet d'édition (annulable) ; *Contrats* et *Tendance* en haut. Accueil : carte « Reste à vivre » (détail au toucher).
    *Commun* : marge réelle, fin de mois, virements (ordres permanents modifiables), trésorerie, appels de fonds, d'où vient
-   le solde ; bouton *Équilibre*.
+   le solde ; bouton *Équilibre*. *Résultats* : bilan de la période précédente et répartition des dépenses.
+12. *Plus › Observations, Impôts, Épargne* : points à faire, impôt du foyer et taxe foncière, livret et plan d'épargne.
 
 Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement. Un faux client Enable Banking (`window.KladFauxEB`, utilisé par le parcours Chromium) permet d'essayer la connexion et la synchro sans réseau.

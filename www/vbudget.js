@@ -56,6 +56,7 @@
     let h = '<div class="bhaut"><div class="seg" role="group" aria-label="Périmètre">' +
       ['perso', 'commun'].map(x => '<button data-scope="' + x + '" aria-pressed="' + (x === scope) + '">' + (x === 'perso' ? 'Perso' : 'Commun') + '</button>').join('') + '</div>' +
       '<button class="btn ghost small" data-ouvrir="secContrats">Contrats</button><button class="btn ghost small" data-ouvrir="secTendance">Tendance</button>' +
+      (g.KladVuesFisc ? '<button class="btn ghost small" data-ouvrir="secResultats">Résultats</button>' : '') +
       (scope === 'commun' && g.KladVuesCommun ? '<button class="btn ghost small" data-ouvrir="secEquilibre">Équilibre</button>' : '') + '</div>';
     h += '<div class="cycnav"><button class="btn ghost small" data-nav="prev"' + (per.prev ? '' : ' disabled') + ' aria-label="Période précédente">◀</button>' +
       '<b>' + esc(libellePeriode(per)) + '</b><button class="btn ghost small" data-nav="next"' + (past ? '' : ' disabled') + ' aria-label="Période suivante">▶</button></div>' +
