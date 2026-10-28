@@ -318,6 +318,9 @@
         A.log('ok', 'Budget repris de l\'ancienne version : ' + rb.postes + ' poste(s), ' + rb.contrats + ' contrat(s), ' + rb.virements + ' virement(s).');
       } catch (e) { A.log('err', 'Budget : ' + (e.message || e)); }
     }
+    if (s0.budget && (s0.budget.v || 1) < 2 && s0.carnet != null && window.KladCommun) {
+      try { window.KladCommun.importer(s0, s0.carnet); } catch (e) { A.log('err', 'Compte commun : ' + (e.message || e)); }
+    }
     A.changed('import');
     reprendreClassement(s0).then(() => { if (st.relire && A.etat() === s0) A.synchro('relecture'); });
   });

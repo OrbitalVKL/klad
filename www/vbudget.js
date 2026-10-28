@@ -55,7 +55,8 @@
     const ouverts = (ui && ui.ouverts) || new Set();
     let h = '<div class="bhaut"><div class="seg" role="group" aria-label="Périmètre">' +
       ['perso', 'commun'].map(x => '<button data-scope="' + x + '" aria-pressed="' + (x === scope) + '">' + (x === 'perso' ? 'Perso' : 'Commun') + '</button>').join('') + '</div>' +
-      '<button class="btn ghost small" data-ouvrir="secContrats">Contrats</button><button class="btn ghost small" data-ouvrir="secTendance">Tendance</button></div>';
+      '<button class="btn ghost small" data-ouvrir="secContrats">Contrats</button><button class="btn ghost small" data-ouvrir="secTendance">Tendance</button>' +
+      (scope === 'commun' && g.KladVuesCommun ? '<button class="btn ghost small" data-ouvrir="secEquilibre">Équilibre</button>' : '') + '</div>';
     h += '<div class="cycnav"><button class="btn ghost small" data-nav="prev"' + (per.prev ? '' : ' disabled') + ' aria-label="Période précédente">◀</button>' +
       '<b>' + esc(libellePeriode(per)) + '</b><button class="btn ghost small" data-nav="next"' + (past ? '' : ' disabled') + ' aria-label="Période suivante">▶</button></div>' +
       (past ? '<div class="row center"><button class="lien" data-nav="now">Revenir au cycle en cours</button></div>' : '');
@@ -101,6 +102,7 @@
       h += '</section>';
     }
     h += soldeCycle(s);
+    if (scope === 'commun' && !past && g.KladVuesCommun) { try { h += g.KladVuesCommun.cartes(B, ui && ui.cartes); } catch (e) { h += '<p class="muted">Compte commun : calcul impossible.</p>'; } }
     h += '<p class="muted small">' + (per.cyc ? 'Cycle du dernier salaire à la veille du suivant. ' : '') +
       'Budget = votre budget mensuel (une charge trimestrielle ou annuelle ne compte que le mois de son échéance' + (scope === 'commun' ? ', sauf au compte commun où elle est provisionnée chaque mois' : '') +
       ') ; utilisé = opérations de la période, les paiements carte à leur date de paiement. Hors budget : postes sans budget.</p>';

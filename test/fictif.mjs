@@ -77,8 +77,15 @@ export function repriseFictive(fin) {
       { id: 'v1', who: 'g', from: 'Courant', amt: 800, day: 2, use: 'fixes', label: 'Virement permanent' },
       { id: 'v2', who: 's', from: 'Autre compte', amt: 600, day: 3, use: 'tout', label: 'Virement personne B' }
     ],
+    appels: { H: { lab: 'Copropriété fictive', to: 'SYNDIC FICTIF', iban: '', items: [[moisDe(fin, -6) + '-01', 'charges', 450], [moisDe(fin, -3) + '-01', 'charges', 450], [moisDe(fin, 0) + '-01', 'charges', 450]],
+      stmt: { at: moisDe(fin, -1) + '-20', solde: 0 } } },
     klad: { salaire: { compte: 'r0', motif: 'SOCIETE FICTIVE', paie: 'PAIE', min: 1000, minCycle: 500 },
-      commun: { moi: 'Personne A', autre: 'Personne B' }, cartes: { r3: { motif: 'PRLV CARTE' } } }
+      commun: { moi: 'Personne A', autre: 'Personne B', motifAutre: 'PERSONNE B' }, cartes: { r3: { motif: 'PRLV CARTE' } },
+      appels: { motif: 'SYNDIC', ordre: ['H'], H: 'SYNDIC' },
+      equilibre: { apport: { moi: 5000, autre: 15000 },
+        regles: [['PERSONNE B', 'vs', 'credit'], ['PERSONNE A', 'vg', 'credit'], ['.', 'rf', 'credit'], ['ECH PRET', 'pc', 'debit'], ['SYNDIC', 'ch', 'debit'], ['ENERGIE|BOX', 'en', 'debit'], ['.', 'ot', 'debit']],
+        ops: [[moisDe(fin, -12) + '-02', 'VIR PERSONNE A', 800, 'vg'], [moisDe(fin, -12) + '-03', 'VIR PERSONNE B', 600, 'vs'], [moisDe(fin, -12) + '-05', 'ECH PRET', -950, 'pc']],
+        equip: [['2025-01-15', 'Cuisine fictive', 'facture fictive', 1200, 0, true], ['2025-02-10', 'Peinture fictive', 'facture fictive', 0, 300, false]] } }
   };
   // carte à débit différé : quelques achats
   for (let k = -9; k <= 0; k++) {

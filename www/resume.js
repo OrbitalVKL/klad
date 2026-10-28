@@ -96,6 +96,7 @@
     else if (sv && sv.jours >= 30) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · ' + sv.jours + ' J' });
     if (ext && ext.maj && /^\d+\.\d+\.\d+$/.test(ext.maj)) out.push({ level: 'info', code: 'UPDATE_AVAILABLE', text: 'KLAD ' + ext.maj });
     for (const b of (ext && ext.budgetOver) || []) out.push({ level: 'caut', code: 'BUDGET_OVER', text: b });
+    if (ext && ext.decouvert) out.push({ level: 'caut', code: 'OVERDRAFT_RISK', text: ext.decouvert });
     return out.map((a, i) => [a, i]).sort((x, y) => NIVEAUX[x[0].level] - NIVEAUX[y[0].level] || x[1] - y[1]).map(x => x[0]);
   }
 
@@ -191,7 +192,9 @@
       date: e.date, label: e.sorte === 'carte' && comptes.get(e.label) ? libelle(comptes.get(e.label)) : (libellePoste(S, e.poste || e.label) || 'ECHEANCE'),
       amount: -euros(e.montant), kind: { contrat: 'contract', recurrent: 'recurring', carte: 'card' }[e.sorte] }));
     const over = s.depasses.filter(a => a.pm > 50).slice(0, 3).map(a => (libellePoste(S, a.label) || 'POSTE') + ' +' + Math.round(100 * (a.cur - a.pm) / a.pm) + ' %');
-    return { month, upcoming, over };
+    let commun = null;
+    if (g.KladCommun) { try { commun = g.KladCommun.resume(B); } catch (e) { commun = null; } }
+    return { month, upcoming, over, commun };
   }
 
   // ext (facultatif) : { attention: { unseen, unclassified, accountsToCheck, toMatch }, sauvegarde: { jours | null }, maj: version,
@@ -202,6 +205,10 @@
     let bu = null;
     try { bu = budget(S, now, ext); } catch (e) { bu = null; }
     if (bu && bu.over.length) ext = Object.assign({}, ext, { budgetOver: bu.over });
+    if (bu && bu.commun && bu.commun.overdraft_risk) {
+      const c = bu.commun, d = c.low ? c.low.date : null;
+      ext = Object.assign({}, ext, { decouvert: 'COMPTE COMMUN' + (d ? ' · ' + d.slice(8, 10) + '/' + d.slice(5, 7) : '') });
+    }
     const accounts = comptes.map(c => compteResume(S, c, now));
     const r = { v: V, state: 'ok', generated: now };
     const st = dernierReleve(S);
@@ -213,7 +220,7 @@
     if (mac != null) r.main_after_card = mac;
     const at = attention(ext);
     if (at) r.attention = at;
-    if (bu) { r.month = bu.month; r.upcoming = bu.upcoming; }
+    if (bu) { r.month = bu.month; r.upcoming = bu.upcoming; if (bu.commun) r.commun = bu.commun; }
     r.alerts = alertes(S, comptes, accounts, now, ext);
     // Filet de sécurité (30 comptes tiennent largement) : alertes, puis comptes en trop retirés.
     while (octets(r) > MAX_OCTETS && r.upcoming && r.upcoming.length) r.upcoming.pop();

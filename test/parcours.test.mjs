@@ -430,7 +430,25 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.match(b, /Mois en cours/);
     assert.match(b, /Personne A[\s\S]*Personne B/);
     assert.match(b, /Solde du compte commun/);
+    // Lot 7 : marge réelle, fin de mois, virements, trésorerie ; équilibre ; ordres permanents (annulable)
+    assert.match(b, /Marge réelle du commun[\s\S]*Fin de mois estimée[\s\S]*Virements[\s\S]*Trésorerie · 12 mois[\s\S]*Appels de fonds/);
+    assert.doesNotMatch(b, /[\u2212-]\s?\d[\d\s\u00a0\u202f]*(,\d\d)? €/);
     await capture(page, '14-budget-commun');
+    await page.locator('#vBudget [data-ouvrir="secEquilibre"]').click();
+    assert.match(await page.locator('#equilibreCorps').innerText(), /Reste à combler[\s\S]*Personne A doit encore investir/);
+    await page.fill('#eqSimY', '100000');
+    await page.waitForFunction(() => /Équilibre atteint tout de suite/.test(document.getElementById('eqSimOut').textContent));
+    await capture(page, '16-equilibre');
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('#vBudget details[data-cc="vir"] [data-ouvrir="secVirements"]').click();
+    await page.waitForSelector('#virementsCorps [data-vok]');
+    await page.locator('#virementsCorps [data-vf="montant"]').first().fill('900');
+    await page.locator('#virementsCorps [data-vok]').click();
+    await page.waitForSelector('#toast.show.action');
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.virements[0].montant), 90000);
+    await page.locator('#toast button').click();
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.virements[0].montant), 80000);
     // contrats et échéances, tendance
     await page.locator('#vBudget [data-ouvrir="secContrats"]').click();
     assert.match(await page.locator('#contratsCorps').innerText(), /Prêt immobilier fictif[\s\S]*Échéances des 31 prochains jours/);
@@ -450,6 +468,8 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.waitForFunction(() => window.KladLienGrafit.demo() != null);
     const r = JSON.parse(await page.evaluate(() => window.KladLienGrafit.demo()));
     assert.equal(r.month.cycle, 'salary');
+    assert.equal(typeof r.commun.balance, 'number');
+    assert.equal(typeof r.commun.overdraft_risk, 'boolean');
     assert.ok(r.month.budget > 0 && Array.isArray(r.month.top) && r.month.left_to_live_basis === 'accounts');
     assert.ok(Array.isArray(r.upcoming));
     const brut = JSON.stringify(r);
