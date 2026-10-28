@@ -1,4 +1,5 @@
-// Klad — chiffrement des données (WebCrypto), phrase de récupération, sauvegarde, migration du prototype.
+// Klad — chiffrement des données (WebCrypto), phrase de récupération, sauvegarde, chargement du modèle,
+// migrations (prototype → 0.2, 0.2 → 0.3).
 // Fonctions pures, testées dans node (test/coffre.test.mjs). Aucun appel réseau, aucune donnée en clair écrite.
 //
 // La clé de données (DEK) vient du coffre natif KladVault après déverrouillage. Elle est importée ici en clé
@@ -41,7 +42,10 @@
   const MAGIC = [0x4b, 0x4c, 0x44];
   const BLOC_V = 1;
   const IV = 12;
-  const BLOCS = ['cle', 'comptes', 'journal', 'sauvegarde'];
+  // Noms de blocs : liste fixe, plus un bloc d'opérations par compte et par année (« ops-<compte>-<année> »).
+  // « comptes » : format 0.2, lu une dernière fois par la migration puis supprimé.
+  const BLOCS = ['cle', 'modele', 'soldes', 'carnet', 'journal', 'sauvegarde', 'comptes'];
+  const nomValide = name => BLOCS.indexOf(name) >= 0 || /^ops-[a-z0-9]{8}-\d{4}$/.test(String(name));
 
   function blocAad(version, name) {
     const n = enc.encode('klad.bloc:' + name);
@@ -51,7 +55,7 @@
   }
 
   async function seal(key, name, obj) {
-    if (BLOCS.indexOf(name) < 0) throw fail('nom', 'Bloc inconnu : ' + name);
+    if (!nomValide(name)) throw fail('nom', 'Bloc inconnu : ' + name);
     const iv = random(IV);
     const ct = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: blocAad(BLOC_V, name) },
       key, enc.encode(JSON.stringify(obj))));
@@ -229,6 +233,70 @@
     return { sessions: Object.keys(parts.comptes.sessions).length, cle: !!parts.cle.pem };
   }
 
+  // ------------------------------------------------------------ chargement du modèle (0.3), migration 0.2 → 0.3
+  // store : { get(nom) → objet | null, put(nom, objet), del(nom) }.
+  // → { S, ecrits: { nom: JSON lu ou écrit }, migration: compte rendu | null }.
+  // Migration : nouveaux blocs écrits (« modele » en dernier), relus et comparés ; seulement ensuite, « comptes » est
+  // supprimé. En cas d'échec, les nouveaux blocs sont retirés et l'ancien format reste intact (nouvel essai au
+  // prochain déverrouillage).
+  async function charger(store, now) {
+    const M = g.KladModele;
+    const b = { cle: await store.get('cle'), modele: await store.get('modele'), journal: await store.get('journal') };
+    const ecrits = {};
+    if (b.modele) {
+      if (await store.get('comptes') != null) await store.del('comptes');     // migration interrompue après l'écriture
+      b.soldes = await store.get('soldes');
+      b.carnet = await store.get('carnet');
+      for (const n of M.nomsOps(b.modele)) b[n] = await store.get(n);
+      for (const n of Object.keys(b)) if (b[n] != null) ecrits[n] = JSON.stringify(b[n]);
+      return { S: M.depuisBlocs(b), ecrits, migration: null };
+    }
+    const S = M.depuisBlocs({ cle: b.cle, journal: b.journal });
+    for (const n of ['cle', 'journal']) if (b[n] != null) ecrits[n] = JSON.stringify(b[n]);
+    const old = await store.get('comptes');
+    if (old == null) return { S, ecrits, migration: null };                    // coffre neuf
+    const conv = await M.depuis02(old, now == null ? Date.now() : now);
+    S.modele = conv.S.modele; S.soldes = conv.S.soldes; S.ops = conv.S.ops;
+    const blocs = M.versBlocs(S);
+    const noms = Object.keys(blocs).filter(n => n !== 'cle' && n !== 'journal' && n !== 'modele').concat('modele');
+    try {
+      for (const n of noms) await store.put(n, blocs[n]);
+      for (const n of noms) {
+        if (JSON.stringify(await store.get(n)) !== JSON.stringify(blocs[n])) throw fail('migration', 'relecture différente');
+      }
+    } catch (e) {
+      for (const n of noms.slice().reverse()) { try { await store.del(n); } catch (e2) { /* déjà absent */ } }
+      throw fail('migration', 'Conversion des données 0.2 impossible (' + (e.message || e) + '). Rien n\'a été effacé : nouvel essai au prochain déverrouillage.');
+    }
+    await store.del('comptes');
+    for (const n of noms) ecrits[n] = JSON.stringify(blocs[n]);
+    return { S, ecrits, migration: conv.r };
+  }
+
+  // Contenu d'une sauvegarde exportée (v2) : tous les blocs sauf le journal.
+  function contenuSauvegarde(S) {
+    const blocs = g.KladModele.versBlocs(S);
+    delete blocs.journal;
+    return { app: 'klad', v: 2, blocs };
+  }
+
+  // Sauvegarde ouverte → état. Une sauvegarde 0.2 (v1 : { cle, comptes }) passe par la migration.
+  async function depuisSauvegarde(payload, now) {
+    const M = g.KladModele;
+    if (!payload || payload.app !== 'klad') throw fail('format', 'Contenu de sauvegarde inattendu.');
+    if (payload.v === 2) {
+      if (!payload.blocs || !payload.blocs.modele) throw fail('format', 'Sauvegarde incomplète.');
+      for (const n of Object.keys(payload.blocs)) if (!nomValide(n)) throw fail('format', 'Sauvegarde : bloc inattendu.');
+      return M.depuisBlocs(payload.blocs);
+    }
+    const S = M.depuisBlocs({ cle: payload.cle || {} });
+    if (payload.comptes) {
+      const conv = await M.depuis02(payload.comptes, now == null ? Date.now() : now);
+      S.modele = conv.S.modele; S.soldes = conv.S.soldes; S.ops = conv.S.ops;
+    }
+    return S;
+  }
+
   function pick(o, keys) {
     const r = {};
     keys.forEach(k => { if (o[k] !== undefined) r[k] = o[k]; });
@@ -236,7 +304,7 @@
   }
 
   g.KladCoffre = {
-    toB64, fromB64, importDek, seal, open, BLOCS,
+    toB64, fromB64, importDek, seal, open, BLOCS, nomValide, charger, contenuSauvegarde, depuisSauvegarde,
     newPhrase, normPhrase, pickGroups, checkGroups,
     SAUV_ITER, newBackupKey, exportBackup, readBackupHeader, importBackup,
     blank, split, join, PROTO_KEY, migrate

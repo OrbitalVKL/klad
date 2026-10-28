@@ -1,6 +1,6 @@
 name: APK Android
 
-# Demande de fusion : vérification légère (tests Node, compilation Java + tests JUnit), sans APK ni signature.
+# Demande de fusion : vérification légère (tests Node, parcours Chromium, compilation Java + tests JUnit), sans APK ni signature.
 # main : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature ;
 #        si la version de package.json n'a pas encore de publication, création de l'étiquette v<version>
 #        et de la publication dans Releases avec l'APK.
@@ -61,6 +61,14 @@ jobs:
 
       - name: Dépendances
         run: npm install --no-audit --no-fund
+
+      - name: Parcours Chromium (coffre de démonstration, données fictives)
+        env:
+          KLAD_PARCOURS: obligatoire
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.49.1
+          npx playwright install --with-deps chromium
+          node --test test/parcours.test.mjs
 
       - name: Préparation Capacitor
         run: |

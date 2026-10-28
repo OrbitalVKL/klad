@@ -87,9 +87,10 @@
       }
       return this._jwt;
     }
-    async call(method, path, body) {
+    // extra : en-têtes supplémentaires (en-têtes « utilisateur présent » Psu-*).
+    async call(method, path, body, extra) {
       const t0 = Date.now();
-      const headers = { Authorization: 'Bearer ' + await this.token(), Accept: 'application/json' };
+      const headers = Object.assign({}, extra || {}, { Authorization: 'Bearer ' + await this.token(), Accept: 'application/json' });
       if (body) headers['Content-Type'] = 'application/json';
       let res, txt;
       try {
@@ -106,7 +107,7 @@
         const detail = data.message || data.detail || data.error || data.raw || '';
         this.log('err', method + ' ' + path.split('?')[0] + ' → ' + res.status + ' (' + ms + ' ms) ' + JSON.stringify(detail).slice(0, 300));
         const err = new Error('Enable Banking ' + res.status + ' : ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)).slice(0, 300));
-        err.status = res.status; err.data = data;
+        err.status = res.status; err.data = data; err.code = typeof data.error === 'string' ? data.error : (data.code || '');
         throw err;
       }
       this.log('ok', method + ' ' + path.split('?')[0] + ' → ' + res.status + ' (' + ms + ' ms)');
@@ -127,13 +128,19 @@
     createSession(code) { return this.call('POST', '/sessions', { code }); }
     session(id) { return this.call('GET', '/sessions/' + encodeURIComponent(id)); }
     deleteSession(id) { return this.call('DELETE', '/sessions/' + encodeURIComponent(id)); }
-    balances(uid) { return this.call('GET', '/accounts/' + encodeURIComponent(uid) + '/balances').then(r => r.balances || []); }
+    balances(uid, headers) { return this.call('GET', '/accounts/' + encodeURIComponent(uid) + '/balances', null, headers).then(r => r.balances || []); }
     details(uid) { return this.call('GET', '/accounts/' + encodeURIComponent(uid) + '/details'); }
-    async transactions(uid, dateFrom, onPage) {
+    // opts : date de début (AAAA-MM-JJ) ou { dateFrom, strategy, headers }. Sans date : stratégie « longest »
+    // (la plus longue période que la banque accepte).
+    async transactions(uid, opts, onPage) {
+      const o = typeof opts === 'string' ? { dateFrom: opts } : (opts || {});
       let key = null, all = [], pages = 0;
       do {
-        const q = '?date_from=' + dateFrom + (key ? '&continuation_key=' + encodeURIComponent(key) : '');
-        const r = await this.call('GET', '/accounts/' + encodeURIComponent(uid) + '/transactions' + q);
+        const p = [];
+        if (o.dateFrom) p.push('date_from=' + o.dateFrom);
+        else p.push('strategy=' + (o.strategy || 'longest'));
+        if (key) p.push('continuation_key=' + encodeURIComponent(key));
+        const r = await this.call('GET', '/accounts/' + encodeURIComponent(uid) + '/transactions?' + p.join('&'), null, o.headers);
         all = all.concat(r.transactions || []);
         key = r.continuation_key || null;
         if (onPage) onPage(all.length, ++pages);
@@ -143,17 +150,25 @@
   }
 
   // ------------------------------------------------------------ mise en forme d'une opération
+  // Contrepartie (créancier d'un débit, débiteur d'un crédit), si la banque la fournit.
+  function counterparty(t) { return ((t.credit_debit_indicator === 'CRDT' ? t.debtor : t.creditor) || {}).name || ''; }
+
+  // Libellé normalisé : informations de remise (espaces réduits), précédées de la contrepartie si elle n'y figure pas.
+  function label(t) {
+    const rem = (t.remittance_information || []).join(' ').replace(/\s+/g, ' ').trim();
+    const cp = counterparty(t);
+    const base = rem || (t.bank_transaction_code && t.bank_transaction_code.description) || 'Opération';
+    return (cp && base.toUpperCase().indexOf(cp.toUpperCase()) < 0 ? cp + ' · ' : '') + base;
+  }
+
   function normalize(t) {
     const raw = parseFloat(t.transaction_amount && t.transaction_amount.amount);
     const amt = isNaN(raw) ? null
       : (t.credit_debit_indicator ? Math.abs(raw) * (t.credit_debit_indicator === 'DBIT' ? -1 : 1) : raw);
-    const rem = (t.remittance_information || []).join(' ').replace(/\s+/g, ' ').trim();
-    const cp = ((t.credit_debit_indicator === 'CRDT' ? t.debtor : t.creditor) || {}).name || '';
-    const base = rem || (t.bank_transaction_code && t.bank_transaction_code.description) || 'Opération';
     return {
       id: t.entry_reference || t.transaction_id || null,
       date: t.booking_date || t.value_date || t.transaction_date || '',
-      label: (cp && base.toUpperCase().indexOf(cp.toUpperCase()) < 0 ? cp + ' · ' : '') + base,
+      label: label(t),
       amount: amt == null ? null : Math.round(amt * 100) / 100,
       currency: (t.transaction_amount && t.transaction_amount.currency) || 'EUR',
       pending: !!(t.status && t.status !== 'BOOK')
@@ -168,5 +183,5 @@
     return 'https://' + host + (r.toLowerCase() === host ? '' : '/' + r) + '/retour.html';
   }
 
-  g.KladEB = { API, Client, importKey, makeJwt, pemToPkcs8, normalize, redirectUrlFor, _b64u: b64u };
+  g.KladEB = { API, Client, importKey, makeJwt, pemToPkcs8, normalize, label, counterparty, redirectUrlFor, _b64u: b64u };
 })(typeof window !== 'undefined' ? window : globalThis);

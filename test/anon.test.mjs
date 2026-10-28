@@ -37,12 +37,16 @@ test('filtre : messages utiles conservés', () => {
 
 test('journal : chaque ligne filtrée, aucun nom de banque, de compte ou de titulaire', () => {
   const app = read('www/app.js');
-  assert.match(app, /S\.log\.push\([^\n]*KladAnon\.scrub\(msg\)/);
-  const calls = app.split('\n').filter(l => /\blog\('/.test(l) && !/function log/.test(l));
-  assert.ok(calls.length > 5);
-  for (const line of calls) {
-    const l = line.replace(/bankLabel\([^)]*\)|KladAnon\.accountLabel\([^)]*\)/g, 'ALIAS');
-    assert.doesNotMatch(l, /bank\.name|pend\.name|s\.bank\b|a\.name|\.iban|f\.s\.bank|f\.a\./, line.trim());
+  assert.match(app, /L\.push\([^\n]*KladAnon\.scrub\(msg\)/);
+  let n = 0;
+  for (const f of ['www/app.js', 'www/plus.js', 'www/sync.js', 'www/verrou.js']) {
+    const calls = read(f).split('\n').filter(l => /\blog\('/.test(l) && !/function log/.test(l));
+    n += calls.length;
+    for (const line of calls) {
+      const l = line.replace(/bankLabel\([^)]*\)|KladAnon\.accountLabel\([^)]*\)/g, 'ALIAS');
+      assert.doesNotMatch(l, /bank\.name|\.banque|s\.bank\b|a\.name|\.iban|libelle|intitule|fin4|\.label|montant|centimes/, f + ' : ' + line.trim());
+    }
   }
+  assert.ok(n > 15);
   assert.match(read('www/index.html'), /<script src="anon\.js"><\/script>\s*<script src="eb\.js">/);
 });
