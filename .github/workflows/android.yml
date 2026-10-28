@@ -1,12 +1,13 @@
 name: APK Android
 
+# Demande de fusion : tests + fabrication (vérification avant fusion, rien n'est publié).
+# main : fabrication de l'APK signé ; si la version de package.json n'a pas encore de publication,
+#        création de l'étiquette v<version> et de la publication dans Releases avec l'APK.
 on:
   push:
     branches: [main]
     paths-ignore: ['site/**', '**.md']
-    tags: ['v*']
-  release:
-    types: [published]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -14,7 +15,7 @@ permissions:
 
 concurrency:
   group: android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -22,19 +23,35 @@ jobs:
     env:
       HAS_KEY: ${{ secrets.KLAD_KEYSTORE_B64 != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
 
       - name: Tests
         run: node --test test/*.test.mjs
+
+      - name: Version
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(node scripts/version.mjs)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Version $TAG déjà publiée : fabrication seule."
+            else
+              echo "Nouvelle version $TAG : publication après la fabrication."
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
 
       - name: Dépendances
         run: npm install --no-audit --no-fund
@@ -84,21 +101,21 @@ jobs:
           cp android/app/build/outputs/apk/debug/app-debug.apk "klad-debug-${GITHUB_RUN_NUMBER}.apk"
           echo "APK=klad-debug-${GITHUB_RUN_NUMBER}.apk" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: klad-apk
           path: ${{ env.APK }}
           retention-days: 30
 
       - name: Publication (Releases)
-        if: startsWith(github.ref, 'refs/tags/v') && env.HAS_KEY == 'true'
+        if: steps.ver.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" --clobber
-          else
-            gh release create "$TAG" "$APK" --title "Klad $TAG" --prerelease \
-              --notes "Prototype de faisabilité. Installer l'APK, puis suivre la mise en place sur le site."
+          if [ "$HAS_KEY" != true ]; then
+            echo "::error::Secrets de signature absents : $TAG non publiée (un APK debug ne peut pas être publié)."
+            exit 1
           fi
+          gh release create "$TAG" "$APK" --target "$GITHUB_SHA" --title "Klad $TAG" --latest \
+            --notes "Prototype de faisabilité. Installer l'APK, puis suivre la mise en place sur le site."

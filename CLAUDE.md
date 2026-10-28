@@ -10,3 +10,5 @@
 - Formulations financières dans l'interface : pas de montants négatifs affichés ; dire « débit / crédit », « débiteur », ou qui doit combien à qui.
 - Avant de pousser : `npm test` doit passer.
 - Travail sur une branche + demande de fusion ; `main` déclenche la fabrication de l'APK et du site.
+- Cycle GitHub géré par Claude, sans intervention du propriétaire : branche, demande de fusion, attente des vérifications (workflow « APK Android »), fusion quand tout est vert, suivi des workflows sur `main`, correction en cas d'échec. Le propriétaire n'intervient que pour les décisions de design.
+- Publication : changer `version` dans `package.json` ; la fusion dans `main` crée l'étiquette `v<version>` et la publication avec l'APK signé. Pas de publication ni d'étiquette à la main. Pas de secret ni de réglage du dépôt modifié par Claude.
