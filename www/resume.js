@@ -1,0 +1,178 @@
+// Klad — résumé lu par Grafit (Lien Grafit, palier du Lot 4) : construction à partir de l'état déchiffré, et écritures
+// limitées aux vrais changements. Fonctions pures (le plugin est fourni par l'appelant), testées dans node
+// (test/resume.test.mjs).
+//
+// Le résumé ne contient jamais d'IBAN (ni sa fin), d'identifiant bancaire, de jeton, d'opération, de nom de banque
+// ni de libellé bancaire brut. Montants en euros (centimes / 100), dates AAAA-MM-JJ, instants en ms.
+// Un champ impossible à calculer est omis, jamais remplacé par 0.
+(function (g) {
+  'use strict';
+
+  const M = () => g.KladModele;
+  const V = 1;
+  const MAX_OCTETS = 32 * 1024 - 1;              // moins de 32 Ko (contrôlé aussi par le plugin natif)
+  const PERIME_MS = 30 * 3600e3;                 // relevé de plus de 30 h
+  const CRIT_JOURS = 3;                          // accès bancaire : critique à 3 jours ou moins
+  const KINDS = { courant: 'current', commun: 'current', carte_differee: 'card', paiement_en_ligne: 'wallet', epargne: 'savings' };
+  // Libellé d'un compte encore « à vérifier » (jamais confirmé par l'utilisateur) : il peut venir de la banque.
+  const GENERIQUES = { courant: 'COMPTE COURANT', commun: 'COMPTE COMMUN', carte_differee: 'CARTE', paiement_en_ligne: 'PAIEMENT EN LIGNE', epargne: 'EPARGNE' };
+  const NIVEAUX = { crit: 0, caut: 1, info: 2 };
+
+  const euros = c => c / 100;
+  const enEuros = c => (c.devise || 'EUR') === 'EUR';
+  const visibles = S => M().comptesTries(S).filter(c => !c.masque);
+
+  // Libellé en majuscules, sans accents, sans rien qui ressemble à un numéro (IBAN, fin d'IBAN, n° de compte, e-mail).
+  function libelle(c) {
+    const generique = GENERIQUES[c.role] || 'COMPTE';
+    let s = String((c.aVerifier ? generique : c.libelle) || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+      .replace(/[\u0000-\u001f\u007f]/g, ' ')
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/g, ' ')
+      .replace(/\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]){10,30}\b/g, ' ')
+      .replace(/\d(?:[\s.]?\d){4,}/g, ' ');
+    const fin = c.source && c.source.fin4 ? String(c.source.fin4).toUpperCase() : '';
+    if (fin) s = s.split(/\s+/).filter(w => w.replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, '') !== fin).join(' ');
+    s = s.replace(/\s+/g, ' ').trim().slice(0, 24).trim();
+    return s || generique;
+  }
+
+  function perime(c, now) {
+    const lu = c.sync && c.sync.lu ? Date.parse(c.sync.lu) : 0;
+    return !lu || now - lu > PERIME_MS;
+  }
+
+  // Âge d'un relevé : « n H » sous 24 h, sinon « n J ».
+  function age(ms) { return ms < 864e5 ? Math.floor(ms / 3600e3) + ' H' : Math.floor(ms / 864e5) + ' J'; }
+
+  function compteResume(S, c, now) {
+    const r = { id: c.id, label: libelle(c), kind: KINDS[c.role] || 'current' };
+    const eb = c.source.type === 'eb';
+    const s = M().soldeAffiche(S, c);
+    // Carte à débit différé : le solde brut de la carte n'est pas exposé (sa signification varie selon la banque).
+    if (c.role !== 'carte_differee' && s && enEuros(c)) {
+      r.balance = euros(s.centimes);
+      const itav = eb && S.soldes[c.id] && S.soldes[c.id].types && S.soldes[c.id].types.ITAV;
+      if (itav && Number.isInteger(itav.centimes) && itav.centimes !== s.centimes) r.available = euros(itav.centimes);
+      const ref = typeof s.dateRef === 'string' ? s.dateRef.slice(0, 10) : '';
+      const lu = s.lu ? Date.parse(s.lu) : 0;
+      const asOf = M().dateValide(ref) ? ref : lu ? M().jourLocal(lu) : null;
+      if (asOf) r.as_of = asOf;
+    }
+    if (eb) r.stale = perime(c, now);
+    else r.manual = true;
+    return r;
+  }
+
+  function alertes(S, comptes, resumes, now) {
+    const out = [];
+    comptes.forEach((c, i) => {
+      const r = resumes[i];
+      if ((c.role === 'courant' || c.role === 'commun') && r.balance < 0) out.push({ level: 'crit', code: 'NEGATIVE_BALANCE', text: r.label });
+      if (c.source.type !== 'eb') return;
+      const cx = S.modele.connexions[c.source.connexion];
+      const acces = M().etatAcces(cx, now);
+      if (acces) {
+        const j = Math.max(0, Math.floor((Date.parse(cx.valid_until) - now) / 864e5));
+        out.push({ level: acces === 'expire' || j <= CRIT_JOURS ? 'crit' : 'caut', code: 'BANK_CONSENT_EXPIRING', text: r.label + ' · ' + j + ' J' });
+      }
+      if (c.sync && c.sync.erreur) out.push({ level: 'caut', code: 'SYNC_FAILED', text: r.label });
+      if (r.stale) {
+        const lu = c.sync && c.sync.lu ? Date.parse(c.sync.lu) : 0;
+        out.push({ level: 'info', code: 'STALE', text: lu ? r.label + ' · ' + age(now - lu) : r.label });
+      }
+    });
+    return out.map((a, i) => [a, i]).sort((x, y) => NIVEAUX[x[0].level] - NIVEAUX[y[0].level] || x[1] - y[1]).map(x => x[0]);
+  }
+
+  // Totaux : épargne ; tous comptes (courants, commun, épargne) seulement sans carte à débit différé visible.
+  // Un total dont un compte n'a pas de solde connu est omis. Les comptes hors euros ne sont pas comptés.
+  function totaux(S, comptes) {
+    let ep = 0, nEp = 0, epOk = true, tout = 0, nTout = 0, toutOk = true, carte = false;
+    for (const c of comptes) {
+      if (c.role === 'carte_differee') carte = true;
+      if (!enEuros(c) || ['courant', 'commun', 'epargne'].indexOf(c.role) < 0) continue;
+      const s = M().soldeAffiche(S, c);
+      if (s) { tout += s.centimes; nTout++; } else toutOk = false;
+      if (c.role === 'epargne') { if (s) { ep += s.centimes; nEp++; } else epOk = false; }
+    }
+    const t = {};
+    if (!carte && nTout && toutOk) t.all = euros(tout);
+    if (nEp && epOk) t.savings = euros(ep);
+    return Object.keys(t).length ? t : null;
+  }
+
+  // Fin de la dernière lecture réussie, tous comptes confondus (ms), ou null.
+  function dernierReleve(S) {
+    let t = 0;
+    for (const c of S.modele.comptes) {
+      const lu = c.source.type === 'eb' && c.sync && c.sync.lu ? Date.parse(c.sync.lu) : 0;
+      if (lu > t) t = lu;
+    }
+    return t || null;
+  }
+
+  function construire(S, now) {
+    const comptes = visibles(S);
+    if (!comptes.length) return { v: V, state: 'empty', generated: now };
+    const accounts = comptes.map(c => compteResume(S, c, now));
+    const r = { v: V, state: 'ok', generated: now };
+    const st = dernierReleve(S);
+    if (st) r.statement_at = st;
+    r.accounts = accounts;
+    const t = totaux(S, comptes);
+    if (t) r.total = t;
+    r.alerts = alertes(S, comptes, accounts, now);
+    // Filet de sécurité (30 comptes tiennent largement) : alertes, puis comptes en trop retirés.
+    while (octets(r) > MAX_OCTETS && r.alerts.length) r.alerts.pop();
+    while (octets(r) > MAX_OCTETS && r.accounts.length > 1) { r.accounts.pop(); delete r.total; }
+    return r;
+  }
+
+  const octets = o => new TextEncoder().encode(JSON.stringify(o)).length;
+
+  // Résumé sans « generated » : deux résumés de même signature ne valent pas une nouvelle écriture.
+  function signature(x) {
+    const o = typeof x === 'string' ? JSON.parse(x) : JSON.parse(JSON.stringify(x));
+    delete o.generated;
+    return JSON.stringify(o);
+  }
+
+  const actif = S => !!(S && S.modele.grafit && S.modele.grafit.actif);
+
+  // Écritures du résumé, une à la fois. P : plugin KladGrafit (ou un faux) :
+  //   lire() → { json | null }, ecrire({ json }) → { ok, reason }, effacer() → { ok }.
+  // Le contenu enregistré est relu une fois, puis suivi en mémoire : rien n'est écrit (ni notifié) s'il n'a pas changé.
+  function creerLien(P) {
+    let connu;                 // undefined : à relire ; null : aucun résumé enregistré ; sinon sa signature
+    let file = Promise.resolve();
+    const enFile = fn => (file = file.catch(() => {}).then(fn));
+    async function enregistre() {
+      if (connu === undefined) {
+        const r = await P.lire();
+        try { connu = r && r.json ? signature(r.json) : null; } catch (e) { connu = ''; }   // illisible : sera remplacé
+      }
+      return connu;
+    }
+    function maj(S, now) {
+      return enFile(async () => {
+        if (!S) return 'rien';
+        if (!actif(S)) {
+          if (await enregistre() === null) return 'rien';
+          await P.effacer(); connu = null;
+          return 'efface';
+        }
+        const r = construire(S, now);
+        const sig = signature(r);
+        if (await enregistre() === sig) return 'inchange';
+        const res = await P.ecrire({ json: JSON.stringify(r) });
+        if (res && res.ok === false) throw new Error('résumé refusé (' + (res.reason || 'erreur') + ')');
+        connu = sig;
+        return 'ecrit';
+      });
+    }
+    function effacer() { return enFile(async () => { await P.effacer(); connu = null; return 'efface'; }); }
+    return { maj, effacer };
+  }
+
+  g.KladResume = { V, MAX_OCTETS, KINDS, libelle, construire, signature, actif, creerLien };
+})(typeof window !== 'undefined' ? window : globalThis);

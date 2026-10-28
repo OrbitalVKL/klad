@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Prépare la fabrication Android de Klad.
 //   node scripts/prepare-android.mjs web     → identifiant d'appli, www/config.js, www/vendor/capacitor.js
-//   node scripts/prepare-android.mjs native  → vérifie le manifeste (klad://eb, pas de sauvegarde Android),
+//   node scripts/prepare-android.mjs native  → vérifie le manifeste (klad://eb, pas de sauvegarde Android, lien Grafit),
 //                                              écrit android/klad.properties (identifiant d'appli, version)
 //
 // Le compte GitHub n'est écrit nulle part dans le dépôt : il vient de GITHUB_REPOSITORY_OWNER (GitHub Actions)
@@ -36,6 +36,20 @@ export function checkManifest(x) {
   if (!/android:launchMode="singleTask"/.test(x)) return 'launchMode singleTask absent';
   if (!/android:allowBackup="false"/.test(x)) return 'android:allowBackup doit valoir false';
   if (!/android:dataExtractionRules=/.test(x)) return 'dataExtractionRules absent';
+  return checkGrafit(x);
+}
+
+// Lien Grafit : un seul provider exporté, en lecture seule, sans permission ni délégation d'accès ; aucun autre
+// composant exporté que l'activité principale. Renvoie le problème trouvé, ou null.
+export function checkGrafit(x) {
+  const p = (x.match(/<provider\b[^>]*app\.klad\.grafit\.GrafitProvider[^>]*>/) || [])[0];
+  if (!p) return 'GrafitProvider absent';
+  if (!/android:authorities="\$\{applicationId\}\.grafit"/.test(p)) return 'GrafitProvider : authority ${applicationId}.grafit attendue';
+  if (!/android:exported="true"/.test(p)) return 'GrafitProvider : exported="true" attendu';
+  if (!/android:grantUriPermissions="false"/.test(p)) return 'GrafitProvider : grantUriPermissions="false" attendu';
+  if (/[Pp]ermission="/.test(p.replace('grantUriPermissions="false"', ''))) return 'GrafitProvider : aucune permission attendue (contrôle de l\'appelant dans le code)';
+  const exportes = (x.match(/<(activity|activity-alias|service|receiver|provider)\b[^>]*android:exported="true"[^>]*>/g) || []);
+  if (exportes.length !== 2 || !exportes.some(e => /\.MainActivity"/.test(e))) return 'composants exportés : seulement MainActivity et GrafitProvider';
   return null;
 }
 
@@ -77,7 +91,7 @@ else if (step === 'native') {
   if (!fs.existsSync(man)) die('android/ absent du dépôt.');
   const problem = checkManifest(fs.readFileSync(man, 'utf8'));
   if (problem) die('AndroidManifest.xml : ' + problem);
-  console.log('✓ AndroidManifest.xml : lien profond klad://eb, aucune sauvegarde Android');
+  console.log('✓ AndroidManifest.xml : lien profond klad://eb, aucune sauvegarde Android, GrafitProvider en lecture seule');
 
   write('android/klad.properties', kladProperties(owner, pkg.version, buildNo));
   console.log('✓ applicationId ' + appIdFor(owner) + ', version ' + pkg.version + ' (' + buildNo + ')');

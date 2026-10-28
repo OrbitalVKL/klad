@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { checkManifest, kladProperties } from '../scripts/prepare-android.mjs';
+import { checkManifest, checkGrafit, kladProperties } from '../scripts/prepare-android.mjs';
 
 const read = rel => fs.readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
 const MAN = 'android/app/src/main/AndroidManifest.xml';
@@ -32,10 +32,12 @@ test('identifiant d\'appli et version hors des fichiers versionnés', () => {
 
 test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
   const files = ['MainActivity.java', 'vault/KladVaultPlugin.java', 'vault/Vault.java', 'vault/Coffre.java',
-    'update/KladUpdatePlugin.java', 'update/Maj.java', 'reseau/KladReseauPlugin.java', 'reseau/Adresse.java'];
+    'update/KladUpdatePlugin.java', 'update/Maj.java', 'reseau/KladReseauPlugin.java', 'reseau/Adresse.java',
+    'grafit/GrafitConfig.java', 'grafit/Appelant.java', 'grafit/Resume.java', 'grafit/Stockage.java', 'grafit/CleKeystore.java',
+    'grafit/GrafitProvider.java', 'grafit/KladGrafitPlugin.java'];
   for (const f of files) {
     const x = read(JAVA + f);
-    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau)?;/m, f);
+    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau|\.grafit)?;/m, f);
     assert.doesNotMatch(x, /io\.github\./, f);
   }
   const main = read(JAVA + 'MainActivity.java');
@@ -43,6 +45,7 @@ test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
   assert.match(main, /registerPlugin\(KladVaultPlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladUpdatePlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladReseauPlugin\.class\)/);
+  assert.match(main, /registerPlugin\(KladGrafitPlugin\.class\)/);
   // adresse IP pour l'en-tête Psu-Ip-Address : aucune requête vers un service tiers
   const r = read(JAVA + 'reseau/KladReseauPlugin.java') + read(JAVA + 'reseau/Adresse.java');
   assert.match(r, /NetworkInterface\.getNetworkInterfaces\(\)/);
@@ -89,4 +92,51 @@ test('workflow : cache Gradle, vérification légère des demandes de fusion, un
   assert.doesNotMatch(w, /lint\s*\{|checkReleaseBuilds/);       // lint gardé (lintVitalRelease)
   assert.match(w, /KLAD_PARCOURS: obligatoire[\s\S]*?node --test test\/parcours\.test\.mjs/);   // parcours Chromium jamais sauté
   assert.doesNotMatch(read('android/app/build.gradle'), /checkReleaseBuilds\s+false/);
+});
+
+test('lien Grafit : provider en lecture seule, seul composant exporté avec l\'activité', () => {
+  const m = read(MAN);
+  assert.equal(checkGrafit(m), null);
+  assert.match(m, /<provider[^>]*android:name="app\.klad\.grafit\.GrafitProvider"[^>]*android:authorities="\$\{applicationId\}\.grafit"[^>]*android:exported="true"[^>]*android:grantUriPermissions="false"/);
+  assert.match(m, /<queries>\s*<package android:name="fr\.orbitalvkl\.grafit" \/>/);
+  const p = m.replace(/[\s\S]*(<provider[^>]*GrafitProvider[^>]*>)[\s\S]*/, '$1');
+  assert.doesNotMatch(p, /readPermission|writePermission|android:permission/);
+  // modifications refusées à la fabrication
+  assert.match(checkGrafit(m.replace('android:grantUriPermissions="false"', 'android:grantUriPermissions="true"')), /grantUriPermissions/);
+  assert.match(checkGrafit(m.replace('android:grantUriPermissions="false"', 'android:grantUriPermissions="false" android:readPermission="x"')), /permission/);
+  assert.match(checkGrafit(m.replace('.grafit"', '.autre"')), /authority/);
+  assert.match(checkGrafit(m.replace('android:name="androidx.core.content.FileProvider"', 'android:name="androidx.core.content.FileProvider" android:exported="true"')
+    .replace('android:exported="false"', '')), /exportés/);
+  assert.match(checkManifest(m.replace(/<provider\s+android:name="app\.klad\.grafit[\s\S]*?\/>/, '')), /absent/);
+});
+
+test('lien Grafit : contrôle de l\'appelant par UID et signature, configuration unique, clé « klad.resume »', () => {
+  const g = 'grafit/';
+  const cfg = read(JAVA + g + 'GrafitConfig.java');
+  assert.match(cfg, /PACKAGE = "fr\.orbitalvkl\.grafit"/);
+  assert.match(cfg, /CERT_SHA256 = "D3FB8A672ADA21218B0A4EEA66ACD634B26C938A25CA1D2DD795665DBE5E82FC"/);
+  const autres = files => files.map(f => read(JAVA + g + f)).join('\n');
+  // paquet et empreinte écrits seulement dans GrafitConfig
+  assert.doesNotMatch(autres(['Appelant.java', 'Resume.java', 'Stockage.java', 'CleKeystore.java', 'GrafitProvider.java', 'KladGrafitPlugin.java']),
+    /"fr\.orbitalvkl\.grafit"|D3FB8A67/);
+  const prov = read(JAVA + g + 'GrafitProvider.java');
+  const q = prov.slice(prov.indexOf('public Cursor query('));
+  assert.match(q, /^public Cursor query\([^)]*\) \{\s*(\/\/[^\n]*\s*)*Appelant\.verifier\(Binder\.getCallingUid\(\)/);   // en tout début
+  assert.match(prov, /getPackagesForUid\(uid\)/);
+  assert.match(prov, /hasSigningCertificate\(paquet, sha256, PackageManager\.CERT_INPUT_SHA256\)/);
+  assert.doesNotMatch(prov + read(JAVA + g + 'Appelant.java'), /\.getCallingPackage\(/);
+  assert.match(prov, /new MatrixCursor\(cols, 1\)/);
+  for (const op of ['insert', 'update', 'delete']) assert.match(prov, new RegExp('public \\w+ ' + op + '\\([^)]*\\) \\{\\s*throw new UnsupportedOperationException'));
+  assert.doesNotMatch(prov, /https?:\/\/|HttpURLConnection|KladSync|import java\.net/);
+  // clé sans authentification, la même que celle supprimée par « Tout effacer »
+  const cle = read(JAVA + g + 'CleKeystore.java');
+  assert.match(cle, /ALIAS = "klad\.resume"/);
+  assert.doesNotMatch(cle, /setUserAuthenticationRequired/);
+  assert.match(read(JAVA + 'vault/Vault.java'), /deleteKey\(KEY_RESUME\)/);
+  assert.match(prov, /getNoBackupFilesDir\(\)/);
+  const plug = read(JAVA + g + 'KladGrafitPlugin.java');
+  assert.match(plug, /@CapacitorPlugin\(name = "KladGrafit"\)/);
+  assert.match(plug, /stockage\.ecrire\(json[\s\S]*?notifier\(\)/);
+  assert.match(plug, /stockage\.effacer\(\)[\s\S]*?notifier\(\)/);
+  assert.match(plug, /notifyChange\(GrafitProvider\.uri\(getContext\(\)\), null\)/);
 });
