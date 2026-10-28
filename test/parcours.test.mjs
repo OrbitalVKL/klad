@@ -1,5 +1,6 @@
 // Parcours dans Chromium (coffre de démonstration, faux client Enable Banking, données fictives) :
-// premier lancement, connexion d'une banque, synchro simulée, import d'une reprise puis réimport, accueil, opérations.
+// premier lancement, connexion d'une banque, synchro simulée, import d'une reprise puis réimport, réglage des comptes,
+// renouvellement d'accès, accueil, opérations, verrouillage.
 // Sauté si Playwright et Chromium ne sont pas installés, sauf avec KLAD_PARCOURS=obligatoire (fabrication GitHub Actions).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,7 +37,9 @@ function fauxEB() {
     async aspsps() { return [{ name: 'Banque Démo', country: 'FR', maximum_consent_validity: 7776000, required_psu_headers: ['Psu-Ip-Address'] }]; },
     async startAuth(o) { return { url: location.origin + location.pathname + '?code=CODE-FICTIF&state=' + o.state }; },
     async createSession() {
-      return { session_id: 'sess-fictive', access: { valid_until: new Date(Date.now() + 80 * 864e5).toISOString() }, accounts: [
+      const n = +(sessionStorage.getItem('faux.sessions') || 0) + 1;
+      sessionStorage.setItem('faux.sessions', String(n));
+      return { session_id: n > 1 ? 'sess-fictive-' + n : 'sess-fictive', access: { valid_until: new Date(Date.now() + 80 * 864e5).toISOString() }, accounts: [
         { uid: 'uid-1', account_id: { iban: 'FR7600000000000000000000001' }, product: 'Compte courant', cash_account_type: 'CACC', currency: 'EUR' },
         { uid: 'uid-2', account_id: { iban: 'FR7600000000000000000000002' }, product: 'Livret', cash_account_type: 'SVGS', currency: 'EUR' }] };
     },
@@ -144,9 +147,50 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.locator('#volet [data-fermer]').last().click();
     assert.equal(await nbOps(), n1);
 
+    // fiche d'un compte : la carte (ancien livret fictif) devient une carte à débit différé prélevée sur COURANT le 5
+    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    await page.locator('#vPlus [data-volet="secComptes"]').click();
+    await page.locator('#listeComptes [data-edit]').nth(1).click();
+    await page.fill('#fLibelle', 'CARTE');
+    await page.selectOption('#fRole', 'carte_differee');
+    await page.locator('#formCompte [data-a="ok"]').click();
+    assert.match(await page.locator('#fMsg').innerText(), /Choisissez le compte/);
+    await page.selectOption('#fPrelCompte', { label: 'COURANT' });
+    await page.fill('#fJour', '5');
+    await page.locator('#formCompte [data-a="ok"]').click();
+    await page.waitForSelector('#listeComptes');
+    const carte = await page.evaluate(() => window.KladApp.etat().modele.comptes.find(c => c.libelle === 'CARTE'));
+    assert.equal(carte.role, 'carte_differee');
+    assert.equal(carte.prelevement.jour, 5);
+    // compte manuel : solde débiteur saisi sans signe
+    await page.locator('#btnNouveauManuel').click();
+    await page.fill('#fLibelle', 'PRET');
+    await page.selectOption('#fRole', 'epargne');
+    await page.fill('#fSolde', '1 000,50');
+    await page.selectOption('#fSens', 'deb');
+    await page.locator('#formCompte [data-a="ok"]').click();
+    await page.waitForTimeout(200);
+    assert.match(await page.locator('#listeComptes').innerText(), /PRET[\s\S]*1\s000,50\s€ débiteur/);
+    await page.locator('#volet [data-fermer]').last().click();
+
+    // renouvellement de l'accès en un appui : nouvelle session, comptes réassociés par empreinte d'IBAN
+    await page.locator('#vPlus [data-volet="secBanques"]').click();
+    await page.locator('#connexions [data-renouveler]').click();
+    await page.waitForURL(/code=CODE-FICTIF/);
+    await page.waitForSelector('.pad');
+    await code();
+    await page.waitForFunction(() => window.KladApp.etat() && window.KladApp.etat().modele.connexions['sess-fictive-2']);
+    const apres = await page.evaluate(() => window.KladApp.etat().modele);
+    assert.deepEqual(Object.keys(apres.connexions), ['sess-fictive-2']);
+    assert.equal(apres.comptes.length, 4);
+    assert.ok(apres.comptes.filter(c => c.source.type === 'eb').every(c => c.source.connexion === 'sess-fictive-2' && !c.aReassocier));
+    assert.equal(apres.comptes.find(c => c.libelle === 'CARTE').role, 'carte_differee');   // réglages gardés
+    await page.waitForFunction(() => !document.getElementById('pastille').classList.contains('encours'));
+    assert.equal(await nbOps(), n1);
+
     // accueil : grande carte, cartes de comptes ; aucun montant signé
     await page.locator('.onglets [data-onglet="vAccueil"]').click();
-    assert.equal(await page.locator('.ccompte').count(), 3);
+    assert.equal(await page.locator('.ccompte').count(), 4);
     const accueil = await page.locator('#vAccueil').innerText();
     assert.match(accueil, /LIVRET A[\s\S]*5\s000,00\s€/);
     assert.doesNotMatch(accueil, SANS_SIGNE);
@@ -187,7 +231,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await code();
     await page.waitForSelector('#appli:not([hidden])');
     assert.equal(await nbOps(), n1);
-    assert.equal(await page.locator('.ccompte').count(), 3);
+    assert.equal(await page.locator('.ccompte').count(), 4);
     assert.deepEqual(erreurs, []);
   } finally {
     await browser.close();
