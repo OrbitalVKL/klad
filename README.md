@@ -18,7 +18,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
-| `.github/workflows/android.yml` | Tests, fabrication Capacitor, signature de l'APK ; sur `main`, publication dans Releases quand la version change. Vérification sur chaque demande de fusion. |
+| `.github/workflows/android.yml` | Demande de fusion : vérification légère (tests Node, compilation Java et tests JUnit). `main` : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature, publication dans Releases quand la version change. Gradle en cache (`gradle/actions/setup-gradle`). |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
 | `test/` | Tests sans réseau (clé, JWT, mise en forme, blocs chiffrés, phrase, sauvegarde, reprise, réglages Android). `npm test`. Tests Java du coffre : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
 

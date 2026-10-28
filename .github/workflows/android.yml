@@ -1,13 +1,16 @@
 name: APK Android
 
-# Demande de fusion : tests + fabrication (vérification avant fusion, rien n'est publié).
-# main : fabrication de l'APK signé ; si la version de package.json n'a pas encore de publication,
-#        création de l'étiquette v<version> et de la publication dans Releases avec l'APK.
+# Demande de fusion : vérification légère (tests Node, compilation Java + tests JUnit), sans APK ni signature.
+# main : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature ;
+#        si la version de package.json n'a pas encore de publication, création de l'étiquette v<version>
+#        et de la publication dans Releases avec l'APK.
+# Gradle et ses dépendances sont mis en cache (gradle/actions/setup-gradle) ; le cache est écrit depuis main.
 on:
   push:
     branches: [main]
     paths-ignore: ['site/**', '**.md']
   pull_request:
+    paths-ignore: ['site/**', '**.md']
   workflow_dispatch:
 
 permissions:
@@ -22,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HAS_KEY: ${{ secrets.KLAD_KEYSTORE_B64 != '' }}
+      IS_PR: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -33,6 +37,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
 
       - name: Tests
         run: node --test test/*.test.mjs
@@ -62,17 +68,18 @@ jobs:
           node scripts/prepare-android.mjs native
           npx cap sync android
 
-      - name: Tests Java (coffre)
+      - name: Vérification Java (compilation, tests JUnit)
+        if: env.IS_PR == 'true'
         working-directory: android
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      - name: Fabrication (release non signée)
-        if: env.HAS_KEY == 'true'
+      - name: Fabrication (tests JUnit, release non signée, lint)
+        if: env.IS_PR != 'true' && env.HAS_KEY == 'true'
         working-directory: android
-        run: ./gradlew --no-daemon assembleRelease
+        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
 
       - name: Signature
-        if: env.HAS_KEY == 'true'
+        if: env.IS_PR != 'true' && env.HAS_KEY == 'true'
         env:
           KS_B64: ${{ secrets.KLAD_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.KLAD_KEYSTORE_PASSWORD }}
@@ -92,19 +99,20 @@ jobs:
           echo "APK=$OUT" >> "$GITHUB_ENV"
 
       - name: Fabrication de secours (debug, sans clé de signature)
-        if: env.HAS_KEY != 'true'
+        if: env.IS_PR != 'true' && env.HAS_KEY != 'true'
         working-directory: android
         run: |
           echo "::warning::Secrets de signature absents : APK debug seulement (non publiable, mises à jour impossibles)."
-          ./gradlew --no-daemon assembleDebug
+          ./gradlew --no-daemon testDebugUnitTest assembleDebug
 
       - name: APK debug
-        if: env.HAS_KEY != 'true'
+        if: env.IS_PR != 'true' && env.HAS_KEY != 'true'
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk "klad-debug-${GITHUB_RUN_NUMBER}.apk"
           echo "APK=klad-debug-${GITHUB_RUN_NUMBER}.apk" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v6
+        if: env.IS_PR != 'true'
         with:
           name: klad-apk
           path: ${{ env.APK }}

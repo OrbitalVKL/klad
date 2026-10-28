@@ -74,3 +74,12 @@ test('coffre natif : réglages des clés Keystore', () => {
 test('aucune donnée en clair dans localStorage', () => {
   for (const f of ['www/app.js', 'www/verrou.js']) assert.doesNotMatch(read(f), /localStorage\.setItem/, f);
 });
+
+test('workflow : cache Gradle, vérification légère des demandes de fusion, un seul appel Gradle sur main', () => {
+  const w = read('.github/workflows/android.yml');
+  assert.match(w, /uses: gradle\/actions\/setup-gradle@v4/);
+  assert.match(w, /if: env\.IS_PR == 'true'[\s\S]*?run: \.\/gradlew --no-daemon testDebugUnitTest\n/);
+  assert.match(w, /if: env\.IS_PR != 'true' && env\.HAS_KEY == 'true'[\s\S]*?run: \.\/gradlew --no-daemon testDebugUnitTest assembleRelease\n/);
+  assert.doesNotMatch(w, /lint\s*\{|checkReleaseBuilds/);       // lint gardé (lintVitalRelease)
+  assert.doesNotMatch(read('android/app/build.gradle'), /checkReleaseBuilds\s+false/);
+});
