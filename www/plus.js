@@ -311,6 +311,13 @@
     A.toast('Reprise importée : ' + st.operations + ' opération(s).');
     rep = null;
     $('repriseApercu').innerHTML = '';
+    // Budget, contrats et virements du carnet : repris s'ils ne l'ont pas encore été (les réglages faits dans Klad sont gardés).
+    if (!s0.budget && s0.carnet != null && window.KladBudget) {
+      try {
+        const rb = window.KladBudget.importer(s0, s0.carnet, { now: Date.now(), renommer: CN.renommeur(s0.carnet) });
+        A.log('ok', 'Budget repris de l\'ancienne version : ' + rb.postes + ' poste(s), ' + rb.contrats + ' contrat(s), ' + rb.virements + ' virement(s).');
+      } catch (e) { A.log('err', 'Budget : ' + (e.message || e)); }
+    }
     A.changed('import');
     reprendreClassement(s0).then(() => { if (st.relire && A.etat() === s0) A.synchro('relecture'); });
   });

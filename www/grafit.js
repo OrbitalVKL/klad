@@ -22,7 +22,7 @@
     const S = A.etat();
     if (!S) return Promise.resolve(null);
     const now = Date.now();
-    return lien.maj(S, now, () => { if (!A.etat()) return null; const e = A.extras(now); return { attention: e.attention, sauvegarde: e.sauvegarde, maj: e.maj }; }).catch(e => { if (A.etat()) A.log('err', 'Lien Grafit : ' + (e.message || e)); return null; });
+    return lien.maj(S, now, () => { if (!A.etat()) return null; const e = A.extras(now); return { attention: e.attention, sauvegarde: e.sauvegarde, maj: e.maj, budget: e.budget }; }).catch(e => { if (A.etat()) A.log('err', 'Lien Grafit : ' + (e.message || e)); return null; });
   }
 
   M.surChangement(() => maj());

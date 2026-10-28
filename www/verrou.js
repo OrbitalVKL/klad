@@ -70,7 +70,7 @@
       if (ecrits[n] !== j) { ecrire.push([n, j]); ecrits[n] = j; }
     }
     if (tout) for (const n of Object.keys(ecrits)) {
-      if (!(n in blocs) && (/^ops-/.test(n) || n === 'carnet' || n === 'classement')) { effacer.push(n); delete ecrits[n]; }
+      if (!(n in blocs) && (/^ops-/.test(n) || n === 'carnet' || n === 'classement' || n === 'budget')) { effacer.push(n); delete ecrits[n]; }
     }
     if (!ecrire.length && !effacer.length) return chain;
     chain = chain.then(async () => {

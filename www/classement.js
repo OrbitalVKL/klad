@@ -34,7 +34,7 @@
     'Virements à des proches': ['optionnelle', '🤝'], 'Divers': ['optionnelle', '📦'], 'Autres': ['optionnelle', '❔'],
     'Salaire': ['revenu', '💼'], 'Remboursements santé': ['revenu', '🩺'], 'Remboursements entre amis': ['revenu', '🤝'],
     'Famille': ['revenu', '👪'], 'Ventes': ['revenu', '🏷️'], 'Autres revenus': ['revenu', '💰'],
-    'Virements internes': ['interne', '🔁'], 'Épargne': ['epargne', '🐷']
+    'Apports compte commun': ['revenu', '📥'], 'Virements internes': ['interne', '🔁'], 'Épargne': ['epargne', '🐷']
   };
   const ICONES = ['🛒', '🥖', '🍔', '🍽️', '🍕', '☕', '🍺', '🍷', '🎁', '🛍️', '👕', '💄', '💊', '🏥', '💇', '🚗', '⛽', '🔧', '🚆',
     '🚌', '✈️', '🅿️', '🏠', '🛋️', '🔨', '🌱', '💡', '📱', '💻', '🎮', '🎬', '🎟️', '🎵', '⚽', '🏋️', '🏖️', '🏦', '💳', '🏛️',
@@ -108,11 +108,14 @@
         if (min) cartes.push({ c, mots, min, fin: M().plusJours(max, COUVERTURE_CARTE) });
       } else if (c.role === 'paiement_en_ligne') {
         const montants = new Map();
+        let min = '', max = '';
         for (const o of ops) {
           const k = Math.abs(o.montant);
           (montants.get(k) || montants.set(k, []).get(k)).push(o.date);
+          if (!min || o.date < min) min = o.date;
+          if (o.date > max) max = o.date;
         }
-        if (montants.size) portefeuilles.push({ c, mots, montants });
+        if (montants.size) portefeuilles.push({ c, mots, montants, min, max });
       }
     }
     return { S, C, D, comptes, base, regles, cartes, portefeuilles, invalides, now: now == null ? Date.now() : now,
@@ -207,6 +210,33 @@
     return r;
   }
 
+  // Prélèvement d'un portefeuille sans opération de même montant dans son détail (pendant la période couverte par le
+  // détail) : il reste une dépense, mais il est signalé « à rapprocher » et peut être marqué interne à la main.
+  // → le compte portefeuille concerné, ou null.
+  function aRapprocher(ctx, o) {
+    if (o.montant >= 0 || (o.categorie && o.categorie.cat) || !ctx.portefeuilles.length) return null;
+    const c = ctx.comptes.get(o.compte);
+    if (!estCourant(c)) return null;
+    const F = fold(o.libelle);
+    for (const w of ctx.portefeuilles) {
+      if (!contient(F, w.mots)) continue;
+      if (o.date < M().plusJours(w.min, -PORTEFEUILLE_AVANT) || o.date > M().plusJours(w.max, PORTEFEUILLE_APRES)) continue;
+      return classer(ctx, o).type === 'interne' ? null : w.c;
+    }
+    return null;
+  }
+  // Marque un prélèvement de portefeuille comme réglé par ce portefeuille (interne). → instantané pour annuler.
+  function marquerInterne(ctx, o, w) {
+    const snap = { op: o, categorie: o.categorie, vue: o.vue };
+    o.categorie = { cat: ctx.D.interne.cat, sub: 'Règlement ' + ((w && w.libelle) || 'portefeuille') + ' (rapproché à la main)' };
+    if (!vue(ctx.S, o)) o.vue = true;
+    return snap;
+  }
+  function annulerInterne(snap) {
+    snap.op.categorie = snap.categorie;
+    if (snap.vue === undefined) delete snap.op.vue; else snap.op.vue = snap.vue;
+  }
+
   // ------------------------------------------------------------ opérations vues
   // Une opération est vue si elle a été cochée, ou si elle est datée du jour de départ ou avant (et pas décochée).
   // o.vue : true (vue), 0 (remise en non vue) ; toute autre valeur : d'après la date de départ.
@@ -242,17 +272,18 @@
   }
 
   // ------------------------------------------------------------ « à vérifier »
-  // → { unseen, unclassified, accountsToCheck } (nombres).
+  // → { unseen, unclassified, accountsToCheck, toMatch } (nombres ; toMatch : prélèvements de portefeuille à rapprocher).
   function attention(ctx, now) {
     const S = ctx.S;
     const limite = M().plusJours(M().jourLocal(now == null ? ctx.now : now), -NC_JOURS);
-    let unseen = 0, unclassified = 0;
+    let unseen = 0, unclassified = 0, toMatch = 0;
     for (const o of opsVisibles(S)) {
       if (!vue(S, o)) unseen++;
       if (o.date >= limite && classer(ctx, o).nc) unclassified++;
+      if (aRapprocher(ctx, o)) toMatch++;
     }
     const accountsToCheck = S.modele.comptes.filter(c => c.aVerifier || c.aReassocier).length;
-    return { unseen, unclassified, accountsToCheck };
+    return { unseen, unclassified, accountsToCheck, toMatch };
   }
 
   // ------------------------------------------------------------ volet « Classer »
@@ -405,7 +436,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, ICONES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, concernees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, annulerInterne, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, concernees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions
   };
 })(typeof window !== 'undefined' ? window : globalThis);

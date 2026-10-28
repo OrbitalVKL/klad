@@ -93,7 +93,7 @@
   }
 
   function vide() {
-    return { cle: { appId: '', pem: '', redirectUrl: '' }, modele: nouveauModele(), soldes: {}, ops: {}, carnet: null, classement: null, journal: { log: [] } };
+    return { cle: { appId: '', pem: '', redirectUrl: '' }, modele: nouveauModele(), soldes: {}, ops: {}, carnet: null, classement: null, budget: null, journal: { log: [] } };
   }
 
   // ------------------------------------------------------------ comptes
@@ -477,7 +477,7 @@
   }
 
   // ------------------------------------------------------------ blocs chiffrés
-  // cle, modele, soldes, journal, carnet (s'il existe) et un bloc d'opérations par compte et par année :
+  // cle, modele, soldes, journal, carnet, classement et budget (s'ils existent) et un bloc d'opérations par compte et par année :
   // une synchro ne touche que l'année en cours, l'historique n'est pas réécrit.
   function versBlocs(S) {
     const b = {}, index = {};
@@ -493,6 +493,7 @@
     b.cle = S.cle; b.modele = S.modele; b.soldes = S.soldes; b.journal = S.journal;
     if (S.carnet != null) b.carnet = { carnet: S.carnet };
     if (S.classement != null) b.classement = S.classement;
+    if (S.budget != null) b.budget = S.budget;
     return b;
   }
 
@@ -511,6 +512,7 @@
     if (blocks.journal) S.journal = { log: blocks.journal.log || [] };
     if (blocks.carnet) S.carnet = blocks.carnet.carnet;
     if (blocks.classement) S.classement = blocks.classement;
+    if (blocks.budget) S.budget = blocks.budget;
     for (const n of Object.keys(blocks)) {
       const m = n.match(BLOC_OPS);
       if (m && blocks[n]) S.ops[m[1]] = (S.ops[m[1]] || []).concat(blocks[n].ops || []);

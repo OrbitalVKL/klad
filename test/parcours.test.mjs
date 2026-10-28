@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { repriseFictive } from './fictif.mjs';
 
 let chromium = null;
 try { ({ chromium } = createRequire(import.meta.url)('playwright')); } catch (e) { chromium = null; }
@@ -345,6 +346,114 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.locator('#grafitActif').uncheck();
     await page.waitForFunction(() => window.KladLienGrafit.demo() == null);
     assert.match(await page.locator('#log').evaluate(() => window.KladApp.etat().journal.log.join('\n')), /Lien Grafit désactivé/);
+    assert.deepEqual(erreurs, []);
+  } finally {
+    await browser.close();
+    srv.close();
+  }
+});
+
+// Lot 6 : onglet Budget (perso / commun, cycles, poste déplié, édition annulable, ajout), carte « Reste à vivre »,
+// contrats et échéances, tendance, résumé Grafit (month, upcoming). Jeu fictif daté d'aujourd'hui.
+test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium && !process.env.KLAD_PARCOURS && 'Playwright absent' }, async () => {
+  const srv = await serveur();
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 400, height: 820 }, hasTouch: true });
+    page.setDefaultTimeout(8000);
+    const erreurs = [];
+    page.on('pageerror', e => erreurs.push(e.message));
+    await page.goto(base);
+    const code = async () => { for (const k of '123456') await page.keyboard.press(k); };
+    await page.getByRole('button', { name: 'Créer mon code' }).click();
+    await code(); await page.waitForTimeout(100); await code();
+    const groupes = await page.locator('ol.phrase li').allInnerTexts();
+    await page.getByRole('button', { name: 'Je l\'ai recopiée' }).click();
+    for (const id of ['g1', 'g2']) {
+      const lab = await page.locator('label:has(#' + id + ')').innerText();
+      await page.fill('#' + id, groupes[+lab.match(/n° (\d)/)[1] - 1]);
+    }
+    await page.getByRole('button', { name: 'Vérifier' }).click();
+    await page.waitForSelector('#appli:not([hidden])');
+    // reprise fictive avec un carnet (budget, contrats, virements, réglages du salaire)
+    const auj = await page.evaluate(() => window.KladModele.jourLocal(Date.now()));
+    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    await page.locator('#vPlus [data-volet="secReprise"]').click();
+    const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#btnChoisirReprise').click()]);
+    await fc.setFiles({ name: 'reprise.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(repriseFictive(auj))) });
+    await page.waitForSelector('#repriseApercu [data-a="importer"]');
+    await page.locator('#repriseApercu [data-a="importer"]').click();
+    await page.waitForFunction(() => window.KladApp.etat().budget && window.KladApp.etat().classement && window.KladApp.etat().classement.import);
+    await page.locator('#volet [data-fermer]').last().click();
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
+
+    // accueil : carte « Reste à vivre » (deux colonnes), détail au toucher
+    await page.locator('.onglets [data-onglet="vAccueil"]').click();
+    const rav = await page.locator('#vAccueil .carte.rav').innerText();
+    assert.match(rav, /Reste à vivre jusqu'au[\s\S]*sur le dernier salaire[\s\S]*sur les comptes courants/);
+    await page.locator('#vAccueil .carte.rav').click();
+    assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
+    await capture(page, '12-reste-a-vivre');
+    await page.locator('#volet [data-fermer]').last().click();
+
+    // onglet Budget : sections, cycle de salaire, aucun montant signé
+    await page.locator('.onglets [data-onglet="vBudget"]').click();
+    let b = await page.locator('#vBudget').innerText();
+    assert.match(b, /Cycle en cours · du \d\d\/\d\d au/);
+    assert.match(b, /Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Solde prévu par le budget/);
+    assert.match(b, /Contribution compte commun/);
+    assert.doesNotMatch(b, SANS_SIGNE);
+    assert.doesNotMatch(b, /[\u2212-]\s?\d[\d\s\u00a0\u202f]* €/);
+    await capture(page, '13-budget');
+    // poste déplié (opérations), édition dans le volet, annulation
+    await page.locator('#vBudget [data-poste="c|Alimentation"]').click();
+    assert.equal(await page.locator('#vBudget .bdet').count(), 1);
+    await page.locator('#vBudget [data-editer="c|Alimentation"]').click();
+    await page.waitForSelector('#posteCorps #peAmt');
+    await page.fill('#peAmt', '250');
+    await page.locator('#posteCorps [data-pe="ok"]').click();
+    await page.waitForSelector('#toast.show.action');
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.plan.perso['c|Alimentation'].amt), 25000);
+    await page.locator('#toast button').click();
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.plan.perso['c|Alimentation'].amt), 16000);
+    // cycle précédent (lecture), retour au cycle en cours
+    await page.locator('#vBudget [data-nav="prev"]').click();
+    b = await page.locator('#vBudget').innerText();
+    assert.match(b, /Cycle du \d\d\/\d\d au \d\d\/\d\d\/\d\d.*terminé/);
+    assert.match(b, /Solde de la période/);
+    await page.locator('#vBudget [data-nav="now"]').click();
+    // commun : mois civil, apports attendus selon la répartition
+    await page.locator('#vBudget [data-scope="commun"]').click();
+    b = await page.locator('#vBudget').innerText();
+    assert.match(b, /Mois en cours/);
+    assert.match(b, /Personne A[\s\S]*Personne B/);
+    assert.match(b, /Solde du compte commun/);
+    await capture(page, '14-budget-commun');
+    // contrats et échéances, tendance
+    await page.locator('#vBudget [data-ouvrir="secContrats"]').click();
+    assert.match(await page.locator('#contratsCorps').innerText(), /Prêt immobilier fictif[\s\S]*Échéances des 31 prochains jours/);
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('#vBudget [data-scope="perso"]').click();
+    await page.locator('#vBudget [data-ouvrir="secTendance"]').click();
+    assert.ok(await page.locator('#tendanceCorps svg.graph rect').count() >= 3);
+    await page.selectOption('#tdCat', 'Alimentation');
+    assert.match(await page.locator('#tendanceCorps').innerText(), /budget 160 €/);
+    await capture(page, '15-tendance');
+    await page.locator('#volet [data-fermer]').last().click();
+
+    // Grafit : month et upcoming
+    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    await page.locator('#vPlus [data-volet="secModules"]').click();
+    await page.locator('#grafitActif').check();
+    await page.waitForFunction(() => window.KladLienGrafit.demo() != null);
+    const r = JSON.parse(await page.evaluate(() => window.KladLienGrafit.demo()));
+    assert.equal(r.month.cycle, 'salary');
+    assert.ok(r.month.budget > 0 && Array.isArray(r.month.top) && r.month.left_to_live_basis === 'accounts');
+    assert.ok(Array.isArray(r.upcoming));
+    const brut = JSON.stringify(r);
+    for (const x of ['FICTI', 'PRLV', 'SUPERMARCHE']) assert.ok(!brut.includes(x), x);
     assert.deepEqual(erreurs, []);
   } finally {
     await browser.close();
