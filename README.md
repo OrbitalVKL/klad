@@ -18,7 +18,8 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 | `www/` | Page de test (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `app.js` = écran. |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
-| `.github/workflows/android.yml` | Tests, fabrication Capacitor, signature de l'APK, publication dans Releases (sur étiquette `v*`). |
+| `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
+| `.github/workflows/android.yml` | Tests, fabrication Capacitor, signature de l'APK ; sur `main`, publication dans Releases quand la version change. Vérification sur chaque demande de fusion. |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
 | `test/` | Tests sans réseau (clé, JWT, mise en forme). `npm test`. |
 
@@ -63,11 +64,9 @@ Sans ces secrets, la fabrication produit seulement un APK *debug* (artefact de l
 
 ### 4. Publication
 
-```
-git tag v0.1.0 && git push origin v0.1.0
-```
+Automatique : changer `version` dans `package.json` (par exemple `0.1.0` → `0.2.0`), puis fusionner dans `main`. La fabrication voit que `v0.2.0` n'est pas encore publiée : elle crée l'étiquette et la publication dans *Releases*, avec l'APK signé. Sans changement de version, l'APK est fabriqué (artefact de l'action) sans être publié.
 
-L'APK signé apparaît dans *Releases*. Le site renvoie vers la dernière version.
+Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la dernière version (`releases/latest`, qui ignore les pré-versions).
 
 ## Utilisation du prototype
 
