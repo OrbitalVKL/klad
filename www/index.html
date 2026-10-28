@@ -43,7 +43,6 @@
           <li><button data-volet="secBanques">Banques et accès<small id="mBanques"></small></button></li>
           <li><button data-volet="secComptes">Comptes<small id="mComptes"></small></button></li>
           <li><button data-volet="secReprise">Import de reprise<small id="mReprise"></small></button></li>
-          <li><button data-volet="secModules">Modules<small id="mModules"></small></button></li>
           <li><button data-volet="secSauv">Sauvegarde<small id="mSauv"></small></button></li>
           <li><button data-volet="secVerrou">Verrou<small>Code, empreinte, effacement</small></button></li>
           <li><button data-volet="secLog">Journal<small>Anonyme, à copier pour un diagnostic</small></button></li>
@@ -128,19 +127,6 @@
       <div id="repriseApercu"></div>
     </section>
 
-    <section id="secModules" data-titre="Modules">
-      <h3>Lien Grafit</h3>
-      <label class="inline"><input id="grafitActif" type="checkbox"> Partager un résumé avec Grafit</label>
-      <p id="grafitEtat" class="muted"></p>
-      <p class="muted">Grafit, installé sur ce téléphone, lit un résumé de Klad, même Klad verrouillé, sans réseau ni fichier partagé.
-        Le résumé est chiffré sur le téléphone et mis à jour après chaque synchronisation, import ou réglage.</p>
-      <p class="muted"><b>Partagé :</b> libellés et types des comptes, soldes, totaux, heure du dernier relevé, alertes
-        (relevé ancien, lecture en erreur, accès bancaire à renouveler, compte débiteur).</p>
-      <p class="muted"><b>Jamais partagé :</b> opérations, libellés bancaires, IBAN ou fin d'IBAN, noms de banque,
-        identifiants, clé Enable Banking.</p>
-      <p class="muted" id="grafitEmpreinte"></p>
-    </section>
-
     <section id="secSauv" data-titre="Sauvegarde">
       <p class="muted">Fichier chiffré par votre phrase de récupération, à garder hors du téléphone. <span id="sauvState"></span></p>
       <div class="row">
@@ -192,12 +178,10 @@
   <script src="modele.js"></script>
   <script src="reprise.js"></script>
   <script src="sync.js"></script>
-  <script src="resume.js"></script>
   <script src="coffre.js"></script>
   <script src="vues.js"></script>
   <script src="app.js"></script>
   <script src="plus.js"></script>
-  <script src="grafit.js"></script>
   <script src="maj.js"></script>
   <script src="verrou.js"></script>
 </body>

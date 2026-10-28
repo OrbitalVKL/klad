@@ -78,7 +78,7 @@
   }
 
   // ------------------------------------------------------------ données changées : enregistrement, affichage, événement
-  // Point unique après une synchro, un import, un réglage ou une connexion (le résumé Grafit s'abonne à KladModele.surChangement).
+  // Point unique après une synchro, un import ou un réglage (le résumé du Lot 4 s'abonnera à KladModele.surChangement).
   function changed(cause) {
     if (!S) return;
     save();
@@ -511,15 +511,7 @@
   $('btnClearLog').addEventListener('click', () => { S.journal.log = []; saveLog(); renderLog(); });
   preparer.secLog = () => renderLog();
 
-  // ------------------------------------------------------------ ouverture (après déverrouillage) et premier plan
-  // ouvertures : fonctions appelées au déverrouillage et à chaque retour au premier plan, appli déverrouillée
-  // (résumé Grafit : l'ancienneté des relevés et les jours restants évoluent avec le temps).
-  const ouvertures = [];
-  function premierPlan() {
-    if (!S) return;
-    ouvertures.forEach(fn => { try { fn(); } catch (e) { /* un abonné défaillant ne bloque pas les autres */ } });
-  }
-
+  // ------------------------------------------------------------ ouverture (après déverrouillage)
   $('ver').textContent = 'Version ' + (CFG.version || 'dev') + (isNative ? '' : ' · navigateur');
 
   function open(state, h) {
@@ -530,7 +522,6 @@
     save();
     montrer('vAccueil');
     rendre();
-    premierPlan();
     if (KladSync.aFaire(S, Date.now())) synchro('auto');
   }
 
@@ -546,7 +537,7 @@
   }
 
   window.KladApp = {
-    open, close, handleReturn, log, toast, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
+    open, close, handleReturn, log, toast, copy, confirmInline, busy, changed, synchro, montrer,
     ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, etat: () => S, hooks: () => hooks, esc, isNative
   };
 })();

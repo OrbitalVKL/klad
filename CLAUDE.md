@@ -9,12 +9,7 @@
 - Le compte GitHub n'est écrit nulle part : il est déduit à la fabrication (`GITHUB_REPOSITORY_OWNER`).
 - Le nom du dépôt n'est pas écrit en dur non plus : `GITHUB_REPOSITORY` à la fabrication (`klad` par défaut), `location.pathname` sur le site.
 - Formulations financières dans l'interface : pas de montants négatifs affichés ; dire « débit / crédit », « débiteur », ou qui doit combien à qui.
-- Avant de pousser : `npm test` doit passer ; avec l'environnement Android (`klad-android`), aussi `./gradlew assembleDebug testDebugUnitTest lint` dans `android/`.
+- Avant de pousser : `npm test` doit passer.
 - Travail sur une branche + demande de fusion ; `main` déclenche la fabrication de l'APK et du site.
-- Cycle GitHub géré par Claude, sans intervention du propriétaire : branche, demande de fusion, attente des vérifications (workflow « APK Android »), fusion par Claude quand tout est vert, suivi des workflows sur `main`, correction en cas d'échec. Le propriétaire n'intervient que pour les décisions de design.
-- **Fusion par Claude**, y compris pour une demande de fusion qui change la version (donc publie l'APK). Garde-fous :
-  - fusionner uniquement ses propres demandes de fusion, quand la vérification « APK Android » est verte, sans aucun test sauté ;
-  - une seule version publiée par lot, sauf correctif ;
-  - après publication, donner au propriétaire la recette manuelle ; si le téléphone révèle une régression, publier un correctif plutôt que revenir en arrière.
+- Cycle GitHub géré par Claude, sans intervention du propriétaire : branche, demande de fusion, attente des vérifications (workflow « APK Android »), fusion quand tout est vert, suivi des workflows sur `main`, correction en cas d'échec. Le propriétaire n'intervient que pour les décisions de design.
 - Publication : changer `version` dans `package.json` ; la fusion dans `main` crée l'étiquette `v<version>` et la publication avec l'APK signé. Pas de publication ni d'étiquette à la main. Pas de secret ni de réglage du dépôt modifié par Claude.
-- Lien Grafit : le résumé (`www/resume.js`) ne contient jamais d'IBAN ni de fin d'IBAN, d'identifiant, de jeton, d'opération, de nom de banque ni de libellé bancaire brut. Paquet et empreinte attendus de Grafit : seulement dans `GrafitConfig.java`.

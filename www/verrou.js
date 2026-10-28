@@ -286,7 +286,6 @@
   async function createVault(pin, restored) {
     busyScreen('Création du coffre…');
     try {
-      try { await window.KladLienGrafit.effacer(); } catch (e) { /* aucun résumé */ }   // nouveau coffre : lien remis à zéro
       const r = await V.create({ pin });
       if (!r.ok) return fatal('Création impossible : ' + explain(r));
       key = await C.importDek(C.fromB64(r.dek));
@@ -550,7 +549,6 @@
     if (!pin) return;
     const r = await V.wipe({ pin });
     if (!r.ok) return toast(explain(r), true);
-    try { await window.KladLienGrafit.effacer(); } catch (e) { /* clé du résumé déjà supprimée : illisible */ }
     key = null; S = null; B = null; ecrits = {};
     try { localStorage.removeItem(C.PROTO_KEY); } catch (e) { /* rien */ }
     location.reload();
@@ -619,7 +617,6 @@
     };
     if ((key && due) || lockP) { lock().then(reveal); return; }
     reveal();
-    if (key && S) A().premierPlan();         // déverrouillé : résumé Grafit remis à jour (relevés, jours restants)
   }
 
   if (AppP) {

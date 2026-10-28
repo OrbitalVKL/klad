@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Aucune sauvegarde Android (cloud ou transfert d'appareil) : le coffre ne quitte jamais le téléphone. -->
     <application
@@ -45,22 +44,7 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
-
-        <!-- Lien Grafit : résumé en lecture seule, content://${applicationId}.grafit/summary.
-             Exporté sans permission (Grafit est une autre appli) : GrafitProvider.query() n'accepte que l'UID de
-             fr.orbitalvkl.grafit signé par le certificat attendu (SecurityException sinon). -->
-        <provider
-            android:name="app.klad.grafit.GrafitProvider"
-            android:authorities="${applicationId}.grafit"
-            android:exported="true"
-            android:grantUriPermissions="false"
-            tools:ignore="ExportedContentProvider" />
     </application>
-
-    <!-- Android 11 et plus : Grafit visible par Klad, pour contrôler son paquet et sa signature. -->
-    <queries>
-        <package android:name="fr.orbitalvkl.grafit" />
-    </queries>
 
     <!-- Permissions -->
 

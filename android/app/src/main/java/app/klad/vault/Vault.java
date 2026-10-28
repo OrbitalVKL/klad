@@ -37,8 +37,8 @@ final class Vault {
 
     static final String KEY_DEVICE = "klad.appareil";
     static final String KEY_BIO = "klad.empreinte";
-    // Lien Grafit : clé SANS authentification du « résumé » lisible appli verrouillée (créée et utilisée par
-    // app.klad.grafit.CleKeystore). Le coffre la supprime seulement, avec tout le reste, à l'effacement complet.
+    // Lot 2 (lien Grafit) : clé SANS authentification réservée au futur « résumé » lisible appli verrouillée.
+    // Emplacement seulement : rien ne l'utilise encore.
     static final String KEY_RESUME = "klad.resume";
 
     private static final String KS = "AndroidKeyStore";
@@ -187,6 +187,17 @@ final class Vault {
         KeyGenerator g = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KS);
         g.init(b.build());
         g.generateKey();
+    }
+
+    /** Lot 2 : clé du futur « résumé », créée à la demande. Non utilisée pour l'instant. */
+    @SuppressWarnings("unused")
+    private static SecretKey resumeKey() throws GeneralSecurityException, IOException {
+        SecretKey k = getKey(KEY_RESUME);
+        if (k == null) {
+            newKey(KEY_RESUME, false);
+            k = getKey(KEY_RESUME);
+        }
+        return k;
     }
 
     // ------------------------------------------------------------ code
