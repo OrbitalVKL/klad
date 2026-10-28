@@ -1,5 +1,5 @@
 node_modules/
-android/
+android/klad.properties
 www/vendor/
 *.apk
 *.aab

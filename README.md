@@ -2,28 +2,27 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : prototype de faisabilité (étape 2).** Le prototype sert à vérifier, sur un vrai téléphone et de vraies banques :
-
-- l'import d'une clé d'application Enable Banking (.pem PKCS#8, ou PKCS#1 converti automatiquement) ;
-- la signature JWT RS256 dans l'appli ;
-- la liste des banques, l'autorisation bancaire et le retour dans l'appli par `klad://eb` ;
-- la lecture des comptes, des soldes et des opérations.
+**État : version 0.2 — coffre et chiffrement (Lot 1).** L'appli lit les comptes, soldes et opérations par Enable Banking
+(clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Depuis la 0.2, **plus aucune donnée sensible
+n'est en clair sur le téléphone** : la clé .pem, son identifiant, les sessions bancaires et les opérations sont chiffrés, et
+l'appli s'ouvre par un code à 6 chiffres ou par empreinte.
 
 Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur fournit sa propre application Enable Banking (production restreinte).
 
-## Architecture du prototype
+## Architecture
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Page de test (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `app.js` = écran. |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, reprise du prototype, `verrou.js` = verrou, premier lancement, section Sécurité, `app.js` = écran principal. |
+| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et le plugin local `vault/KladVaultPlugin` (coffre). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
 | `.github/workflows/android.yml` | Tests, fabrication Capacitor, signature de l'APK ; sur `main`, publication dans Releases quand la version change. Vérification sur chaque demande de fusion. |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
-| `test/` | Tests sans réseau (clé, JWT, mise en forme). `npm test`. |
+| `test/` | Tests sans réseau (clé, JWT, mise en forme, blocs chiffrés, phrase, sauvegarde, reprise, réglages Android). `npm test`. Tests Java du coffre : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
 
-Le dossier `android/` n'est pas versionné : il est régénéré à chaque fabrication par `npx cap add android`.
+Le dossier `android/` est versionné (code natif). L'identifiant d'appli et la version n'y sont pas écrits : `prepare-android.mjs native` les place dans `android/klad.properties` (non versionné), lu par `android/app/build.gradle`.
 
 Les appels à Enable Banking passent par CapacitorHttp (natif), donc sans restriction CORS. Dans un navigateur ordinaire, la page s'affiche mais les appels sont bloqués par CORS.
 
@@ -36,6 +35,29 @@ Pour un compte `<compte>` et un dépôt `<dépôt>` (`klad` par défaut) :
 - identifiant d'appli : `io.github.<compte>.klad`, en minuscules, avec les tirets remplacés par `_`
 
 Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO` en local) ; le site le lit dans sa propre adresse. Cas particulier : un dépôt nommé `<compte>.github.io` est publié à la racine (`https://<compte>.github.io/retour.html`).
+
+## Sécurité des données
+
+| Élément | Protection |
+|---|---|
+| Clé de données (DEK) | AES-256 aléatoire, créée une fois. Jamais écrite en clair. |
+| Enveloppe « code » | DEK chiffrée (AES-GCM) par PBKDF2-HMAC-SHA256(code, sel aléatoire, itérations calibrées ≈ 0,5 s sur le téléphone), puis chiffrée de nouveau par une clé Android Keystore sans authentification, non exportable (StrongBox si disponible). Un fichier copié hors du téléphone ne permet donc pas d'essayer les codes. |
+| Enveloppe « empreinte » (facultative) | DEK chiffrée par une clé Keystore exigeant une empreinte forte à chaque usage (BiometricPrompt + CryptoObject), invalidée si une empreinte est ajoutée au téléphone : retour au code, puis proposition de réactiver. |
+| Codes faux | Délai après le 5ᵉ : 30 s, puis 1 min, 5 min, 15 min, 30 min, 1 h au plus. Compteur dans le coffre natif, augmenté avant chaque essai. Pas d'effacement automatique. |
+| Données | Blocs chiffrés AES-GCM (`KLD` + version + IV 96 bits aléatoire ; nom du bloc en donnée associée) dans `noBackupFilesDir`. Le chiffrement se fait en JavaScript (WebCrypto) avec la DEK importée **non extractible** : les données sont de toute façon en clair en mémoire pour l'affichage, la clé ne traverse le pont natif qu'une fois par déverrouillage, et les tests vérifient le vrai code. |
+| Verrou | Après 5 min en arrière-plan, ou par le bouton « Verrouiller » : écritures terminées, puis rechargement de la page (clé et données effacées de la mémoire). Un masque couvre l'écran dès le passage en arrière-plan. Un retour bancaire `klad://eb` reçu appli verrouillée est gardé en mémoire et traité après déverrouillage (`state` vérifié). |
+| Téléphone | `allowBackup="false"` et règles d'extraction qui excluent tout ; `FLAG_SECURE` : pas de capture d'écran, aperçu masqué dans les applis récentes. |
+| Lot 2 (préparé) | Emplacement d'une seconde clé Keystore sans authentification (`klad.resume`), pour un futur « résumé » lisible appli verrouillée. Non utilisée. |
+
+### Sauvegarde et phrase de récupération
+
+Au premier lancement, Klad affiche une **phrase de récupération** : 24 caractères (120 bits aléatoires) en 6 groupes de 4, alphabet sans I, L, O, U. Elle est affichée une seule fois, à recopier sur papier, puis vérifiée par la ressaisie de 2 groupes.
+
+La sauvegarde exportée (section *Sécurité › Exporter*, sélecteur de fichiers Android) est un fichier `.klad` chiffré par une clé tirée de cette phrase (PBKDF2-SHA256, 600 000 itérations ; sel, itérations et IV dans l'en-tête, format versionné). Elle n'est **pas** chiffrée par le code à 6 chiffres, trop court pour résister à des essais hors du téléphone. Un rappel s'affiche si le dernier export date de plus de 30 jours.
+
+**Code oublié** : désinstaller l'appli, la réinstaller, choisir « Restaurer une sauvegarde » et saisir la phrase.
+
+Au premier lancement de la 0.2, les données du prototype (stockées en clair) sont reprises, chiffrées, relues pour vérification, puis effacées.
 
 ## Mise en ligne
 
@@ -68,13 +90,13 @@ Automatique : changer `version` dans `package.json` (par exemple `0.1.0` → `0.
 
 Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la dernière version (`releases/latest`, qui ignore les pré-versions).
 
-## Utilisation du prototype
+## Utilisation
 
 1. Dans le Control Panel Enable Banking, ajouter l'adresse de retour à l'application.
-2. Installer l'APK.
+2. Installer l'APK. Créer le code (deux saisies), recopier la phrase de récupération, activer l'empreinte si souhaité.
 3. Saisir l'identifiant d'application, choisir le `.pem`, puis **Enregistrer** et **Tester la clé**. Le test vérifie aussi que l'application est active et que l'adresse de retour est bien déclarée.
 4. **Charger** les banques du pays, puis **Connecter**. Après l'accord à la banque, le retour dans Klad crée la session.
 5. **Récupérer** sur chaque compte. Le **journal** est anonyme (ni noms, ni banques, ni montants, ni identifiants : « Banque A · compte 1 ») et peut être copié pour diagnostic.
-6. En fin de test : **Déconnecter** chaque banque, puis **Tout effacer**.
+6. **Sécurité** : changer le code, activer ou désactiver l'empreinte, exporter ou restaurer une sauvegarde, tout effacer (code demandé ; déconnecter les banques avant).
 
-⚠️ Prototype : la clé et les opérations sont stockées **sans chiffrement**. Le verrou (code, empreinte) et le chiffrement AES-GCM arrivent à l'étape 6.
+Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement.

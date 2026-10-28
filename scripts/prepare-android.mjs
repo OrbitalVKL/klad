@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Prépare la fabrication Android de Klad.
 //   node scripts/prepare-android.mjs web     → identifiant d'appli, www/config.js, www/vendor/capacitor.js
-//   node scripts/prepare-android.mjs native  → lien profond klad://eb, numéro de version (après « cap add android »)
+//   node scripts/prepare-android.mjs native  → vérifie le manifeste (klad://eb, pas de sauvegarde Android),
+//                                              écrit android/klad.properties (identifiant d'appli, version)
 //
 // Le compte GitHub n'est écrit nulle part dans le dépôt : il vient de GITHUB_REPOSITORY_OWNER (GitHub Actions)
 // ou de la variable KLAD_OWNER en local. Le nom du dépôt vient de GITHUB_REPOSITORY (ou KLAD_REPO), « klad » par défaut.
@@ -21,6 +22,21 @@ export function appIdFor(o) {
   let seg = String(o).toLowerCase().replace(/[^a-z0-9_]/g, '_');
   if (/^[0-9_]/.test(seg)) seg = 'u' + seg;
   return 'io.github.' + seg + '.klad';
+}
+
+// Contenu de android/klad.properties.
+export function kladProperties(o, version, build) {
+  return '# Généré par scripts/prepare-android.mjs — ne pas versionner.\n' +
+    'applicationId=' + appIdFor(o) + '\nversionCode=' + build + '\nversionName=' + version + '\n';
+}
+
+// Réglages de sécurité attendus dans le manifeste versionné. Renvoie le problème trouvé, ou null.
+export function checkManifest(x) {
+  if (!/android:scheme="klad"\s+android:host="eb"/.test(x)) return 'lien profond klad://eb absent';
+  if (!/android:launchMode="singleTask"/.test(x)) return 'launchMode singleTask absent';
+  if (!/android:allowBackup="false"/.test(x)) return 'android:allowBackup doit valoir false';
+  if (!/android:dataExtractionRules=/.test(x)) return 'dataExtractionRules absent';
+  return null;
 }
 
 // Nom du dépôt : KLAD_REPO, sinon la partie après « / » de GITHUB_REPOSITORY (compte/nom), sinon « klad ».
@@ -54,31 +70,17 @@ if (step === 'web') {
 }
 
 else if (step === 'native') {
+  // android/ est versionné : on n'y modifie aucun fichier suivi. L'identifiant et la version vont dans
+  // android/klad.properties (non versionné), lu par android/app/build.gradle.
+  if (!owner) die('Compte GitHub inconnu : définir KLAD_OWNER (ou lancer dans GitHub Actions).');
   const man = path.join(root, 'android/app/src/main/AndroidManifest.xml');
-  if (!fs.existsSync(man)) die('android/ absent : lancer « npx cap add android » avant.');
-  let x = fs.readFileSync(man, 'utf8');
-  if (x.indexOf('android:scheme="klad"') < 0) {
-    const filter =
-      '\n            <intent-filter>\n' +
-      '                <action android:name="android.intent.action.VIEW" />\n' +
-      '                <category android:name="android.intent.category.DEFAULT" />\n' +
-      '                <category android:name="android.intent.category.BROWSABLE" />\n' +
-      '                <data android:scheme="klad" android:host="eb" />\n' +
-      '            </intent-filter>\n        ';
-    const i = x.indexOf('</activity>');
-    if (i < 0) die('</activity> introuvable dans AndroidManifest.xml');
-    x = x.slice(0, i) + filter + x.slice(i);
-  }
-  if (!/android:launchMode=/.test(x)) x = x.replace(/(<activity\b)/, '$1\n            android:launchMode="singleTask"');
-  fs.writeFileSync(man, x);
-  console.log('✓ AndroidManifest.xml : lien profond klad://eb');
+  if (!fs.existsSync(man)) die('android/ absent du dépôt.');
+  const problem = checkManifest(fs.readFileSync(man, 'utf8'));
+  if (problem) die('AndroidManifest.xml : ' + problem);
+  console.log('✓ AndroidManifest.xml : lien profond klad://eb, aucune sauvegarde Android');
 
-  const gradle = path.join(root, 'android/app/build.gradle');
-  let gtxt = fs.readFileSync(gradle, 'utf8');
-  gtxt = gtxt.replace(/versionCode\s+\d+/, 'versionCode ' + buildNo)
-             .replace(/versionName\s+"[^"]*"/, 'versionName "' + pkg.version + '"');
-  fs.writeFileSync(gradle, gtxt);
-  console.log('✓ build.gradle : version ' + pkg.version + ' (' + buildNo + ')');
+  write('android/klad.properties', kladProperties(owner, pkg.version, buildNo));
+  console.log('✓ applicationId ' + appIdFor(owner) + ', version ' + pkg.version + ' (' + buildNo + ')');
 }
 
 else if (step !== undefined) die('Étape inconnue : ' + step + ' (web | native)');

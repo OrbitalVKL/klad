@@ -1,12 +1,12 @@
 {
   "name": "klad",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
-  "description": "Klad (Клад) — carnet de comptes personnel pour Android. Prototype de faisabilité Enable Banking.",
+  "description": "Klad (Клад) — carnet de comptes personnel pour Android. Données chiffrées, verrou par code ou empreinte.",
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "serve": "python3 -m http.server 8080 --directory www",
-    "android:prepare": "node scripts/prepare-android.mjs web && npx cap add android && node scripts/prepare-android.mjs native && npx cap sync android"
+    "android:prepare": "node scripts/prepare-android.mjs web && node scripts/prepare-android.mjs native && npx cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
