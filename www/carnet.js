@@ -301,5 +301,13 @@
     }
   }
 
-  g.KladCarnet = { utilisable, convertir, cleCarnet, sha256hex, BARS };
+  // Nom actuel d'une catégorie de l'ancienne version (renommages successifs du carnet et de ses versions).
+  function renommeur(carnet) {
+    const st = racine(carnet) || {};
+    const cats = isObj(st.cats) ? st.cats : {};
+    const ren = Object.assign({}, RENOMMEES, isObj(cats.renamed) ? cats.renamed : {});
+    return c => { let x = c; for (let i = 0; ren[x] && ren[x] !== x && i < 5; i++) x = ren[x]; return x; };
+  }
+
+  g.KladCarnet = { utilisable, convertir, cleCarnet, sha256hex, BARS, renommeur, racine };
 })(typeof window !== 'undefined' ? window : globalThis);

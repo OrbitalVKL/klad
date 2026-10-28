@@ -5,8 +5,8 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.5.0** — Lot 5 : classement des opérations, opérations vues, carte à débit différé, paiements en ligne,
-réassociation manuelle, « À vérifier » dans Klad et dans Grafit.
+**0.6.0** — Lot 6 : onglet Budget (perso / commun, cycles de salaire, sections, édition annulable), reste à vivre,
+contrats et échéances sur 31 jours, tendance, résumé Grafit `month` / `upcoming` / `BUDGET_OVER`.
 
 ## Feuille de route
 
@@ -16,7 +16,7 @@ réassociation manuelle, « À vérifier » dans Klad et dans Grafit.
 | 3 | Modèle de données, dédoublonnage, synchro automatique, reprise de l'ancienne version, coquille en onglets | 0.3 | fait |
 | 4 | Lien Grafit (résumé v1 : soldes, totaux, alertes) | 0.4 | fait |
 | 5 | Classement, opérations vues, carte à débit différé, paiements en ligne, réassociation, « À vérifier » | 0.5 | fait |
-| 6 | Budget par cycle (salaire), reste à vivre, contrats et charges fixes, tendance ; Grafit : `month`, reste à vivre, `upcoming` | 0.6 | à faire |
+| 6 | Budget par cycle (salaire), reste à vivre, contrats et charges fixes, tendance ; Grafit : `month`, reste à vivre, `upcoming` | 0.6 | fait |
 | 7 | Module compte commun + équilibre ; Grafit : `commun` | 0.7 | à faire |
 | 8 | Impôts, épargne salariale, taxe foncière | 0.8 | à faire |
 | 9 | Extras (IMAP, Claude), reprise définitive, bascule | 0.9 → 1.0 | à faire |
@@ -32,6 +32,10 @@ réassociation manuelle, « À vérifier » dans Klad et dans Grafit.
   « Classer », filtres, gestes, « À vérifier »), dette de carte, anti-double-comptage des portefeuilles, réassociation,
   avertissement au réimport, résumé Grafit enrichi (`due`, `due_since`, `total.all` avec carte, `main_after_card`,
   `attention`, alertes `TO_REVIEW`, `ACCOUNT_CHECK`, `BACKUP_DUE`, `UPDATE_AVAILABLE`).
+- Lot 6 : moteur de budget (`www/budget.js`, calculs de l'ancienne version : `budgetLines`, `salaryCycle`, `pastCycle`,
+  `drawTrack`, reste à vivre), rendu (`www/vbudget.js`), onglet Budget (`www/ecranbudget.js`), bloc chiffré `budget`
+  (import du carnet au premier déverrouillage), carte « Reste à vivre », contrats, échéances, tendance, prélèvements de
+  portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
 
@@ -53,7 +57,24 @@ réassociation manuelle, « À vérifier » dans Klad et dans Grafit.
   l'écran concerné.
 - Réassociation manuelle : seulement pour un compte « à réassocier », vers un compte bancaire d'une connexion active.
 
-## Points d'appui pour le Lot 6
+- Budget (0.6) : chiffres identiques à l'ancienne version (parité dans klad-ref, `outils/parite/budget.mjs` : 0 écart
+  sur le cycle en cours et 3 cycles passés, perso et commun, avec le complément ; seul écart connu à d'autres dates : un
+  prélèvement de portefeuille sans correspondance, désormais signalé « à rapprocher »).
+- Cycle perso = cycle de salaire, sans bascule « depuis le 1er » (choix du propriétaire) ; repli sur le mois civil.
+- Réglages propres au propriétaire (critères du salaire, noms des personnes du commun) : `klad.salaire`, `klad.commun` du
+  complément ou du carnet, surchargés par `S.budget.reglages` ; jamais dans le code.
+- Reste à vivre : colonne « comptes courants » prioritaire pour Grafit (`left_to_live_basis` = `accounts`), sinon `budget`.
+
+## Points d'appui pour le Lot 7
+
+- Budget : `KladBudget.contexte(S, now, ctxClassement)` → B (une fois par affichage, `KladApp.budget()`) ;
+  `suivi(B, scope, nav)`, `postes(B, sc)`, `parts(B)` (répartition du commun : `pg` par poste), `reserveCommun(B)`,
+  `moisProchaineEcheance`, `echeances(B, 31)`, `contrats(B, sc)` ; virements permanents dans `S.budget.virements`
+  (`qui` : `moi` / `autre`, `montant`, `jour`, `usage`).
+- Réglages du carnet encore inexploités : `appels`, `eq`, `eqItems`, `split` (déjà dans `bplan.commun`), `fisc`, `tf`,
+  `livret`, `pee`, `dismiss`, `excl`, `fuel` ; payload `eqops`, `equip` (équilibre).
+
+## Points d'appui pour le Lot 6 (historique)
 
 - Résultat de classement d'une opération : `KladClasse.classer(ctx, op)` → `{ type, cat, sub, src, nc }` ;
   `ctx = KladClasse.contexte(S, now)` (une fois par affichage) ; nature d'une catégorie : `KladClasse.natureDe`.

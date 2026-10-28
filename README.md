@@ -19,7 +19,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil (« À vérifier »), des opérations, du détail et du volet « Classer », `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `budget.js` = budget par cycle, reste à vivre, contrats, échéances, tendance (calculs), `vbudget.js` = rendu de l'onglet Budget, `ecranbudget.js` = onglet Budget (navigation, édition), `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil (« À vérifier »), des opérations, du détail et du volet « Classer », `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
 | `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour), `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent ») et `grafit/` (lien Grafit : `GrafitProvider`, plugin `KladGrafitPlugin`, contrôle de l'appelant `Appelant`, configuration `GrafitConfig`). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
@@ -65,6 +65,7 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
 | `ops-<compte>-<année>` | Opérations d'un compte pour une année. Une synchro ne réécrit que les blocs changés (en pratique l'année en cours). |
 | `carnet` | Réglages de l'ancienne version repris tels quels (classement repris au Lot 5 ; budget et suivants aux lots suivants). |
 | `classement` | Catégories (nature, icône), règles de base, règles de l'utilisateur, compte rendu de l'import du carnet (0.5). |
+| `budget` | Budget par périmètre (postes `f|`, `c|`, `r|`, `m|` : montant, périodicité, part du commun), base de calcul, contrats, virements permanents, réglages du cycle (0.6). |
 | `journal`, `sauvegarde` | Journal anonyme ; clé de sauvegarde tirée de la phrase. |
 
 - **Montants** : centimes entiers signés, convertis depuis le texte de la banque sans virgule flottante. Le signe n'est jamais affiché : colonnes Débit / Crédit, « débiteur » pour un solde négatif.
@@ -141,6 +142,39 @@ restaurants), `comptes` (noms de comptes de l'ancienne version, rang = référen
 (`{ "r3": { "motif": "…", "remboursements": "…" } }`). Sans motif de règlement, Klad le déduit des règles de base
 « à détailler », sinon il reste à choisir dans la fiche du compte (débits récurrents proposés).
 
+### Budget, reste à vivre, contrats (0.6)
+
+Calculs identiques à l'ancienne version (parité mesurée hors du dépôt, sur le cycle en cours et 3 cycles passés) ; aucun nom
+d'employeur, de personne ou de banque dans le code : ce sont des données (carnet, complément, réglages de Klad).
+
+- **Périmètres** : *Perso* (comptes courants, cartes à débit différé, paiements en ligne) et *Commun* (compte commun).
+- **Cycle** : perso = du dernier salaire reçu à la veille du même jour le mois suivant (prolongé jusqu'à aujourd'hui si le
+  salaire suivant est en retard). Salaire = opération de catégorie *Salaire* sur un compte perso ; critères facultatifs en
+  données (`klad.salaire` du complément : `compte`, `motif`, `paie`, `min`, `minCycle`, `ecart`) : le cycle en cours part du
+  dernier crédit du compte qui contient le motif et (le mot de paie ou au moins `min` €) ; à défaut, du dernier salaire. Un
+  salaire ouvre un nouveau cycle s'il arrive au moins `ecart` jours (15) après le précédent. Sans salaire : mois civil.
+  Commun : mois civil. Navigation ◀ ▶, cycles passés en lecture.
+- **Postes** : charges fixes par sous-catégorie, dépenses courantes et optionnelles par catégorie ; budget = montant du
+  poste (une charge trimestrielle ou annuelle ne compte que le cycle où elle est prélevée ; au commun elle est provisionnée
+  chaque mois) ; utilisé = opérations de la période, paiements carte à leur date de paiement ; réel habituel sur la base de
+  calcul (moyenne pour les charges fixes, médiane des mois pour les autres, 12 derniers mois ÷ 12 pour un poste non
+  mensuel). *Hors budget* = postes sans budget. Virements internes, épargne et natures `hors_budget` exclus.
+- **Revenus** : salaire attendu (moyenne des 3 derniers mois, dernier salaire ou montant libre), autres revenus saisis ;
+  commun : apports attendus de chaque personne selon la répartition des postes (`klad.commun` : `moi`, `autre`).
+  Le poste perso *Contribution compte commun* vaut ma part du budget commun.
+- **Reste à vivre** (perso, cycle en cours) : colonne *dernier salaire* = salaire du cycle − charges fixes prélevées −
+  variable dépensé ; colonne *comptes courants* = soldes des comptes courants − charges fixes encore à venir − reste du
+  budget variable.
+- **Contrats** : montant du document, périodicité, dernier prélèvement trouvé (motif), écart, prochaine échéance.
+  **Échéances sur 31 jours** : contrats, prélèvements récurrents détectés (même compte, mêmes premiers mots, au moins 2 des
+  3 derniers mois, montants proches), dette des cartes au jour du prélèvement.
+- **Tendance** : dépenses des 12 derniers cycles (ou mois) par nature, ou pour une catégorie avec son budget.
+- **Import** : `bplan` (ou `budgets` et `fixedPrefs`), `budgetRef`, `revprev`, `contrats`, `virements` du carnet, au
+  premier déverrouillage de la 0.6 ou à l'import d'une reprise ; le carnet reste intact.
+- **Portefeuille** : un prélèvement sans opération de même montant dans le détail (période couverte par le détail) reste une
+  dépense, apparaît dans « À vérifier » (« n prélèvement(s) de portefeuille à rapprocher ») et peut être marqué interne
+  depuis son détail (annulable).
+
 ### Sauvegarde et phrase de récupération
 
 Au premier lancement, Klad affiche une **phrase de récupération** : 24 caractères (120 bits aléatoires) en 6 groupes de 4, alphabet sans I, L, O, U. Elle est affichée une seule fois, à recopier sur papier, puis vérifiée par la ressaisie de 2 groupes.
@@ -202,7 +236,15 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
   (`info`, « SAUVEGARDE · n J » à partir de 30 jours, « SAUVEGARDE · JAMAIS »), `UPDATE_AVAILABLE` (`info`, « KLAD x.y.z »).
   Grafit affiche un code inconnu par son seul texte.
 - Jamais : IBAN ni fin d'IBAN, identifiant ou jeton, opération, nom de banque, libellé bancaire brut.
-- Prévus aux lots suivants : `month`, `upcoming` (Lot 6), `commun` (Lot 7).
+- `month` (0.6) : cycle perso en cours — `cycle` (`salary` ou `calendar`), `from`, `to`, `spent`, `budget`, `left`
+  (budget − dépensé, négatif si dépassé), `income` (revenus reçus), `top` (5 postes au plus, triés par dépassement puis par
+  montant : `label` en majuscules sans numéro ni nom de banque, `spent`, `budget`), `left_to_live` et `left_to_live_basis`
+  (`accounts` si les soldes des comptes courants sont connus, sinon `budget`, comme la carte de l'accueil).
+- `upcoming` (0.6) : 10 échéances au plus sur 31 jours, par date : `date`, `label`, `amount` (négatif : sortie), `kind`
+  (`contract`, `recurring`, `card`).
+- `attention.wallet_to_match` (0.6) : prélèvements de portefeuille à rapprocher. Alerte `BUDGET_OVER` (`caut`,
+  « CATÉGORIE +n % ») pour chaque poste dépassé du cycle en cours (3 au plus).
+- Prévu au lot suivant : `commun` (Lot 7).
 
 ## Mise à jour depuis l'appli
 
@@ -257,5 +299,7 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 8. *Plus › Sauvegarde* et *Plus › Verrou* : exporter ou restaurer une sauvegarde, changer le code, activer ou désactiver l'empreinte, tout effacer.
 9. *Plus › Modules › Lien Grafit* : partager le résumé avec Grafit (désactivé par défaut).
 10. *Opérations* : appui = détail ; glisser à droite = vue / non vue, à gauche = « Classer » ; filtres non vues, non classées, catégorie. *Plus › Classement* : catégories (nature, icône), règles, reprise du carnet.
+11. *Budget* : Perso / Commun, ◀ ▶ entre cycles ; un appui sur un poste montre ses opérations, « Modifier le budget » ouvre
+   le volet d'édition (annulable) ; *Contrats* et *Tendance* en haut. Accueil : carte « Reste à vivre » (détail au toucher).
 
 Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement. Un faux client Enable Banking (`window.KladFauxEB`, utilisé par le parcours Chromium) permet d'essayer la connexion et la synchro sans réseau.

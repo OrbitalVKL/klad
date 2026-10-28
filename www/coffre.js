@@ -44,7 +44,7 @@
   const IV = 12;
   // Noms de blocs : liste fixe, plus un bloc d'opérations par compte et par année (« ops-<compte>-<année> »).
   // « comptes » : format 0.2, lu une dernière fois par la migration puis supprimé.
-  const BLOCS = ['cle', 'modele', 'soldes', 'carnet', 'classement', 'journal', 'sauvegarde', 'comptes'];
+  const BLOCS = ['cle', 'modele', 'soldes', 'carnet', 'classement', 'budget', 'journal', 'sauvegarde', 'comptes'];
   const nomValide = name => BLOCS.indexOf(name) >= 0 || /^ops-[a-z0-9]{8}-\d{4}$/.test(String(name));
 
   function blocAad(version, name) {
@@ -248,6 +248,7 @@
       b.soldes = await store.get('soldes');
       b.carnet = await store.get('carnet');
       b.classement = await store.get('classement');
+      b.budget = await store.get('budget');
       for (const n of M.nomsOps(b.modele)) b[n] = await store.get(n);
       for (const n of Object.keys(b)) if (b[n] != null) ecrits[n] = JSON.stringify(b[n]);
       return { S: M.depuisBlocs(b), ecrits, migration: null };

@@ -32,6 +32,7 @@
     const L = [];
     if (a.unseen) L.push({ cle: 'nonvues', texte: pluriel(a.unseen, 'opération') + ' à voir', niveau: 'info' });
     if (a.unclassified) L.push({ cle: 'nonclassees', texte: pluriel(a.unclassified, 'opération non classée', 'opérations non classées') + ' (3 derniers mois)', niveau: 'info' });
+    if (a.toMatch) L.push({ cle: 'rapprocher', texte: pluriel(a.toMatch, 'prélèvement') + ' de portefeuille à rapprocher', niveau: 'info' });
     if (a.accountsToCheck) L.push({ cle: 'comptes', texte: pluriel(a.accountsToCheck, 'compte') + ' à vérifier ou à réassocier', niveau: 'caut' });
     for (const sid of Object.keys(S.modele.connexions)) {
       const cx = S.modele.connexions[sid];
@@ -91,6 +92,7 @@
     const t = total(S, now);
     const d = S.modele.sync.derniere;
     let h = aVerifier(S, now, ext);
+    if (ext && ext.rav && g.KladVuesBudget) h += g.KladVuesBudget.carteRav(ext.rav);
     h += '<div class="carte grande"><small>Comptes courants' + (t.cartes ? ', carte déduite' : '') + '</small><div class="total">' +
       (t.n ? solde(t.centimes) : '<span class="m muted">—</span>') + '</div><small>' +
       pluriel(t.n, 'compte') + (t.cartes ? ' · à prélever ' + esc(F().montant(t.carte)) : '') + (d ? ' · synchronisé ' + esc(F().ilYa(d, now)) : '') + '</small></div>';
@@ -111,13 +113,15 @@
     const ids = f.compte ? [f.compte] : M().comptesTries(S).filter(c => !c.masque).map(c => c.id);
     const k = f.q ? M().cleLibelle(f.q) : '';
     const limNc = f.cat === '__nc' && ctx ? M().plusJours(M().jourLocal(ctx.now), -K().NC_JOURS) : '';
+    const rap = f.cat === '__rap' && ctx;
     const out = [];
     for (const id of ids) {
       for (const o of S.ops[id] || []) {
         if (limNc && o.date < limNc) continue;
         if (k && M().cleLibelle(o.libelle + ' ' + (o.contrepartie || '')).indexOf(k) < 0) continue;
         if (f.nonVues && K().vue(S, o)) continue;
-        if (f.cat && ctx) {
+        if (rap) { if (!K().aRapprocher(ctx, o)) continue; }
+        else if (f.cat && ctx) {
           const r = K().classer(ctx, o);
           if (f.cat === '__nc' ? !r.nc : r.cat !== f.cat) continue;
         }
@@ -170,6 +174,7 @@
     const cats = K().listeCategories(ctx.C);
     return '<button class="puce' + (f.nonVues ? ' on' : '') + '" data-f="nonVues" aria-pressed="' + !!f.nonVues + '">Non vues <b>' + nb.unseen + '</b></button>' +
       '<button class="puce' + (f.cat === '__nc' ? ' on' : '') + '" data-f="nc" aria-pressed="' + (f.cat === '__nc') + '">Non classées <small>3 mois</small></button>' +
+      (f.cat === '__rap' ? '<button class="puce on" data-f="rap" aria-pressed="true">À rapprocher</button>' : '') +
       '<select id="opsCat" aria-label="Catégorie" class="' + (f.cat && f.cat !== '__nc' ? 'on' : '') + '"><option value="">Catégorie</option>' +
       cats.map(c => '<option value="' + esc(c) + '"' + (c === f.cat ? ' selected' : '') + '>' + esc(K().iconeDe(ctx.C, c) + ' ' + c) + '</option>').join('') + '</select>' +
       (nb.visiblesNonVues ? '<button class="lien" data-f="toutVu">Tout marquer vu</button>' : '');
@@ -182,6 +187,7 @@
     const r = K().classer(ctx, o);
     const vu = K().vue(S, o);
     const dd = K().dateDepense(o);
+    const w = K().aRapprocher(ctx, o);
     const lignes = [
       ['Date', F().jour(o.date) + (o.statut === 'en_cours' ? ' (en cours)' : '')],
       dd && dd !== o.date ? ['Payée le', F().jour(dd)] : null,
@@ -194,8 +200,11 @@
       '<dl class="details">' + lignes.map(x => '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>').join('') +
       '<dt>Catégorie</dt><dd>' + esc(r.cat + (r.sub && r.sub !== r.cat ? ' › ' + r.sub : '')) + '<small>' + esc(SOURCES[r.src] || '') + '</small></dd>' +
       '<dt>Vue</dt><dd>' + (vu ? 'oui' : 'non') + '</dd></dl>' +
+      (w ? '<p class="note">Prélèvement de ' + esc(w.libelle) + ' sans opération de même montant dans son détail : il est compté comme une dépense. ' +
+        'S\'il est déjà détaillé dans ' + esc(w.libelle) + ', marquez-le interne.</p>' : '') +
       '<div class="row"><button class="btn" data-a="classer">Classer</button>' +
-      '<button class="btn ghost" data-a="vue">' + (vu ? 'Marquer non vue' : 'Marquer vue') + '</button></div>' +
+      '<button class="btn ghost" data-a="vue">' + (vu ? 'Marquer non vue' : 'Marquer vue') + '</button>' +
+      (w ? '<button class="btn ghost" data-a="interne">Marquer interne</button>' : '') + '</div>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
   }
 

@@ -10,6 +10,7 @@
 
   const M = () => g.KladModele;
   const K = () => g.KladClasse;
+  const KB = () => g.KladBudget;
   const V = 1;
   const MAX_OCTETS = 32 * 1024 - 1;              // moins de 32 Ko (contrôlé aussi par le plugin natif)
   const PERIME_MS = 30 * 3600e3;                 // relevé de plus de 30 h
@@ -94,6 +95,7 @@
     if (sv && sv.jours == null) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · JAMAIS' });
     else if (sv && sv.jours >= 30) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · ' + sv.jours + ' J' });
     if (ext && ext.maj && /^\d+\.\d+\.\d+$/.test(ext.maj)) out.push({ level: 'info', code: 'UPDATE_AVAILABLE', text: 'KLAD ' + ext.maj });
+    for (const b of (ext && ext.budgetOver) || []) out.push({ level: 'caut', code: 'BUDGET_OVER', text: b });
     return out.map((a, i) => [a, i]).sort((x, y) => NIVEAUX[x[0].level] - NIVEAUX[y[0].level] || x[1] - y[1]).map(x => x[0]);
   }
 
@@ -145,15 +147,61 @@
     if (a.unseen) r.unseen = a.unseen;
     if (a.unclassified) r.unclassified = a.unclassified;
     if (a.accountsToCheck) r.accounts_to_check = a.accountsToCheck;
+    if (a.toMatch) r.wallet_to_match = a.toMatch;
     const sv = ext && ext.sauvegarde;
     if (sv && sv.jours) r.backup_days = sv.jours;
     return Object.keys(r).length ? r : null;
   }
 
-  // ext (facultatif) : { attention: { unseen, unclassified, accountsToCheck }, sauvegarde: { jours | null }, maj: version }.
+  // Libellé d'un poste ou d'une échéance : majuscules sans accents, sans numéro ni adresse, sans les mots des noms
+  // de banque connus (connexions), 24 caractères au plus.
+  function libellePoste(S, txt) {
+    const banques = new Set();
+    for (const k of Object.keys(S.modele.connexions || {})) {
+      for (const w of String(S.modele.connexions[k].banque || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().split(/[^A-Z0-9]+/)) if (w.length >= 3) banques.add(w);
+    }
+    let s = String(txt || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+      .replace(/[\u0000-\u001f\u007f]/g, ' ')
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/g, ' ')
+      .replace(/\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]){10,30}\b/g, ' ')
+      .replace(/\d(?:[\s.]?\d){3,}/g, ' ');
+    s = s.split(/\s+/).filter(w => !banques.has(w.replace(/[^A-Z0-9]/g, ''))).join(' ');
+    return s.replace(/\s+/g, ' ').trim().slice(0, 24).trim();
+  }
+
+  // Budget du cycle en cours (perso), reste à vivre, échéances à venir, postes dépassés. → { month, upcoming, over } ;
+  // champs omis s'ils ne peuvent pas être calculés.
+  function budget(S, now, ext) {
+    if (!KB() || !K()) return null;
+    const B = (ext && ext.budget) || KB().contexte(S, now);
+    if (!B.rows.length) return null;
+    const s = KB().suivi(B, 'perso', null);
+    const per = s.per;
+    const postes = [];
+    for (const nk of KB().NATS) postes.push(...s.sections[nk].lignes);
+    postes.push(...s.horsBudget.lignes);
+    const top = postes.filter(a => a.cur > 50 || a.pm > 50).map(a => ({ a, over: a.debit === undefined ? a.cur - a.pm : 0 }))
+      .sort((x, y) => (Math.max(0, y.over) - Math.max(0, x.over)) || (y.a.cur - x.a.cur)).slice(0, 5)
+      .map(x => ({ label: libellePoste(S, x.a.label) || 'POSTE', spent: euros(Math.round(x.a.cur)), budget: euros(Math.round(x.a.pm)) }));
+    const month = { cycle: per.cyc ? 'salary' : 'calendar', from: per.start, to: per.end, spent: euros(Math.round(s.total.C)),
+      budget: euros(Math.round(s.total.P)), left: euros(Math.round(s.total.P - s.total.C)), income: euros(Math.round(s.revenus.c)), top };
+    if (s.rav) { month.left_to_live = euros(Math.round(s.rav.valeur)); month.left_to_live_basis = s.rav.base; }
+    const comptes = new Map(S.modele.comptes.map(c => [c.libelle, c]));
+    const upcoming = KB().echeances(B, 31).slice(0, 10).map(e => ({
+      date: e.date, label: e.sorte === 'carte' && comptes.get(e.label) ? libelle(comptes.get(e.label)) : (libellePoste(S, e.poste || e.label) || 'ECHEANCE'),
+      amount: -euros(e.montant), kind: { contrat: 'contract', recurrent: 'recurring', carte: 'card' }[e.sorte] }));
+    const over = s.depasses.filter(a => a.pm > 50).slice(0, 3).map(a => (libellePoste(S, a.label) || 'POSTE') + ' +' + Math.round(100 * (a.cur - a.pm) / a.pm) + ' %');
+    return { month, upcoming, over };
+  }
+
+  // ext (facultatif) : { attention: { unseen, unclassified, accountsToCheck, toMatch }, sauvegarde: { jours | null }, maj: version,
+  //   budget: contexte KladBudget déjà construit }.
   function construire(S, now, ext) {
     const comptes = visibles(S);
     if (!comptes.length) return { v: V, state: 'empty', generated: now };
+    let bu = null;
+    try { bu = budget(S, now, ext); } catch (e) { bu = null; }
+    if (bu && bu.over.length) ext = Object.assign({}, ext, { budgetOver: bu.over });
     const accounts = comptes.map(c => compteResume(S, c, now));
     const r = { v: V, state: 'ok', generated: now };
     const st = dernierReleve(S);
@@ -165,8 +213,10 @@
     if (mac != null) r.main_after_card = mac;
     const at = attention(ext);
     if (at) r.attention = at;
+    if (bu) { r.month = bu.month; r.upcoming = bu.upcoming; }
     r.alerts = alertes(S, comptes, accounts, now, ext);
     // Filet de sécurité (30 comptes tiennent largement) : alertes, puis comptes en trop retirés.
+    while (octets(r) > MAX_OCTETS && r.upcoming && r.upcoming.length) r.upcoming.pop();
     while (octets(r) > MAX_OCTETS && r.alerts.length) r.alerts.pop();
     while (octets(r) > MAX_OCTETS && r.accounts.length > 1) { r.accounts.pop(); delete r.total; }
     return r;
@@ -218,5 +268,5 @@
     return { maj, effacer };
   }
 
-  g.KladResume = { V, MAX_OCTETS, KINDS, libelle, construire, signature, actif, creerLien };
+  g.KladResume = { V, MAX_OCTETS, KINDS, libelle, libellePoste, construire, signature, actif, creerLien };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -99,15 +99,17 @@
   // Point unique après une synchro, un import, un réglage ou une connexion (le résumé Grafit s'abonne à KladModele.surChangement).
   function changed(cause) {
     if (!S) return;
-    CTX = null;
+    CTX = null; BCTX = null;
     save();
     rendre();
     M.signaler(cause);
   }
 
   // ------------------------------------------------------------ classement : contexte (règles compilées, résultats)
-  let CTX = null;
+  let CTX = null, BCTX = null;
   function ctx() { if (!CTX && S) CTX = KC.contexte(S, Date.now()); return CTX; }
+  // Budget : contexte construit sur celui du classement (une fois par affichage).
+  function budget() { if (!BCTX && S && window.KladBudget) BCTX = window.KladBudget.contexte(S, Date.now(), ctx()); return BCTX; }
 
   // Informations venues du verrou (sauvegarde) et de la mise à jour, pour « À vérifier » et le résumé Grafit.
   const externe = { sauvegarde: null, maj: null };
@@ -116,11 +118,13 @@
   // → { attention, sauvegarde, maj, ctx } (lu par le rendu et par le résumé Grafit).
   function extras(now) {
     const cx = ctx();
-    return { attention: KC.attention(cx, now), sauvegarde: externe.sauvegarde, maj: externe.maj, ctx: cx };
+    let rav = null;
+    try { const B = budget(); rav = B ? window.KladBudget.suivi(B, 'perso', null).rav || null : null; } catch (e) { rav = null; }
+    return { attention: KC.attention(cx, now), sauvegarde: externe.sauvegarde, maj: externe.maj, ctx: cx, rav, budget: BCTX };
   }
 
   // ------------------------------------------------------------ onglets
-  const TITRES = { vAccueil: 'Accueil', vOps: 'Opérations', vPlus: 'Plus' };
+  const TITRES = { vAccueil: 'Accueil', vOps: 'Opérations', vBudget: 'Budget', vPlus: 'Plus' };
   let onglet = 'vAccueil';
   function montrer(id) {
     onglet = id;
@@ -189,7 +193,7 @@
   }
   function rendre() {
     if (!S) return;
-    CTX = null;
+    CTX = null; BCTX = null;
     renderAccueil();
     renderFiltre();
     renderOps(true);
@@ -212,12 +216,13 @@
   // sur une ligne de « À vérifier », l'écran concerné.
   const AV = { comptes: 'secComptes', banques: 'secBanques', sync: 'secSync', sauvegarde: 'secSauv', maj: 'secMaj' };
   $('vAccueil').addEventListener('click', ev => {
+    if (ev.target.closest('[data-rav]')) { ouvrirVolet('secRav'); return; }
     const av = ev.target.closest('[data-av]');
     if (av) {
       const k = av.dataset.av;
-      if (k === 'nonvues' || k === 'nonclassees') {
+      if (k === 'nonvues' || k === 'nonclassees' || k === 'rapprocher') {
         filtre.nonVues = k === 'nonvues';
-        filtre.cat = k === 'nonclassees' ? '__nc' : '';
+        filtre.cat = k === 'nonclassees' ? '__nc' : k === 'rapprocher' ? '__rap' : '';
         $('opsCompte').value = ''; $('opsQ').value = '';
         opsFin = 0; renderOps(true); montrer('vOps');
       } else if (AV[k]) ouvrirVolet(AV[k]);
@@ -248,7 +253,7 @@
       const garde = Math.max(opsFin, 1);
       filtre.compte = $('opsCompte').value; filtre.q = $('opsQ').value.trim();
       const cx = ctx();
-      if (filtre.cat && filtre.cat !== '__nc' && !cx.C.categories[filtre.cat]) filtre.cat = '';
+      if (filtre.cat && filtre.cat !== '__nc' && filtre.cat !== '__rap' && !cx.C.categories[filtre.cat]) filtre.cat = '';
       opsListe = Vu.filtrer(S, filtre, cx);
       opsFin = 0;
       const unseen = Vu.filtrer(S, { compte: filtre.compte, nonVues: true }, cx).length;
@@ -287,6 +292,7 @@
     const f = b.dataset.f;
     if (f === 'nonVues') filtre.nonVues = !filtre.nonVues;
     else if (f === 'nc') filtre.cat = filtre.cat === '__nc' ? '' : '__nc';
+    else if (f === 'rap') filtre.cat = '';
     else if (f === 'toutVu') {
       const l = opsListe.filter(o => !KC.vue(S, o));
       const avant = KC.marquer(S, l, true);
@@ -373,6 +379,16 @@
     if (!b || !opCourante) return;
     if (b.dataset.a === 'vue') basculerVue(opCourante[0], opCourante[1]);
     else if (b.dataset.a === 'classer') ouvrirClasser(opCourante[0], opCourante[1], true);
+    else if (b.dataset.a === 'interne') {
+      const o = trouverOp(opCourante[0], opCourante[1]);
+      const w = o && KC.aRapprocher(ctx(), o);
+      if (!w) return;
+      const snap = KC.marquerInterne(ctx(), o, w);
+      log('info', 'Prélèvement de portefeuille rapproché à la main.');
+      fermerVolet();
+      changed('classement');
+      toastAnnuler('Prélèvement marqué interne (réglé par ' + w.libelle + ').', () => { KC.annulerInterne(snap); changed('classement'); });
+    }
   });
 
   // ------------------------------------------------------------ volet « Classer »
@@ -733,7 +749,7 @@
   $('ver').textContent = 'Version ' + (CFG.version || 'dev') + (isNative ? '' : ' · navigateur');
 
   function open(state, h) {
-    S = state; hooks = h || {}; CTX = null;
+    S = state; hooks = h || {}; CTX = null; BCTX = null;
     if (!S.cle.redirectUrl) S.cle.redirectUrl = defaultRedirect();
     // nettoie les autorisations restées en suspens plus d'une heure
     Object.keys(S.modele.pending).forEach(k => { if (Date.now() - (S.modele.pending[k].ts || 0) > 3600e3) delete S.modele.pending[k]; });
@@ -758,18 +774,27 @@
       if (S !== s0) return;
       const init = KC.initialiserVues(s0, Date.now());
       if (!s0.classement) KC.donnees(s0);
-      if (init || s0.classement) changed('classement');
+      // Première ouverture de la 0.6 : budget, contrats et virements repris du carnet (le carnet reste intact).
+      let bud = false;
+      if (!s0.budget && s0.carnet != null && window.KladBudget) {
+        try {
+          const r = window.KladBudget.importer(s0, s0.carnet, { now: Date.now(), renommer: window.KladCarnet.renommeur(s0.carnet) });
+          log('ok', 'Budget repris de l\'ancienne version : ' + r.postes + ' poste(s), ' + r.contrats + ' contrat(s), ' + r.virements + ' virement(s).');
+          bud = true;
+        } catch (e) { log('err', 'Budget : ' + (e.message || e)); }
+      }
+      if (init || s0.classement || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
 
   // Verrouillage : l'état et tout ce qui était affiché sont effacés.
   function close() {
-    S = null; hooks = {}; bankList = []; handled = {}; opsListe = []; opsFin = 0; CTX = null; cls = null; opCourante = null;
+    S = null; hooks = {}; bankList = []; handled = {}; opsListe = []; opsFin = 0; CTX = null; BCTX = null; cls = null; opCourante = null;
     filtre.cat = ''; filtre.nonVues = false;
     fermerVolet();
     toastAction = null; $('toast').className = '';
     ['vAccueil', 'opsListe', 'opsFiltres', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps'].forEach(id => { $(id).textContent = ''; });
+      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'vBudget', 'posteCorps', 'contratsCorps', 'tendanceCorps', 'ravCorps', 'ajoutCorps'].forEach(id => { $(id).textContent = ''; });
     $('badgeOps').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'opsQ'].forEach(id => { $(id).value = ''; });
     $('opsCompte').innerHTML = '';
@@ -779,6 +804,6 @@
   window.KladApp = {
     open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
     ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, etat: () => S, hooks: () => hooks, esc, isNative,
-    ctx, extras, infoSauvegarde, infoMaj, renouveler
+    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp
   };
 })();

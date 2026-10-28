@@ -285,3 +285,76 @@ dl.details dd small { display: block; color: var(--muted); font-size: 12px; }
 .icones { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
 .icones button { font-size: 20px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 0; cursor: pointer; }
 .icones button.on { border-color: var(--accent); }
+
+/* ------------------------------------------------------------ Lot 6 : budget, reste à vivre, contrats, tendance */
+:root { --nfix: #5b6ee1; --ncour: #16a34a; --nopt: #d97706; --hbc: #2f6fed; --good-bg: #e7f4ec; --bad-bg: #fde8e6; }
+@media (prefers-color-scheme: dark) { :root { --nfix: #8a99ff; --ncour: #4ade80; --nopt: #fbbf24; --hbc: #6d9bff; --good-bg: #183424; --bad-bg: #3d1d19; } }
+.hb { color: var(--hbc); }
+.chip.good { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
+.chip.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+.chip.warn { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.chip.info { color: var(--hbc); border-color: color-mix(in srgb, var(--hbc) 40%, var(--line)); }
+.bhaut { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 2px 0 8px; }
+.bhaut .seg { flex: 1 1 160px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+.seg button { flex: 1; font: inherit; font-size: 14px; padding: 8px 10px; border: 0; background: none; color: var(--ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.cycnav { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.cycnav b { flex: 1; text-align: center; font-size: 14px; }
+.carte.btot, .carte.bsolde { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 8px 0 12px; }
+.carte.bsolde .grand { font-size: 20px; font-weight: 700; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.carte.bsolde small { display: block; }
+.rangee { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-variant-numeric: tabular-nums; }
+.rangee.small { font-size: 12px; }
+.tbar { position: relative; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 5px 0 2px; }
+.tbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ok); border-radius: 3px; }
+.tbar i.over { background: var(--bad); } .tbar i.warn { background: var(--accent); } .tbar i.hb { background: var(--hbc); } .tbar i.prov { background: var(--muted); }
+.tbar span { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: .55; }
+.tbar.seg2 { display: flex; height: 8px; }
+.tbar.seg2 i { position: static; border-radius: 0; }
+.tbar.seg2 i.in { background: var(--ok); } .tbar.seg2 i.out { background: var(--hbc); }
+.causes { margin: 8px 0 0; } .causes ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+.bsec { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 6px; margin: 10px 0; }
+.bsec h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 4px; font-size: 15px; }
+.bsec h3 .gs { flex-basis: 100%; font-size: 12px; font-weight: 400; color: var(--muted); }
+.nat { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.nat.fixe { background: var(--nfix); } .nat.courante { background: var(--ncour); } .nat.optionnelle { background: var(--nopt); } .nat.rev { background: var(--ok); } .nat.hb { background: var(--hbc); }
+.bl { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; width: 100%; background: none; border: 0; border-top: 1px solid var(--line);
+  color: var(--ink); font: inherit; text-align: left; padding: 9px 0; cursor: pointer; }
+.bsec h3 + .bl { border-top: 0; }
+.bl .ico { font-size: 19px; text-align: center; }
+.bl .nm { min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.bl .nm small { display: block; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.bl .et { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 12px; text-align: right; white-space: nowrap; }
+.bl.off .nm { color: var(--muted); }
+.cause { font-size: 12px; color: var(--muted); padding: 0 0 8px 34px; }
+.cause b { color: var(--bad); font-weight: 600; }
+.bdet { padding: 0 0 8px 34px; }
+.bop { display: flex; justify-content: space-between; gap: 8px; width: 100%; background: none; border: 0; border-top: 1px dashed var(--line); color: var(--ink);
+  font: inherit; font-size: 13px; text-align: left; padding: 6px 0; cursor: pointer; }
+.bop small { display: block; color: var(--muted); font-size: 11.5px; }
+.carte.rav { display: block; width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer; background: var(--card);
+  border: 2px solid color-mix(in srgb, var(--ok) 55%, var(--line)); border-radius: 16px; padding: 12px 14px; margin: 4px 0 12px; }
+.carte.rav .rtit { display: flex; justify-content: space-between; font-weight: 700; font-size: 15px; }
+.carte.rav .chev { color: var(--muted); font-weight: 400; font-size: 13px; }
+.carte.rav .rvs { display: flex; gap: 10px; margin-top: 6px; }
+.carte.rav .rv { flex: 1; background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+.carte.rav .rv b { display: block; font-size: 19px; }
+.carte.rav .rv b small { font-size: 11px; font-weight: 500; }
+.carte.rav .rv > small { color: var(--muted); font-size: 12px; }
+table.ravt { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.ravt th, .ravt td { padding: 7px 4px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; }
+.ravt th:first-child { text-align: left; font-weight: 500; }
+.ravt th small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+.ravt thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.ravt tr.mg th, .ravt tr.mg td { font-weight: 600; }
+.ravt tr.rvt th, .ravt tr.rvt td { font-weight: 700; font-size: 15px; }
+svg.graph { width: 100%; height: auto; display: block; margin: 8px 0; }
+.legende { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); margin: 0 0 8px; }
+.legende i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.legende i.ligne { height: 0; border-top: 2px dashed var(--ink); border-radius: 0; }
+.list.ctr li { align-items: flex-start; }
+.list li .m { font-variant-numeric: tabular-nums; }
+.bl .nm small.chip { display: inline; font-size: 10.5px; padding: 1px 6px; }
+#toast { visibility: hidden; }
+#toast.show { visibility: visible; }
