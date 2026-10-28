@@ -277,16 +277,26 @@
     return n;
   }
 
+  // Jour de la frontière : l'opération Enable Banking x est-elle déjà dans la reprise du compte ? Même jour, même
+  // montant, libellés compatibles (même libellé normalisé, l'un prolongeant l'autre, ou référence commune).
+  // Une pour une : pris garde les opérations de reprise déjà retrouvées.
+  function dejaReprise(list, x, pris) {
+    const o = list.find(r => r.source === 'reprise' && !pris.has(r.id) && r.date === x.date && r.montant === x.montant && compatibles(r.libelle, x.libelle));
+    if (o) pris.add(o.id);
+    return !!o;
+  }
+
   // Intègre un relevé Enable Banking (opérations brutes) dans le compte cid.
+  // Frontière de reprise : dates antérieures ignorées ; jour même accepté, sauf opération déjà dans la reprise.
   function integrer(S, cid, raw, now) {
     const c = compte(S, cid);
     const jour = jourLocal(now);
     const front = (c && c.frontiere) || '';
-    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, ignorees: 0 };
+    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, ignorees: 0, reprises: 0 };
     const cands = [];
     for (const t of raw || []) {
       const x = depuisEB(t);
-      if (!x || (front && x.date <= front)) { st.ignorees++; continue; }
+      if (!x || (front && x.date < front)) { st.ignorees++; continue; }
       cands.push(x);
     }
     doterIds(cid, cands, 'h');
@@ -294,12 +304,15 @@
     const parId = new Map(list.map(o => [o.id, o]));
     const absorbees = new Set(list.map(o => o.exEnCours).filter(Boolean));
     const vues = new Set();
+    const pris = new Set();
     for (const x of cands) {
       if (x.statut === 'en_cours') vues.add(x.id);
       const o = parId.get(x.id);
       if (o) {
         if (poser(o, x)) st.maj++;
         delete o.absente;
+      } else if (front && x.date === front && dejaReprise(list, x, pris)) {
+        st.ignorees++; st.reprises++;
       } else if (!absorbees.has(x.id)) {
         const n = nouvelleOp(cid, x, 'eb', jour);
         list.push(n); parId.set(n.id, n);
@@ -316,23 +329,29 @@
     return st;
   }
 
-  // Date de début de la prochaine récupération : dernière date comptabilisée (Enable Banking) − 5 jours,
-  // jamais avant le lendemain de la frontière de reprise. null → la plus longue période acceptée par la banque.
-  function debutRecuperation(S, c) {
+  // Début de la prochaine récupération : dernière date comptabilisée (Enable Banking) − 5 jours, jamais avant la
+  // frontière de reprise (le jour même est relu, dédoublonné contre la reprise), jamais après aujourd'hui (la banque
+  // refuse une date future : erreur 422). from null → la plus longue période acceptée par la banque.
+  // → { from, ramenee } ; ramenee : la date calculée était dans le futur.
+  function bornesRecuperation(S, c, now) {
     let max = '';
     for (const o of S.ops[c.id] || []) if (o.source === 'eb' && o.statut === 'comptabilisee' && o.date > max) max = o.date;
     let from = max ? plusJours(max, -5) : null;
-    if (c.frontiere) { const f = plusJours(c.frontiere, 1); if (!from || from < f) from = f; }
-    return from;
+    if (c.frontiere && (!from || from < c.frontiere)) from = c.frontiere;
+    const auj = jourLocal(now == null ? Date.now() : now);
+    if (from && from > auj) return { from: auj, ramenee: true };
+    return { from, ramenee: false };
   }
+  const debutRecuperation = (S, c, now) => bornesRecuperation(S, c, now).from;
 
-  // Frontière : les opérations Enable Banking datées de la frontière ou avant sont retirées.
+  // Frontière : les opérations Enable Banking datées d'avant la frontière sont retirées, et celles du jour même
+  // qui sont déjà dans la reprise.
   function appliquerFrontiere(S, cid) {
     const c = compte(S, cid);
     if (!c || !c.frontiere || !S.ops[cid]) return 0;
-    const avant = S.ops[cid].length;
-    S.ops[cid] = S.ops[cid].filter(o => o.source !== 'eb' || o.date > c.frontiere);
-    return avant - S.ops[cid].length;
+    const list = S.ops[cid], f = c.frontiere, pris = new Set();
+    S.ops[cid] = list.filter(o => o.source !== 'eb' || o.date > f || (o.date === f && !dejaReprise(list, o, pris)));
+    return list.length - S.ops[cid].length;
   }
 
   // ------------------------------------------------------------ soldes
@@ -515,7 +534,7 @@
   g.KladModele = {
     V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId,
     vide, nouveauModele, compte, comptesTries, comptesDe, opsDe, roleDefaut, nouveauCompte, compteEB, empreinte,
-    associerSession, supprimerCompte, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, debutRecuperation,
+    associerSession, supprimerCompte, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, bornesRecuperation, debutRecuperation,
     appliquerFrontiere, soldePrefere, soldesLus, soldeAffiche, totalCourants, etatAcces, alerteCompte,
     versBlocs, nomsOps, depuisBlocs, BLOC_OPS, depuis02, surChangement, signaler
   };

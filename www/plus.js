@@ -198,11 +198,28 @@
       '<label>Vers<select data-ref="' + esc(a.ref) + '">' + opts(choix[a.ref]) + '</select></label></li>').join('');
     $('repriseApercu').innerHTML = '<h3>Aperçu</h3><p class="muted">Fichier ' + (rep.created ? 'du ' + F.date(rep.created.slice(0, 10)) : 'sans date') +
       ' · ' + rep.nb + ' opération(s). Associez chaque compte de la reprise à un compte Klad.</p>' +
-      '<ul class="list">' + lignes + '</ul>' +
+      '<ul class="list">' + lignes + '</ul>' + '<p class="note" id="repIgnores" hidden></p>' +
       '<label class="inline"><input id="repReglages" type="checkbox" checked> Reprendre libellés, rôles et rattachements de l\'ancienne version</label>' +
       (S().modele.reprise ? '<p class="note">Les opérations de la reprise précédente seront remplacées.</p>' : '') +
       '<p class="msg bad" id="repMsg"></p><div class="row"><button class="btn" data-a="importer">Importer</button></div>';
+    // Valeur proposée appliquée explicitement à chaque sélecteur (sans dépendre de l'attribut « selected » au rendu,
+    // vu ignoré sur le téléphone) ; un compte manuel sans correspondance est toujours « Créer un compte manuel ».
+    $('repriseApercu').querySelectorAll('select[data-ref]').forEach(sel => {
+      sel.value = choix[sel.dataset.ref];
+      if (sel.value !== choix[sel.dataset.ref]) sel.value = 'creer';
+    });
+    majIgnores();
   }
+
+  // Avant confirmation : nombre de comptes de la reprise qui seront ignorés.
+  function majIgnores() {
+    const n = [...$('repriseApercu').querySelectorAll('select[data-ref]')].filter(sel => sel.value === 'ignorer').length;
+    const el = $('repIgnores');
+    if (!el) return;
+    el.hidden = !n;
+    el.textContent = n ? n + ' compte(s) ignoré(s) : ' + (n > 1 ? 'leurs' : 'ses') + ' opérations ne seront pas importées.' : '';
+  }
+  $('repriseApercu').addEventListener('change', ev => { if (ev.target.matches('select[data-ref]')) majIgnores(); });
 
   $('repriseApercu').addEventListener('click', ev => {
     const b = ev.target.closest('[data-a="importer"]');

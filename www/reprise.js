@@ -113,7 +113,7 @@
       let c = comptes.find(x => x.id === avant[r.ref]);
       if (!libre(c) && r.fin4) c = comptes.find(x => libre(x) && x.source.fin4 && x.source.fin4.toUpperCase() === r.fin4.toUpperCase());
       if (!libre(c)) c = comptes.find(x => libre(x) && x.role === r.role && M().cleLibelle(x.libelle) === M().cleLibelle(r.label));
-      if (libre(c)) { pris.add(c.id); choix[r.ref] = c.id; } else choix[r.ref] = 'creer';
+      if (libre(c)) { pris.add(c.id); choix[r.ref] = c.id; } else choix[r.ref] = 'creer';     // sans correspondance (manuel ou non) : créer
     }
     return choix;
   }

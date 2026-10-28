@@ -39,7 +39,9 @@
       try {
         if (!cx) throw new Error('Connexion bancaire absente : reconnectez la banque.');
         if (M().etatAcces(cx, now) === 'expire') throw new Error('Accès bancaire expiré : renouvelez-le.');
-        const from = M().debutRecuperation(S, c);
+        const b = M().bornesRecuperation(S, c, now);
+        const from = b.from;
+        if (b.ramenee) deps.log('info', nom + ' : date de début ramenée à aujourd\'hui');
         let h = entetesPSU(cx.psu, dispo);
         const lire = async hh => ({
           bal: await cl.balances(c.source.uid, hh),
@@ -62,7 +64,7 @@
         res.nouvelles += st.nouvelles; res.fusionnees += st.fusionnees; res.retirees += st.retirees;
         deps.log('ok', nom + ' : ' + st.lues + ' lue(s) depuis ' + (from ? 'le ' + from.split('-').reverse().join('/') : 'le plus tôt possible') +
           ', ' + st.nouvelles + ' nouvelle(s), ' + st.maj + ' mise(s) à jour, ' + st.fusionnees + ' fusion(s), ' + st.retirees + ' retirée(s), ' +
-          st.ignorees + ' ignorée(s)' + (Object.keys(h).length ? '' : ', sans en-têtes utilisateur'));
+          st.ignorees + ' ignorée(s)' + (st.reprises ? ' dont ' + st.reprises + ' déjà dans la reprise' : '') + (Object.keys(h).length ? '' : ', sans en-têtes utilisateur'));
       } catch (e) {
         if (!ok()) return null;
         res.erreurs++;

@@ -127,10 +127,20 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     };
     await ouvrirReprise();
     assert.match(await page.locator('#repriseApercu').innerText(), /COURANT[\s\S]*3 opération\(s\) du 03\/01\/2023/);
-    assert.equal(await page.locator('[data-ref="r5"]').inputValue(), 'creer');
+    assert.equal(await page.locator('[data-ref="r5"]').inputValue(), 'creer');      // compte manuel : « Créer » présélectionné
+    assert.equal(await page.locator('[data-ref="r5"] option[value="creer"]').innerText(), 'Créer un compte manuel');
+    assert.equal(await page.locator('#repIgnores').isVisible(), false);
+    await page.selectOption('[data-ref="r5"]', 'ignorer');
+    assert.match(await page.locator('#repIgnores').innerText(), /^1 compte\(s\) ignoré\(s\)/);
+    await page.selectOption('[data-ref="r5"]', 'creer');
+    assert.equal(await page.locator('#repIgnores').isVisible(), false);
     await page.locator('#repriseApercu [data-a="importer"]').click();
     await page.waitForSelector('#volet', { state: 'visible' });
     assert.match(await page.locator('#repriseEtat').innerText(), /3 opération/);
+    const livret = await page.evaluate(() => window.KladApp.etat().modele.comptes.find(c => c.libelle === 'LIVRET A'));
+    assert.equal(livret.source.type, 'manuel');
+    assert.equal(livret.solde.centimes, 500000);
+    assert.match(livret.solde.date, /^\d{4}-\d{2}-\d{2}$/);
     await page.locator('#volet [data-fermer]').last().click();
 
     // nouvelle synchro (pastille), puis réimport : aucun doublon
