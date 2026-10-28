@@ -24,7 +24,7 @@
 
   function defaultRedirect() {
     if (!CFG.owner) return '';
-    return 'https://' + String(CFG.owner).toLowerCase() + '.github.io/klad/retour.html';
+    return KladEB.redirectUrlFor(CFG.owner, CFG.repo || 'klad');
   }
   if (!S.redirectUrl) S.redirectUrl = defaultRedirect();
 

@@ -17,7 +17,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 |---|---|
 | `www/` | Page de test (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `app.js` = écran. |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
-| `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub, ajoute le lien profond, numérote la version. |
+| `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `.github/workflows/android.yml` | Tests, fabrication Capacitor, signature de l'APK, publication dans Releases (sur étiquette `v*`). |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
 | `test/` | Tests sans réseau (clé, JWT, mise en forme). `npm test`. |
@@ -28,17 +28,19 @@ Les appels à Enable Banking passent par CapacitorHttp (natif), donc sans restri
 
 ## Identifiants dérivés du compte GitHub
 
-Pour un compte `<compte>`, avec le dépôt nommé `klad` :
+Pour un compte `<compte>` et un dépôt `<dépôt>` (`klad` par défaut) :
 
-- site : `https://<compte>.github.io/klad/`
-- **adresse de retour à déclarer chez Enable Banking** : `https://<compte>.github.io/klad/retour.html`
+- site : `https://<compte>.github.io/<dépôt>/`
+- **adresse de retour à déclarer chez Enable Banking** : `https://<compte>.github.io/<dépôt>/retour.html`
 - identifiant d'appli : `io.github.<compte>.klad`, en minuscules, avec les tirets remplacés par `_`
+
+Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO` en local) ; le site le lit dans sa propre adresse. Cas particulier : un dépôt nommé `<compte>.github.io` est publié à la racine (`https://<compte>.github.io/retour.html`).
 
 ## Mise en ligne
 
 ### 1. Dépôt
 
-Le dépôt doit être **public** et nommé **`klad`**. Le code est poussé sur la branche `main`.
+Le dépôt doit être **public**. Son nom est libre (`klad` conseillé) : il est déduit à la fabrication. Le code est poussé sur la branche `main`.
 
 ### 2. GitHub Pages
 

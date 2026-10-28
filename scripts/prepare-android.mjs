@@ -4,13 +4,14 @@
 //   node scripts/prepare-android.mjs native  → lien profond klad://eb, numéro de version (après « cap add android »)
 //
 // Le compte GitHub n'est écrit nulle part dans le dépôt : il vient de GITHUB_REPOSITORY_OWNER (GitHub Actions)
-// ou de la variable KLAD_OWNER en local.
+// ou de la variable KLAD_OWNER en local. Le nom du dépôt vient de GITHUB_REPOSITORY (ou KLAD_REPO), « klad » par défaut.
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const step = process.argv[2];
 const owner = (process.env.KLAD_OWNER || process.env.GITHUB_REPOSITORY_OWNER || '').trim();
+const repo = repoName(process.env);
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const buildNo = parseInt(process.env.GITHUB_RUN_NUMBER || '1', 10);
 const sha = (process.env.GITHUB_SHA || 'local').slice(0, 7);
@@ -22,6 +23,12 @@ export function appIdFor(o) {
   return 'io.github.' + seg + '.klad';
 }
 
+// Nom du dépôt : KLAD_REPO, sinon la partie après « / » de GITHUB_REPOSITORY (compte/nom), sinon « klad ».
+export function repoName(env) {
+  const r = String(env.KLAD_REPO || env.GITHUB_REPOSITORY || '').trim();
+  return r.split('/').pop() || 'klad';
+}
+
 function die(msg) { console.error('✗ ' + msg); process.exit(1); }
 function write(rel, txt) { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), txt); console.log('✓ ' + rel); }
 
@@ -31,11 +38,11 @@ if (step === 'web') {
   const cap = JSON.parse(fs.readFileSync(capPath, 'utf8'));
   cap.appId = appIdFor(owner);
   fs.writeFileSync(capPath, JSON.stringify(cap, null, 2) + '\n');
-  console.log('✓ appId = ' + cap.appId);
+  console.log('✓ appId = ' + cap.appId + ', dépôt = ' + repo);
 
   write('www/config.js',
     '// Généré par scripts/prepare-android.mjs — ne pas modifier.\n' +
-    'window.KLAD_CONFIG = ' + JSON.stringify({ owner, version: pkg.version, build: buildNo + ' · ' + sha }) + ';\n');
+    'window.KLAD_CONFIG = ' + JSON.stringify({ owner, repo, version: pkg.version, build: buildNo + ' · ' + sha }) + ';\n');
 
   // Exécution Capacitor sans outil d'assemblage : copie du fichier autonome de @capacitor/core.
   const candidates = ['dist/capacitor.js', 'dist/capacitor.min.js'].map(f => path.join(root, 'node_modules/@capacitor/core', f));

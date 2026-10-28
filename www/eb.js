@@ -160,5 +160,13 @@
     };
   }
 
-  g.KladEB = { API, Client, importKey, makeJwt, pemToPkcs8, normalize, _b64u: b64u };
+  // ------------------------------------------------------------ adresse de retour (site GitHub Pages)
+  // Dépôt « <compte>.github.io » : site publié à la racine ; sinon sous /<dépôt>/.
+  function redirectUrlFor(owner, repo) {
+    const host = String(owner).toLowerCase() + '.github.io';
+    const r = String(repo || 'klad');
+    return 'https://' + host + (r.toLowerCase() === host ? '' : '/' + r) + '/retour.html';
+  }
+
+  g.KladEB = { API, Client, importKey, makeJwt, pemToPkcs8, normalize, redirectUrlFor, _b64u: b64u };
 })(typeof window !== 'undefined' ? window : globalThis);

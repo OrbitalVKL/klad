@@ -46,9 +46,13 @@
     </div>
   </main>
   <script>
+    // Nom du dépôt lu dans l'adresse : /<dépôt>/… ; à la racine, c'est le dépôt « <compte>.github.io ».
     var owner = location.hostname.split('.')[0];
-    document.getElementById('apk').href = 'https://github.com/' + owner + '/klad/releases/latest';
-    document.getElementById('ret').textContent = location.origin + '/klad/retour.html';
+    var seg = location.pathname.split('/')[1] || '';
+    var repo = (seg && seg.indexOf('.html') < 0) ? decodeURIComponent(seg) : location.hostname;
+    var base = repo === location.hostname ? '' : '/' + seg;
+    document.getElementById('apk').href = 'https://github.com/' + owner + '/' + repo + '/releases/latest';
+    document.getElementById('ret').textContent = location.origin + base + '/retour.html';
   </script>
 </body>
 </html>
