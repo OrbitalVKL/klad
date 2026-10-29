@@ -5,13 +5,13 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.8.1** — écarts comblés après l'inventaire : contrats modifiables (« → prévu »), base de calcul et « Tout aligner »,
-thème clair / sombre, mode démo, import manuel d'un relevé CSV ou JSON. (0.8.0 — Lot 8 : impôts, taxe foncière, épargne,
-observations, résultats, répartition ; 0.7.0 — Lot 7 : compte commun et équilibre ; 0.6.0 — Lot 6 : budget par cycle,
-reste à vivre, contrats, échéances, tendance.)
-
-Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts enchaînés sans validation intermédiaire
-(décisions par défaut notées dans chaque section « Décisions »).
+**0.9.0** — Lot 9a : Klad reprend l'interface de l'ancienne version (Carnet v63–v65 sur téléphone) : mêmes couleurs,
+thèmes Auto / Clair / Sombre, polices libres embarquées, cartes, grande carte d'accueil, sections repliables mémorisées,
+puces, icônes de catégories, animations (coupées si « réduire les animations ») ; onglets Budget / Opérations / Commun /
+Plus. Fonctions reprises : tendance complète, parts du commun par poste, équilibre détaillé, estimation du livret sur sa
+carte, calculateur carburant, import Excel (.xlsx), calcul dans les champs de montant. Nouvelle icône adaptative (К) et
+logo du site. Alerte Grafit `OVERDRAFT_RISK` graduée. (0.8.1 : écarts comblés ; 0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ;
+0.6.0 — Lot 6.)
 
 ## Feuille de route
 
@@ -24,7 +24,9 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
 | 6 | Budget par cycle (salaire), reste à vivre, contrats et charges fixes, tendance ; Grafit : `month`, reste à vivre, `upcoming` | 0.6 | fait |
 | 7 | Module compte commun + équilibre ; Grafit : `commun` | 0.7 | fait |
 | 8 | Impôts, épargne salariale, taxe foncière, livret, observations, résultats, répartition | 0.8 | fait |
-| 9 | Extras (IMAP, Claude), reprise définitive, bascule | 0.9 → 1.0 | à faire |
+| 9a | Interface identique à l'ancienne version, fonctions restantes, icône | 0.9.0 | fait |
+| 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.x | à faire |
+| 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Ce qui est fait (résumé)
 
@@ -43,6 +45,25 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- Lot 9a (0.9.0) : interface copiée de l'ancienne version (feuille de style d'origine, reprise telle quelle, plus une
+  section Klad pour le verrou, les volets et les réglages). Écrans comparés un à un avec captures (hors dépôt) sur les
+  données réelles : Budget, Opérations, Commun, Équilibre, Impôts, Épargne, Relevés, volet Plus, thème sombre.
+  Écarts volontaires : aucun montant négatif affiché (l'ancienne version écrivait « -438 € » et « -2 k€ » sur les axes :
+  Klad écrit le montant sans signe, en rouge, ou « débiteur », « déficit ») ; pas de bascule « Depuis le salaire /
+  Depuis le 1er » (choix du propriétaire) ; synchronisation directe Enable Banking (pas de script ni de Drive) ;
+  sauvegarde par export chiffré (pas de fichier lié). Pastilles de banques et couleurs de catégories : génériques dans
+  le code, surchargées par le complément (`klad.pastilles` { motif: [initiales, couleur] }, `klad.couleurs`) ; nom de la
+  résidence et du syndic des appels de fonds : `klad.appels.titre`, `klad.appels.syndic`. Le livret saisi à la main
+  s'ouvre sur Épargne depuis sa carte (le ✎ de l'ancienne version). Les sections « Résultats » et le volet « Reste à
+  vivre » disparaissent : la v65 les affiche dans le suivi (période clôturée) et dans la carte dépliable.
+- `OVERDRAFT_RISK` (Grafit) gradué : `crit` si le compte commun passe sous zéro dans les 31 jours (premier jour sous
+  zéro de la trésorerie, ou fin du mois si les prélèvements à venir dépassent le solde), `caut` plus tard dans les
+  12 mois, aucune alerte sinon (`KladCommun.risqueDecouvert`). Format du résumé inchangé.
+- La clé Claude et le mot de passe de messagerie (Lot 9b) ne passent jamais par les secrets GitHub : saisis dans
+  l'appli, chiffrés dans le coffre comme la clé Enable Banking.
+- Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées),
+  `klad.periode`, `klad.tendance` (liste fermée, `KladUI.pref`) ; aucune donnée.
 
 - Lot 8 (0.8) : chiffres identiques à l'ancienne version (parité `outils/parite/lot8.mjs` : impôts avis et estimation,
   partage, régularisations, taxe foncière, livret, résultats perso et commun ; 0 écart). Observations : mêmes règles,
@@ -84,40 +105,40 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
   complément ou du carnet, surchargés par `S.budget.reglages` ; jamais dans le code.
 - Reste à vivre : colonne « comptes courants » prioritaire pour Grafit (`left_to_live_basis` = `accounts`), sinon `budget`.
 
-## Inventaire des écarts avec l'ancienne version (0.8.1)
+## Inventaire des écarts avec l'ancienne version (0.9.0)
 
-Comblés en 0.8.1 (ni clé ni réglage personnel) : édition des contrats et « → prévu » ; base de calcul et « Tout aligner
-sur le réel habituel » ; thème ; mode démo ; import manuel CSV / JSON par compte manuel.
+Repris en 0.9.0 : interface ; tendance complète (revenus, dépenses, balance, balance cumulée, solde reconstitué ou une
+catégorie face à son budget ; comptes et période au choix) ; parts du commun par poste (Personne A / B) ; équilibre
+détaillé (composition, graphique cumulé, utilisation du compte commun, dépenses payées en direct, tous les mouvements) ;
+livret sur sa carte ; calculateur carburant ; import Excel (.xlsx, lecteur embarqué sans bibliothèque) ; « Retirer les
+imports manuels » ; calcul dans les champs de montant (« 29,99+64 ») ; libellés et titres de la v65.
 
-Restent (à arbitrer pour le Lot 9 ou au-delà) :
-- Tendance : séries revenus / dépenses / balance par mois, solde cumulé et solde reconstitué, choix des comptes.
-- Compte commun : vue d'ensemble des parts par poste (tableau « Total retenu / Personne A / Personne B ») ; équilibre :
-  liste complète des mouvements filtrable par sorte, graphique de l'investissement cumulé de chacun.
-- Livret : estimation affichée sur la carte du compte livret (elle est dans Plus › Épargne).
-- Calculateur carburant (réglage `fuel` du carnet).
-- Import Excel (.xlsx) : l'ancienne version chargeait une bibliothèque en ligne ; à reprendre seulement avec une
-  bibliothèque embarquée (taille de l'appli).
-- Opérations « exceptionnelles » : réglage vide dans l'ancienne version (`EXC = {}`), rien à reprendre.
-- Avec clé ou réglage personnel (Lot 9) : lecture des bulletins de paie, avis et appels de fonds (Drive, Gmail / IMAP),
-  analyses par Claude, reprise définitive et bascule.
+Restent :
+- Avec clé ou réglage personnel (Lot 9b, extras désactivés par défaut) : lecture des bulletins de paie et des avis
+  (l'ancienne version passait par Drive et Claude), appels de fonds par mail, « Analyse de Claude ».
+- Observations : mêmes règles, 18 points de chaque côté sur les données réelles ; titres formés avec les libellés des
+  contrats et des comptes de Klad (« Eau (…) : prélèvement absent ») là où l'ancienne version avait des titres écrits à la
+  main ; deux écarts de calcul connus (un prélèvement de paiement en ligne sans correspondance → « détaillé en partie », et la balance
+  des 3 derniers mois qui en dépend).
+- Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
+  « en ligne ».
 
-Décisions 0.8.1 : contrats et base de calcul suivent l'ancienne version (poste deviné par les mots de 4 lettres ou plus,
-« → prévu » = total mensuel des contrats, ou échéance et périodicité d'un contrat non mensuel unique ; alignement à
-l'euro) ; import de relevé réservé aux comptes manuels (les comptes bancaires sont lus par Enable Banking : pas de
-doublon possible avec la synchro) ; mode démo sans facteur mémorisé (s'arrête au redémarrage) ; libellés courts des
-comptes non masqués en démo (ce sont aussi des mots de l'interface : « Commun »…).
+## Points d'appui pour le Lot 9b
 
-## Points d'appui pour le Lot 9
+- Interface : `KladUI` (format, pastilles, sections repliables, préférences, graduation des axes, calcul) ; écrans
+  `KladVues*` (rendu) et `ecran*.js` (événements) ; volets dans `#rangement` ouverts par `KladApp.ouvrirVolet(id)`.
+- Crochets prévus pour les extras (`window.KladExtras`) : `actif(S, nom)`, `analyse(scope)`, `analyser(...)`,
+  `lireDocument(...)`, `etatMail(S)` ; boutons `data-lirebs`, `data-lireavis`, `data-analyseimpots` dans Impôts,
+  « Analyse de Claude » dans les observations du Budget.
+- Impôts : bulletins (`S.budget.fisc.bs`) et avis (`fisc.avis`) au format de l'ancienne version
+  (`{ p, emp, m, pay, ni, pas, taux, type, brut }`, avis `{ rev, sal, ded, … }`).
+- Appels de fonds : `S.budget.appels[cp].items`, `mails`, `pdfs` (format de l'ancienne version).
+- Import manuel : `KladReleve.lireFichier(octets, role, auj)` (CSV, JSON, .xlsx) puis `integrer(S, cid, lignes, now)`.
 
-- Impôts : `KladFisc` (`contexte`, `annee`, `partage`, `regularisations`, `alertes`, `taxeFonciere`, `pee`, `livret`) ;
-  bulletins (`S.budget.fisc.bs`) et avis (`fisc.avis`) au format de l'ancienne version : la lecture automatique (Drive,
-  Claude) du Lot 9 doit produire ces objets (`{ p, emp, m, pay, ni, pas, taux, type, brut }`, avis `{ rev, sal, ded, … }`).
-- Appels de fonds : `S.budget.appels[cp].items`, `mails`, `pdfs` (format de l'ancienne version) ; lecture des mails au Lot 9.
+## Points d'appui pour le Lot 9 (historique)
+
+- Impôts : `KladFisc` (`contexte`, `annee`, `partage`, `regularisations`, `alertes`, `taxeFonciere`, `pee`, `livret`).
 - Observations : `KladObservations.audit(B)` (points), `observations(B, scope)` (à faire, masqués, infos).
-- Réglages du carnet encore inexploités : `excl` (opérations exceptionnelles, vide chez le propriétaire), `fuel`
-  (calculateur carburant), `eq.mG/mS` (recalculés), `autoFiles` (soldes de l'ancienne synchro).
-- Import manuel : `KladReleve.lire(texte, role, auj)` puis `integrer(S, cid, lignes, now)` (source `fichier`) ; utile
-  pour la reprise définitive si un relevé manque.
 
 ## Points d'appui pour le Lot 8 (historique)
 

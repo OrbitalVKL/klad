@@ -385,6 +385,56 @@
   function retirerEquipement(S, id) { const st = etatEq(S); const avant = JSON.stringify(st); st.items = (st.items || []).filter(x => x.id !== id); return avant; }
   function annulerEquilibre(S, avant) { S.budget.equilibre = JSON.parse(avant); }
 
+  // Investissement cumulé de chacun (graphique de l'équilibre) : série mensuelle depuis les apports initiaux, puis
+  // projection jusqu'à l'équilibre au rythme actuel. → { serie: [[mois, moi, autre]], projection: [[mois, moi, autre]] }.
+  function serieEquilibre(B) {
+    const R = equilibre(B);
+    if (!R) return null;
+    const byM = {}, r = R.rNE;
+    const add = (m, a, b) => { const e = byM[m] || (byM[m] = { g: 0, s: 0 }); e.g += a; e.s += b; };
+    for (const [d, , a, k] of R.OPS) {
+      const m = d.slice(0, 7);
+      if (k === 'vg') add(m, a, 0); else if (k === 'vs' || k === 'rs') add(m, 0, a);
+      else if (NON_ELIG.indexOf(k) >= 0 || k === 'rf') add(m, a * r, a * (1 - r));
+    }
+    for (const x of R.EQ) if (x.on && x.date && x.date.slice(0, 7) <= R.dernierMois) add(x.date.slice(0, 7), x.moi, x.autre);
+    const ms = Object.keys(byM).sort();
+    if (!ms.length) return null;
+    let cg = R.apport.moi, cs = R.apport.autre;
+    const serie = [[shift(ms[0], -1), cg, cs]];
+    for (let m = ms[0]; m <= R.dernierMois; m = shift(m, 1)) { const e = byM[m] || { g: 0, s: 0 }; cg += e.g; cs += e.s; serie.push([m, cg, cs]); }
+    const projection = [];
+    if (R.dateEquilibre) { let pg = cg, ps = cs; for (let k = 1; k <= R.mois && k <= 600; k++) { pg += R.mensMoi; ps += R.mensAutre; if (k % 3 === 0 || k === R.mois) projection.push([shift(R.dernierMois, k), pg, ps]); } }
+    return { serie, projection };
+  }
+
+  // Versements mensuels moyens de chacun sur la base de calcul (mode Budget du commun). → { moi, autre } (centimes).
+  function versementsMoyens(B, W) {
+    let vm = 0, va = 0;
+    for (const [d, , x, k] of mouvements(B)) { const m = d.slice(0, 7); if (m < W.start || m > W.end) continue; if (k === 'vg') vm += x; if (k === 'vs' || k === 'rs') va += x; }
+    const n = Math.max(1, W.months.length);
+    return { moi: vm / n, autre: va / n };
+  }
+
+  // Découvert prévu du compte commun : premier jour sous zéro (trésorerie sur 12 mois, ou fin du mois en cours si les
+  // prélèvements à venir dépassent le solde). Niveau gradué : « crit » sous 31 jours, « caut » au-delà (12 mois au plus).
+  // → { date, jours, niveau } ou null.
+  function risqueDecouvert(B) {
+    const f = finDeMois(B);
+    if (!f) return null;
+    const C = tresorerie(B);
+    let d = C && C.negAt ? C.negAt : '';
+    if (f.decouvert) {
+      const y = +B.auj.slice(0, 4), m = +B.auj.slice(5, 7);
+      const fin = B.auj.slice(0, 8) + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0');
+      if (!d || d > fin) d = fin;
+    }
+    if (!d) return null;
+    const jours = Math.max(0, Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(B.auj + 'T00:00:00Z')) / 864e5));
+    if (jours > 366) return null;
+    return { date: d, jours, niveau: jours <= 31 ? 'crit' : 'caut' };
+  }
+
   // ------------------------------------------------------------ résumé Grafit « commun »
   function resume(B) {
     const f = finDeMois(B);
@@ -392,7 +442,7 @@
     const C = tresorerie(B);
     const e = c => Math.round(c) / 100;
     const out = { balance: e(f.solde), debits_due: e(f.due), transfers_expected: e(f.inc), reserve: e(f.reserve), end_of_month: e(f.end),
-      overdraft_risk: !!(f.decouvert || (C && C.min < 0)) };
+      overdraft_risk: !!risqueDecouvert(B) };
     if (C && C.min < 0) out.low = { date: C.minAt, amount: e(C.min) };
     if (C) out.due = C.due.filter(d => d.m <= shift(B.auj.slice(0, 7), 3)).slice(0, 4).map(d => ({ month: d.m, amount: -e(d.v), late: !!d.late }));
     return out;
@@ -415,5 +465,5 @@
   }
 
   g.KladCommun = { USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
-    sorteDe, mouvements, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, retirerEquipement, annulerEquilibre, resume, importer };
+    sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer };
 })(typeof window !== 'undefined' ? window : globalThis);

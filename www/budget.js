@@ -884,18 +884,138 @@
   // ------------------------------------------------------------ textes (sans signe)
   const eur = (c, cents) => {
     const a = Math.abs(c) / 100;
-    return (cents ? a.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(a).toLocaleString('fr-FR')).replace(/[  ]/g, ' ') + ' €';
+    return (cents ? a.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(a).toLocaleString('fr-FR')).replace(/[ \u00a0]/g, '\u202f') + '\u00a0€';
   };
   const jjmm = D => String(D.dd).padStart(2, '0') + '/' + String(D.mm).padStart(2, '0');
   const jjmm2 = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7);
   const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
   const nomMois = m => MOIS[+m.slice(5, 7) - 1] + ' ' + m.slice(2, 4);
 
+
+  // ------------------------------------------------------------ tendance par mois (comme l'ancienne version)
+  // o : { comptes: 'auto' | 'perso' | 'commun' | 'foyer' | <id de compte>, scope (pour « auto »), from, to ('AAAA-MM'),
+  //       mode: 'rd' | 'bal' | 'cum' | 'solde' | 'cat:<catégorie>' }.
+  // Revenus et dépenses par mois (date d'enregistrement), virements internes, épargne et hors budget exclus ; « foyer » :
+  // tous les comptes, ma contribution au commun et mes apports comptés une seule fois.
+  // → { mois, rev, dep, bal, barres?, ligne?, ref?, categories, perimetre, compte? } (centimes).
+  function tendanceMois(B, o) {
+    const sel = o.comptes && o.comptes !== 'auto' ? o.comptes : (o.scope === 'commun' ? 'commun' : 'perso');
+    const cpt = ['perso', 'commun', 'foyer'].indexOf(sel) < 0 ? B.comptes.find(c => c.id === sel) : null;
+    const R = B.R.commun;
+    const dans = r => {
+      if (cpt) return r.cid === cpt.id;
+      if (sel === 'commun') return estCommun(B, r);
+      if (sel === 'perso') return estPerso(B, r);
+      if (!estPerso(B, r) && !estCommun(B, r)) return false;
+      if (r.sub === R.contribution) return false;
+      if (r.cat === APPORTS && R.moi && r.sub === R.moi) return false;
+      return true;
+    };
+    const mois = [];
+    for (let m = o.from; m <= o.to && mois.length < 240; m = shift(m, 1)) mois.push(m);
+    const idx = {}; mois.forEach((m, i) => { idx[m] = i; });
+    const rev = mois.map(() => 0), dep = mois.map(() => 0);
+    const cats = new Set();
+    for (const r of B.rows) {
+      if ((r.type !== 'revenu' && r.type !== 'depense') || !dans(r)) continue;
+      if (r.type === 'depense') cats.add(r.cat);
+      const i = idx[r.date.slice(0, 7)];
+      if (i === undefined) continue;
+      if (r.type === 'revenu') rev[i] += r.m; else dep[i] -= r.m;
+    }
+    const bal = mois.map((m, i) => rev[i] - dep[i]);
+    const out = { mois, rev, dep, bal, categories: [...cats].filter(Boolean).sort((a, b) => a.localeCompare(b, 'fr')), perimetre: sel, compte: cpt ? cpt.libelle : null };
+    const mode = o.mode || 'rd';
+    if (mode === 'bal') out.barres = bal;
+    else if (mode === 'cum') { let c = 0; out.ligne = bal.map(v => (c += v)); }
+    else if (mode === 'solde') {
+      // comptes du solde : le compte choisi, le commun, tous les comptes courants (foyer) ou le compte du salaire (perso)
+      const L = cpt ? [cpt] : sel === 'commun' ? B.comptes.filter(c => c.role === 'commun')
+        : sel === 'foyer' ? B.comptes.filter(c => c.role === 'courant' || c.role === 'commun' || c.role === 'paiement_en_ligne')
+          : [B.comptes.find(c => c.id === B.R.salaire.compte) || B.comptes.find(c => c.role === 'courant')].filter(Boolean);
+      let v = 0, n = 0;
+      for (const c of L) { const s0 = M().soldeAffiche(B.S, c); if (s0) { v += s0.centimes; n++; } }
+      out.soldeComptes = L.map(c => c.libelle);
+      if (!n) out.ligne = null;
+      else {
+        const ids = new Set(L.map(c => c.id));
+        const debut = L.map(c => (B.cover[c.id] || {}).min).filter(Boolean).sort().pop() || '0000';
+        const apres = B.rows.filter(r => ids.has(r.cid));
+        out.solde = v;
+        out.ligne = mois.map(m => { const fin = finMois(m); if (fin < debut) return null; return v - apres.filter(r => r.date > fin).reduce((t, r) => t + r.m, 0); });
+      }
+    } else if (mode.startsWith('cat:')) {
+      const cat = mode.slice(4);
+      out.barres = mois.map(() => 0);
+      for (const r of B.rows) { if (r.type !== 'depense' || r.cat !== cat || !dans(r)) continue; const i = idx[r.date.slice(0, 7)]; if (i !== undefined) out.barres[i] -= r.m; }
+      const p = planDe(B, o.scope === 'commun' || sel === 'commun' ? 'commun' : 'perso')['c|' + cat];
+      out.ref = p && p.on !== false && +p.amt > 0 ? Math.round(+p.amt) : null;       // budget du poste (centimes par mois)
+      out.cat = cat;
+    }
+    return out;
+  }
+
+  // ------------------------------------------------------------ calculateur carburant (comme l'ancienne version)
+  // Réglages : bloc budget (carburant), sinon réglage « fuel » du carnet, sinon valeurs génériques.
+  const CARBURANT = { ar: 0, jours: 20, autres: 0, conso: 5.5, prix: 2 };
+  function carburant(S) {
+    const D = S.budget || {};
+    const Rc = S.carnet ? racine(S.carnet) : null, X = Rc ? Rc.fuel : null;
+    const src = isObj(D.carburant) ? D.carburant : isObj(X) ? X : {};
+    const r = {};
+    for (const k of Object.keys(CARBURANT)) r[k] = isFinite(+src[k]) && +src[k] >= 0 ? +src[k] : CARBURANT[k];
+    return r;
+  }
+  // → { km (par mois), prevu (centimes par mois), reel: { mediane, moyenne, pleins } sur la base de calcul }.
+  function calculCarburant(B, reglage) {
+    const R = reglage || carburant(B.S), W = fenetre(B);
+    const km = R.ar * R.jours + R.autres;
+    const prevu = Math.round(km * R.conso / 100 * R.prix * 100);
+    const mon = {};
+    let pleins = 0;
+    for (const r of B.rows) {
+      if (r.type !== 'depense' || r.cat !== 'Carburant' || !estPerso(B, r) || exclue(B, r)) continue;
+      const m = r.date.slice(0, 7);
+      if (m < W.start || m > W.end) continue;
+      mon[m] = (mon[m] || 0) - r.m;
+      if (r.sub === 'Carburant') pleins++;
+    }
+    const vals = W.months.map(m => mon[m] || 0);
+    return { km, prevu, reel: { mediane: median(vals), moyenne: vals.reduce((x, y) => x + y, 0) / Math.max(1, vals.length), pleins } };
+  }
+  function reglerCarburant(S, ch) {
+    const D = donnees(S);
+    const avant = isObj(D.carburant) ? JSON.stringify(D.carburant) : null;
+    const r = carburant(S);
+    for (const k of Object.keys(CARBURANT)) if (k in ch && isFinite(+ch[k]) && +ch[k] >= 0) r[k] = +ch[k];
+    D.carburant = r;
+    return avant;
+  }
+  function annulerCarburant(S, avant) { const D = donnees(S); if (avant == null) delete D.carburant; else D.carburant = JSON.parse(avant); }
+
+  // Détail d'un poste sur la base de calcul (mode Budget) : charges fixes regroupées par montant, autres postes par
+  // sous-catégorie. → [{ cle, ref, cur, n, noms }] (centimes).
+  function detailPoste(B, sc, key) {
+    const W = fenetre(B), cur = B.auj.slice(0, 7), out = {};
+    for (const r of B.rows) {
+      if (r.type !== 'depense' || !dansScope(B, sc, r) || exclue(B, r) || cleDe(B, r) !== key) continue;
+      const m = r.od.slice(0, 7), inRef = m >= W.start && m <= W.end, inCur = m === cur;
+      if (!inRef && !inCur) continue;
+      const v = -r.m, fixe = key[0] === 'f';
+      const k = fixe ? String(Math.round(v / 100)) : r.sub;
+      const d = out[k] || (out[k] = { cle: k, ref: 0, cur: 0, n: 0, noms: {}, ex: r.label });
+      if (inRef) { d.ref += v; d.n++; }
+      if (inCur) d.cur += v;
+      if (fixe) { const nm = K().suggestKw(r.label) || r.label.slice(0, 24); d.noms[nm] = (d.noms[nm] || 0) + 1; }
+    }
+    return Object.values(out).sort((x, y) => (y.ref - x.ref) || (y.cur - x.cur));
+  }
+
   g.KladBudget = {
     V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, nouveau, donnees, importer, reglages, contexte,
     cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
     devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement,
-    shift, finMois, nomMois, eur, dernierDebit, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median
+    shift, finMois, nomMois, eur, dernierDebit, tendanceMois, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median
   };
 })(typeof window !== 'undefined' ? window : globalThis);

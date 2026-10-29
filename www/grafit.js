@@ -43,7 +43,6 @@
       : 'Seule l\'appli Grafit signée par le certificat attendu peut le lire (empreinte affichée dans l\'appli Android).';
   }
   A.preparer.secModules = () => { renderModules(); };
-  A.rendus.push(() => { const S = A.etat(); $('mModules').textContent = 'Lien Grafit ' + (R.actif(S) ? 'activé' : 'désactivé'); });
 
   $('grafitActif').addEventListener('change', ev => {
     const S = A.etat();
@@ -72,6 +71,7 @@
 
   // Effacement du résumé : « Tout effacer », création d'un coffre (verrou.js).
   window.KladLienGrafit = {
+    etiquette: () => { const S = A.etat(); return 'Lien Grafit ' + (S && R.actif(S) ? 'activé' : 'désactivé'); },
     effacer: () => lien.effacer(),
     demo: () => (P && P.contenu ? P.contenu() : undefined)
   };

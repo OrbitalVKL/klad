@@ -4,13 +4,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { charge, json } from './charge.mjs';
+import { montantSigne } from './charge.mjs';
 
-const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'fisc.js', 'observations.js', 'vues.js', 'vbudget.js', 'vcommun.js', 'vfisc.js']);
+const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'fisc.js', 'observations.js', 'ui.js', 'vues.js', 'vbudget.js', 'vcommun.js', 'vfisc.js']);
 const { KladModele: M, KladClasse: K, KladBudget: KB, KladFisc: KF, KladObservations: KO, KladVuesFisc: VF } = X;
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 let n = 0;
 const op = (c, date, montant, libelle) => ({ id: c.id + ':t:' + (n++), compte: c.id, date, montant, libelle, statut: 'comptabilisee', source: 'eb', categorie: null, vue: true });
-const SANS_SIGNE = h => !/[−-]\s?\d/.test(h.replace(/<[^>]+>/g, ' ').replace(/\d{2}\/\d{2}\/\d{2,4}/g, '').replace(/\d{4}-\d{2}-\d{2}/g, ''));
+const SANS_SIGNE = h => !montantSigne(String(h).replace(/\d{4}-\d{2}-\d{2}/g, ''));
 
 function etat() {
   const S = M.vide();
@@ -104,7 +105,7 @@ test('observations : contrat résilié encore prélevé, charges sur un compte s
   const A = KO.audit(B);
   const t = A.map(a => a.niveau + ' ' + a.titre);
   assert.ok(t.includes('bad Ancien contrat fictif encore prélevé'), t.join(' | '));
-  assert.ok(t.includes('warn Charges récurrentes sur SECOND'), t.join(' | '));
+  assert.ok(t.includes('warn Charges récurrentes sur le SECOND'), t.join(' | '));
   const O = KO.observations(B, 'perso');
   const nb = O.faire.length;
   const avant = KO.fait(S, 'Ancien contrat fictif encore prélevé', NOW);
@@ -120,4 +121,25 @@ test('observations : contrat résilié encore prélevé, charges sur un compte s
   assert.equal(Rp.total, 7000 + 7000 + 1500);
   assert.ok(SANS_SIGNE(VF.resultats(B, 'perso', null)));
   assert.ok(SANS_SIGNE(VF.observations(B, 'perso')));
+});
+
+test('livret : solde estimé et intérêts par quinzaine (un versement rapporte à partir de la quinzaine suivante)', () => {
+  const S = M.vide();
+  const a = M.nouveauCompte(S, { libelle: 'COURANT', role: 'courant', solde: { centimes: 100000, date: '2026-10-28' } });
+  const l = M.nouveauCompte(S, { libelle: 'LIVRET', role: 'epargne', source: { type: 'manuel' } });
+  S.ops[a.id] = [op(a, '2026-10-27', -10000, 'VIR LIVRET FICTIF')];
+  S.budget = KB.nouveau();
+  S.budget.livret = { base: 1000, date: '2026-01-01' };
+  assert.equal(KF.livretInterets(ctx(S)), null);                 // taux inconnu : pas d'estimation
+  assert.deepEqual(json(KF.livretCarte(ctx(S))), {});            // compte d'épargne non désigné : rien sur les cartes
+  S.budget.livret.taux = 3;
+  const L = json(KF.livret(ctx(S)));
+  assert.deepEqual([L.centimes, L.n], [110000, 1]);
+  // 20 quinzaines à 1 000 €, 4 (novembre, décembre) à 1 100 € : 24 400 × 3 % / 24
+  assert.deepEqual(json(KF.livretInterets(ctx(S))), { centimes: 3050, taux: 3, annee: 2026 });
+  // carte du compte livret (complément : compte d'épargne désigné)
+  S.carnet = { klad: { livret: { epargne: l.id } } };
+  const t = json(KF.livretCarte(ctx(S)))[l.id];
+  assert.equal(t.centimes, 110000);
+  assert.match(t.texte, /≈ 31\s€ en 2026/);
 });

@@ -51,7 +51,7 @@
     const nom = q => q === 'moi' ? RC.moi : RC.autre;
     if (RO.secondaire) {
       const R = recurrentsSecondaire(B, RO.secondaire);
-      if (R.length) add('warn', 'perso', 'Charges récurrentes sur ' + RO.secondaire.libelle,
+      if (R.length) add('warn', 'perso', 'Charges récurrentes sur le ' + RO.secondaire.libelle,
         R.map(x => { const r = x.rows[x.rows.length - 1]; return r.label.replace(/^PAIEMENT (CB|PSC|MOB) \d{4} /, '').slice(0, 28) + ' (' + e2(-r.m) + ', ' + x.ms.size + ' mois)'; }).join(' · ') + ' : à basculer sur ' + (RO.principal ? RO.principal.libelle : 'le compte courant principal') + '.',
         R.map(x => x.rows[x.rows.length - 1].date).sort().pop());
     }
@@ -176,7 +176,7 @@
         }
         for (const r of KF().regularisations(X)) {
           if (r.kind === 'avis') { if (!r.done) add('warn', 'all', 'À régulariser : ' + X.noms[r.from] + ' verse ' + KB().eur(r.amt * 100) + ' à ' + X.noms[r.to], r.per + '. Partage : ' + KF().PART_RULES[X.FI.hyp.partage || 'seul'][0].toLowerCase() + ' (Plus › Impôts).'); }
-          else add('info', 'all', 'Impôt ' + r.y + ' (estimation) : ' + (r.solde >= 0 ? 'solde d\'environ ' + KB().eur(r.solde * 100) : 'remboursement d\'environ ' + KB().eur(-r.solde * 100)), r.per + '. ' + r.txt);
+          else add('info', 'all', 'Impôt ' + r.y + ' (estimation) : ' + (r.solde >= 0 ? 'solde ≈ ' + KB().eur(r.solde * 100) : 'remboursement ≈ ' + KB().eur(-r.solde * 100)), r.per + '. ' + r.txt);
         }
       } catch (e) { /* pas de données fiscales */ }
     }

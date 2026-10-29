@@ -29,8 +29,8 @@
       return '<li><button class="grow lien-compte" data-edit="' + esc(c.id) + '"><b>' + esc(c.libelle) + '</b>' +
         '<small' + (c.aVerifier || c.aReassocier ? ' class="bad"' : '') + '>' + esc(info) + '</small>' +
         (s ? Vu.solde(s.centimes, c.devise) : '') + (al && c.source.type === 'eb' ? '<small class="muted">' + esc(al) + '</small>' : '') + '</button>' +
-        '<span class="ordre"><button class="btn ghost small" data-haut="' + esc(c.id) + '"' + (i ? '' : ' disabled') + ' aria-label="Monter">↑</button>' +
-        '<button class="btn ghost small" data-bas="' + esc(c.id) + '"' + (i < list.length - 1 ? '' : ' disabled') + ' aria-label="Descendre">↓</button></span></li>';
+        '<span class="ordre"><button class="btn small" data-haut="' + esc(c.id) + '"' + (i ? '' : ' disabled') + ' aria-label="Monter">↑</button>' +
+        '<button class="btn small" data-bas="' + esc(c.id) + '"' + (i < list.length - 1 ? '' : ' disabled') + ' aria-label="Descendre">↓</button></span></li>';
     }).join('') : '<li class="muted">Aucun compte : connectez une banque, importez une reprise ou ajoutez un compte manuel.</li>';
   }
 
@@ -96,9 +96,9 @@
         '<label>Date du solde<input id="fSoldeDate" type="date" value="' + esc(c && c.solde ? c.solde.date : M.jourLocal(Date.now())) + '"></label></div>' : soldeTypes) +
       '<label class="inline"><input id="fMasque" type="checkbox"' + (c && c.masque ? ' checked' : '') + '> Masquer ce compte</label>' +
       (c && manuel && window.KladReleve ? '<details class="adv"><summary>Importer un relevé (CSV ou JSON)</summary><p class="muted small">' + esc(TEXTE_RELEVE[KR().FORMATS[c.role] || 'banque']) +
-        ' Les opérations déjà présentes sont ignorées ; l\'import est annulable.</p><div class="row"><button class="btn ghost small" data-a="releve">Choisir le fichier</button></div></details>' : '') +
+        ' Les opérations déjà présentes sont ignorées ; l\'import est annulable.</p><div class="row"><button class="btn small" data-a="releve">Choisir le fichier</button></div></details>' : '') +
       '<p class="msg bad" id="fMsg"></p>' +
-      '<div class="row"><button class="btn" data-a="ok">Enregistrer</button>' +
+      '<div class="row"><button class="btn primary" data-a="ok">Enregistrer</button>' +
       (c && manuel ? '<span class="grow"></span><button class="btn danger small" data-a="del">Supprimer</button>' : '') + '</div>';
     majPrel();
   }
@@ -109,13 +109,14 @@
     carte: 'Relevé de carte : colonnes Date, Description, Montant (dépenses en positif) ; les règlements de la carte sont écartés.',
     portefeuille: 'Historique de paiement en ligne : colonnes Date, Nom, Type, Net ; virements, approvisionnements et retenues écartés.'
   };
+  A.importerReleve = cid => importerReleve(cid);
   async function importerReleve(cid) {
     const h = A.hooks();
-    const texte = h.choisirFichier ? await h.choisirFichier() : null;
-    if (texte == null) return;
+    const octets = h.choisirOctets ? await h.choisirOctets() : null;     // CSV, JSON ou classeur Excel (.xlsx)
+    if (octets == null) return;
     const c = M.compte(S(), cid);
     if (!c) return;
-    const lu = KR().lire(texte, c.role, M.jourLocal(Date.now()));
+    const lu = await KR().lireFichier(octets, c.role, M.jourLocal(Date.now()));
     if (!lu.entete) throw new Error('Aucune colonne « Date » reconnue : ce fichier n\'est pas un relevé lisible.');
     if (!lu.lignes.length) throw new Error('Aucune opération lisible dans ce fichier' + (lu.stats.dateIllisible ? ' (' + lu.stats.dateIllisible + ' date(s) illisible(s))' : '') + '.');
     const r = KR().integrer(S(), cid, lu.lignes, Date.now());
@@ -166,7 +167,7 @@
     return '<div class="grp"><label>Réassocier à<select id="fReass">' + dispo.map(x => '<option value="' + esc(x.id) + '">' + esc(x.libelle +
       (x.source.fin4 ? ' (…' + x.source.fin4 + ')' : '') + (x.aVerifier ? ' — nouveau' : '')) + '</option>').join('') + '</select></label></div>' +
       '<p class="muted small">Le compte choisi est fusionné dans celui-ci : ses opérations et ses soldes le rejoignent, sans doublon.</p>' +
-      '<div class="row"><button class="btn small" data-a="reass">Réassocier</button></div>';
+      '<div class="row"><button class="btn primary small" data-a="reass">Réassocier</button></div>';
   }
 
   $('formCompte').addEventListener('change', ev => { if (ev.target.id === 'fRole') majPrel(); if (ev.target.id === 'fPrelCompte') majProps(); });
@@ -289,7 +290,7 @@
       '<ul class="list">' + lignes + '</ul>' + '<p class="note" id="repIgnores" hidden></p>' +
       '<label class="inline"><input id="repReglages" type="checkbox" checked> Reprendre libellés, rôles et rattachements de l\'ancienne version</label>' +
       (S().modele.reprise ? '<p class="note">Les opérations de la reprise précédente seront remplacées.</p>' : '') +
-      '<p class="msg bad" id="repMsg"></p><div class="row"><button class="btn" data-a="importer">Importer</button></div>';
+      '<p class="msg bad" id="repMsg"></p><div class="row"><button class="btn primary" data-a="importer">Importer</button></div>';
     // Valeur proposée appliquée explicitement à chaque sélecteur (sans dépendre de l'attribut « selected » au rendu,
     // vu ignoré sur le téléphone) ; un compte manuel sans correspondance est toujours « Créer un compte manuel ».
     $('repriseApercu').querySelectorAll('select[data-ref]').forEach(sel => {
@@ -387,8 +388,8 @@
     let h = '<p class="muted">' + (r ? 'Repris de l\'ancienne version le ' + esc(F.date(imp.le.slice(0, 10))) + ' : ' + pl(r.categories, 'catégorie') + ', ' +
       pl(r.base, 'règle') + ' de base, ' + pl(r.regles, 'règle') + ' personnelle' + (r.regles > 1 ? 's' : '') + ', ' + r.correctionsRetrouvees + ' correction(s) retrouvée(s) sur ' + r.corrections +
       (r.depuis ? ', opérations vues jusqu\'au ' + esc(F.date(r.depuis)) : '') + '.' : 'Aucun classement repris de l\'ancienne version.') + '</p>';
-    h += '<div class="row">' + (s.carnet != null && CN.utilisable(s.carnet) ? '<button class="btn ghost small" data-a="reprendre">Reprendre depuis l\'ancienne version</button>' : '') +
-      '<button class="btn ghost small" data-a="complement">Importer un complément</button></div>';
+    h += '<div class="row">' + (s.carnet != null && CN.utilisable(s.carnet) ? '<button class="btn small" data-a="reprendre">Reprendre depuis l\'ancienne version</button>' : '') +
+      '<button class="btn small" data-a="complement">Importer un complément</button></div>';
     h += '<h3>Catégories</h3><p class="muted small">Nombre d\'opérations sur 12 mois. Touchez une catégorie pour changer sa nature ou son icône.</p><ul class="list cats">' +
       cats.map(c => '<li><button class="lien-cat" data-cat="' + esc(c) + '"><span class="ico" aria-hidden="true">' + esc(KC.iconeDe(C, c)) + '</span><span class="grow">' + esc(c) +
         '<small>' + esc(KC.NOMS_NATURES[KC.natureDe(C, c)]) + '</small></span><span class="muted">' + (nb[c] || 0) + '</span></button>' +
@@ -396,7 +397,7 @@
           '<div class="icones">' + KC.ICONES.map(i => '<button type="button" data-icone="' + esc(i) + '" aria-label="Icône ' + esc(i) + '"' + (i === KC.iconeDe(C, c) ? ' class="on"' : '') + '>' + esc(i) + '</button>').join('') + '</div></div>' : '') +
         '</li>').join('') + '</ul>' +
       '<div class="grp"><label>Nouvelle catégorie<input id="ncNom" maxlength="40" autocomplete="off"></label><label>Nature<select id="ncNature">' + natOpts('optionnelle') + '</select></label></div>' +
-      '<div class="row"><button class="btn small" data-a="nouvelle">Ajouter</button></div>';
+      '<div class="row"><button class="btn primary small" data-a="nouvelle">Ajouter</button></div>';
     const regles = C.regles || [];
     h += '<h3>Vos règles</h3>' + (regles.length ? '<ul class="list">' + regles.map((u, i) => {
       const cpt = u.compte && M.compte(s, u.compte);
@@ -411,7 +412,7 @@
   A.preparer.secClassement = () => renderClassement();
   A.rendus.push(() => {
     const C = S().classement;
-    $('mClassement').textContent = C ? KC.listeCategories(C).length + ' catégories, ' + (C.regles || []).length + ' règle(s)' : 'Catégories et règles';
+    ($('mClassement') || {}).textContent = C ? KC.listeCategories(C).length + ' catégories, ' + (C.regles || []).length + ' règle(s)' : 'Catégories et règles';
   });
 
   $('classementCorps').addEventListener('change', ev => {

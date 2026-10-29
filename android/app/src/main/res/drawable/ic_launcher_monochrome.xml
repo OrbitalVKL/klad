@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône monochrome (icônes à thème d'Android 13 et plus) : le К seul, teinté par le système. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M37,31h9.5v19.2h3.2L61.6,31h10.6L58.6,52.4 73.4,77H62.5L50.6,56.6h-4.1V77H37z" />
+</vector>

@@ -96,7 +96,7 @@
     else if (sv && sv.jours >= 30) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · ' + sv.jours + ' J' });
     if (ext && ext.maj && /^\d+\.\d+\.\d+$/.test(ext.maj)) out.push({ level: 'info', code: 'UPDATE_AVAILABLE', text: 'KLAD ' + ext.maj });
     for (const b of (ext && ext.budgetOver) || []) out.push({ level: 'caut', code: 'BUDGET_OVER', text: b });
-    if (ext && ext.decouvert) out.push({ level: 'caut', code: 'OVERDRAFT_RISK', text: ext.decouvert });
+    if (ext && ext.decouvert) out.push({ level: ext.decouvert.niveau === 'crit' ? 'crit' : 'caut', code: 'OVERDRAFT_RISK', text: ext.decouvert.texte });
     return out.map((a, i) => [a, i]).sort((x, y) => NIVEAUX[x[0].level] - NIVEAUX[y[0].level] || x[1] - y[1]).map(x => x[0]);
   }
 
@@ -193,8 +193,9 @@
       amount: -euros(e.montant), kind: { contrat: 'contract', recurrent: 'recurring', carte: 'card' }[e.sorte] }));
     const over = s.depasses.filter(a => a.pm > 50).slice(0, 3).map(a => (libellePoste(S, a.label) || 'POSTE') + ' +' + Math.round(100 * (a.cur - a.pm) / a.pm) + ' %');
     let commun = null;
-    if (g.KladCommun) { try { commun = g.KladCommun.resume(B); } catch (e) { commun = null; } }
-    return { month, upcoming, over, commun };
+    let risque = null;
+    if (g.KladCommun) { try { commun = g.KladCommun.resume(B); risque = commun && g.KladCommun.risqueDecouvert(B); } catch (e) { commun = null; } }
+    return { month, upcoming, over, commun, risque };
   }
 
   // ext (facultatif) : { attention: { unseen, unclassified, accountsToCheck, toMatch }, sauvegarde: { jours | null }, maj: version,
@@ -205,9 +206,10 @@
     let bu = null;
     try { bu = budget(S, now, ext); } catch (e) { bu = null; }
     if (bu && bu.over.length) ext = Object.assign({}, ext, { budgetOver: bu.over });
-    if (bu && bu.commun && bu.commun.overdraft_risk) {
-      const c = bu.commun, d = c.low ? c.low.date : null;
-      ext = Object.assign({}, ext, { decouvert: 'COMPTE COMMUN' + (d ? ' · ' + d.slice(8, 10) + '/' + d.slice(5, 7) : '') });
+    // Découvert prévu du commun : « crit » sous 31 jours, « caut » plus tard dans les 12 mois, rien sinon.
+    if (bu && bu.risque) {
+      const d = bu.risque.date;
+      ext = Object.assign({}, ext, { decouvert: { niveau: bu.risque.niveau, texte: 'COMPTE COMMUN · ' + d.slice(8, 10) + '/' + d.slice(5, 7) } });
     }
     const accounts = comptes.map(c => compteResume(S, c, now));
     const r = { v: V, state: 'ok', generated: now };

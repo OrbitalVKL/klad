@@ -3,9 +3,9 @@
 // signé. Données fictives uniquement.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { charge, json } from './charge.mjs';
+import { charge, json, montantSigne } from './charge.mjs';
 
-const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'resume.js', 'vues.js', 'vbudget.js', 'vcommun.js']);
+const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'resume.js', 'ui.js', 'vues.js', 'vbudget.js', 'vcommun.js']);
 const { KladModele: M, KladClasse: K, KladBudget: KB, KladCommun: KC, KladResume: R, KladVuesCommun: VC, KladVuesBudget: VB } = X;
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 let n = 0;
@@ -79,24 +79,55 @@ test('équilibre des apports : investi, écart, rattrapage, date, simulation, é
   KC.ajouterEquipement(S, { label: 'Store fictif', date: '2026-10-01', moi: 0, autre: 20000 });
   assert.equal(KC.equilibre(ctx(S)).invAutre, 380000);
   const h = VC.equilibre(ctx(S), {});
-  assert.match(h, /Personne A doit encore investir 1 100 € de plus que Personne B/);
-  assert.ok(!/[−-]\s?\d/.test(h.replace(/<[^>]+>/g, ' ').replace(/\d{2}\/\d{2}\/\d{4}/g, '')));
+  assert.match(h.replace(/<[^>]+>/g, ' '), /Reste à combler\s+1\s100\s€\s+Personne A doit encore investir de plus que Personne B/);
+  assert.ok(!montantSigne(h));
 });
 
 test('rendu du périmètre Commun et résumé Grafit « commun » ; import du carnet', () => {
   const { S } = etat();
   const B = ctx(S);
-  const h = VB.ecran(B, 'commun', null, { ouverts: new Set(), cartes: new Set(['cash', 'why']) });
-  assert.match(h, /Marge réelle du commun[\s\S]*Fin de mois estimée[\s\S]*Virements[\s\S]*Trésorerie · 12 mois[\s\S]*Appels de fonds[\s\S]*D'où vient le solde/);
-  assert.ok(!/[−-]\s?\d/.test(h.replace(/<[^>]+>/g, ' ').replace(/\d{2}\/\d{2}\/\d{2,4}/g, '')), 'aucun montant signé');
+  const h = VB.ravM(B, 'commun', {}) + VC.plan(B, { cartes: new Set(['cm|cash', 'cm|why']) }) + VB.suivi(B, 'commun', {}).html;
+  assert.match(h, /Marge réelle du commun[\s\S]*Virements à mettre en place[\s\S]*Appels de fonds[\s\S]*Trésorerie · 12 mois[\s\S]*D'où vient le solde/);
+  assert.ok(!montantSigne(h), 'aucun montant signé');
+  // nom de la résidence et du syndic : données du complément seulement
+  S.carnet.klad.appels.titre = 'Résidence fictive'; S.carnet.klad.appels.syndic = 'Syndic fictif';
+  const h2 = VC.plan(ctx(S), { cartes: new Set(['cm|ap']) });
+  assert.match(h2, /Appels de fonds Résidence fictive/);
+  assert.match(h2, /Syndic fictif/);
+  delete S.carnet.klad.appels.titre; delete S.carnet.klad.appels.syndic;
   const r = json(R.construire(S, NOW, {}));
   assert.deepEqual(r.commun, { balance: 1000, debits_due: 0, transfers_expected: 0, reserve: 300, end_of_month: 700, overdraft_risk: false,
     due: [{ month: '2026-10', amount: -450, late: false }, { month: '2027-01', amount: -450, late: false }] });
   assert.ok(!r.alerts.some(a => a.code === 'OVERDRAFT_RISK'));
+  // découvert prévu sous 31 jours : « crit »
   S.modele.comptes[0].solde.centimes = 10000;
   const r2 = json(R.construire(S, NOW, {}));
   assert.equal(r2.commun.overdraft_risk, true);
-  assert.deepEqual(r2.alerts.find(a => a.code === 'OVERDRAFT_RISK'), { level: 'caut', code: 'OVERDRAFT_RISK', text: 'COMPTE COMMUN · 05/10' });
+  assert.deepEqual(r2.alerts.find(a => a.code === 'OVERDRAFT_RISK'), { level: 'crit', code: 'OVERDRAFT_RISK', text: 'COMPTE COMMUN · 05/10' });
+});
+
+test('découvert du commun gradué : « crit » sous 31 jours, « caut » plus tard dans les 12 mois, rien sinon', () => {
+  const { S, c } = etat();
+  // échéance annuelle fictive prélevée en décembre : le compte passe sous zéro le 05/12
+  S.budget.plan.commun['f|Taxe fictive'] = { on: true, amt: 20000, per: 12, ech: 240000, pg: 50, elig: true };
+  S.classement.regles.push({ mot: 'TAXE FICTIVE', cat: 'Logement', sub: 'Taxe fictive' });
+  S.ops[c.id].push(op(c, '2025-12-10', -240000, 'PRLV TAXE FICTIVE'));
+  assert.deepEqual(json(KC.risqueDecouvert(ctx(S))), { date: '2026-12-05', jours: 38, niveau: 'caut' });
+  let r = json(R.construire(S, NOW, {}));
+  assert.equal(r.commun.overdraft_risk, true);
+  assert.deepEqual(r.alerts.find(a => a.code === 'OVERDRAFT_RISK'), { level: 'caut', code: 'OVERDRAFT_RISK', text: 'COMPTE COMMUN · 05/12' });
+  // le même découvert vu le 10/11 : 25 jours → « crit »
+  const N2 = Date.parse('2026-11-10T10:00:00Z');
+  assert.equal(KC.risqueDecouvert(KB.contexte(S, N2)).niveau, 'crit');
+  r = json(R.construire(S, N2, {}));
+  assert.equal(r.alerts.find(a => a.code === 'OVERDRAFT_RISK').level, 'crit');
+  // sans l'échéance : aucun découvert, aucune alerte
+  delete S.budget.plan.commun['f|Taxe fictive'];
+  assert.equal(KC.risqueDecouvert(ctx(S)), null);
+  assert.ok(!json(R.construire(S, NOW, {})).alerts.some(a => a.code === 'OVERDRAFT_RISK'));
+});
+
+test('import du carnet : appels et équilibre, une fois', () => {
   // import : appels et équilibre du carnet, une fois (version du bloc budget → 2)
   const S2 = M.vide();
   S2.budget = KB.nouveau();

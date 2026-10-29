@@ -89,6 +89,8 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.addInitScript(fauxEB);
     await page.goto(base);
     const code = async () => { for (const k of '123456') await page.keyboard.press(k); };
+    const plusVers = async sec => { await page.locator('#app-tb [data-tab="plus"]').click(); await page.locator('#plusCorps [data-volet="' + sec + '"]').click(); };
+    const synchroFinie = () => page.waitForFunction(() => { const S = window.KladApp && window.KladApp.etat(); return S && S.modele.sync.derniere && !document.getElementById('ah-sync').classList.contains('busy'); });
 
     // premier lancement : code (deux fois), phrase de récupération vérifiée
     await page.getByRole('button', { name: 'Créer mon code' }).click();
@@ -102,11 +104,10 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     }
     await page.getByRole('button', { name: 'Vérifier' }).click();
     await page.waitForSelector('#appli:not([hidden])');
-    assert.match(await page.locator('#vAccueil').innerText(), /Bienvenue dans Klad/);
+    assert.match(await page.locator('#app-hero').innerText(), /Connectez une banque/);
 
     // connexion d'une banque (faux client) : le retour bancaire recharge la page, déverrouillage, synchro automatique
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    await page.locator('#vPlus [data-volet="secBanques"]').click();
+    await plusVers('secBanques');
     await page.getByText('Adresse de retour bancaire').click();
     await page.fill('#redirectUrl', base + 'retour.html');
     await page.locator('#redirectUrl').dispatchEvent('change');
@@ -115,15 +116,14 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.waitForURL(/code=CODE-FICTIF/);
     await page.waitForSelector('.pad');
     await code();
-    await page.waitForFunction(() => /✓/.test(document.getElementById('pastille').textContent));
-    assert.equal(await page.locator('.ccompte').count(), 2);
-    assert.match(await page.locator('.carte.grande').innerText(), /42,50\s€ débiteur/);
-    assert.match(await page.locator('#vAccueil .averif').innerText(), /2 comptes à vérifier ou à réassocier/);
+    await synchroFinie();
+    assert.equal(await page.locator('#bal-panel .bal-t').count(), 2);
+    assert.match(await page.locator('#app-hero').innerText(), /42,50\s€\s*débiteur/);
+    assert.match(await page.locator('#av-zone').innerText(), /2 comptes à vérifier ou à réassocier/);
 
     // import de la reprise : association proposée par la fin d'IBAN, livret manuel créé, frontière
     const ouvrirReprise = async () => {
-      await page.locator('.onglets [data-onglet="vPlus"]').click();
-      await page.locator('#vPlus [data-volet="secReprise"]').click();
+      await plusVers('secReprise');
       const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#btnChoisirReprise').click()]);
       await fc.setFiles({ name: 'reprise.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(reprise())) });
       await page.waitForSelector('#repriseApercu [data-a="importer"]');
@@ -138,7 +138,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.selectOption('[data-ref="r5"]', 'creer');
     assert.equal(await page.locator('#repIgnores').isVisible(), false);
     await page.locator('#repriseApercu [data-a="importer"]').click();
-    await page.waitForSelector('#volet', { state: 'visible' });
+    await page.waitForSelector('#repriseEtat', { state: 'visible' });
     assert.match(await page.locator('#repriseEtat').innerText(), /3 opération/);
     const livret = await page.evaluate(() => window.KladApp.etat().modele.comptes.find(c => c.libelle === 'LIVRET A'));
     assert.equal(livret.source.type, 'manuel');
@@ -150,8 +150,9 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     const nbOps = () => page.evaluate(() => { const S = window.KladApp.etat(); return Object.values(S.ops).flat().length; });
     const n1 = await nbOps();
     assert.equal(n1, 3 + 3);                    // reprise 3 ; banque : épicerie, salaire, café en cours (avant frontière ignorée)
-    await page.locator('#pastille').click();
-    await page.waitForFunction(() => !document.getElementById('pastille').classList.contains('encours'));
+    await page.locator('#ah-sync').click();
+    await page.waitForTimeout(100);
+    await synchroFinie();
     await page.waitForTimeout(300);
     assert.equal(await nbOps(), n1);
     await ouvrirReprise();
@@ -161,8 +162,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.equal(await nbOps(), n1);
 
     // fiche d'un compte : la carte (ancien livret fictif) devient une carte à débit différé prélevée sur COURANT le 5
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    await page.locator('#vPlus [data-volet="secComptes"]').click();
+    await plusVers('secComptes');
     await page.locator('#listeComptes [data-edit]').nth(1).click();
     await page.fill('#fLibelle', 'CARTE');
     await page.selectOption('#fRole', 'carte_differee');
@@ -187,7 +187,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.locator('#volet [data-fermer]').last().click();
 
     // renouvellement de l'accès en un appui : nouvelle session, comptes réassociés par empreinte d'IBAN
-    await page.locator('#vPlus [data-volet="secBanques"]').click();
+    await plusVers('secBanques');
     await page.locator('#connexions [data-renouveler]').click();
     await page.waitForURL(/code=CODE-FICTIF/);
     await page.waitForSelector('.pad');
@@ -198,55 +198,55 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.equal(apres.comptes.length, 4);
     assert.ok(apres.comptes.filter(c => c.source.type === 'eb').every(c => c.source.connexion === 'sess-fictive-2' && !c.aReassocier));
     assert.equal(apres.comptes.find(c => c.libelle === 'CARTE').role, 'carte_differee');   // réglages gardés
-    await page.waitForFunction(() => !document.getElementById('pastille').classList.contains('encours'));
+    await synchroFinie();
     assert.equal(await nbOps(), n1);
 
     // accueil : grande carte, cartes de comptes ; aucun montant signé
-    await page.locator('.onglets [data-onglet="vAccueil"]').click();
-    assert.equal(await page.locator('.ccompte').count(), 4);
-    const accueil = await page.locator('#vAccueil').innerText();
+    await page.locator('#app-tb [data-tab="budget"]').click();
+    assert.equal(await page.locator('#bal-panel .bal-t').count(), 4);
+    const accueil = await page.locator('#bal-panel').innerText() + '\n' + await page.locator('#app-hero').innerText();
     assert.match(accueil, /LIVRET A[\s\S]*5\s000,00\s€/);
     assert.doesNotMatch(accueil, SANS_SIGNE);
     await capture(page, '1-accueil');
 
-    // opérations : liste par jour, en cours en italique, recherche, filtre par compte
-    await page.locator('.onglets [data-onglet="vOps"]').click();
-    assert.ok(await page.locator('#opsListe section.jour h3').count() >= 4);
-    assert.equal(await page.locator('#opsListe .op.encours').count(), 1);
-    assert.equal(await page.locator('#opsListe .op .cre', { hasText: '1 800,00' }).count(), 1);
-    const liste = await page.locator('#opsListe').innerText();
+    // opérations : liste par jour (période d'analyse), en cours marquée, recherche, filtre par compte
+    await page.locator('#app-tb [data-tab="operations"]').click();
+    assert.ok(await page.locator('#tx tr.tx-day').count() >= 4);
+    assert.equal(await page.locator('#tx tr.txr.encours').count(), 1);
+    assert.equal(await page.locator('#tx tr.txr .amt.pos', { hasText: /1\s800,00/ }).count(), 1);
+    const liste = await page.locator('#tx').innerText();
     assert.doesNotMatch(liste, SANS_SIGNE);
     assert.doesNotMatch(liste, /AVANT FRONTIERE/);
     await capture(page, '2-operations');
-    await page.locator('#defil').evaluate(d => { d.scrollTop = 140; });
-    await capture(page, '3-operations-defilees');
-    await page.fill('#opsQ', 'boulang');
-    await page.waitForTimeout(300);
-    assert.equal(await page.locator('#opsListe .op').count(), 2);
-    await page.fill('#opsQ', '');
-    await page.locator('#opsCompte').selectOption({ label: 'LIVRET A' });
-    assert.match(await page.locator('#opsListe').innerText(), /Aucune opération/);
-    assert.doesNotMatch(await page.locator('body').innerText(), /\u2212/);
+    await page.locator('#ah-search').click();
+    await page.fill('#q', 'epicer');
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('#tx tr.txr').count(), 1);
+    await page.fill('#q', '');
+    await page.waitForTimeout(400);
+    await page.locator('#opsCompte').selectOption({ label: 'CARTE' });
+    assert.match(await page.locator('#tx').innerText(), /Aucune opération ne correspond/);
+    assert.doesNotMatch(await page.locator('body').innerText(), /\u2212\s?\d/);
 
     // classement repris du carnet fictif : règle de base (restaurants), règle de l'utilisateur (épicerie)
     await page.locator('#opsCompte').selectOption('');
     await page.waitForTimeout(100);
-    const ligneOp = t => page.locator('#opsListe .op', { hasText: t });
-    assert.match(await ligneOp('CB RESTAURANT').innerText(), /Restaurant · COURANT/);
+    const ligneOp = t => page.locator('#tx tr.txr', { hasText: t });
+    assert.match(await ligneOp('CB RESTAURANT').innerText(), /COURANT\s+Restaurant/);
     assert.match(await ligneOp('CB EPICERIE FICTIVE').innerText(), /Alimentation · Courses/);
-    assert.match(await page.locator('#badgeOps').innerText(), /^3$/);
+    assert.match(await page.locator('#tb-badge').innerText(), /^3$/);
     // détail par un appui ; « Marquer vue » (bouton, alternative au geste)
-    await ligneOp('CB CAFE').click();
+    await ligneOp('CB CAFE').locator('.tl').click();
     await page.waitForSelector('#opDetail [data-a="classer"]');
     assert.match(await page.locator('#opDetail').innerText(), /Autres › Non classé/);
     await page.locator('#opDetail [data-a="vue"]').click();
-    await page.waitForFunction(() => document.getElementById('badgeOps').textContent === '2');
+    await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '2');
     // Classer : règle « CAFE » → Bars, puis Annuler
     await page.locator('#opDetail [data-a="classer"]').click();
     await page.waitForSelector('#clsCorps [data-a="go"]');
     await page.locator('#clsCorps [data-toutes]').click();
     await page.locator('#clsCorps [data-cat="Bars"]').click();
-    assert.equal(await page.locator('#clsAutres').isChecked(), true);
+    assert.equal(await page.locator('#clsAutres').getAttribute('aria-checked'), 'true');
     await page.fill('#clsMot', 'CAFE');
     assert.match(await page.locator('#clsN').innerText(), /1 opération contient « CAFE »/);
     await capture(page, '9-classer');
@@ -266,33 +266,32 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
       for (let i = 1; i <= 5; i++) el.dispatchEvent(new TouchEvent('touchmove', { touches: [tc(x + dx * i / 5)], changedTouches: [tc(x + dx * i / 5)], bubbles: true }));
       el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [tc(x + dx)], bubbles: true }));
     }, dx);
-    await glisser('VIREMENT SALAIRE', 120);
-    await page.waitForFunction(() => document.getElementById('badgeOps').textContent === '1');
+    await glisser('SALAIRE FICTIF', 120);
+    await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '1');
     await glisser('CB EPICERIE FICTIVE', -120);
-    await page.waitForSelector('#clsCorps [data-a="go"]');
-    assert.match(await page.locator('#clsCorps').innerText(), /CB EPICERIE FICTIVE/);
+    await page.waitForFunction(() => !document.getElementById('volet').hidden && /CB EPICERIE FICTIVE/.test(document.getElementById('clsCorps').textContent));
     await page.locator('#volet [data-fermer]').last().click();
     // filtre « Non vues », « Tout marquer vu » puis Annuler
-    await page.locator('#opsFiltres [data-f="nonVues"]').click();
-    assert.equal(await page.locator('#opsListe .op').count(), 1);
-    await page.locator('#opsFiltres [data-f="toutVu"]').click();
-    await page.waitForFunction(() => document.getElementById('badgeOps').hidden);
-    assert.match(await page.locator('#opsListe').innerText(), /Toutes les opérations ont été vues/);
+    await page.locator('#app-chips [data-f="nonVues"]').click();
+    assert.equal(await page.locator('#tx tr.txr').count(), 1);
+    await page.locator('#app-chips [data-f="toutVu"]').click();
+    await page.waitForFunction(() => document.getElementById('tb-badge').hidden);
+    assert.match(await page.locator('#tx').innerText(), /Toutes les opérations de la période ont été vues/);
     await page.locator('#toast button').click();
-    await page.waitForFunction(() => document.getElementById('badgeOps').textContent === '1');
-    await page.locator('#opsFiltres [data-f="nonVues"]').click();
-    await page.locator('#opsFiltres [data-f="nc"]').click();
-    assert.ok(await page.locator('#opsListe .op').count() >= 1);
-    await page.locator('#opsFiltres [data-f="nc"]').click();
+    await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '1');
+    await page.locator('#app-chips [data-f="nonVues"]').click();
+    await page.locator('#app-chips [data-f="nc"]').click();
+    assert.ok(await page.locator('#tx tr.txr').count() >= 1);
+    await page.locator('#app-chips [data-f="nc"]').click();
     await capture(page, '10-operations-lot5');
 
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    await page.locator('#app-tb [data-tab="plus"]').click();
     await capture(page, '4-plus');
-    await page.locator('#vPlus [data-volet="secClassement"]').click();
+    await page.locator('#plusCorps [data-volet="secClassement"]').click();
     assert.match(await page.locator('#classementCorps').innerText(), /Repris de l'ancienne version[\s\S]*Vos règles[\s\S]*EPICERIE/);
     await capture(page, '11-classement');
     await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#vPlus [data-volet="secComptes"]').click();
+    await plusVers('secComptes');
     await capture(page, '5-comptes');
     await page.locator('#listeComptes [data-edit]').nth(1).click();
     await capture(page, '6-fiche-compte');
@@ -301,9 +300,9 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
 
     // Lien Grafit (faux plugin) : désactivé par défaut ; activé → résumé écrit tout de suite ; renommage suivi
     const grafit = () => page.evaluate(() => { const j = window.KladLienGrafit.demo(); return j == null ? null : JSON.parse(j); });
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    assert.match(await page.locator('#mModules').innerText(), /Lien Grafit désactivé/);
-    await page.locator('#vPlus [data-volet="secModules"]').click();
+    await page.locator('#app-tb [data-tab="plus"]').click();
+    assert.match(await page.locator('#plusCorps [data-volet="secModules"]').innerText(), /Lien Grafit désactivé/);
+    await page.locator('#plusCorps [data-volet="secModules"]').click();
     assert.equal(await page.locator('#grafitActif').isChecked(), false);
     assert.equal(await grafit(), null);
     await page.locator('#grafitActif').check();
@@ -321,7 +320,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.match(await page.locator('#grafitEtat').innerText(), /Activé/);
     await capture(page, '8-modules');
     await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#vPlus [data-volet="secComptes"]').click();
+    await plusVers('secComptes');
     await page.locator('#listeComptes [data-edit]').first().click();
     await page.fill('#fLibelle', 'Principal');
     await page.locator('#formCompte [data-a="ok"]').click();
@@ -329,19 +328,19 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.locator('#volet [data-fermer]').last().click();
 
     // verrouiller puis rouvrir : données relues depuis le coffre chiffré ; le résumé reste lisible appli verrouillée
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    await page.locator('#app-tb [data-tab="plus"]').click();
     await page.locator('#btnLock').click();
     await page.waitForSelector('.pad');
     assert.equal((await grafit()).accounts[0].label, 'PRINCIPAL');
     await code();
     await page.waitForSelector('#appli:not([hidden])');
     assert.equal(await nbOps(), n1);
-    assert.equal(await page.locator('.ccompte').count(), 4);
+    assert.equal(await page.locator('#bal-panel .bal-t').count(), 4);
 
     // désactivé → résumé effacé
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    assert.match(await page.locator('#mModules').innerText(), /Lien Grafit activé/);
-    await page.locator('#vPlus [data-volet="secModules"]').click();
+    await page.locator('#app-tb [data-tab="plus"]').click();
+    assert.match(await page.locator('#plusCorps [data-volet="secModules"]').innerText(), /Lien Grafit activé/);
+    await page.locator('#plusCorps [data-volet="secModules"]').click();
     assert.equal(await page.locator('#grafitActif').isChecked(), true);
     await page.locator('#grafitActif').uncheck();
     await page.waitForFunction(() => window.KladLienGrafit.demo() == null);
@@ -377,9 +376,10 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.getByRole('button', { name: 'Vérifier' }).click();
     await page.waitForSelector('#appli:not([hidden])');
     // reprise fictive avec un carnet (budget, contrats, virements, réglages du salaire)
+    const plusVers = async sec => { await page.locator('#app-tb [data-tab="plus"]').click(); await page.locator('#plusCorps [data-volet="' + sec + '"]').click(); };
+    const deplier = async id => { if (await page.locator('#' + id).evaluate(e => e.classList.contains('collapsed'))) await page.locator('#' + id + ' .panel-h h2.fold').click(); };
     const auj = await page.evaluate(() => window.KladModele.jourLocal(Date.now()));
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    await page.locator('#vPlus [data-volet="secReprise"]').click();
+    await plusVers('secReprise');
     const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#btnChoisirReprise').click()]);
     await fc.setFiles({ name: 'reprise.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(repriseFictive(auj))) });
     await page.waitForSelector('#repriseApercu [data-a="importer"]');
@@ -388,59 +388,52 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#volet [data-fermer]').last().click();
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
 
-    // accueil : carte « Reste à vivre » (deux colonnes), détail au toucher
-    await page.locator('.onglets [data-onglet="vAccueil"]').click();
-    const rav = await page.locator('#vAccueil .carte.rav').innerText();
+    // Budget : « Reste à vivre » (deux colonnes), détail en dépliant
+    await page.locator('#app-tb [data-tab="budget"]').click();
+    const rav = await page.locator('#rav-m').innerText();
     assert.match(rav, /Reste à vivre jusqu'au[\s\S]*sur le dernier salaire[\s\S]*sur les comptes courants/);
-    await page.locator('#vAccueil .carte.rav').click();
-    assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
+    await page.locator('#rav-m summary').click();
+    assert.match(await page.locator('#rav-m').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
     await capture(page, '12-reste-a-vivre');
-    await page.locator('#volet [data-fermer]').last().click();
 
-    // onglet Budget : sections, cycle de salaire, aucun montant signé
-    await page.locator('.onglets [data-onglet="vBudget"]').click();
-    let b = await page.locator('#vBudget').innerText();
+    // budget mensuel : sections, cycle de salaire, aucun montant signé
+    let b = await page.locator('#view-budget').innerText();
     assert.match(b, /Cycle en cours · du \d\d\/\d\d au/);
-    assert.match(b, /Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Solde prévu par le budget/);
-    assert.match(b, /Contribution compte commun/);
+    assert.match(b, /Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Solde prévu par le budget/i);
     assert.doesNotMatch(b, SANS_SIGNE);
-    assert.doesNotMatch(b, /[\u2212-]\s?\d[\d\s\u00a0\u202f]* €/);
+    assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]* €/);
     await capture(page, '13-budget');
-    // poste déplié (opérations), édition dans le volet, annulation
-    await page.locator('#vBudget [data-poste="c|Alimentation"]').click();
-    assert.equal(await page.locator('#vBudget .bdet').count(), 1);
-    await page.locator('#vBudget [data-editer="c|Alimentation"]').click();
-    await page.waitForSelector('#posteCorps #peAmt');
-    await page.fill('#peAmt', '250');
-    await page.locator('#posteCorps [data-pe="ok"]').click();
+    // section dépliée ; montant d'un poste modifié en mode Budget, annulation
+    await page.locator('#budget-main [data-sec="courante"]').first().click();
+    assert.ok(await page.locator('#budget-main tr', { hasText: 'Alimentation' }).count() >= 1);
+    await page.locator('#budget-main [data-bmode="plan"]').click();
+    await page.locator('#budget-main [data-pamt="c|Alimentation"]').fill('250');
+    await page.locator('#budget-main [data-pamt="c|Alimentation"]').press('Tab');
     await page.waitForSelector('#toast.show.action');
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.plan.perso['c|Alimentation'].amt), 25000);
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.plan.perso['c|Alimentation'].amt), 16000);
-    // cycle précédent (lecture), retour au cycle en cours
-    await page.locator('#vBudget [data-nav="prev"]').click();
-    b = await page.locator('#vBudget').innerText();
-    assert.match(b, /Cycle du \d\d\/\d\d au \d\d\/\d\d\/\d\d.*terminé/);
-    assert.match(b, /Solde de la période/);
-    await page.locator('#vBudget [data-nav="now"]').click();
-    // commun : mois civil, apports attendus selon la répartition
-    await page.locator('#vBudget [data-scope="commun"]').click();
-    b = await page.locator('#vBudget').innerText();
+    await page.locator('#budget-main [data-bmode="suivi"]').click();
+    // cycle précédent (période clôturée), retour au cycle en cours
+    await page.locator('#budget-main [data-nav="prev"]').click();
+    b = await page.locator('#view-budget').innerText();
+    assert.match(b, /Période clôturée/);
+    assert.match(b, /Cycle du \d\d\/\d\d au \d\d\/\d\d\/\d\d/);
+    await page.locator('#cyc-nav [data-nav="now"]').click();
+    assert.match(await page.locator('#view-budget').innerText(), /Cycle en cours/);
+    // Commun : mois civil, apports attendus selon la répartition ; virements, trésorerie, appels de fonds ; marge réelle
+    await page.locator('#app-tb [data-tab="commun"]').click();
+    b = await page.locator('#view-budget').innerText();
     assert.match(b, /Mois en cours/);
     assert.match(b, /Personne A[\s\S]*Personne B/);
     assert.match(b, /Solde du compte commun/);
-    // Lot 7 : marge réelle, fin de mois, virements, trésorerie ; équilibre ; ordres permanents (annulable)
-    assert.match(b, /Marge réelle du commun[\s\S]*Fin de mois estimée[\s\S]*Virements[\s\S]*Trésorerie · 12 mois[\s\S]*Appels de fonds/);
-    assert.doesNotMatch(b, /[\u2212-]\s?\d[\d\s\u00a0\u202f]*(,\d\d)? €/);
+    assert.match(b, /Marge réelle du commun[\s\S]*Virements à mettre en place[\s\S]*Trésorerie · 12 mois[\s\S]*Budget mensuel/);
+    assert.match(await page.locator('#bal-panel').innerText(), /Fin de mois estimée/i);
+    assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
     await capture(page, '14-budget-commun');
-    await page.locator('#vBudget [data-ouvrir="secEquilibre"]').click();
-    assert.match(await page.locator('#equilibreCorps').innerText(), /Reste à combler[\s\S]*Personne A doit encore investir/);
-    await page.fill('#eqSimY', '100000');
-    await page.waitForFunction(() => /Équilibre atteint tout de suite/.test(document.getElementById('eqSimOut').textContent));
-    await capture(page, '16-equilibre');
-    await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#vBudget details[data-cc="vir"] [data-ouvrir="secVirements"]').click();
+    // ordres permanents (annulable)
+    await page.locator('#cm-plan [data-ouvrir="secVirements"]').click();
     await page.waitForSelector('#virementsCorps [data-vok]');
     await page.locator('#virementsCorps [data-vf="montant"]').first().fill('900');
     await page.locator('#virementsCorps [data-vok]').click();
@@ -449,92 +442,98 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.virements[0].montant), 80000);
-    // contrats et échéances, tendance
-    await page.locator('#vBudget [data-ouvrir="secContrats"]').click();
-    assert.match(await page.locator('#contratsCorps').innerText(), /Prêt immobilier fictif[\s\S]*Échéances des 31 prochains jours/);
-    await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#vBudget [data-scope="perso"]').click();
-    await page.locator('#vBudget [data-ouvrir="secTendance"]').click();
-    assert.ok(await page.locator('#tendanceCorps svg.graph rect').count() >= 3);
-    await page.selectOption('#tdCat', 'Alimentation');
-    assert.match(await page.locator('#tendanceCorps').innerText(), /budget 160 €/);
-    await capture(page, '15-tendance');
-    await page.locator('#volet [data-fermer]').last().click();
+    // Équilibre (Plus) : reste à combler, simulation
+    await page.locator('#app-tb [data-tab="plus"]').click();
+    await page.locator('#plusCorps [data-vue="appartement"]').click();
+    assert.match(await page.locator('#view-appart').innerText(), /Reste à combler[\s\S]*Personne A doit encore investir/i);
+    await page.fill('#eqSimY', '100000');
+    await page.waitForFunction(() => /Équilibre atteint tout de suite/.test(document.getElementById('eqSimOut').textContent));
+    await capture(page, '16-equilibre');
 
-    // 0.8.1 : contrat ajouté depuis le volet (annulable) ; base de calcul ; thème ; mode démo
-    await page.locator('#vBudget [data-ouvrir="secContrats"]').click();
-    await page.locator('#contratsCorps [data-ctedit="nouveau"]').click();
+    // contrats et échéances (commun), tendance (perso)
+    await page.locator('#app-tb [data-tab="commun"]').click();
+    await deplier('p-contrats');
+    assert.match(await page.locator('#p-contrats').innerText(), /Prêt immobilier fictif[\s\S]*Échéances des 31 prochains jours/i);
+    await page.locator('#app-tb [data-tab="budget"]').click();
+    await deplier('tend-panel');
+    assert.ok(await page.locator('#tend-panel svg rect').count() >= 3);
+    await page.selectOption('#tend-mode', 'cat:Alimentation');
+    await page.waitForTimeout(150);
+    assert.match(await page.locator('#tend-panel').innerText(), /Alimentation/);
+    await capture(page, '15-tendance');
+
+    // contrat ajouté (annulable) ; base de calcul ; thème ; mode démo
+    await deplier('p-contrats');
+    await page.locator('#p-contrats [data-ctedit="liste"]').click();
+    await page.locator('#p-contrats [data-ctedit="nouveau"]').click();
     await page.fill('#ctLabel', 'Abonnement fictif');
     await page.fill('#ctMontant', '12,50');
     await page.fill('#ctMotif', 'ABONNEMENT FICTIF');
-    await page.locator('#contratsCorps [data-ct="ok"]').click();
+    await page.locator('#p-contrats [data-ct="ok"]').click();
     await page.waitForSelector('#toast.show.action');
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 5);
-    assert.match(await page.locator('#contratsCorps').innerText(), /Abonnement fictif[\s\S]*12,50\s€/);
+    assert.match(await page.locator('#p-contrats').innerText(), /Abonnement fictif[\s\S]*12,50\s€/);
     await capture(page, '19-contrats');
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
-    await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#vBudget details.bbase summary').click();
+    await page.locator('#budget-main [data-bmode="plan"]').click();
     const refAvant = await page.evaluate(() => window.KladApp.etat().budget.ref);
-    const opts = await page.locator('#bRef option').evaluateAll(o => o.map(x => x.value));
-    await page.selectOption('#bRef', opts[1]);
+    const opts = await page.locator('#bref option').evaluateAll(o => o.map(x => x.value));
+    await page.selectOption('#bref', opts[1]);
     await page.waitForSelector('#toast.show.action');
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.ref), opts[1]);
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.ref), refAvant);
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    await page.locator('#vPlus [data-volet="secAffichage"]').click();
-    await page.locator('#affichageCorps [data-theme-choix="sombre"]').click();
+    await page.locator('#budget-main [data-bmode="suivi"]').click();
+    // thème : bouton de l'en-tête (Auto → Clair → Sombre) et volet Affichage
+    await page.locator('#ah-theme').click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'clair');
+    await page.locator('#ah-theme').click();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'sombre');
     await capture(page, '20-theme-sombre');
+    await plusVers('secAffichage');
     await page.locator('#affichageCorps [data-theme-choix="auto"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme || 'auto'), 'auto');
-    const tot0 = await page.locator('#vBudget .bsec.fixe .gs').textContent();
+    const tot0 = await page.locator('#budget-main tr.g-fixe .gsum').first().textContent();
     await page.locator('#affichageCorps [data-demo="on"]').click();
-    await page.locator('.onglets [data-onglet="vBudget"]').click();
+    await page.locator('#app-tb [data-tab="budget"]').click();
     await page.waitForTimeout(150);
     assert.ok(await page.locator('#demoBar').isVisible());
-    assert.notEqual(await page.locator('#vBudget .bsec.fixe .gs').textContent(), tot0);
+    assert.notEqual(await page.locator('#budget-main tr.g-fixe .gsum').first().textContent(), tot0);
     await capture(page, '21-mode-demo');
     await page.locator('#demoBar button').click();
     assert.ok(!(await page.locator('#demoBar').isVisible()));
     assert.equal(await page.evaluate(() => document.documentElement.classList.contains('demo')), false);
 
-    // Lot 8 : résultats, impôts, épargne, observations ; « À vérifier » signale les observations à faire
-    await page.locator('.onglets [data-onglet="vBudget"]').click();
-    await page.locator('#vBudget [data-ouvrir="secResultats"]').click();
-    assert.match(await page.locator('#resultatsCorps').innerText(), /Cycle précédent[\s\S]*Solde de la période[\s\S]*Répartition des dépenses/);
-    await capture(page, '17-resultats');
-    await page.locator('#volet [data-fermer]').last().click();
-    for (const [sec, motif] of [['secImpots', /À régulariser entre vous[\s\S]*Taxe foncière/], ['secEpargne', /Livret[\s\S]*Solde estimé[\s\S]*Plan d'épargne entreprise/], ['secObs', /À faire/]]) {
-      await page.locator('.onglets [data-onglet="vPlus"]').click();
-      await page.locator('#vPlus [data-volet="' + sec + '"]').click();
-      const t = await page.locator('#' + sec).innerText();
+    // Lot 8 : impôts, épargne (écrans de Plus), observations (volet) ; observations à faire en tête du Budget
+    for (const [v, id, motif] of [['impots', 'view-impots', /À régulariser entre vous[\s\S]*Taxe foncière/i], ['epargne', 'view-epargne', /Plan d'épargne entreprise[\s\S]*Livret[\s\S]*Solde estimé/i]]) {
+      await page.locator('#app-tb [data-tab="plus"]').click();
+      await page.locator('#plusCorps [data-vue="' + v + '"]').click();
+      const t = await page.locator('#' + id).innerText();
       assert.match(t, motif);
-      assert.doesNotMatch(t, /[\u2212-]\s?\d[\d\s\u00a0\u202f]*(,\d\d)? €/);
-      await capture(page, '18-' + sec);
-      await page.locator('#volet [data-fermer]').last().click();
+      assert.doesNotMatch(t, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
+      await capture(page, '18-' + v);
     }
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    await page.locator('#vPlus [data-volet="secImpots"]').click();
-    await page.locator('#impotsCorps summary', { hasText: /^Hypothèses \d{4}/ }).click();
-    await page.locator('#impotsCorps [data-hyp="communG"]').fill('60');
-    await page.locator('#impotsCorps [data-hyp="communG"]').press('Tab');
+    await plusVers('secObs');
+    assert.match(await page.locator('#obsCorps').innerText(), /À faire/i);
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('#app-tb [data-tab="plus"]').click();
+    await page.locator('#plusCorps [data-vue="impots"]').click();
+    await deplier('tx-hyp-panel');
+    await page.locator('#view-impots [data-hyp="communG"]').fill('60');
+    await page.locator('#view-impots [data-hyp="communG"]').press('Tab');
     await page.waitForSelector('#toast.show.action');
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.fisc.hyp.communG), 60);
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.fisc.hyp.communG), 50);
-    await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('.onglets [data-onglet="vAccueil"]').click();
-    assert.match(await page.locator('#vAccueil .averif').innerText(), /observations? à faire/);
+    await page.locator('#app-tb [data-tab="budget"]').click();
+    assert.match(await page.locator('#actions').innerText(), /à faire/i);
 
     // Grafit : month et upcoming
-    await page.locator('.onglets [data-onglet="vPlus"]').click();
-    await page.locator('#vPlus [data-volet="secModules"]').click();
+    await plusVers('secModules');
     await page.locator('#grafitActif').check();
     await page.waitForFunction(() => window.KladLienGrafit.demo() != null);
     const r = JSON.parse(await page.evaluate(() => window.KladLienGrafit.demo()));
