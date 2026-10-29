@@ -22,7 +22,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 | `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `budget.js` = budget par cycle, reste à vivre, contrats, échéances, tendance (calculs), `commun.js` = compte commun (virements, trésorerie, appels de fonds, équilibre), `vbudget.js` = rendu de l'onglet Budget, `vcommun.js` = rendu du compte commun et de l'équilibre, `fisc.js` = impôt du foyer, taxe foncière, PEE, livret, `observations.js` = observations, résultats d'une période, répartition, `vfisc.js` et `ecranfisc.js` = écrans Impôts, Épargne, Observations, Résultats, `ecranbudget.js` = onglet Budget (navigation, édition), `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `controle.js` et `ecrancontrole.js` = relevé de contrôle (Plus › Contrôle, format `klad-controle` v1), `ui.js` = interface commune (format des montants, pastilles de banques et de catégories, sections repliables mémorisées, préférences d'affichage, graduation des axes, calcul dans les champs de montant), `vues.js` = rendu de l'accueil (grande carte, cartes des comptes, « À voir », « À vérifier »), des opérations, du détail, du volet « Classer » et des relevés, `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
 | `www/style.css`, `www/polices/` | Apparence de l'ancienne version (Carnet v63–v65 sur téléphone), thèmes Auto / Clair / Sombre ; polices libres (Schibsted Grotesk, JetBrains Mono, licence OFL) embarquées, jamais chargées d'Internet. |
 | `www/xlsx.js` | Lecture des classeurs Excel (.xlsx) pour l'import manuel d'un relevé (`releve.js`), sans bibliothèque ni réseau : ZIP lu à la main (entrées stockées ou compressées, décompression native), chaînes partagées, texte riche, formats de date (base 1900 et 1904). Refuse proprement les anciens .xls, les classeurs chiffrés ou binaires (.xlsb) ; tailles limitées contre les bombes ZIP. |
-| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour), `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent ») et `grafit/` (lien Grafit : `GrafitProvider`, plugin `KladGrafitPlugin`, contrôle de l'appelant `Appelant`, configuration `GrafitConfig`). |
+| `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour), `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent »), `grafit/` (lien Grafit : `GrafitProvider`, plugin `KladGrafitPlugin`, contrôle de l'appelant `Appelant`, configuration `GrafitConfig`) et `mail/KladMailPlugin` (lecture seule d'une boîte IMAP, voir *Lecture des courriels*). |
 | `tools/controle/` | Contrôle automatique Klad / ancienne version : relevé calculé par l'ancienne version (exécutée dans Chromium à date figée) et comparaison de deux relevés, rapport en français ; mode d'emploi et format dans `tools/controle/README.md`. Code seulement, aucune donnée. |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
@@ -341,6 +341,31 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
   zéro), `due` (échéances non mensuelles des 3 prochains mois : `month`, `amount` négatif, `late`). Alerte `OVERDRAFT_RISK`
   graduée (0.9) : `crit` si le compte commun passe sous zéro dans les 31 jours, `caut` plus tard dans les 12 mois
   (« COMPTE COMMUN · JJ/MM », premier jour sous zéro).
+
+## Lecture des courriels (plugin `KladMail`)
+
+Plugin natif local, en **lecture seule**, qui lit une boîte aux lettres IMAP pour retrouver des courriels (factures, avis,
+appels de fonds) et leurs pièces PDF. Bibliothèque : Eclipse Angus Mail (implémentation maintenue de Jakarta Mail).
+
+- `tester({ hote, port, adresse, motDePasse })` → `{ ok: true, nb }` (nombre de courriels de la boîte de réception).
+- `chercher({ hote, port, adresse, motDePasse, expediteurs, motsCles, jours, max })` →
+  `{ messages: [ { id, date, expediteur, sujet, texte, pieces: [ { nom, type, taille, base64 } ] } ] }`, du plus récent
+  au plus ancien. Recherche sur le serveur (reçu depuis `jours` jours, 800 au plus ; expéditeur), puis dans Klad : adresse
+  de l'expéditeur contenant l'un des `expediteurs`, au moins un des `motsCles` dans le sujet ou le texte (sans casse ni
+  accents ; liste vide : pas de filtre). `max` : 50 par défaut, 100 au plus ; 300 courriels lus au plus par appel.
+- **TLS obligatoire** : protocole `imaps` seulement (chiffré dès le premier octet, port 993 par défaut), certificat et nom
+  du serveur vérifiés ; IMAP en clair et STARTTLS refusés (port 143 refusé). Délais de 20 s.
+- **Lecture seule** : boîte ouverte en lecture seule, lecture sans marquer « lu » ; aucun drapeau posé, rien de déplacé,
+  supprimé ni envoyé. Le dossier et la connexion sont fermés à la fin de chaque appel.
+- **PDF seulement** : seules les pièces PDF (type `application/pdf` ou nom en `.pdf`) sont renvoyées, 3 Mo au plus chacune
+  et 15 Mo au plus par appel ; une pièce plus grosse est listée avec sa taille, sans contenu. Texte : partie texte, sinon
+  HTML sans balises, 8 000 caractères au plus. `id` : en-tête Message-ID (à défaut, UID du dossier).
+- **Aucun mot de passe dans le journal** : rien n'est journalisé (ni adresse, ni mot de passe, ni sujet, ni texte) ; les
+  erreurs sont des phrases fixes (« Identifiants refusés (mot de passe d'application ?) », « Serveur injoignable »,
+  « Délai dépassé », « Réglages invalides »…), sans le texte renvoyé par le serveur.
+- Réglages contrôlés avant toute connexion : serveur sans espace ni schéma, port 1 à 65535, adresse avec « @ », mot de
+  passe non vide. Tests JUnit sans réseau (`android/app/src/test/java/app/klad/mail/`), sur des courriels fictifs construits
+  en mémoire.
 
 ## Mise à jour depuis l'appli
 
