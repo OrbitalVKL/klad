@@ -95,7 +95,13 @@
     try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
     catch (e) { return new TextDecoder('windows-1252').decode(b); }      // relevé CSV exporté en Windows-1252
   }
-  const hooks = { save: () => mark(['*']), saveLog: () => mark(['journal']), flush, choisirFichier, choisirOctets };
+  // Fichier texte enregistré par le sélecteur Android (Drive compris) → true, false si annulé.
+  async function exporterTexte(name, text, type) {
+    const r = await V.exportFile({ name, data: C.toB64(new TextEncoder().encode(text)), type: type || '' });
+    if (!r.ok && r.reason !== 'annule') throw new Error('Enregistrement impossible : ' + explain(r));
+    return !!r.ok;
+  }
+  const hooks = { save: () => mark(['*']), saveLog: () => mark(['journal']), flush, choisirFichier, choisirOctets, exporterTexte };
 
   // ------------------------------------------------------------ affichage
   const vPanel = $('vPanel');

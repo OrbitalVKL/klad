@@ -353,7 +353,8 @@ public class KladVaultPlugin extends Plugin {
     public void exportFile(PluginCall call) {
         Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("application/octet-stream");
+        // Type facultatif : « application/json » pour le relevé de contrôle, sinon fichier binaire (sauvegarde).
+        i.setType("application/json".equals(call.getString("type", "")) ? "application/json" : "application/octet-stream");
         i.putExtra(Intent.EXTRA_TITLE, call.getString("name", "klad-sauvegarde.klad"));
         startActivityForResult(call, i, "exportDone");
     }

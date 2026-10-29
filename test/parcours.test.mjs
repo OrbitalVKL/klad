@@ -532,6 +532,18 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#app-tb [data-tab="budget"]').click();
     assert.match(await page.locator('#actions').innerText(), /à faire/i);
 
+    // 0.9.1 : relevé de contrôle (Plus › Contrôle) : confirmation, fichier JSON klad-controle v1
+    await plusVers('secControle');
+    assert.match(await page.locator('#controleCorps').innerText(), /Fichier personnel en clair/);
+    await page.locator('#controleCorps [data-ctl="exporter"]').click();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('#controleCorps [data-ctl="exporter"]').click()]);
+    assert.match(dl.suggestedFilename(), /^klad-controle-\d{8}-\d{4}\.json$/);
+    const rel = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+    assert.deepEqual([rel.format, rel.v, rel.source], ['klad-controle', 1, 'klad']);
+    assert.ok(rel.budget.courant.postes.length > 0 && rel.empreinte.cycles.courant.comptes.length > 0);
+    assert.ok(!/FR76|sk-ant/.test(JSON.stringify(rel)));
+    await page.locator('#volet [data-fermer]').last().click();
+
     // Grafit : month et upcoming
     await plusVers('secModules');
     await page.locator('#grafitActif').check();
