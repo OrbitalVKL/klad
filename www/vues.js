@@ -183,8 +183,9 @@
   }
 
   // ------------------------------------------------------------ opérations
-  // f : { scope, compte, q, cat ('' | '__nc' | '__rap' | nom), nonVues, depuis (AAAA-MM-JJ) }.
-  // « Non classées » : celles des 3 derniers mois (comme « À vérifier »). Tri : date décroissante.
+  // f : { scope, compte, q, cat ('' | '__nc' | '__rap' | '__int' | nom), nonVues, du, au (AAAA-MM-JJ, bornes incluses) }.
+  // « Non classées » : celles des 3 derniers mois (comme « À vérifier »). « Internes » : virements entre comptes et
+  // règlements détaillés ailleurs, automatiques ou marqués à la main. Tri : date décroissante.
   function filtrer(S, f, ctx) {
     const ids = f.compte ? [f.compte] : comptesDe(S, f.scope || 'perso').filter(c => f.scope ? opsDuScope(S, f.scope, c) : true).map(c => c.id);
     const k = f.q ? M().cleLibelle(f.q) : '';
@@ -193,14 +194,15 @@
     const out = [];
     for (const id of ids) {
       for (const o of S.ops[id] || []) {
-        if (f.depuis && o.date < f.depuis) continue;
+        if ((f.du || f.depuis) && o.date < (f.du || f.depuis)) continue;
+        if (f.au && o.date > f.au) continue;
         if (limNc && o.date < limNc) continue;
         if (k && M().cleLibelle(o.libelle + ' ' + (o.contrepartie || '')).indexOf(k) < 0) continue;
         if (f.nonVues && K().vue(S, o)) continue;
         if (rap) { if (!K().aRapprocher(ctx, o)) continue; }
         else if (f.cat && ctx) {
           const r = K().classer(ctx, o);
-          if (f.cat === '__nc' ? !r.nc : r.cat !== f.cat) continue;
+          if (f.cat === '__nc' ? !r.nc : f.cat === '__int' ? r.type !== 'interne' : r.cat !== f.cat) continue;
         }
         out.push(o);
       }
@@ -209,6 +211,40 @@
   }
 
   const COMPTEE = t => t !== 'interne' && t !== 'horsbudget' && t !== 'epargne';
+
+  // ------------------------------------------------------------ période des opérations (filtre)
+  const PERIODES = [['tout', 'Toute période'], ['cycle', 'Cycle en cours'], ['cycleP', 'Cycle précédent'], ['mois', 'Ce mois-ci'],
+    ['moisP', 'Mois précédent'], ['30j', '30 derniers jours'], ['12m', '12 derniers mois'], ['perso', 'Personnalisé…']];
+  // k : clé de PERIODES ; auj : AAAA-MM-JJ ; B : contexte du budget (cycles de salaire) ; scope : perso / commun
+  // (commun : le cycle est le mois civil) ; du, au : bornes choisies (« Personnalisé »).
+  // → { du, au, libelle } ; du et au vides : pas de borne. Dates incluses.
+  function bornesPeriode(k, auj, B, scope, du, au) {
+    const KB = g.KladBudget;
+    const fm = m => KB.finMois(m), mois = auj.slice(0, 7);
+    let r;
+    if (k === 'cycle' || k === 'cycleP') {
+      const p = B && KB.periode(B, scope, null);
+      const q = p && k === 'cycleP' ? (p.prev ? KB.periode(B, scope, p.prev) : null) : p;
+      r = q ? { du: q.start, au: q.end } : k === 'cycle' ? { du: mois + '-01', au: fm(mois) } : { du: KB.shift(mois, -1) + '-01', au: fm(KB.shift(mois, -1)) };
+      r.libelle = (k === 'cycle' ? 'Cycle en cours' : 'Cycle précédent') + ' : ' + jjmm(r.du) + ' → ' + jjmm(r.au);
+    } else if (k === 'mois') r = { du: mois + '-01', au: fm(mois), libelle: 'Ce mois-ci' };
+    else if (k === 'moisP') { const m = KB.shift(mois, -1); r = { du: m + '-01', au: fm(m), libelle: 'Mois précédent' }; }
+    else if (k === '30j') r = { du: M().plusJours(auj, -29), au: auj, libelle: '30 derniers jours' };
+    else if (k === '12m') r = { du: KB.shift(mois, -11) + '-01', au: auj, libelle: '12 derniers mois' };
+    else if (k === 'perso') {
+      let a = M().dateValide(du) ? du : '', b = M().dateValide(au) ? au : '';
+      if (a && b && a > b) [a, b] = [b, a];
+      r = { du: a, au: b, libelle: a && b ? 'Du ' + jjmm(a) + (a.slice(0, 4) !== b.slice(0, 4) ? '/' + a.slice(2, 4) : '') + ' au ' + jjmm(b) + '/' + b.slice(2, 4)
+        : a ? 'Depuis le ' + jjmm(a) + '/' + a.slice(2, 4) : b ? 'Jusqu\'au ' + jjmm(b) + '/' + b.slice(2, 4) : 'Personnalisé' };
+    } else r = { du: '', au: '', libelle: 'Toute période' };
+    return r;
+  }
+  // Totaux d'une sélection (toutes les opérations listées, internes comprises). Montants positifs.
+  function totaux(ops) {
+    let debit = 0, credit = 0;
+    for (const o of ops) { if (o.montant < 0) debit -= o.montant; else credit += o.montant; }
+    return { n: ops.length, debit, credit };
+  }
   // Une ligne de la liste (tr.txr) : icône, libellé lisible, catégorie, compte, montant.
   function ligne(S, o, opt) {
     const c = M().compte(S, o.compte);
@@ -217,7 +253,8 @@
     const r = ctx ? K().classer(ctx, o) : { cat: 'Autres', sub: '', type: o.montant < 0 ? 'depense' : 'revenu' };
     const vue = K().vue(S, o);
     const C = ctx ? ctx.C : null;
-    const nc = !COMPTEE(r.type) ? '<span class="tx-tag" title="' + (r.type === 'epargne' ? 'versement d\'épargne' : r.type === 'horsbudget' ? 'hors budget' : 'virement entre vos comptes ou règlement déjà détaillé') + ' : pas compté dans les dépenses">non comptée</span>' : '';
+    const nc = r.type === 'interne' ? '<span class="tx-tag int" title="virement entre vos comptes ou règlement déjà détaillé : pas compté dans le budget">interne' + (K().interneManuel(o) ? ' (à la main)' : '') + '</span>'
+      : !COMPTEE(r.type) ? '<span class="tx-tag" title="' + (r.type === 'epargne' ? 'versement d\'épargne' : 'hors budget') + ' : pas compté dans les dépenses">non comptée</span>' : '';
     const cat = esc(r.cat) + (r.sub && r.sub !== r.cat && r.sub !== 'Non classé' ? ' · ' + esc(r.sub) : '');
     const cls = 'txr' + (vue ? '' : ' unseen') + (o.statut === 'en_cours' ? ' encours' : '');
     return '<tr class="' + cls + '" data-op="' + esc(o.id) + '" data-c="' + esc(o.compte) + '"><td class="ic">' + U().icoOp(C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '</td>' +
@@ -263,6 +300,9 @@
       '<button type="button" data-f="nonVues" class="ch-u" aria-pressed="' + !!f.nonVues + '">Non vues <b>' + nb.unseen + '</b></button>' +
       '<button type="button" data-f="nc" aria-pressed="' + (f.cat === '__nc') + '">Non classées <b>' + nb.nc + '</b></button>' +
       (f.cat === '__rap' ? '<button type="button" data-f="rap" aria-pressed="true">À rapprocher</button>' : '') +
+      '<button type="button" data-f="int" aria-pressed="' + (f.cat === '__int') + '">Internes <b>' + (nb.int || 0) + '</b></button>' +
+      '<select id="opsPer" aria-label="Filtrer par période" class="' + (f.per && f.per !== 'tout' ? 'on' : '') + '">' +
+      PERIODES.map(([k, l]) => '<option value="' + k + '"' + (k === (f.per || 'tout') ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
       '<select id="opsCat" aria-label="Filtrer par catégorie" class="' + (f.cat && f.cat[0] !== '_' ? 'on' : '') + '"><option value="">Catégorie</option>' +
       cats.map(c => '<option value="' + esc(c) + '"' + (c === f.cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select>' +
       (comptes.length > 1 || f.compte ? '<select id="opsCompte" aria-label="Filtrer par compte" class="' + (f.compte ? 'on' : '') + '"><option value="">Compte</option>' +
@@ -278,6 +318,8 @@
     const vu = K().vue(S, o);
     const dd = K().dateDepense(o);
     const w = K().aRapprocher(ctx, o);
+    const man = r.type === 'interne' && K().interneManuel(o);
+    const cd = r.detail && M().compte(S, r.detail), nomDetail = cd ? cd.libelle : 'le compte détaillé';
     const lignes = [
       ['Libellé', o.libelle],
       ['Date', F().jour(o.date) + (o.statut === 'en_cours' ? ' (en cours)' : '')],
@@ -287,6 +329,8 @@
       [o.montant < 0 ? 'Débit' : 'Crédit', F().montant(o.montant, cur)],
       o.contrepartie ? ['Contrepartie', o.contrepartie] : null,
       ['Catégorie', r.cat + (r.sub && r.sub !== r.cat ? ' › ' + r.sub : '') + ' (' + (SOURCES[r.src] || '') + ')'],
+      r.type === 'interne' ? ['Interne', (man ? 'marquée interne à la main' : r.src === 'reglement' ? 'règlement détaillé sur ' + nomDetail + ', compté automatiquement interne' : 'virement entre vos comptes') +
+        ' : pas comptée dans le budget'] : null,
       ['Vue', vu ? 'oui' : 'non']
     ].filter(Boolean);
     return '<div class="sh-head op-h">' + U().icoOp(ctx.C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '<div class="t"><b>' + esc(libelleCourt(o.libelle)) + '</b><span>' +
@@ -296,7 +340,8 @@
         'S\'il est déjà détaillé dans ' + esc(w.libelle) + ', marquez-le interne.</p>' : '') +
       '<div class="row"><button type="button" class="btn primary" data-a="classer">Classer</button>' +
       '<button type="button" class="btn" data-a="vue">' + (vu ? 'Marquer non vue' : 'Marquer vue') + '</button>' +
-      (w ? '<button type="button" class="btn" data-a="interne">Marquer interne</button>' : '') + '</div>' +
+      (w ? '<button type="button" class="btn" data-a="interne">Marquer interne</button>' : '') +
+      (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
   }
 
@@ -374,5 +419,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, filtres, detail, classer, COMPTEE };
+  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, filtres, detail, classer, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

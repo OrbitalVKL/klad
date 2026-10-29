@@ -8,11 +8,30 @@
   const CLE = 'klad.theme';
   const THEMES = ['auto', 'clair', 'sombre'];
 
+  // Attribut lu par la feuille de style : data-theme="light" / "dark" (absent en automatique).
+  const ATTR = { clair: 'light', sombre: 'dark' };
+
   function theme() { try { const t = g.localStorage && g.localStorage.getItem(CLE); return THEMES.indexOf(t) >= 0 ? t : 'auto'; } catch (e) { return 'auto'; } }
+  const telephoneSombre = () => !!(g.matchMedia && g.matchMedia('(prefers-color-scheme: dark)').matches);
+  // Affichage sombre effectif : choix de l'utilisateur, sinon réglage du téléphone.
+  function sombre(t) { t = t || theme(); return t === 'sombre' || (t === 'auto' && telephoneSombre()); }
+
+  // Barres d'état et de navigation Android accordées au thème affiché (plugin natif KladAffichage ; rien ailleurs).
+  function barres(t) {
+    const P = g.Capacitor && g.Capacitor.Plugins && g.Capacitor.Plugins.KladAffichage;
+    if (!P || !g.document || !g.document.body) return;
+    const c = (g.getComputedStyle(g.document.body).backgroundColor.match(/\d+/g) || []).slice(0, 3).map(Number);
+    const fond = c.length === 3 ? '#' + c.map(x => x.toString(16).padStart(2, '0')).join('') : null;
+    Promise.resolve(P.appliquer({ sombre: sombre(t), fond })).catch(() => { /* ancienne version de l'appli native */ });
+  }
+
   function appliquerTheme(t) {
     t = THEMES.indexOf(t) >= 0 ? t : 'auto';
     const r = g.document && g.document.documentElement;
-    if (r) { if (t === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', t); }
+    if (r) { if (t === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', ATTR[t]); }
+    const m = g.document && g.document.querySelector('meta[name="color-scheme"]');
+    if (m) m.setAttribute('content', t === 'auto' ? 'light dark' : ATTR[t]);
+    barres(t);
     return t;
   }
   function choisirTheme(t) {
@@ -116,7 +135,12 @@
     if (g.KladAffichage.surArret) g.KladAffichage.surArret();
   }
 
-  if (g.document) appliquerTheme(theme());
+  if (g.document) {
+    appliquerTheme(theme());
+    // automatique : suit le téléphone quand il change de thème, appli ouverte
+    try { g.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (theme() === 'auto') { barres(); if (g.KladAffichage.surTheme) g.KladAffichage.surTheme(); } }); } catch (e) { /* navigateur ancien */ }
+    if (g.addEventListener) g.addEventListener('load', () => barres());
+  }
 
-  g.KladAffichage = { THEMES, theme, choisirTheme, appliquerTheme, masquer, aliasDe, demarrerDemo, arreterDemo, demoActif: () => demo.on, facteurDemo: () => demo.k, surArret: null };
+  g.KladAffichage = { THEMES, theme, sombre, choisirTheme, appliquerTheme, surTheme: null, masquer, aliasDe, demarrerDemo, arreterDemo, demoActif: () => demo.on, facteurDemo: () => demo.k, surArret: null };
 })(typeof window !== 'undefined' ? window : globalThis);

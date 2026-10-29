@@ -133,6 +133,15 @@ reprises du carnet de l'ancienne version ou créées dans Klad (bloc chiffré `c
 - **Non classée** : classement par défaut (ou catégorie « Autres »). « À vérifier » compte celles des 90 derniers jours.
 - **Opérations vues** : point bleu, pastille sur l'onglet, filtre « Non vues », « Tout marquer vu » (annulable). Gestes :
   glisser à droite = vue / non vue, à gauche = « Classer » ; les mêmes actions sont dans le détail de l'opération (appui).
+- **Filtres des opérations (0.9.4)** : « Internes » (virements entre comptes et règlements détaillés ailleurs, comptés
+  automatiquement ou marqués à la main : toujours visibles dans la liste, étiquette « interne », jamais comptés dans le
+  budget) ; période (toute période, cycle en cours ou précédent, ce mois-ci, mois précédent, 30 derniers jours, 12 derniers
+  mois, personnalisée par le sélecteur de dates du téléphone), combinable avec compte, catégorie, non vues, non classées,
+  internes et recherche ; pastille de la période avec une croix, totaux débit / crédit de la sélection en bas de la liste.
+  La période est gardée tant que l'appli reste ouverte (« Toute période » au démarrage).
+- **Marquer interne** (prélèvement de portefeuille à rapprocher) : l'opération reste dans la liste (filtre « Internes »),
+  son détail porte « marquée interne à la main » et « Annuler : compter en dépense » (annulable), qui la remet dans
+  « À vérifier ».
 - **Volet « Classer »** : catégories les plus utilisées (dépenses des 150 derniers jours), sous-catégorie, « Classer aussi
   les autres » (mot-clé proposé, nombre d'opérations concernées, compte et sens facultatifs), un seul bouton ; annulable.
 - **Carte à débit différé** : dette = opérations de la carte après le dernier règlement débité sur son compte de
@@ -243,7 +252,9 @@ d'impôt, bulletins de paie déjà lus, hypothèses, logement, plan d'épargne e
   poste et contrats » compare le budget de chaque poste au total mensuel de ses contrats, « → prévu » l'y aligne.
 - **Budget › Base de calcul** (en bas du cycle en cours) : mois de début du réel habituel (par défaut les 6 derniers mois
   complets) et « Tout aligner sur le réel habituel », annulables.
-- **Plus › Affichage** : thème automatique, clair ou sombre (gardé sur le téléphone, hors coffre) ; mode démo (montants
+- **Plus › Affichage** : thème automatique, clair ou sombre (gardé sur le téléphone, hors coffre ; appliqué avant le premier
+  affichage par `www/theme.js` ; la WebView n'assombrit jamais la page d'elle-même ; barres d'état et de navigation
+  accordées par le plugin natif `KladAffichage`) ; mode démo (montants
   multipliés par un facteur pris au hasard, noms des personnes et des banques remplacés, champs de saisie floutés ; en
   mémoire seulement, rien n'est modifié).
 - **Plus › Comptes › (compte manuel) › Importer un relevé** : fichier CSV (relevé bancaire, relevé de carte, historique de

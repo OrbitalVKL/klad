@@ -5,13 +5,17 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.9.3** — correctif trouvé par le contrôle automatique sur le téléphone : les données figées de l'ancienne version
+**0.9.4** — retours d'usage : mode clair réparé (le choix « Clair » / « Sombre » était écrit `clair` / `sombre`
+alors que la feuille de style attend `light` / `dark` ; thème appliqué avant le premier affichage, assombrissement
+automatique de la WebView désactivé, barres Android accordées au thème) ; opérations internes toujours visibles
+(filtre « Internes », mention « marquée interne à la main », « Annuler : compter en dépense ») ; filtre de période
+des opérations (raccourcis, personnalisée), pastille et totaux débit / crédit.
+(0.9.3 — correctif trouvé par le contrôle automatique sur le téléphone : les données figées de l'ancienne version
 rangées sous `carnet._payload` dans le fichier de reprise (règles de base, budgets par défaut, revenu prévu, mouvements
 et équipements de l'équilibre) n'étaient pas lues (`www/carnet.js` ne lisait que `P` et `payload`) ; migration au
 premier déverrouillage (`www/migrations.js`) qui complète les données déjà présentes ; crédits de règlement des cartes
 écartés à l'import ; état de l'import dans Plus › Contrôle. Nouvelle icône : К cyrillique rouge sur noir (couleurs de
-Grafit), logo de l'appli et du site assortis (`scripts/icone.mjs`).
-(0.9.2 — Lot 9b : extras facultatifs, mail et Claude ; 0.9.1 : relevé de contrôle, demandé comme « 0.8.2 » ; 0.9.0 —
+Grafit), logo de l'appli et du site assortis (`scripts/icone.mjs`) ; 0.9.2 — Lot 9b : extras facultatifs, mail et Claude ; 0.9.1 : relevé de contrôle, demandé comme « 0.8.2 » ; 0.9.0 —
 Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` gradué ; 0.8.1 : écarts comblés ;
 0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ; 0.6.0 — Lot 6.)
 
@@ -30,6 +34,7 @@ Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` 
 | — | Relevé de contrôle (export Klad, outil de comparaison avec l'ancienne version) | 0.9.1 | fait |
 | 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.2 | fait |
 | — | Correctif : import incomplet (`_payload`), migration, crédits de règlement de carte, icône rouge et noire | 0.9.3 | fait |
+| — | Retours d'usage : mode clair, opérations internes visibles, filtre de période des opérations | 0.9.4 | fait |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Ce qui est fait (résumé)
@@ -49,6 +54,11 @@ Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` 
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- Thème : valeur gardée `auto` / `clair` / `sombre` (clé `klad.theme`), attribut de la page `data-theme="light"` /
+  `"dark"` (absent en automatique) ; tests sur la couleur réellement affichée, téléphone en thème sombre puis clair.
+- Opérations : une opération interne n'est jamais masquée ; « Marquer interne » depuis « À rapprocher » bascule la liste
+  sur le filtre « Internes ». La période des opérations est indépendante de la période d'analyse de la tendance.
 
 - Parité (dépôt privé) : toujours par le **fichier de reprise** (payload sous `carnet._payload`, écrit puis relu, comme
   sur le téléphone) et par les étapes du premier déverrouillage ; la lecture directe de la page ne suffit pas (c'est ce

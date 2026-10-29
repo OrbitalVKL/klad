@@ -33,6 +33,7 @@ img{max-width:100%}
     --shadow:none;
   }
 }
+:root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#111513; --surface:#191e1c; --surface-2:#202624; --ink:#edf1ee; --ink-2:#b7c0bb; --muted:#89938e; --line:#2d3532;
@@ -1585,3 +1586,12 @@ html.demo input:not([type="checkbox"]):not([type="radio"]), html.demo textarea, 
 
 /* ---------- Klad : extras (Claude) ---------- */
 pre.cl-ap { white-space: pre-wrap; word-break: break-word; font: 12.5px/1.45 var(--mono); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-height: 40vh; overflow: auto; }
+
+/* Opérations : période (pastille effaçable, dates personnalisées), totaux de la sélection, opérations internes (0.9.4) */
+.ops-per{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 16px 10px;font-size:13px;color:var(--ink-2)}
+.ops-per input[type=date]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 8px;margin-left:4px}
+.per-pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--ink);border-radius:999px;padding:3px 4px 3px 12px;font-weight:600}
+.per-pill button{border:0;background:transparent;color:inherit;font:inherit;font-size:16px;line-height:1;width:26px;height:26px;border-radius:999px;cursor:pointer}
+.ops-tot{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2)}
+.ops-tot b{color:var(--ink)}
+.tx-tag.int{background:var(--accent-soft);color:var(--accent)}

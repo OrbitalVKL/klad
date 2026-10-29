@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <title>Klad</title>
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,12 +48,15 @@
             <div class="row"><input type="search" id="q" placeholder="Rechercher un libellé…" aria-label="Rechercher un libellé" autocomplete="off" spellcheck="false"></div>
           </div>
           <div class="app-chips" id="app-chips" role="group" aria-label="Filtres des opérations"></div>
+          <div class="ops-per" id="ops-perso" hidden><label>Du <input type="date" id="opsDu"></label><label>au <input type="date" id="opsAu"></label></div>
+          <div class="ops-per" id="ops-pastille" hidden></div>
           <div class="scroll tablewrap">
             <table class="tx txv2"><colgroup><col style="width:34px"><col><col style="width:118px"></colgroup>
               <tbody id="tx"></tbody>
             </table>
           </div>
           <div id="tx-suite"></div>
+          <div class="ops-tot" id="ops-tot" hidden></div>
         </section>
       </div>
       <div id="ctr-zone" style="display:grid;gap:18px"></div>

@@ -49,6 +49,8 @@ dependencies {
     implementation "androidx.activity:activity:$androidxActivityVersion"
     implementation "androidx.biometric:biometric:$androidxBiometricVersion"
     implementation project(':capacitor-android')
+    // Thème : assombrissement automatique de la WebView désactivé (MainActivity).
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
     // Lecture IMAP (plugin KladMail) : Eclipse Angus Mail, implémentation maintenue de Jakarta Mail.
     implementation "org.eclipse.angus:angus-mail:$angusMailVersion"
     testImplementation "junit:junit:$junitVersion"
