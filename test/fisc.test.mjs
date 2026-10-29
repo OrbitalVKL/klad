@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { charge, json } from './charge.mjs';
 import { montantSigne } from './charge.mjs';
 
-const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'fisc.js', 'observations.js', 'ui.js', 'vues.js', 'vbudget.js', 'vcommun.js', 'vfisc.js']);
-const { KladModele: M, KladClasse: K, KladBudget: KB, KladFisc: KF, KladObservations: KO, KladVuesFisc: VF } = X;
+const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'fisc.js', 'observations.js', 'ui.js', 'vues.js', 'vbudget.js', 'vcommun.js', 'vfisc.js', 'claude.js', 'mail.js', 'extras.js']);
+const { KladModele: M, KladClasse: K, KladBudget: KB, KladFisc: KF, KladObservations: KO, KladVuesFisc: VF, KladExtras: EX } = X;
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 let n = 0;
 const op = (c, date, montant, libelle) => ({ id: c.id + ':t:' + (n++), compte: c.id, date, montant, libelle, statut: 'comptabilisee', source: 'eb', categorie: null, vue: true });
@@ -142,4 +142,12 @@ test('livret : solde estimé et intérêts par quinzaine (un versement rapporte 
   const t = json(KF.livretCarte(ctx(S)))[l.id];
   assert.equal(t.centimes, 110000);
   assert.match(t.texte, /≈ 31\s€ en 2026/);
+});
+
+test('analyse de Claude des impôts : chiffres du foyer, sans employeur ni nom', () => {
+  const { S } = etat();
+  const t = EX.agregats(ctx(S), 'impots');
+  assert.match(t, /Impôt sur le revenu du foyer, revenus 2026 \(estimation\) : total [\d\s]+ €, déjà prélevé/);
+  assert.match(t, /Régularisation/);
+  for (const x of ['Société fictive', 'Personne A', 'Personne B']) assert.ok(!t.includes(x), x);
 });

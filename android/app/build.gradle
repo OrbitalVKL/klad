@@ -21,6 +21,12 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    packaging {
+        resources {
+            // Angus Mail, Jakarta Mail et Jakarta Activation ont chacun leur LICENSE.md et NOTICE.md : textes mis bout à bout.
+            merges += ['META-INF/LICENSE.md', 'META-INF/NOTICE.md']
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
@@ -43,6 +49,8 @@ dependencies {
     implementation "androidx.activity:activity:$androidxActivityVersion"
     implementation "androidx.biometric:biometric:$androidxBiometricVersion"
     implementation project(':capacitor-android')
+    // Lecture IMAP (plugin KladMail) : Eclipse Angus Mail, implémentation maintenue de Jakarta Mail.
+    implementation "org.eclipse.angus:angus-mail:$angusMailVersion"
     testImplementation "junit:junit:$junitVersion"
     implementation project(':capacitor-cordova-android-plugins')
 }

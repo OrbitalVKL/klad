@@ -34,10 +34,11 @@ test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
   const files = ['MainActivity.java', 'vault/KladVaultPlugin.java', 'vault/Vault.java', 'vault/Coffre.java',
     'update/KladUpdatePlugin.java', 'update/Maj.java', 'reseau/KladReseauPlugin.java', 'reseau/Adresse.java',
     'grafit/GrafitConfig.java', 'grafit/Appelant.java', 'grafit/Resume.java', 'grafit/Stockage.java', 'grafit/CleKeystore.java',
-    'grafit/GrafitProvider.java', 'grafit/KladGrafitPlugin.java'];
+    'grafit/GrafitProvider.java', 'grafit/KladGrafitPlugin.java', 'mail/KladMailPlugin.java', 'mail/Reglages.java',
+    'mail/Criteres.java', 'mail/Lecture.java', 'mail/Erreurs.java'];
   for (const f of files) {
     const x = read(JAVA + f);
-    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau|\.grafit)?;/m, f);
+    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau|\.grafit|\.mail)?;/m, f);
     assert.doesNotMatch(x, /io\.github\./, f);
   }
   const main = read(JAVA + 'MainActivity.java');
@@ -46,10 +47,28 @@ test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
   assert.match(main, /registerPlugin\(KladUpdatePlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladReseauPlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladGrafitPlugin\.class\)/);
+  assert.match(main, /registerPlugin\(KladMailPlugin\.class\)/);
   // adresse IP pour l'en-tête Psu-Ip-Address : aucune requête vers un service tiers
   const r = read(JAVA + 'reseau/KladReseauPlugin.java') + read(JAVA + 'reseau/Adresse.java');
   assert.match(r, /NetworkInterface\.getNetworkInterfaces\(\)/);
   assert.doesNotMatch(r, /https?:\/\/|URL\(|HttpURLConnection/);
+});
+
+test('lecture des courriels : IMAP sur TLS, lecture seule, rien dans le journal', () => {
+  const dir = JAVA + 'mail/';
+  const x = ['KladMailPlugin.java', 'Reglages.java', 'Criteres.java', 'Lecture.java', 'Erreurs.java'].map(f => read(dir + f)).join('\n');
+  const p = read(dir + 'KladMailPlugin.java');
+  const r = read(dir + 'Reglages.java');
+  assert.match(p, /getStore\("imaps"\)/);
+  assert.match(p, /open\(Folder\.READ_ONLY\)/);
+  assert.match(p, /close\(false\)/);
+  for (const re of [/mail\.imaps\.ssl\.enable", "true"/, /mail\.imaps\.ssl\.checkserveridentity", "true"/, /mail\.imaps\.peek", "true"/])
+    assert.match(r, re);
+  // ni écriture dans la boîte, ni envoi, ni journal, ni texte d'exception renvoyé
+  assert.doesNotMatch(x, /READ_WRITE|setFlags?\(|expunge|copyMessages|moveMessages|appendMessages|Transport|"imap"|"smtps?"/);
+  assert.doesNotMatch(x, /\bLog\.|printStackTrace|System\.(out|err)/);
+  assert.doesNotMatch(p, /reject\([^)]*getMessage/);
+  assert.match(read('android/app/build.gradle'), /org\.eclipse\.angus:angus-mail/);
 });
 
 test('empreinte : aucune opération sur la clé avant BiometricPrompt', () => {

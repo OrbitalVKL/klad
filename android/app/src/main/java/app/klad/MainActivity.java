@@ -4,6 +4,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
 import app.klad.grafit.KladGrafitPlugin;
+import app.klad.mail.KladMailPlugin;
 import app.klad.reseau.KladReseauPlugin;
 import app.klad.update.KladUpdatePlugin;
 import app.klad.vault.KladVaultPlugin;
@@ -17,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(KladUpdatePlugin.class);
         registerPlugin(KladReseauPlugin.class);
         registerPlugin(KladGrafitPlugin.class);
+        registerPlugin(KladMailPlugin.class);
         super.onCreate(savedInstanceState);
         // Pas de capture d'écran ni d'aperçu lisible dans les applis récentes.
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);

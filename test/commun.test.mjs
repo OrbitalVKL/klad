@@ -5,8 +5,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { charge, json, montantSigne } from './charge.mjs';
 
-const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'resume.js', 'ui.js', 'vues.js', 'vbudget.js', 'vcommun.js']);
-const { KladModele: M, KladClasse: K, KladBudget: KB, KladCommun: KC, KladResume: R, KladVuesCommun: VC, KladVuesBudget: VB } = X;
+const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'commun.js', 'fisc.js', 'resume.js', 'ui.js', 'vues.js', 'vbudget.js', 'vcommun.js', 'claude.js', 'mail.js', 'extras.js']);
+const { KladModele: M, KladClasse: K, KladBudget: KB, KladCommun: KC, KladResume: R, KladVuesCommun: VC, KladVuesBudget: VB, KladExtras: EX } = X;
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 let n = 0;
 const op = (c, date, montant, libelle) => ({ id: c.id + ':t:' + (n++), compte: c.id, date, montant, libelle, statut: 'comptabilisee', source: 'eb', categorie: null, vue: true });
@@ -135,4 +135,15 @@ test('import du carnet : appels et équilibre, une fois', () => {
   assert.deepEqual(json(rep), { appels: 1, equipements: 1 });
   assert.equal(S2.budget.v, 2);
   assert.deepEqual(json(S2.budget.equilibre), { equip: { 1: true }, items: [{ id: 'o1', date: '', label: 'Fictif', moi: 1250, autre: 0, on: true, src: 'manuel' }] });
+});
+
+test('analyse de Claude : agrégats seulement (ni opération, ni libellé bancaire, ni nom des personnes)', () => {
+  const { S } = etat();
+  S.carnet.klad.commun = { moi: 'Alice Fictive', autre: 'Bob Fictif' };
+  for (const scope of ['perso', 'commun']) {
+    const t = EX.agregats(ctx(S), scope);
+    assert.match(t, scope === 'commun' ? /Budget du compte commun[\s\S]*Compte commun : solde[\s\S]*Équilibre des apports/ : /Budget personnel/);
+    for (const x of ['Alice', 'Bob', 'SYNDIC FICTIF', 'APPORT', 'EMPRUNT FICTIF', 'FR76', 'COMMUN']) assert.ok(!t.includes(x), scope + ' : ' + x);
+  }
+  assert.match(EX.agregats(ctx(S), 'commun'), /personne A a investi/);
 });
