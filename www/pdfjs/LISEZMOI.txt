@@ -1,2 +1,0 @@
-pdf.js 6.3.289 (Mozilla, licence Apache-2.0), paquet npm pdfjs-dist : build/pdf.min.mjs et build/pdf.worker.min.mjs
-(renommés en .js pour le serveur local de l'appli) et cmaps/. Sert seulement à extraire le texte des PDF, sans réseau.

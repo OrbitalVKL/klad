@@ -134,9 +134,6 @@
     const mail = [AR.syndic ? esc(AR.syndic) : '', mail0].filter(Boolean).join(' · ');
     return cmSub(ouv, 'ap', 'Appels de fonds' + (AR.titre ? ' ' + esc(AR.titre) : ''), tot > 50 ? '<b class="bad-t num">' + e2(tot) + ' à virer</b>' : chip('good', 'à jour'),
       (mail ? '<p class="subs" style="margin:0 0 6px">' + mail + '</p>' : '') + '<p class="cm-sit" style="margin:0 0 8px">' + (tot > 50 ? '<b class="bad-t">' + e2(tot) + ' restent à virer au syndic.</b>' : 'Tous les appels reçus sont réglés.') + '</p><div class="cmp-grid">' + ks.map(card).join('') + '</div>' +
-      (g.KladExtras && (g.KladExtras.actif(B.S, 'mail') || g.KladExtras.actif(B.S, 'claude')) ? '<div class="row">' +
-        (g.KladExtras.actif(B.S, 'mail') ? '<button class="btn" type="button" data-liremails="1">Lire les mails</button>' : '') +
-        (g.KladExtras.actif(B.S, 'claude') ? '<button class="btn" type="button" data-lireappel="1">Lire un appel (PDF)</button>' : '') + '</div>' : '') +
       U().comment('Un appel de fonds par mail du syndic ; montant lu dans le PDF joint quand il est connu, sinon estimé d\'après le relevé du syndic ou l\'appel précédent. Les appels du relevé du syndic sans mail sont aussi comptés. Chaque virement du compte commun vers le syndic règle l\'appel le plus ancien en premier.'), tot > 50);
   }
 

@@ -83,8 +83,8 @@
     return chain;
   }
   // Fichier choisi par le sélecteur Android → octets (relevé, éventuellement Excel), ou null si annulé.
-  async function choisirOctets(type) {
-    const r = await V.importFile(type ? { type } : {});
+  async function choisirOctets() {
+    const r = await V.importFile();
     if (!r.ok) { if (r.reason !== 'annule') throw new Error('Lecture impossible : ' + explain(r)); return null; }
     return C.fromB64(r.data);
   }
@@ -673,11 +673,10 @@
         a.download = name; document.body.appendChild(a); a.click(); a.remove();
         return ok();
       },
-      importFile(o) {
+      importFile() {
         return new Promise(resolve => {
           const i = document.createElement('input');
           i.type = 'file';
-          if (o && o.type) i.accept = o.type;
           i.onchange = async () => {
             const f = i.files && i.files[0];
             resolve(f ? ok({ data: C.toB64(new Uint8Array(await f.arrayBuffer())) }) : { ok: false, reason: 'annule' });

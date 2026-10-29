@@ -379,9 +379,7 @@ public class KladVaultPlugin extends Plugin {
     public void importFile(PluginCall call) {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
-        // Type facultatif (« application/pdf » pour un bulletin ou un avis) ; le sélecteur Android propose aussi Drive.
-        String type = call.getString("type", "*/*");
-        i.setType("application/pdf".equals(type) ? type : "*/*");
+        i.setType("*/*");
         startActivityForResult(call, i, "importDone");
     }
 

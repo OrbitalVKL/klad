@@ -184,8 +184,7 @@ test('résumé Grafit : month, left_to_live, upcoming, BUDGET_OVER ; aucun motif
     left_to_live: 1280, left_to_live_basis: 'accounts' });
   assert.deepEqual(r.upcoming, [{ date: '2026-11-05', label: 'PRET', amount: -1200, kind: 'recurring' }, { date: '2026-11-05', label: 'CARTE', amount: -40, kind: 'card' }, { date: '2026-11-10', label: 'ASSURANCE AUTO', amount: -50, kind: 'contract' }]);
   assert.deepEqual(r.alerts.filter(a => a.code === 'BUDGET_OVER'), [{ level: 'caut', code: 'BUDGET_OVER', text: 'BARS +80 %' }]);
-  // identifiants de comptes : tirés au hasard (8 caractères), ils peuvent contenir 5 chiffres de suite
-  const txt = JSON.stringify(Object.assign({}, r, { generated: 0, accounts: r.accounts.map(a => Object.assign({}, a, { id: '' })) }));
+  const txt = JSON.stringify(Object.assign({}, r, { generated: 0 }));
   for (const motif of [/FR\d{2}/, /\d{5,}/, /NORD/, /FICTI/, /PRLV/, /@/]) assert.ok(!motif.test(txt), String(motif));
 });
 

@@ -224,10 +224,6 @@
     if (t.closest('[data-reafficher]')) { const avant = window.KladObservations.reafficher(S(), Date.now()); A.changed('budget'); A.toastAnnuler('Points réaffichés.', () => { window.KladObservations.annulerFait(S(), avant); A.changed('budget'); }); return; }
     if (t.closest('[data-audit]')) { A.synchro('manuel'); A.rendre(); A.toast('Audit relancé.'); return; }
     if (t.closest('[data-analyse]') && window.KladExtras) { window.KladExtras.analyser(A.scope()); return; }
-    const lm = t.closest('[data-liremails]');
-    if (lm && window.KladExtras) { window.KladExtras.lireMails(lm); return; }
-    const la = t.closest('[data-lireappel]');
-    if (la && window.KladExtras) { window.KladExtras.lireDocument('appel', la); return; }
     // compte commun : cartes dépliées, ordres permanents
     const ov = t.closest('[data-ouvrir]');
     if (ov) { A.ouvrirVolet(ov.dataset.ouvrir); return; }
