@@ -62,9 +62,14 @@
     return o;
   }
 
-  // Ancien format (« budgets » et « fixedPrefs » sans « bplan ») : même conversion que l'ancienne version.
+  // Données figées de l'ancienne version (P, payload ou _payload ; voir KladCarnet.payload).
+  const payload = st => (g.KladCarnet && g.KladCarnet.payload ? g.KladCarnet.payload(st) : {});
+
+  // Ancien format (« budgets » et « fixedPrefs » sans « bplan ») : même conversion que l'ancienne version, budgets par
+  // défaut du payload quand le carnet n'en a pas.
   function migrerAncien(st) {
-    const out = {}, fp = isObj(st.fixedPrefs) ? st.fixedPrefs : {}, bu = isObj(st.budgets) ? st.budgets : {};
+    const P = payload(st);
+    const out = {}, fp = isObj(st.fixedPrefs) ? st.fixedPrefs : {}, bu = isObj(st.budgets) ? st.budgets : isObj(P.budgets) ? P.budgets : {};
     for (const sc of ['perso', 'commun', 'foyer']) {
       const o = out[sc] = {};
       for (const [s, x] of Object.entries(isObj(fp[sc]) ? fp[sc] : {})) o['f|' + s] = x && x.amt ? { on: x.on !== false, amt: x.amt } : { on: !x || x.on !== false };
@@ -73,13 +78,8 @@
     return out;
   }
 
-  // Import du budget, des contrats et des virements du carnet. Les catégories renommées suivent les renommages du
-  // classement. renommer(cat) → nom actuel. → rapport { postes, contrats, virements }.
-  function importer(S, carnet, opts) {
-    const st = racine(carnet);
-    if (!st) throw new Error('Carnet absent.');
-    const B = donnees(S);
-    const renommer = (opts && opts.renommer) || (c => c);
+  // Postes et revenu prévu du carnet, convertis (centimes, catégories renommées). → { plan, postes, revprev }.
+  function planCarnet(st, renommer) {
     const bplan = isObj(st.bplan) ? st.bplan : migrerAncien(st);
     const plan = {};
     let postes = 0;
@@ -95,10 +95,22 @@
         postes++;
       }
     }
-    B.plan = Object.assign({ perso: {}, commun: {} }, plan);
+    const revprev = {}, rp = isObj(st.revprev) ? st.revprev : payload(st).revenuPrevu;
+    if (isObj(rp)) for (const k of Object.keys(rp)) if (isFinite(+rp[k])) revprev[k] = Math.round(+rp[k] * 100);
+    return { plan, postes, revprev };
+  }
+
+  // Import du budget, des contrats et des virements du carnet. Les catégories renommées suivent les renommages du
+  // classement. renommer(cat) → nom actuel. → rapport { postes, contrats, virements }.
+  function importer(S, carnet, opts) {
+    const st = racine(carnet);
+    if (!st) throw new Error('Carnet absent.');
+    const B = donnees(S);
+    const pc = planCarnet(st, (opts && opts.renommer) || (c => c));
+    const postes = pc.postes;
+    B.plan = Object.assign({ perso: {}, commun: {} }, pc.plan);
     B.ref = typeof st.budgetRef === 'string' && /^\d{4}-\d{2}$/.test(st.budgetRef) ? st.budgetRef : null;
-    B.revprev = {};
-    if (isObj(st.revprev)) for (const k of Object.keys(st.revprev)) if (isFinite(+st.revprev[k])) B.revprev[k] = Math.round(+st.revprev[k] * 100);
+    B.revprev = pc.revprev;
     const map = (S.modele.reprise && S.modele.reprise.map) || {};
     B.contrats = (Array.isArray(st.contrats) ? st.contrats : []).filter(isObj).map((c, i) => ({
       id: String(c.id || 'c' + i).slice(0, 20), sc: c.sc === 'commun' ? 'commun' : 'perso', label: String(c.label || 'Contrat').slice(0, 80),
@@ -1016,6 +1028,6 @@
     cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
     devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement,
-    shift, finMois, nomMois, eur, dernierDebit, tendanceMois, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median
+    shift, finMois, nomMois, eur, dernierDebit, tendanceMois, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median, planCarnet
   };
 })(typeof window !== 'undefined' ? window : globalThis);

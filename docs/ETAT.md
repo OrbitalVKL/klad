@@ -5,11 +5,14 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.9.2** — Lot 9b : extras facultatifs, désactivés par défaut (Plus › Extras) : appels de fonds lus par mail (IMAP en
-lecture seule, Gmail par mot de passe d'application) ; Claude avec la clé saisie dans l'appli (bulletins de paie, avis
-d'impôt, appels de fonds en PDF, « Analyse de Claude » sur agrégats), aperçu de l'envoi et coût affichés.
-(0.9.1 : relevé de contrôle, demandé comme « 0.8.2 », numéroté 0.9.1 car la 0.9.0 était déjà publiée ; 0.9.0 — Lot 9a :
-interface de l'ancienne version, fonctions restantes, icône К, `OVERDRAFT_RISK` gradué ; 0.8.1 : écarts comblés ;
+**0.9.3** — correctif trouvé par le contrôle automatique sur le téléphone : les données figées de l'ancienne version
+rangées sous `carnet._payload` dans le fichier de reprise (règles de base, budgets par défaut, revenu prévu, mouvements
+et équipements de l'équilibre) n'étaient pas lues (`www/carnet.js` ne lisait que `P` et `payload`) ; migration au
+premier déverrouillage (`www/migrations.js`) qui complète les données déjà présentes ; crédits de règlement des cartes
+écartés à l'import ; état de l'import dans Plus › Contrôle. Nouvelle icône : К cyrillique rouge sur noir (couleurs de
+Grafit), logo de l'appli et du site assortis (`scripts/icone.mjs`).
+(0.9.2 — Lot 9b : extras facultatifs, mail et Claude ; 0.9.1 : relevé de contrôle, demandé comme « 0.8.2 » ; 0.9.0 —
+Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` gradué ; 0.8.1 : écarts comblés ;
 0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ; 0.6.0 — Lot 6.)
 
 ## Feuille de route
@@ -26,6 +29,7 @@ interface de l'ancienne version, fonctions restantes, icône К, `OVERDRAFT_RISK
 | 9a | Interface identique à l'ancienne version, fonctions restantes, icône | 0.9.0 | fait |
 | — | Relevé de contrôle (export Klad, outil de comparaison avec l'ancienne version) | 0.9.1 | fait |
 | 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.2 | fait |
+| — | Correctif : import incomplet (`_payload`), migration, crédits de règlement de carte, icône rouge et noire | 0.9.3 | fait |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Ce qui est fait (résumé)
@@ -45,6 +49,19 @@ interface de l'ancienne version, fonctions restantes, icône К, `OVERDRAFT_RISK
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- Parité (dépôt privé) : toujours par le **fichier de reprise** (payload sous `carnet._payload`, écrit puis relu, comme
+  sur le téléphone) et par les étapes du premier déverrouillage ; la lecture directe de la page ne suffit pas (c'est ce
+  qui a masqué l'import incomplet jusqu'à la 0.9.2). Voies `reprise`, `migration` (état de la 0.9.2 puis migration),
+  `page`.
+- Migrations des données du coffre : idempotentes (marque dans `S.modele.migrations`), réversibles (état d'avant gardé),
+  sans écraser ce qui a été modifié dans Klad, testées en sautant des versions (`test/migrations.test.mjs`).
+- Crédits de règlement des cartes et portefeuilles (« prélèvement automatique … merci », « paiement reçu ») : écartés à
+  l'import comme dans l'ancienne version, selon le motif « remboursements » de la fiche du compte (données, pas de code) ;
+  choisi plutôt que de les exclure seulement de l'empreinte du contrôle, pour que les compteurs (non vues, non classées)
+  restent ceux de l'ancienne version.
+- Icône : К cyrillique à empattements, rouge `#9E4A4A` sur noir `#0A0C0E` (valeurs de l'icône de Grafit), source unique
+  `scripts/icone.mjs` ; l'identifiant d'appli et la signature ne changent pas.
 
 - Lot 9a (0.9.0) : interface copiée de l'ancienne version (feuille de style d'origine, reprise telle quelle, plus une
   section Klad pour le verrou, les volets et les réglages). Écrans comparés un à un avec captures (hors dépôt) sur les

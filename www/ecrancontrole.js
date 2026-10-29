@@ -6,6 +6,19 @@
   const A = window.KladApp;
   const $ = id => document.getElementById(id);
 
+  // Import de l'ancienne version, d'un coup d'œil : un import incomplet se voit à ses compteurs à zéro.
+  function etatImport() {
+    const S = A.etat(), X = window.KladMigrations;
+    if (!S || !X) return '';
+    const e = X.etatImport(S);
+    if (!e.carnet) return '<p class="note">Import de l\'ancienne version : aucun carnet repris.</p>';
+    const pl = (n, s) => n + ' ' + s + (n > 1 ? 's' : '');
+    const manque = (e.reglesBaseCarnet > 0 && e.reglesBase === 0) || e.postes === 0;
+    return '<p class="' + (manque ? 'note bad-t' : 'muted small') + '" id="ctlImport">Import de l\'ancienne version : ' + pl(e.reglesBase, 'règle') + ' de base, ' +
+      pl(e.postes, 'poste') + ' de budget, ' + pl(e.mouvementsEquilibre, 'mouvement') + ' d\'équilibre, ' + pl(e.equipements, 'équipement') +
+      (manque ? ' : import incomplet.' : '.') + '</p>';
+  }
+
   function render() {
     $('controleCorps').innerHTML =
       '<p>Le relevé de contrôle reprend les chiffres affichés par Klad (comptes, reste à vivre, budget, commun, équilibre, contrats, ' +
@@ -13,6 +26,7 @@
       'automatique avec l\'ancienne version.</p>' +
       '<p class="note"><b>Fichier personnel en clair</b> (montants, libellés des opérations) : à supprimer après le contrôle. ' +
       'Il ne contient ni IBAN, ni clé, ni journal.</p>' +
+      etatImport() +
       '<p class="muted small">Synchronisez d\'abord, pour comparer les chiffres du jour.</p>' +
       '<button type="button" class="sh-go" data-ctl="exporter">Exporter le relevé de contrôle</button>';
   }

@@ -51,7 +51,7 @@ ni journal, ni identifiant bancaire. Une valeur que l'une des versions ne calcul
 | Clé | Contenu |
 |---|---|
 | `format`, `v`, `source` | `"klad-controle"`, `1`, `"klad"` ou `"carnet"` |
-| `meta` | `version`, `genere` (ISO), `aujourdhui`, `synchro` (par compte : `ref`, `libelle`, `lu`, `source`), `complement` (importé ou non), `derniereSynchro` |
+| `meta` | `version`, `genere` (ISO), `aujourdhui`, `synchro` (par compte : `ref`, `libelle`, `lu`, `source`), `complement` (importé ou non), `derniereSynchro`, `import` (depuis la 0.9.3 : `reglesBase`, `reglesBaseCarnet`, `postes`, `revenuPrevu`, `mouvementsEquilibre`, `equipements`, `migration` ; absent dans l'ancienne version) |
 | `comptes` | 1. par compte : `ref` (référence de la reprise `r0`, `r1`… ; `livret` pour le livret suivi), `libelle`, `role`, `solde` et `date`, `dette` (carte à débit différé) et `prelevement` (prochain) |
 | `resteAVivre` | 2. `fin` du cycle, colonnes `salaire` et `comptes` : `base`, `fixes`, `marge`, `variable`, `reste` (et `date` du salaire) |
 | `budget` | 3. `courant` et `precedent` : `debut`, `fin`, `salaire` (`date`, `montant`), `revenus` (`prevu`, `recu`), `sections` (`fixe`, `courante`, `optionnelle` : `budget`, `utilise`, `reste`), `horsBudget`, `total` (`budget`, `utilise`, `depassement`), `postes` (`cle` « f\|… » ou « c\|… », `section`, `budget`, `utilise`, `reste`) |
@@ -67,6 +67,9 @@ ni journal, ni identifiant bancaire. Une valeur que l'une des versions ne calcul
 Identifiants d'opérations : ceux de la reprise de l'ancienne version (`'k' + sha256(date|montant|compte|libellé[0..30])`,
 20 caractères hexadécimaux, `'.' + rang` parmi les lignes de même clé), sinon l'identifiant de Klad (opérations lues
 par la banque après la reprise) ; le comparateur apparie alors par date et montant.
+
+Un import incomplet de l'ancienne version se voit d'abord dans `meta.import` (règles de base à 0 alors que
+`reglesBaseCarnet` ne l'est pas, aucun poste de budget).
 
 Dans l'ancienne version, `null` pour : rôle, libellé et prochain prélèvement des comptes, date d'équilibre, échéances
 à 31 jours, intérêts du livret, prélèvements à rapprocher, comptes à vérifier, résumé Grafit (fonctions propres à Klad).

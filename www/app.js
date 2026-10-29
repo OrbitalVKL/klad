@@ -1048,6 +1048,19 @@
           bud = true;
         } catch (e) { log('err', 'Impôts : ' + (e.message || e)); }
       }
+      // 0.9.3 : données figées de l'ancienne version (« _payload » du fichier de reprise) qui n'avaient pas été lues.
+      if (window.KladMigrations && !window.KladMigrations.faite(s0) && s0.carnet != null) {
+        try {
+          const r = await window.KladMigrations.payload(s0, Date.now());
+          if (S !== s0) return;
+          if (r) {
+            log('ok', 'Réglages de l\'ancienne version complétés : ' + r.base + ' règle(s) de base, ' + r.categories + ' catégorie(s) ajoutée(s), ' + r.postes +
+              ' poste(s) de budget ajouté(s), ' + r.revprev + ' mois de revenu prévu, ' + r.eqops + ' mouvement(s) d\'équilibre, ' + r.ecartees + ' crédit(s) de règlement de carte retiré(s).');
+            if (r.change) toast('Mise à jour des réglages : classement, budget et équilibre complétés depuis l\'ancienne version.');
+            bud = true;
+          }
+        } catch (e) { log('err', 'Mise à jour des réglages : ' + (e.message || e)); }
+      }
       if (init || s0.classement || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }

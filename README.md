@@ -27,6 +27,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
+| `scripts/icone.mjs` | Source unique de l'icône (К rouge sur noir) : régénère les ressources Android ; le même tracé sert au logo de l'appli et du site. |
 | `.github/workflows/android.yml` | Demande de fusion : vérification légère (tests Node, parcours Chromium, compilation Java et tests JUnit). `main` : fabrication complète en un seul appel Gradle (tests JUnit, APK release, lint), signature, publication dans Releases quand la version change. Gradle en cache (`gradle/actions/setup-gradle`). |
 | `.github/workflows/pages.yml` | Publication du dossier `site/` sur GitHub Pages. |
 | `test/` | Tests sans réseau, données fictives (clé, JWT, centimes, modèle, dédoublonnage, frontière, reprise, réassociation, classement, carnet de l'ancienne version, synchro avec un faux client, migration 0.2, blocs chiffrés, phrase, sauvegarde, rendu, résumé Grafit, réglages Android) et parcours Chromium (`parcours.test.mjs`, sauté sans Playwright). `npm test`. Tests Java (coffre, lien Grafit) : `android/app/src/test` (`./gradlew testDebugUnitTest`). |
@@ -81,6 +82,12 @@ Le nom du dépôt vient de `GITHUB_REPOSITORY` à la fabrication (ou `KLAD_REPO`
   `{ cat, sub }`) et `vue` (`true` vue, `0` remise en non vue, sinon d'après la date de départ `modele.vues.depuis`).
 - **Événement « données changées »** (`KladModele.surChangement`) : émis après une synchro, un import, un réglage ou une connexion, regroupé sur 300 ms ; le résumé Grafit s'y abonne.
 - **Migration 0.2 → 0.3** : au premier déverrouillage, les données 0.2 sont converties, écrites, relues et comparées ; l'ancien format n'est supprimé qu'ensuite. En cas d'échec, rien n'est effacé et la conversion est retentée au déverrouillage suivant.
+- **Migration 0.9.3** (`www/migrations.js`) : au premier déverrouillage, ce qui manquait de l'import de l'ancienne
+  version jusqu'à la 0.9.2 (`_payload` non lu) est complété : règles de base et catégories absentes, postes de budget et
+  mois de revenu prévu absents (rien de ce qui a été modifié dans Klad n'est écrasé), crédits de règlement des cartes
+  retirés ; puis reclassement, calculs et résumé Grafit refaits. Idempotente (marque `modele.migrations.payload`),
+  réversible (état d'avant gardé), testée en sautant des versions. *Plus › Contrôle* affiche l'état de l'import
+  (règles de base, postes de budget, mouvements d'équilibre) pour repérer un import incomplet.
 
 ### Import de la reprise (format `klad-reprise` v1)
 
@@ -101,7 +108,9 @@ Fichier JSON produit hors du dépôt depuis l'ancienne version, choisi par *Plus
 - **Rejouable** : un nouvel import remplace toutes les opérations de reprise. Un compte repris au dernier import et
   « ignoré » cette fois est signalé avant confirmation (ses opérations de reprise vont disparaître) ; s'il est bancaire,
   Klad propose de relire tout son historique bancaire à la synchro suivante.
-- **Carnet** : s'il contient de quoi classer, le classement est repris tout de suite (voir ci-dessous).
+- **Carnet** : s'il contient de quoi classer, le classement est repris tout de suite (voir ci-dessous). Les données figées
+  de l'ancienne version (règles de base, budgets par défaut, revenu prévu, mouvements et équipements de l'équilibre) sont
+  lues sous `P`, `payload` ou `_payload` (forme du fichier de reprise).
 - Fichier refusé avec un message qui ne cite que des numéros (« opération n° 12 : montant non entier »).
 
 ### Classement des opérations (0.5)
@@ -130,6 +139,9 @@ reprises du carnet de l'ancienne version ou créées dans Klad (bloc chiffré `c
   prélèvement (sans rattachement : sur un compte courant ou commun), hors remboursements (motif facultatif) ; jamais
   négative. Accueil : « à prélever le JJ/MM » (jour du prélèvement) ; le total des comptes courants déduit la dette.
   Date de dépense : date de paiement lue dans le libellé (« CARTE JJ/MM … », « PAIEMENT CB JJMM … »), affichée dans le détail.
+  Crédits de règlement sur la carte ou le portefeuille (« prélèvement automatique … merci », « paiement reçu ») : écartés
+  à l'import, comme dans l'ancienne version, selon le motif « remboursements » de la fiche du compte (pré-rempli par le
+  complément) ; sans motif, rien n'est écarté.
 - **Réassociation manuelle** (*Plus › Comptes*, compte « à réassocier ») : un compte bancaire disponible est fusionné dans
   le compte : opérations (identifiants refaits, sans doublon), soldes et source bancaire.
 
@@ -253,8 +265,10 @@ d'impôt, bulletins de paie déjà lus, hypothèses, logement, plan d'épargne e
 - **Données propres au propriétaire** (jamais dans le code) : pastilles de banques (`klad.pastilles`), couleurs de
   catégories (`klad.couleurs`), nom de la résidence et du syndic (`klad.appels.titre`, `klad.appels.syndic`) dans le
   complément.
-- **Icône** adaptative (К doré sur bleu nuit, monochrome pour les icônes à thème d'Android 13 et plus) et écran de
-  démarrage assorti.
+- **Icône** (0.9.3) : К cyrillique à empattements, bras courbe terminé par une goutte, rouge sur noir (couleurs de
+  l'icône de Grafit) ; icône adaptative (avant-plan, fond, monochrome pour les icônes à thème d'Android 13 et plus),
+  ronde, écran de démarrage, logo de l'appli (verrou, masque) et du site. Source unique : `scripts/icone.mjs`.
+  L'identifiant d'appli et la signature ne changent pas.
 
 ### Relevé de contrôle (0.9.1)
 
