@@ -502,15 +502,43 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.ref), refAvant);
     await page.locator('#budget-main [data-bmode="suivi"]').click();
-    // thème : bouton de l'en-tête (Auto → Clair → Sombre) et volet Affichage
+    // thème : bouton de l'en-tête (Auto → Clair → Sombre) et volet Affichage ; couleur réellement affichée, téléphone
+    // en thème sombre puis clair ; barres Android (faux plugin) accordées au thème affiché
+    const fond = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    const CLAIR = 'rgb(243, 245, 242)', SOMBRE = 'rgb(12, 15, 14)';
+    await page.evaluate(() => { window.KladFauxBarres = []; window.Capacitor = window.Capacitor || {};
+      window.Capacitor.Plugins = Object.assign(window.Capacitor.Plugins || {}, { KladAffichage: { async appliquer(o) { window.KladFauxBarres.push(o); return { ok: true }; } } }); });
+    for (const tel of ['dark', 'light']) {
+      await page.emulateMedia({ colorScheme: tel });
+      await plusVers('secAffichage');
+      for (const [choix, attendu] of [['clair', CLAIR], ['sombre', SOMBRE], ['auto', tel === 'dark' ? SOMBRE : CLAIR]]) {
+        await page.locator('#affichageCorps [data-theme-choix="' + choix + '"]').click();
+        assert.equal(await fond(), attendu, 'téléphone ' + tel + ', thème ' + choix);
+        assert.equal(await page.evaluate(() => document.querySelector('meta[name="color-scheme"]').content), choix === 'auto' ? 'light dark' : choix === 'clair' ? 'light' : 'dark');
+        const b = await page.evaluate(() => window.KladFauxBarres[window.KladFauxBarres.length - 1]);
+        assert.deepEqual([b.sombre, b.fond], [attendu === SOMBRE, attendu === SOMBRE ? '#0c0f0e' : '#f3f5f2']);
+      }
+      await page.locator('#volet [data-fermer]').last().click();
+    }
     await page.locator('#ah-theme').click();
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'clair');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
     await page.locator('#ah-theme').click();
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'sombre');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
     await capture(page, '20-theme-sombre');
+    // choix gardé et appliqué dès le démarrage, avant la feuille de style (pas de flash) : téléphone clair, thème sombre
+    assert.equal(await page.evaluate(() => localStorage.getItem('klad.theme')), 'sombre');
+    const tete = fs.readFileSync(new URL('../www/index.html', import.meta.url), 'utf8').split('</head>')[0];
+    assert.ok(/<script src="theme\.js"><\/script>\s*<link rel="stylesheet" href="style\.css">/.test(tete), 'theme.js synchrone, avant la feuille de style');
+    const p2 = await browser.newPage({ colorScheme: 'light' });
+    await p2.addInitScript(() => { try { localStorage.setItem('klad.theme', 'sombre'); } catch (e) { /* page vide */ } });
+    await p2.goto(base + 'index.html', { waitUntil: 'domcontentloaded' });
+    assert.equal(await p2.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    assert.equal(await p2.evaluate(() => getComputedStyle(document.body).backgroundColor), SOMBRE);
+    await p2.close();
     await plusVers('secAffichage');
     await page.locator('#affichageCorps [data-theme-choix="auto"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme || 'auto'), 'auto');
+    await page.emulateMedia({ colorScheme: 'light' });
     const tot0 = await page.locator('#budget-main tr.g-fixe .gsum').first().textContent();
     await page.locator('#affichageCorps [data-demo="on"]').click();
     await page.locator('#app-tb [data-tab="budget"]').click();
@@ -631,6 +659,103 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => JSON.stringify(window.KladApp.etat().budget.appels || null)), apAvant);
+
+    // 0.9.4 : prélèvement de portefeuille « à rapprocher » marqué interne → reste visible (filtre « Internes »),
+    // mention dans le détail, « Annuler : compter en dépense » (annulable) → de nouveau à rapprocher
+    const jourAvant = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+    await page.evaluate(([d1, d2]) => {
+      const S = window.KladApp.etat(), M = window.KladModele;
+      const w = M.nouveauCompte(S, { libelle: 'PORTEFEUILLE', role: 'paiement_en_ligne' });
+      w.prelevement = { motif: 'PORTEFEUILLE FICTIF' };
+      M.opsDe(S, w.id).push(M.nouvelleOp(w.id, { id: w.id + ':m:1', date: d1, montant: -1299, libelle: 'MARCHAND EN LIGNE FICTIF', statut: 'comptabilisee' }, 'manuel', d1));
+      const c = S.modele.comptes.find(x => x.role === 'courant');
+      M.opsDe(S, c.id).push(M.nouvelleOp(c.id, { id: c.id + ':m:rap', date: d2, montant: -4500, libelle: 'PRLV PORTEFEUILLE FICTIF', statut: 'comptabilisee' }, 'manuel', d2));
+      S.ops[c.id].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      window.KladApp.changed('classement');
+    }, [jourAvant(10), jourAvant(8)]);
+    const ligneRap = page.locator('#tx tr.txr[data-op$=":m:rap"]');
+    await page.evaluate(() => window.KladApp.versOps({ cat: '__rap' }));
+    await ligneRap.locator('.tl').click();
+    await page.locator('#opDetail [data-a="interne"]').click();
+    await page.waitForSelector('#toast.show.action');
+    assert.match(await page.locator('#toast').innerText(), /reste dans la liste, filtre « Internes »/);
+    assert.equal(await page.locator('#app-chips [data-f="int"]').getAttribute('aria-pressed'), 'true');
+    assert.match(await ligneRap.innerText(), /Virements internes[\s\S]*interne \(à la main\)/);
+    await ligneRap.locator('.tl').click();
+    assert.match(await page.locator('#opDetail').innerText(), /Interne\s*marquée interne à la main : pas comptée dans le budget/);
+    await page.waitForFunction(() => !document.getElementById('toast').classList.contains('show'), null, { timeout: 15000 });
+    await page.locator('#opDetail [data-a="depense"]').click();
+    await page.waitForSelector('#toast.show.action');
+    assert.match(await page.locator('#toast').innerText(), /revient dans « À vérifier »/);
+    const etatRap = () => page.evaluate(() => { const S = window.KladApp.etat(), c = S.modele.comptes.find(x => x.role === 'courant');
+      const o = S.ops[c.id].find(x => x.id === c.id + ':m:rap'), cx = window.KladApp.ctx(); return [window.KladClasse.classer(cx, o).type, !!window.KladClasse.aRapprocher(cx, o)]; });
+    assert.deepEqual(await etatRap(), ['depense', true]);
+    await page.locator('#toast button').click();                     // annuler l'annulation : de nouveau interne
+    await page.waitForTimeout(100);
+    assert.deepEqual(await etatRap(), ['interne', false]);
+    // les règlements comptés internes automatiquement sont aussi dans le filtre « Internes »
+    await page.locator('#app-tb [data-tab="budget"]').click();
+    await page.locator('#app-tb [data-tab="operations"]').click();
+    await page.locator('#app-chips [data-f="toutes"]').click();
+    await page.locator('#app-chips [data-f="int"]').click();
+    assert.match(await page.locator('#tx').innerText(), /CARTE FICTIVE[\s\S]*interne/);
+    assert.equal(await ligneRap.count(), 1);
+    await page.locator('#app-chips [data-f="int"]').click();
+
+    // 0.9.4 : période des opérations (raccourcis, personnalisée), combinée avec la recherche ; pastille effaçable ;
+    // totaux débit / crédit de la sélection ; gardée en changeant d'onglet
+    const dates = () => page.$$eval('#tx tr.txr', trs => trs.map(t => t.dataset.op));
+    const totalAttendu = () => page.evaluate(() => {
+      const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx tr.txr')].map(t => t.dataset.op));
+      let d = 0, c = 0; for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) if (ids.has(o.id)) { if (o.montant < 0) d -= o.montant; else c += o.montant; }
+      return [ids.size, window.KladFormat.montant(d), window.KladFormat.montant(c)]; });
+    const toutAffiche = async () => { while (await page.locator('#tx-suite [data-suite]').count()) await page.locator('#tx-suite [data-suite]').click(); };
+    await page.selectOption('#opsPer', '30j');
+    assert.equal(await page.locator('#ops-pastille').isVisible(), true);
+    assert.match(await page.locator('#ops-pastille').innerText(), /30 derniers jours/);
+    assert.match(await page.locator('#ah-e').innerText(), /30 derniers jours/);
+    await toutAffiche();
+    const ops30 = await page.evaluate(() => { const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx tr.txr')].map(t => t.dataset.op)), out = [];
+      for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) if (ids.has(o.id)) out.push(o.date); return out; });
+    assert.ok(ops30.length > 0 && ops30.every(d => d >= jourAvant(29)), 'dates dans les 30 jours');
+    let [n, deb, cre] = await totalAttendu();
+    let tot = await page.locator('#ops-tot').innerText();
+    assert.ok(tot.includes(n + ' opération') && tot.includes(deb) && tot.includes(cre), tot);
+    assert.doesNotMatch(tot, /[−-]\s?\d/);
+    // combinée avec la recherche
+    await page.locator('#ah-search').click();
+    await page.fill('#q', 'SUPERMARCHE');
+    await page.locator('#q').dispatchEvent('input');
+    await page.waitForTimeout(400);
+    const txt = await page.locator('#tx').innerText();
+    assert.ok(/SUPERMARCHE/.test(txt) && !/SALAIRE|LIBRAIRIE/.test(txt), txt);
+    [n, deb, cre] = await totalAttendu();
+    tot = await page.locator('#ops-tot').innerText();
+    assert.ok(tot.includes(n + ' opération') && tot.includes(deb), tot);
+    await page.locator('#ah-search').click();
+    // gardée en changeant d'onglet
+    await page.locator('#app-tb [data-tab="budget"]').click();
+    await page.locator('#app-tb [data-tab="operations"]').click();
+    assert.equal(await page.locator('#opsPer').inputValue(), '30j');
+    // cycle précédent, puis personnalisé (sélecteur de dates), puis croix : toute période
+    await page.selectOption('#opsPer', 'cycleP');
+    assert.match(await page.locator('#ops-pastille').innerText(), /Cycle précédent : \d\d\/\d\d → \d\d\/\d\d/);
+    await page.selectOption('#opsPer', 'perso');
+    assert.equal(await page.locator('#ops-perso').isVisible(), true);
+    await page.fill('#opsDu', jourAvant(20));
+    await page.locator('#opsDu').dispatchEvent('change');
+    await page.fill('#opsAu', jourAvant(5));
+    await page.locator('#opsAu').dispatchEvent('change');
+    assert.match(await page.locator('#ops-pastille').innerText(), /Du \d\d\/\d\d(\/\d\d)? au \d\d\/\d\d\/\d\d/);
+    await toutAffiche();
+    const opsP = await page.evaluate(() => { const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx tr.txr')].map(t => t.dataset.op)), out = [];
+      for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) if (ids.has(o.id)) out.push(o.date); return out; });
+    assert.ok(opsP.length > 0 && opsP.every(d => d >= jourAvant(20) && d <= jourAvant(5)));
+    await page.locator('#ops-pastille [data-per-effacer]').click();
+    assert.equal(await page.locator('#ops-pastille').isVisible(), false);
+    assert.equal(await page.locator('#opsPer').inputValue(), 'tout');
+    assert.ok((await dates()).length >= opsP.length);
+    assert.ok(!(await page.evaluate(() => JSON.stringify(localStorage))).includes('30j'), 'période non gardée au redémarrage');
 
     // Grafit : month et upcoming
     await plusVers('secModules');

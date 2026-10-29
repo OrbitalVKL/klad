@@ -161,12 +161,12 @@
         if (per) e = per.cyc ? 'Cycle du ' + U.jjmm(per.cyc.start) + ' au ' + U.jjmm(per.cyc.end) : U.mLabel(per.pm0);
         if (per && per.past) e += ' · terminé'; } catch (x) { e = ''; }
     } else if (S && vue === 'operations') {
-      e = (periode().from ? 'Depuis ' + U.mLabel(periode().from) : 'Toutes') + ' · ' + (scope === 'commun' ? 'Commun' : 'Perso');
+      e = (perOps.k === 'tout' ? 'Toutes' : bornesOps().libelle) + ' · ' + (scope === 'commun' ? 'Commun' : 'Perso');
     }
     $('ah-e').textContent = e;
     $('ah-search').hidden = vue !== 'operations';
     const t = AF.theme();
-    const sombre = t === 'sombre' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    const sombre = AF.sombre(t);
     $('ah-theme').textContent = sombre ? '☾' : '☀';
     $('ah-theme').title = 'Thème : ' + (t === 'sombre' ? 'sombre' : t === 'clair' ? 'clair' : 'automatique (réglage du téléphone)') + ' — toucher pour changer';
     renderPastille();
@@ -180,6 +180,8 @@
     rendus.forEach(fn => { try { fn({ theme: true }); } catch (e) { /* rendu suivant */ } });
     return n;
   }
+  // automatique : le téléphone a changé de thème, appli ouverte (graphiques et icône du thème redessinés)
+  AF.surTheme = () => { if (!S) return; chrome(); rendus.forEach(fn => { try { fn({ theme: true }); } catch (e) { /* rendu suivant */ } }); };
   $('ah-theme').addEventListener('click', () => { const n = changerTheme(); toast('Thème : ' + (n === 'auto' ? 'automatique' : n) + '.'); });
   $('app-tb').addEventListener('click', ev => {
     const b = ev.target.closest('[data-tab]');
@@ -319,7 +321,7 @@
   function renderPlus() {
     const it = (ic, t, s2, attr) => '<button type="button" class="sh-li" ' + attr + '><span class="ic" aria-hidden="true">' + ic + '</span><span>' + esc(t) + (s2 ? '<small>' + esc(s2) + '</small>' : '') + '</span><span class="r" aria-hidden="true">›</span></button>';
     const t = AF.theme();
-    const sombre = t === 'sombre' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    const sombre = AF.sombre(t);
     const d = S.modele.sync.derniere;
     const n = Object.keys(S.modele.connexions).length, c = S.modele.comptes.length, r = S.modele.reprise;
     const nObs = (() => { try { const B = budget(); return B && window.KladObservations ? window.KladObservations.observations(B, 'perso').faire.length : 0; } catch (e) { return 0; } })();
@@ -425,6 +427,7 @@
   const AV = { comptes: 'secComptes', banques: 'secBanques', sync: 'secSync', maj: 'secMaj', observations: 'secObs' };
   function versOps(f) {
     Object.assign(filtre, { compte: '', cat: '', nonVues: false }, f || {});
+    perOps.k = 'tout';                // depuis l'accueil : toutes les opérations (les compteurs portent sur tout)
     $('q').value = '';
     opsFin = 0;
     montrer('operations', { rendre: false, haut: true });
@@ -451,6 +454,9 @@
   // ------------------------------------------------------------ opérations (liste par jour, recherche, filtres)
   const filtre = { compte: '', q: '', cat: '', nonVues: false };
   let opsListe = [], opsFin = 0;
+  // Période des opérations : gardée tant que l'appli reste ouverte (« Toute période » au démarrage).
+  const perOps = { k: 'tout', du: '', au: '' };
+  const bornesOps = () => Vu.bornesPeriode(perOps.k, M.jourLocal(Date.now()), budget(), scope, perOps.du, perOps.au);
   function renderOps(reset) {
     if (!S) return;
     if (reset) {
@@ -458,15 +464,25 @@
       filtre.q = $('q').value.trim(); filtre.scope = scope;
       if (filtre.compte && !M.compte(S, filtre.compte)) filtre.compte = '';
       if (filtre.cat && filtre.cat[0] !== '_' && !cx.C.categories[filtre.cat]) filtre.cat = '';
-      filtre.depuis = periode().from ? periode().from + '-01' : '';
+      const bp = bornesOps();
+      filtre.du = bp.du; filtre.au = bp.au; filtre.per = perOps.k;
       opsListe = Vu.filtrer(S, filtre, cx);
       opsFin = 0;
       const base = Object.assign({}, filtre, { cat: '', nonVues: false });
       const unseen = Vu.filtrer(S, Object.assign({}, base, { nonVues: true }), cx).length;
       const nc = Vu.filtrer(S, Object.assign({}, base, { cat: '__nc' }), cx).length;
-      $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
+      const int = Vu.filtrer(S, Object.assign({}, base, { cat: '__int' }), cx).length;
+      $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
+      $('ops-perso').hidden = perOps.k !== 'perso';
+      if (perOps.k === 'perso') { $('opsDu').value = perOps.du; $('opsAu').value = perOps.au; }
+      $('ops-pastille').hidden = perOps.k === 'tout';
+      $('ops-pastille').innerHTML = perOps.k === 'tout' ? '' : '<span class="per-pill"><span>' + Vu.esc(bp.libelle) + '</span><button type="button" data-per-effacer aria-label="Effacer la période">×</button></span>';
+      const T = Vu.totaux(opsListe);
+      $('ops-tot').hidden = !opsListe.length;
+      $('ops-tot').innerHTML = opsListe.length ? '<span>' + T.n + ' opération' + (T.n > 1 ? 's' : '') + '</span><span>Débit <b class="num">' + Vu.esc(F.montant(T.debit)) +
+        '</b></span><span>Crédit <b class="num">' + Vu.esc(F.montant(T.credit)) + '</b></span>' : '';
       $('tx').innerHTML = opsListe.length ? '' : '<tr><td colspan="3" class="muted" style="padding:14px 16px">' +
-        (filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</td></tr>';
+        (filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte || perOps.k !== 'tout' ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</td></tr>';
       $('tx-suite').innerHTML = '';
       if (opsListe.length) plus(30);
       chrome();
@@ -497,6 +513,7 @@
     else if (f === 'nonVues') filtre.nonVues = !filtre.nonVues;
     else if (f === 'nc') filtre.cat = filtre.cat === '__nc' ? '' : '__nc';
     else if (f === 'rap') filtre.cat = '';
+    else if (f === 'int') filtre.cat = filtre.cat === '__int' ? '' : '__int';
     else if (f === 'toutVu') {
       const l = opsListe.filter(o => !KC.vue(S, o));
       const avant = KC.marquer(S, l, true);
@@ -511,7 +528,15 @@
   $('app-chips').addEventListener('change', ev => {
     if (ev.target.id === 'opsCat') filtre.cat = ev.target.value;
     else if (ev.target.id === 'opsCompte') filtre.compte = ev.target.value;
+    else if (ev.target.id === 'opsPer') perOps.k = ev.target.value;
     else return;
+    opsFin = 0; renderOps(true);
+  });
+  // Période personnalisée (sélecteur de dates du téléphone) et pastille de la période (croix : toute période).
+  $('ops-perso').addEventListener('change', () => { perOps.du = $('opsDu').value; perOps.au = $('opsAu').value; opsFin = 0; renderOps(true); });
+  $('ops-pastille').addEventListener('click', ev => {
+    if (!ev.target.closest('[data-per-effacer]')) return;
+    perOps.k = 'tout'; perOps.du = ''; perOps.au = '';
     opsFin = 0; renderOps(true);
   });
   window.addEventListener('scroll', () => {
@@ -596,8 +621,19 @@
       const snap = KC.marquerInterne(ctx(), o, w);
       log('info', 'Prélèvement de portefeuille rapproché à la main.');
       fermerVolet();
+      const venu = filtre.cat === '__rap';
+      if (venu) filtre.cat = '__int';          // elle reste sous les yeux : filtre « Internes »
       changed('classement');
-      toastAnnuler('Prélèvement marqué interne (réglé par ' + w.libelle + ').', () => { KC.annulerInterne(snap); changed('classement'); });
+      toastAnnuler('Prélèvement marqué interne (réglé par ' + w.libelle + ')' + (venu ? ' : il reste dans la liste, filtre « Internes ».' : '.'),
+        () => { KC.annulerInterne(snap); if (venu && filtre.cat === '__int') filtre.cat = '__rap'; changed('classement'); });
+    } else if (b.dataset.a === 'depense') {
+      const o = trouverOp(opCourante[0], opCourante[1]);
+      const snap = o && KC.compterEnDepense(o);
+      if (!snap) return;
+      log('info', 'Opération remise en dépense (marquée interne à la main auparavant).');
+      fermerVolet();
+      changed('classement');
+      toastAnnuler('Opération comptée en dépense : elle revient dans « À vérifier ».', () => { KC.annulerInterne(snap); changed('classement'); });
     }
   });
 

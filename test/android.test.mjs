@@ -35,10 +35,10 @@ test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
     'update/KladUpdatePlugin.java', 'update/Maj.java', 'reseau/KladReseauPlugin.java', 'reseau/Adresse.java',
     'grafit/GrafitConfig.java', 'grafit/Appelant.java', 'grafit/Resume.java', 'grafit/Stockage.java', 'grafit/CleKeystore.java',
     'grafit/GrafitProvider.java', 'grafit/KladGrafitPlugin.java', 'mail/KladMailPlugin.java', 'mail/Reglages.java',
-    'mail/Criteres.java', 'mail/Lecture.java', 'mail/Erreurs.java'];
+    'mail/Criteres.java', 'mail/Lecture.java', 'mail/Erreurs.java', 'affichage/KladAffichagePlugin.java'];
   for (const f of files) {
     const x = read(JAVA + f);
-    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau|\.grafit|\.mail)?;/m, f);
+    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau|\.grafit|\.mail|\.affichage)?;/m, f);
     assert.doesNotMatch(x, /io\.github\./, f);
   }
   const main = read(JAVA + 'MainActivity.java');
@@ -48,6 +48,13 @@ test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
   assert.match(main, /registerPlugin\(KladReseauPlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladGrafitPlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladMailPlugin\.class\)/);
+  assert.match(main, /registerPlugin\(KladAffichagePlugin\.class\)/);
+  // thème : la WebView n'assombrit jamais la page d'elle-même ; barres Android accordées au thème de l'appli
+  assert.match(main, /setAlgorithmicDarkeningAllowed\(s, false\)/);
+  assert.match(main, /FORCE_DARK_OFF/);
+  const af = read(JAVA + 'affichage/KladAffichagePlugin.java');
+  assert.match(af, /setAppearanceLightStatusBars\(!sombre\)/);
+  assert.match(af, /setAppearanceLightNavigationBars\(!sombre\)/);
   // adresse IP pour l'en-tête Psu-Ip-Address : aucune requête vers un service tiers
   const r = read(JAVA + 'reseau/KladReseauPlugin.java') + read(JAVA + 'reseau/Adresse.java');
   assert.match(r, /NetworkInterface\.getNetworkInterfaces\(\)/);

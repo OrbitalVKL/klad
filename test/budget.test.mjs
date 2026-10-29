@@ -218,3 +218,46 @@ test('calculateur carburant : réglages du carnet, puis réglage annulable dans 
   assert.ok(!('carburant' in S.budget));
   assert.equal(KB.calculCarburant(ctx(S)).prevu, 9720);
 });
+
+test('opérations (0.9.4) : bornes des périodes, filtre combiné (période, recherche, internes), totaux, interne à la main annulable', () => {
+  const Vu = X.KladVues;
+  const { S } = etat();
+  const B = KB.contexte(S, NOW);
+  const b = (k, sc, du, au) => { const r = Vu.bornesPeriode(k, '2026-10-28', B, sc || 'perso', du, au); return [r.du, r.au]; };
+  assert.deepEqual(b('cycle'), ['2026-10-27', '2026-11-26']);
+  assert.deepEqual(b('cycleP'), ['2026-09-26', '2026-10-26']);
+  assert.deepEqual(b('cycle', 'commun'), ['2026-10-01', '2026-10-31']);
+  assert.deepEqual(b('mois'), ['2026-10-01', '2026-10-31']);
+  assert.deepEqual(b('moisP'), ['2026-09-01', '2026-09-30']);
+  assert.deepEqual(b('30j'), ['2026-09-29', '2026-10-28']);
+  assert.deepEqual(b('12m'), ['2025-11-01', '2026-10-28']);
+  assert.deepEqual(b('perso', 'perso', '2026-10-20', '2026-10-05'), ['2026-10-05', '2026-10-20']);
+  assert.deepEqual(b('perso', 'perso', 'n\'importe quoi', ''), ['', '']);
+  assert.deepEqual(b('tout'), ['', '']);
+  assert.match(Vu.bornesPeriode('cycleP', '2026-10-28', B, 'perso').libelle, /^Cycle précédent : 26\/09 → 26\/10$/);
+  // filtre combiné : période + recherche ; internes (règlement de carte détaillé, compté automatiquement)
+  const cx = B.cx;
+  const f = (o) => json(Vu.filtrer(S, Object.assign({ scope: 'perso', q: '', cat: '', nonVues: false }, o), cx).map(x => x.date + ' ' + x.libelle));
+  assert.deepEqual(f({ du: '2026-10-27', au: '2026-10-27', q: 'BAR' }), ['2026-10-27 CB BAR DU PORT']);
+  assert.deepEqual(f({ cat: '__int' }), ['2026-10-05 PRLV CARTE FICTIVE']);
+  assert.deepEqual(f({ cat: '__int', du: '2026-10-06' }), []);
+  const sel = Vu.filtrer(S, { scope: 'perso', du: '2026-10-27', au: '2026-10-28' }, cx);
+  const t = Vu.totaux(sel);
+  assert.equal(t.n, sel.length);
+  assert.equal(t.debit, sel.filter(o => o.montant < 0).reduce((s, o) => s - o.montant, 0));
+  assert.equal(t.credit, sel.filter(o => o.montant > 0).reduce((s, o) => s + o.montant, 0));
+  assert.ok(t.debit > 0 && t.credit > 0);
+  // interne à la main (ancienne forme comprise) : visible avec la mention, « compter en dépense » puis annuler
+  const o = S.ops[S.modele.comptes.find(c => c.libelle === 'COURANT').id].find(x => /ASSUR/.test(x.libelle));
+  o.categorie = { cat: 'Virements internes', sub: 'Règlement PORTEFEUILLE (rapproché à la main)' };
+  assert.equal(K.interneManuel(o), true);
+  const h = Vu.ligne(S, o, { ctx: K.contexte(S, NOW) }) + Vu.detail(S, o, K.contexte(S, NOW));
+  assert.match(h, /interne \(à la main\)/);
+  assert.match(h, /marquée interne à la main : pas comptée dans le budget/);
+  assert.match(h, /data-a="depense">Annuler : compter en dépense/);
+  const snap = K.compterEnDepense(o);
+  assert.equal(o.categorie, null);
+  assert.equal(K.compterEnDepense(o), null);
+  K.annulerInterne(snap);
+  assert.equal(K.interneManuel(o), true);
+});

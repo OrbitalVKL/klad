@@ -230,15 +230,26 @@
     return null;
   }
   // Marque un prélèvement de portefeuille comme réglé par ce portefeuille (interne). → instantané pour annuler.
+  // L'opération reste dans la liste, catégorie interne, non comptée ; « main » : marquée interne à la main.
   function marquerInterne(ctx, o, w) {
     const snap = { op: o, categorie: o.categorie, vue: o.vue };
-    o.categorie = { cat: ctx.D.interne.cat, sub: 'Règlement ' + ((w && w.libelle) || 'portefeuille') + ' (rapproché à la main)' };
+    o.categorie = { cat: ctx.D.interne.cat, sub: 'Règlement ' + ((w && w.libelle) || 'portefeuille') + ' (rapproché à la main)', main: true };
     if (!vue(ctx.S, o)) o.vue = true;
     return snap;
   }
   function annulerInterne(snap) {
     snap.op.categorie = snap.categorie;
     if (snap.vue === undefined) delete snap.op.vue; else snap.op.vue = snap.vue;
+  }
+  // Marquée interne à la main (depuis la 0.9.4 : « main » ; avant : sous-catégorie « … (rapproché à la main) »).
+  const interneManuel = o => !!(o.categorie && (o.categorie.main || / \(rapproché à la main\)$/.test(o.categorie.sub || '')));
+  // « Annuler : compter en dépense » : l'opération retrouve son classement (et « À vérifier » si elle est à
+  // rapprocher). → instantané pour annuler (annulerInterne).
+  function compterEnDepense(o) {
+    if (!interneManuel(o)) return null;
+    const snap = { op: o, categorie: o.categorie, vue: o.vue };
+    o.categorie = null;
+    return snap;
   }
 
   // ------------------------------------------------------------ opérations vues
@@ -508,7 +519,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, ICONES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    aRapprocher, marquerInterne, annulerInterne, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, concernees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, annulerInterne, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, concernees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,
     creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };
