@@ -5,13 +5,11 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.9.0** — Lot 9a : Klad reprend l'interface de l'ancienne version (Carnet v63–v65 sur téléphone) : mêmes couleurs,
-thèmes Auto / Clair / Sombre, polices libres embarquées, cartes, grande carte d'accueil, sections repliables mémorisées,
-puces, icônes de catégories, animations (coupées si « réduire les animations ») ; onglets Budget / Opérations / Commun /
-Plus. Fonctions reprises : tendance complète, parts du commun par poste, équilibre détaillé, estimation du livret sur sa
-carte, calculateur carburant, import Excel (.xlsx), calcul dans les champs de montant. Nouvelle icône adaptative (К) et
-logo du site. Alerte Grafit `OVERDRAFT_RISK` graduée. (0.8.1 : écarts comblés ; 0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ;
-0.6.0 — Lot 6.)
+**0.9.1** — relevé de contrôle (demandé comme « 0.8.2 », numéroté 0.9.1 car la 0.9.0 était déjà publiée) :
+Plus › Contrôle › « Exporter le relevé de contrôle » (format `klad-controle` v1) et outil public `tools/controle`
+(relevé calculé par l'ancienne version dans Chromium, comparaison point par point avec diagnostic des écarts).
+(0.9.0 — Lot 9a : interface de l'ancienne version, fonctions restantes, icône К, `OVERDRAFT_RISK` gradué ; 0.8.1 :
+écarts comblés ; 0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ; 0.6.0 — Lot 6.)
 
 ## Feuille de route
 
@@ -25,7 +23,8 @@ logo du site. Alerte Grafit `OVERDRAFT_RISK` graduée. (0.8.1 : écarts comblés
 | 7 | Module compte commun + équilibre ; Grafit : `commun` | 0.7 | fait |
 | 8 | Impôts, épargne salariale, taxe foncière, livret, observations, résultats, répartition | 0.8 | fait |
 | 9a | Interface identique à l'ancienne version, fonctions restantes, icône | 0.9.0 | fait |
-| 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.x | à faire |
+| — | Relevé de contrôle (export Klad, outil de comparaison avec l'ancienne version) | 0.9.1 | fait |
+| 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.2 | à faire (travail prêt sur une branche locale) |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Ce qui est fait (résumé)
@@ -57,6 +56,15 @@ logo du site. Alerte Grafit `OVERDRAFT_RISK` graduée. (0.8.1 : écarts comblés
   résidence et du syndic des appels de fonds : `klad.appels.titre`, `klad.appels.syndic`. Le livret saisi à la main
   s'ouvre sur Épargne depuis sa carte (le ✎ de l'ancienne version). Les sections « Résultats » et le volet « Reste à
   vivre » disparaissent : la v65 les affiche dans le suivi (période clôturée) et dans la carte dépliable.
+- Relevé de contrôle (0.9.1) : `www/controle.js` (`KladControle.construire(S, B, ctx, now, ext)`), écran
+  `www/ecrancontrole.js`, enregistrement par le sélecteur Android (`exportFile` avec type `application/json`).
+  Montants en centimes, références de comptes de la reprise (`r0`…, `livret`), identifiants d'opérations de la reprise
+  (après `:x:`) sinon de Klad ; opérations en cours comprises (comme le budget). Outil public `tools/controle`
+  (`carnet-controle.mjs`, `comparer.mjs`, mode d'emploi et format dans son README) : code seulement, aucune donnée ;
+  la page de l'ancienne version est lue par ses propres fonctions (repères de code, pas de ligne de données).
+  Vérifié en privé sur les données réelles (28/10, 15/10, 20/09) : points 2 à 7 identiques au centime ; restent les
+  deux écarts connus des observations (prélèvement de paiement en ligne sans correspondance, balance des 3 mois) et
+  trois titres d'observations formulés autrement (signalés « identiques au titre près »).
 - `OVERDRAFT_RISK` (Grafit) gradué : `crit` si le compte commun passe sous zéro dans les 31 jours (premier jour sous
   zéro de la trésorerie, ou fin du mois si les prélèvements à venir dépassent le solde), `caut` plus tard dans les
   12 mois, aucune alerte sinon (`KladCommun.risqueDecouvert`). Format du résumé inchangé.

@@ -71,6 +71,9 @@
 
   // Effacement du résumé : « Tout effacer », création d'un coffre (verrou.js).
   window.KladLienGrafit = {
+    // résumé tel qu'enregistré pour Grafit (relevé de contrôle), ou null
+    lire: async () => { if (!P || !P.lire) return null; const r = await P.lire(); try { return r && r.json ? JSON.parse(r.json) : null; } catch (e) { return null; } },
+    actif: () => { const S = A.etat(); return !!(S && R.actif(S)); },
     etiquette: () => { const S = A.etat(); return 'Lien Grafit ' + (S && R.actif(S) ? 'activé' : 'désactivé'); },
     effacer: () => lien.effacer(),
     demo: () => (P && P.contenu ? P.contenu() : undefined)
