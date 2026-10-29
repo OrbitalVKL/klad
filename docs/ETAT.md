@@ -35,7 +35,21 @@ Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` 
 | 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.2 | fait |
 | — | Correctif : import incomplet (`_payload`), migration, crédits de règlement de carte, icône rouge et noire | 0.9.3 | fait |
 | — | Retours d'usage : mode clair, opérations internes visibles, filtre de période des opérations | 0.9.4 | fait |
+| UX | Étude UX : audit, nouvelle organisation (2 variantes), maquette, plan (`docs/ux/`) ; aucun code de l'appli | — | fait, en attente de validation |
+| UX-1 → UX-7 | Socle lisible, Accueil, Opérations, Plus, Budget et Commun, Modules, rapidité et couleurs (`docs/ux/plan.md`) | 0.10.0 → 0.10.6 | après validation |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
+
+## Étude UX (docs/ux, en attente de validation du propriétaire)
+
+- `docs/ux/audit.md` : inventaire des écrans de la 0.9.4, tâches (appuis avant / après), heuristiques, accessibilité
+  (contrastes, 48 dp, texte à 130 %), performance (déverrouillage 0,9 s à CPU × 4 dans le navigateur), 25 problèmes
+  priorisés ; captures sur données fictives dans `docs/ux/captures/`.
+- `docs/ux/architecture.md` : variante A (Accueil, Opérations, Budget, Commun, Plus ; recommandée) et variante B
+  (4 onglets, commun dans Budget) ; Plus en 6 groupes ; place de chaque fonction.
+- `site/maquette/` : maquette cliquable (données fictives, variantes A / B, thème, palette Klad / Grafit, compteur d'appuis).
+- `docs/ux/plan.md` : 7 lots 0.10.0 → 0.10.6, sans changement de calcul ; parité par le relevé de contrôle ; migration
+  de `klad.replis` par table de correspondance.
+- Les scripts de mesure (Playwright) sont restés hors dépôt ; ils peuvent être recréés à partir de la méthode de l'audit.
 
 ## Ce qui est fait (résumé)
 
