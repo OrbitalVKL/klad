@@ -595,6 +595,39 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#app-tb [data-tab="plus"]').click();
     await page.locator('#plusCorps [data-vue="impots"]').click();
     assert.equal(await page.locator('#view-impots [data-lirebs]').count(), 0);
+    // Lot 9b : « Lire les mails » avec un faux plugin KladMail (aucun réseau) ; PDF fictif fabriqué par Chromium
+    const p0 = await browser.newPage();
+    await p0.setContent('<p>Appel exigible le 01/10/2026</p><p>Total appel copropriétaire 1 234,56</p>');
+    const pdfAppel = (await p0.pdf()).toString('base64');
+    await p0.close();
+    await page.evaluate(b64 => {
+      const S = window.KladApp.etat();
+      S.modele.extras.mail = { on: true, hote: 'imap.exemple.test', port: 993, adresse: 'moi@exemple.test', expediteurs: 'syndic.exemple.test', motsCles: 'appel' };
+      S.cle.mailMdp = 'abcdabcdabcdabcd';
+      window.KladFauxMail = [];
+      window.Capacitor = window.Capacitor || {};
+      window.Capacitor.Plugins = Object.assign(window.Capacitor.Plugins || {}, { KladMail: {
+        async tester(p) { window.KladFauxMail.push(p); return { ok: true, nb: 3 }; },
+        async chercher(p) {
+          window.KladFauxMail.push(p);
+          return { messages: [{ id: '<m1@exemple.test>', date: '2026-09-15T08:00:00Z', expediteur: 'gestion@syndic.exemple.test', sujet: 'Appel de fonds',
+            texte: 'Veuillez trouver ci-joint votre appel.', pieces: [{ nom: 'appel.pdf', type: 'application/pdf', taille: 900, base64: b64 }] }] };
+        } } });
+    }, pdfAppel);
+    const apAvant = await page.evaluate(() => JSON.stringify(window.KladApp.etat().budget.appels || null));
+    await page.evaluate(() => window.KladExtras.lireMails(document.createElement('button')));
+    await page.waitForSelector('#toast.show.action');
+    const ap = await page.evaluate(() => window.KladApp.etat().budget.appels);
+    assert.deepEqual(ap.mails['<m1@exemple.test>'], { mail: '2026-09-15', d: '2026-10-01', cp: 'H', kind: 'charges', fn: 'appel.pdf' });
+    assert.deepEqual(ap.pdfs.filter(x => x.name === 'appel.pdf').map(x => [x.cp, x.d, x.a]), [['H', '2026-10-01', 1234.56]]);
+    const fm = await page.evaluate(() => window.KladFauxMail);
+    assert.deepEqual([fm[0].adresse, fm[0].motDePasse, fm[0].expediteurs, fm[0].motsCles], ['moi@exemple.test', 'abcdabcdabcdabcd', ['syndic.exemple.test'], ['appel']]);
+    const jm = await page.evaluate(() => window.KladApp.etat().journal.log.join('\n'));
+    assert.match(jm, /Mails lus : 1 message\(s\) retenu\(s\), 1 appel\(s\) nouveau\(x\), 1 montant\(s\) lu\(s\)/);
+    for (const x of ['moi@exemple.test', 'abcdabcd', 'syndic.exemple', 'Appel de fonds']) assert.ok(!jm.includes(x), x);
+    await page.locator('#toast button').click();
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(() => JSON.stringify(window.KladApp.etat().budget.appels || null)), apAvant);
 
     // Grafit : month et upcoming
     await plusVers('secModules');

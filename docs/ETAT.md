@@ -5,11 +5,12 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.9.1** — relevé de contrôle (demandé comme « 0.8.2 », numéroté 0.9.1 car la 0.9.0 était déjà publiée) :
-Plus › Contrôle › « Exporter le relevé de contrôle » (format `klad-controle` v1) et outil public `tools/controle`
-(relevé calculé par l'ancienne version dans Chromium, comparaison point par point avec diagnostic des écarts).
-(0.9.0 — Lot 9a : interface de l'ancienne version, fonctions restantes, icône К, `OVERDRAFT_RISK` gradué ; 0.8.1 :
-écarts comblés ; 0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ; 0.6.0 — Lot 6.)
+**0.9.2** — Lot 9b : extras facultatifs, désactivés par défaut (Plus › Extras) : appels de fonds lus par mail (IMAP en
+lecture seule, Gmail par mot de passe d'application) ; Claude avec la clé saisie dans l'appli (bulletins de paie, avis
+d'impôt, appels de fonds en PDF, « Analyse de Claude » sur agrégats), aperçu de l'envoi et coût affichés.
+(0.9.1 : relevé de contrôle, demandé comme « 0.8.2 », numéroté 0.9.1 car la 0.9.0 était déjà publiée ; 0.9.0 — Lot 9a :
+interface de l'ancienne version, fonctions restantes, icône К, `OVERDRAFT_RISK` gradué ; 0.8.1 : écarts comblés ;
+0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ; 0.6.0 — Lot 6.)
 
 ## Feuille de route
 
@@ -24,7 +25,7 @@ Plus › Contrôle › « Exporter le relevé de contrôle » (format `klad-cont
 | 8 | Impôts, épargne salariale, taxe foncière, livret, observations, résultats, répartition | 0.8 | fait |
 | 9a | Interface identique à l'ancienne version, fonctions restantes, icône | 0.9.0 | fait |
 | — | Relevé de contrôle (export Klad, outil de comparaison avec l'ancienne version) | 0.9.1 | fait |
-| 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.2 | à faire (travail prêt sur une branche locale) |
+| 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.2 | fait |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Ce qui est fait (résumé)
@@ -70,7 +71,7 @@ Plus › Contrôle › « Exporter le relevé de contrôle » (format `klad-cont
   12 mois, aucune alerte sinon (`KladCommun.risqueDecouvert`). Format du résumé inchangé.
 - La clé Claude et le mot de passe de messagerie (Lot 9b) ne passent jamais par les secrets GitHub : saisis dans
   l'appli, chiffrés dans le coffre comme la clé Enable Banking.
-- Lot 9b (0.9.1) : extras dans Plus › Extras, désactivés par défaut ; désactivé, un extra n'affiche aucun bouton.
+- Lot 9b (0.9.2) : extras dans Plus › Extras, désactivés par défaut ; désactivé, un extra n'affiche aucun bouton.
   Réglages non secrets dans `S.modele.extras` (`mail` : hôte, port, adresse, expéditeurs, mots-clés, jours, dernière
   lecture ; `claude` : modèle) ; secrets dans `S.cle.mailMdp` et `S.cle.claude` (bloc `cle`, chiffré, compris dans la
   sauvegarde). Mail : plugin natif `KladMail` (Angus Mail, IMAPS seulement, dossier ouvert en lecture seule, PDF
@@ -134,8 +135,8 @@ livret sur sa carte ; calculateur carburant ; import Excel (.xlsx, lecteur embar
 imports manuels » ; calcul dans les champs de montant (« 29,99+64 ») ; libellés et titres de la v65.
 
 Restent :
-- Avec clé ou réglage personnel (Lot 9b, extras désactivés par défaut) : lecture des bulletins de paie et des avis
-  (l'ancienne version passait par Drive et Claude), appels de fonds par mail, « Analyse de Claude ».
+- Repris en 0.9.2 (extras désactivés par défaut, à activer par le propriétaire) : lecture des bulletins de paie et des
+  avis par Claude (l'ancienne version passait par Drive et Claude), appels de fonds par mail, « Analyse de Claude ».
 - Observations : mêmes règles, 18 points de chaque côté sur les données réelles ; titres formés avec les libellés des
   contrats et des comptes de Klad (« Eau (…) : prélèvement absent ») là où l'ancienne version avait des titres écrits à la
   main ; deux écarts de calcul connus (un prélèvement de paiement en ligne sans correspondance → « détaillé en partie », et la balance
@@ -143,7 +144,18 @@ Restent :
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
 
-## Points d'appui pour le Lot 9b
+## Points d'appui pour le Lot 9c (1.0.0, à publier seulement après « recette OK »)
+
+- Complément et carnet en réglages ordinaires : aujourd'hui lus dans `S.carnet` (racine `KladBudget.racine`), sous-objets
+  `klad.*` du complément (`klad.mail`, `appels.titre`, `appels.syndic`, pastilles…) ; réglages saisis dans Klad dans
+  `S.modele.extras` et `S.budget`. Priorité actuelle : complément < réglages de Klad.
+- Sauvegarde : tous les blocs sauf le journal (bloc `cle` compris : clé Enable Banking, clé Claude, mot de passe
+  d'application) ; à vérifier par un export puis une restauration complète sur un téléphone vierge.
+- Relevé de contrôle (`tools/controle`) : à rejouer après chaque changement de calcul.
+- Bascule : arrêt des scripts Google de l'ancienne version, archivage de l'ancienne version, retrait de l'ancienne adresse
+  de retour chez Enable Banking (liste à remettre au propriétaire, rien à faire dans le code).
+
+## Points d'appui pour le Lot 9b (historique)
 
 - Interface : `KladUI` (format, pastilles, sections repliables, préférences, graduation des axes, calcul) ; écrans
   `KladVues*` (rendu) et `ecran*.js` (événements) ; volets dans `#rangement` ouverts par `KladApp.ouvrirVolet(id)`.
