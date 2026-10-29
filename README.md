@@ -19,7 +19,9 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 
 | Élément | Rôle |
 |---|---|
-| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `budget.js` = budget par cycle, reste à vivre, contrats, échéances, tendance (calculs), `commun.js` = compte commun (virements, trésorerie, appels de fonds, équilibre), `vbudget.js` = rendu de l'onglet Budget, `vcommun.js` = rendu du compte commun et de l'équilibre, `fisc.js` = impôt du foyer, taxe foncière, PEE, livret, `observations.js` = observations, résultats d'une période, répartition, `vfisc.js` et `ecranfisc.js` = écrans Impôts, Épargne, Observations, Résultats, `ecranbudget.js` = onglet Budget (navigation, édition), `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `vues.js` = rendu de l'accueil (« À vérifier »), des opérations, du détail et du volet « Classer », `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
+| `www/` | Interface (HTML/CSS/JS sans outil d'assemblage), intégrée à l'APK. `eb.js` = client Enable Banking, `anon.js` = anonymisation du journal, `format.js` = montants et dates à l'écran, `modele.js` = modèle de données (comptes, opérations, soldes, dédoublonnage, blocs, migration 0.2), `reprise.js` = import de la reprise, `classement.js` = classement des opérations (catégories, règles, corrections, opérations vues, dette de carte, paiements en ligne), `carnet.js` = classement repris du carnet de l'ancienne version, `budget.js` = budget par cycle, reste à vivre, contrats, échéances, tendance (calculs), `commun.js` = compte commun (virements, trésorerie, appels de fonds, équilibre), `vbudget.js` = rendu de l'onglet Budget, `vcommun.js` = rendu du compte commun et de l'équilibre, `fisc.js` = impôt du foyer, taxe foncière, PEE, livret, `observations.js` = observations, résultats d'une période, répartition, `vfisc.js` et `ecranfisc.js` = écrans Impôts, Épargne, Observations, Résultats, `ecranbudget.js` = onglet Budget (navigation, édition), `sync.js` = récupération automatique, `coffre.js` = chiffrement des blocs, phrase de récupération, sauvegarde, chargement et migrations, `verrou.js` = verrou, premier lancement, sécurité, `maj.js` = mise à jour depuis l'appli, `ui.js` = interface commune (format des montants, pastilles de banques et de catégories, sections repliables mémorisées, préférences d'affichage, graduation des axes, calcul dans les champs de montant), `vues.js` = rendu de l'accueil (grande carte, cartes des comptes, « À voir », « À vérifier »), des opérations, du détail, du volet « Classer » et des relevés, `app.js` = coquille (onglets, volets, synchro, banques et accès, filtres, gestes, « Classer »), `plus.js` = comptes (carte, portefeuille, réassociation), import de reprise et réglages du classement, `resume.js` = résumé lu par Grafit (construction, écritures limitées aux changements), `grafit.js` = réglage « Lien Grafit ». |
+| `www/style.css`, `www/polices/` | Apparence de l'ancienne version (Carnet v63–v65 sur téléphone), thèmes Auto / Clair / Sombre ; polices libres (Schibsted Grotesk, JetBrains Mono, licence OFL) embarquées, jamais chargées d'Internet. |
+| `www/xlsx.js` | Lecture des classeurs Excel (.xlsx) pour l'import manuel d'un relevé (`releve.js`), sans bibliothèque ni réseau : ZIP lu à la main (entrées stockées ou compressées, décompression native), chaînes partagées, texte riche, formats de date (base 1900 et 1904). Refuse proprement les anciens .xls, les classeurs chiffrés ou binaires (.xlsb) ; tailles limitées contre les bombes ZIP. |
 | `android/` | Projet Android versionné. Code Java dans le package fixe `app.klad` : `MainActivity` (FLAG_SECURE) et les plugins locaux `vault/KladVaultPlugin` (coffre), `update/KladUpdatePlugin` (mise à jour), `reseau/KladReseauPlugin` (adresse IP du téléphone pour l'en-tête « utilisateur présent ») et `grafit/` (lien Grafit : `GrafitProvider`, plugin `KladGrafitPlugin`, contrôle de l'appelant `Appelant`, configuration `GrafitConfig`). |
 | `site/` | Site GitHub Pages : présentation et `retour.html` (retour bancaire → `klad://eb?code=…&state=…`). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
@@ -235,6 +237,24 @@ d'impôt, bulletins de paie déjà lus, hypothèses, logement, plan d'épargne e
   paiement en ligne, selon le rôle du compte ; lecture de l'ancienne version) ou JSON (`[{ date, label, amount }]` ou
   opérations Enable Banking) ; opérations déjà présentes ignorées ; import annulable. Fichiers en UTF-8 ou Windows-1252.
 
+### Interface de l'ancienne version (0.9)
+
+- **Apparence** identique à l'ancienne version sur téléphone : feuille de style d'origine, thèmes Auto / Clair / Sombre
+  (bouton ☀ / ☾ de l'en-tête), polices embarquées, sections repliables dont l'état est gardé sur le téléphone,
+  animations coupées si le téléphone demande moins d'animations.
+- **Onglets** : Budget (grande carte, cartes des comptes, « À voir », « À vérifier », observations, reste à vivre,
+  budget mensuel en mode Suivi ou Budget, tendance, contrats, catégories, règles), Opérations (par jour, recherche,
+  puces de filtre, gestes : vers la droite = vue, vers la gauche = Classer), Commun (virements à mettre en place, appels
+  de fonds, trésorerie sur 12 mois, d'où vient le solde, marge réelle, budget du commun), Plus (Équilibre, Impôts,
+  Épargne, Relevés et sauvegarde, puis les réglages de Klad).
+- **Montants** : jamais de signe moins ; débit sans signe, crédit précédé de « + », solde négatif suivi de « débiteur »,
+  graduations sous zéro en rouge. Les champs de montant acceptent un calcul (« 29,99+64 », « =566,19/3 »).
+- **Données propres au propriétaire** (jamais dans le code) : pastilles de banques (`klad.pastilles`), couleurs de
+  catégories (`klad.couleurs`), nom de la résidence et du syndic (`klad.appels.titre`, `klad.appels.syndic`) dans le
+  complément.
+- **Icône** adaptative (К doré sur bleu nuit, monochrome pour les icônes à thème d'Android 13 et plus) et écran de
+  démarrage assorti.
+
 ### Sauvegarde et phrase de récupération
 
 Au premier lancement, Klad affiche une **phrase de récupération** : 24 caractères (120 bits aléatoires) en 6 groupes de 4, alphabet sans I, L, O, U. Elle est affichée une seule fois, à recopier sur papier, puis vérifiée par la ressaisie de 2 groupes.
@@ -308,7 +328,8 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
   (virements attendus pas encore reçus), `reserve` (mise de côté pour les échéances non mensuelles), `end_of_month`,
   `overdraft_risk` (découvert ce mois ou dans les 12 prochains mois), `low` (`date`, `amount` du point bas s'il est sous
   zéro), `due` (échéances non mensuelles des 3 prochains mois : `month`, `amount` négatif, `late`). Alerte `OVERDRAFT_RISK`
-  (`caut`, « COMPTE COMMUN · JJ/MM »).
+  graduée (0.9) : `crit` si le compte commun passe sous zéro dans les 31 jours, `caut` plus tard dans les 12 mois
+  (« COMPTE COMMUN · JJ/MM », premier jour sous zéro).
 
 ## Mise à jour depuis l'appli
 

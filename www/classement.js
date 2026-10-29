@@ -199,6 +199,10 @@
     if (r) return r;
     const c = ctx.comptes.get(o.compte) || { id: o.compte, role: 'courant', libelle: '' };
     r = brut(ctx, o, c);
+    // catégories renommées ou supprimées dans Klad (comme l'ancienne version) : le classement suit
+    const ren = ctx.C.renommees;
+    if (ren && ren[r.cat]) { r = Object.assign({}, r); for (let i = 0; ren[r.cat] && i < 5; i++) { if (r.sub === r.cat) r.sub = ren[r.cat]; r.cat = ren[r.cat]; } }
+    if (ctx.C.retirees && ctx.C.retirees.indexOf(r.cat) >= 0) r = Object.assign({}, r, { cat: r.type === 'revenu' ? ctx.D.credit.cat : 'Autres', sub: r.sub === r.cat ? r.cat : r.sub });
     // Une vente classée en revenu mais qui est un débit : c'est un achat (règle de l'ancienne version, en données).
     const rv = ctx.C.revente && ctx.C.revente[r.cat];
     if (rv && r.type === 'revenu' && o.montant < 0) r = { type: 'depense', cat: rv.cat, sub: rv.sub || rv.cat, src: r.src };
@@ -433,10 +437,79 @@
       .sort((a, b) => mois[b].size - mois[a].size || n[b] - n[a]).slice(0, 6).map(kw => ({ motif: kw, n: n[kw] }));
   }
 
+
+  // ------------------------------------------------------------ catégories : créer, renommer, supprimer (comme l'ancienne version)
+  // → instantané pour annuler (classement et plan du budget).
+  const instantane = S => ({ classement: JSON.stringify(donnees(S)), plan: S.budget ? JSON.stringify(S.budget.plan || {}) : null, contrats: S.budget ? JSON.stringify(S.budget.contrats || []) : null });
+  function restaurer(S, snap) {
+    S.classement = JSON.parse(snap.classement);
+    if (S.budget && snap.plan != null) { S.budget.plan = JSON.parse(snap.plan); S.budget.contrats = JSON.parse(snap.contrats); }
+  }
+  function creerCategorie(S, nom, nature) {
+    const C = donnees(S), n = String(nom || '').trim().slice(0, 40);
+    if (!n) throw new Error('Indiquez un nom de catégorie.');
+    const dup = listeCategories(C).find(c => fold(c) === fold(n));
+    if (dup) throw new Error('La catégorie « ' + dup + ' » existe déjà.');
+    const snap = instantane(S);
+    C.categories[n] = { nature: NATURES.indexOf(nature) >= 0 ? nature : 'optionnelle', icone: iconeDe(C, n) };
+    if (C.retirees) C.retirees = C.retirees.filter(x => x !== n);
+    if (C.renommees) delete C.renommees[n];
+    return snap;
+  }
+  // Renommer : opérations, règles, corrections et postes du budget suivent.
+  function renommerCategorie(S, ancien, nouveau) {
+    const C = donnees(S), n = String(nouveau || '').trim().slice(0, 40);
+    if (!n || n === ancien) return null;
+    if (listeCategories(C).some(c => c !== ancien && fold(c) === fold(n))) throw new Error('La catégorie « ' + n + ' » existe déjà.');
+    const snap = instantane(S);
+    C.renommees = Object.assign({}, C.renommees, { [ancien]: n });
+    for (const k of Object.keys(C.renommees)) if (C.renommees[k] === ancien) C.renommees[k] = n;
+    delete C.renommees[n];
+    C.categories[n] = Object.assign({ nature: natureDe(C, ancien), icone: iconeDe(C, ancien) }, C.categories[ancien]);
+    delete C.categories[ancien];
+    (C.regles || []).forEach(u => { if (u.cat === ancien) { if (u.sub === ancien) u.sub = n; u.cat = n; } });
+    if (S.budget) {
+      for (const sc of Object.keys(S.budget.plan || {})) {
+        const pl = S.budget.plan[sc];
+        if (pl && pl['c|' + ancien] !== undefined) { pl['c|' + n] = pl['c|' + ancien]; delete pl['c|' + ancien]; }
+      }
+      (S.budget.contrats || []).forEach(c => { if (c.poste === 'c|' + ancien) c.poste = 'c|' + n; });
+    }
+    return snap;
+  }
+  function supprimerCategorie(S, nom) {
+    const C = donnees(S);
+    const snap = instantane(S);
+    C.retirees = (C.retirees || []).filter(x => x !== nom).concat([nom]);
+    delete C.categories[nom];
+    return snap;
+  }
+  function changerNature(S, nom, nature) {
+    const C = donnees(S), snap = instantane(S);
+    C.categories[nom] = Object.assign({ icone: iconeDe(C, nom) }, C.categories[nom], { nature: NATURES.indexOf(nature) >= 0 ? nature : natureDe(C, nom) });
+    return snap;
+  }
+  // Règle ajoutée depuis le panneau « Règles de classement » (sans opération de départ).
+  function ajouterRegle(S, mot, cat, sub) {
+    const C = donnees(S), k = fold(mot);
+    if (!k) throw new Error('Saisissez un mot du libellé.');
+    const snap = instantane(S);
+    C.regles = (C.regles || []).filter(u => fold(u.mot) !== k);
+    C.regles.push({ mot: String(mot).trim(), cat, sub: sub || cat });
+    if (!C.categories[cat]) C.categories[cat] = { nature: natureDe(C, cat), icone: iconeDe(C, cat) };
+    return snap;
+  }
+  function retirerRegle(S, mot) {
+    const C = donnees(S), snap = instantane(S), k = fold(mot);
+    C.regles = (C.regles || []).filter(u => fold(u.mot) !== k);
+    return snap;
+  }
+
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, ICONES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
     aRapprocher, marquerInterne, annulerInterne, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, concernees, frequentes, appliquer, annuler,
-    dateDepense, prochaine, dette, dettes, propositions
+    dateDepense, prochaine, dette, dettes, propositions,
+    creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };
 })(typeof window !== 'undefined' ? window : globalThis);

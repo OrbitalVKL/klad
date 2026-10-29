@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { charge, json } from './charge.mjs';
 
-const { KladModele: M, KladVues: Vu, KladClasse: K } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'vues.js']);
+const { KladModele: M, KladVues: Vu, KladClasse: K } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'ui.js', 'vues.js']);
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 const texte = h => h.replace(/<[a-z\/][^>]*>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/[\u00a0\u202f]/g, ' ');
 const SIGNE = /[\u2212\u2012\u2013-]\s?\d[\d\s]*,\d\d/;
@@ -25,28 +25,28 @@ function etat() {
 
 test('accueil : total des comptes courants « débiteur », cartes, aucun montant signé', () => {
   const { S } = etat();
-  const h = Vu.accueil(S, NOW);
+  const h = Vu.hero(S, 'perso', NOW) + Vu.rangee(S, 'perso', NOW, {});
   const t = texte(h);
-  assert.match(t, /Comptes courants\s+1 234,56 € débiteur/);
-  assert.match(t, /LIVRET <b>\s+Épargne\s+5 000,00 €\s+saisi le 20\/10\/2026/);
-  assert.match(t, /à jour il y a 1 h/);
+  assert.match(t, /Total des comptes courants\s+1 234,56 €\s+débiteur\s+COURANT · relevé de/);
+  assert.match(t, /LIVRET <b>\s+5 000,00 €\s+saisi le 20\/10/);
+  assert.match(t, /COURANT\s+1 234,56 €\s+débiteur · au/);
   assert.match(h, /LIVRET &lt;b&gt;/);
   assert.doesNotMatch(t, SIGNE);
   assert.doesNotMatch(h, /\u2212/);
 });
 
-test('opérations : par jour, débit et crédit en colonnes, en cours marquée, aucun signe', () => {
+test('opérations : par jour, total du jour, débit sans signe, crédit « + », en cours marquée', () => {
   const { S } = etat();
   const ops = Vu.filtrer(S, {});
   assert.deepEqual(json(ops.map(o => o.id)), ['o1', 'o2', 'o3', 'o4']);
-  const r = Vu.tranche(S, ops, 0, 10, { compte: false, annee: 2026 });
+  const r = Vu.tranche(S, ops, 0, 10, { annee: 2026 });
   assert.equal(r.fin, 4);
-  assert.equal((r.html.match(/<section class="jour">/g) || []).length, 3);
-  assert.match(r.html, /<h3>mardi 27 octobre<\/h3>/);
-  assert.match(r.html, /<h3>mercredi 31 décembre 2025<\/h3>/);
-  assert.match(r.html, /<div class="op encours nonvue"/);
-  assert.match(r.html, /<div class="deb">9,99\s€<\/div><div class="cre"><\/div>/);
-  assert.match(r.html, /<div class="deb"><\/div><div class="cre">1\s800,00\s€<\/div>/);
+  assert.equal((r.html.match(/<tr class="tx-day">/g) || []).length, 3);
+  assert.match(texte(r.html), /mar\. 27\/10\s+9,99 €/);
+  assert.match(texte(r.html), /mer\. 31\/12\/25/);
+  assert.match(r.html, /<tr class="txr unseen encours" data-op="o1"/);
+  assert.match(r.html, /<td class="amt"><span class="amt-v">9,99\s€<\/span>/);
+  assert.match(r.html, /<td class="amt pos"><span class="amt-v">\+1\s800,00\s€<\/span>/);
   assert.match(r.html, /LOYER &amp; CHARGES/);
   assert.doesNotMatch(texte(r.html), SIGNE);
   // tranches : au moins n jours complets
@@ -65,7 +65,7 @@ test('opérations : recherche (sans accents ni casse), filtre par compte, compte
   assert.equal(Vu.filtrer(S, { compte: a.id }).length, 4);
 });
 
-test('accueil : « À vérifier » (lignes et écrans), carte à débit différé « à prélever », total carte déduite', () => {
+test('accueil : « À vérifier » (lignes et écrans), carte à débit différé « à régler », compte moins la carte', () => {
   const { S, a } = etat();
   const k = M.nouveauCompte(S, { libelle: 'CARTE', role: 'carte_differee', prelevement: { compte: a.id, jour: 5, motif: 'REGLEMENT CARTE' } });
   S.ops[a.id].push({ id: 'p1', compte: a.id, date: '2026-10-05', montant: -5000, libelle: 'PRLV REGLEMENT CARTE FICTIVE', statut: 'comptabilisee', source: 'eb' });
@@ -73,22 +73,26 @@ test('accueil : « À vérifier » (lignes et écrans), carte à débit différ�
     { id: 'c2', compte: k.id, date: '2026-10-01', montant: -9000, libelle: 'CB AVANT', statut: 'comptabilisee', source: 'eb' }];
   const cx = K.contexte(S, NOW);
   const ext = { attention: K.attention(cx, NOW), sauvegarde: { jours: 45 }, maj: '9.9.9', ctx: cx };
-  const h = Vu.accueil(S, NOW, ext);
-  const t = texte(h);
-  assert.match(t, /À vérifier/);
-  assert.match(h, /data-av="nonvues"/);
-  assert.match(t, /Dernière sauvegarde il y a 45 jours/);
-  assert.match(t, /Klad 9\.9\.9 est disponible/);
-  assert.match(t, /à prélever le 05\/11\s+20,00 €/);
-  assert.match(t, /Comptes courants, carte déduite\s+1 254,56 € débiteur/);
+  const L = json(Vu.lignesAVerifier(S, NOW, ext)).map(x => x.cle);
+  assert.ok(L.includes('nonvues'));
+  const v = Vu.aVerifier(S, NOW, ext), tv = texte(v);
+  assert.doesNotMatch(v, /data-av="nonvues"/);          // les opérations à voir ont leur propre ligne
+  assert.match(v, /data-av="sauvegarde"/);
+  assert.match(tv, /Dernière sauvegarde il y a 45 jours/);
+  assert.match(tv, /Klad 9\.9\.9 est disponible/);
+  assert.match(texte(Vu.aVoir(S, 'perso', cx)), /\d+ opérations à voir/);
+  const dettes = { [k.id]: K.dette(S, k, NOW) };
+  const t = texte(Vu.rangee(S, 'perso', NOW, { dettes }));
+  assert.match(t, /CARTE\s+20,00 €\s+à régler · depuis le 05\/10/);
+  assert.match(t, /COURANT − CARTE\s+1 254,56 €\s+débiteur · après CARTE estimée/);
   assert.doesNotMatch(t, SIGNE);
   // sans motif de prélèvement : rien d'inventé
   delete k.prelevement.motif;
-  assert.match(texte(Vu.accueil(S, NOW, { ctx: K.contexte(S, NOW) })), /Libellé du prélèvement à choisir/);
+  assert.match(texte(Vu.rangee(S, 'perso', NOW, { dettes: { [k.id]: K.dette(S, k, NOW) } })), /Libellé du prélèvement à choisir/i);
   // tout vu, rien à vérifier : pas d'encart
   K.initialiserVues(S, NOW);
-  const L = Vu.lignesAVerifier(S, NOW, { attention: K.attention(K.contexte(S, NOW), NOW), sauvegarde: { jours: 2 } });
-  assert.deepEqual(json(L).map(x => x.cle), ['nonclassees']);
+  const L2 = Vu.lignesAVerifier(S, NOW, { attention: K.attention(K.contexte(S, NOW), NOW), sauvegarde: { jours: 2 } });
+  assert.deepEqual(json(L2).map(x => x.cle), ['nonclassees']);
 });
 
 test('opérations : catégorie affichée, point bleu des non vues, filtres non vues / non classées / catégorie', () => {
@@ -99,16 +103,38 @@ test('opérations : catégorie affichée, point bleu des non vues, filtres non v
   const cx = K.contexte(S, NOW);
   const l = Vu.ligne(S, S.ops[a.id][2], { ctx: cx });
   assert.match(l, /🏠/);
-  assert.match(texte(l), /Logement · Loyer/);
-  assert.doesNotMatch(l, /nonvue/);
-  assert.match(Vu.ligne(S, S.ops[a.id][0], { ctx: cx }), /class="op encours nonvue nc"/);
+  assert.match(texte(l), /Logement · Loyer ▾\s+règle/);
+  assert.doesNotMatch(l, /unseen/);
+  assert.match(Vu.ligne(S, S.ops[a.id][0], { ctx: cx }), /class="txr unseen encours"/);
   assert.deepEqual(json(Vu.filtrer(S, { nonVues: true }, cx).map(o => o.id)), ['o1']);
   assert.deepEqual(json(Vu.filtrer(S, { cat: '__nc' }, cx).map(o => o.id)), ['o1', 'o2']);       // 3 derniers mois
   assert.deepEqual(json(Vu.filtrer(S, { cat: 'Logement' }, cx).map(o => o.id)), ['o3']);
   const d = texte(Vu.detail(S, S.ops[a.id][2], cx));
-  assert.match(d, /Logement › Loyer\s*par une de vos règles/);
+  assert.match(d, /Logement › Loyer \(par une de vos règles\)/);
   assert.match(d, /Marquer non vue/);
   const c = Vu.classer(S, S.ops[a.id][2], cx, { cat: 'Logement', sub: 'Loyer', autres: true, mot: 'LOYER', compte: false, sens: '', toutes: false }, 3);
   assert.match(texte(c), /3 opérations contiennent « LOYER »/);
   assert.match(texte(c), /Classer en Logement \(3\)/);
+});
+
+test('préférences d\'affichage gardées sur le téléphone : liste fermée, sections repliées par défaut comme l\'ancienne version', () => {
+  const mem = {};
+  const localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  const { KladUI: U } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'ui.js'], { localStorage });
+  U.pref('periode', { from: '2026-01', to: '2026-09', n: null });
+  assert.deepEqual(json(U.pref('periode')), { from: '2026-01', to: '2026-09', n: null });
+  assert.throws(() => U.pref('cle', 'x'), /préférence inconnue/);       // jamais de donnée hors du coffre
+  U.pref('periode', null);
+  assert.equal(U.pref('periode'), null);
+  assert.equal(U.replie('cats-panel'), true);
+  assert.equal(U.replie('budget-main'), false);
+  U.plier('cats-panel', false);
+  assert.equal(U.replie('cats-panel'), false);
+  assert.deepEqual(Object.keys(mem).sort(), ['klad.replis']);
+  // calcul dans un champ de montant (comme l'ancienne version), sans eval
+  assert.deepEqual(['29,99+64', '=566,19/3', '(10+5)*2', '1 200,50', '12-', 'alert(1)', '2*(3'].map(U.calcul), [93.99, 188.73, 30, 1200.5, null, null, null]);
+  assert.deepEqual(['29,99+64', '=12', '12', '1 200,50'].map(U.estCalcul), [true, true, false, false]);
+  // graduation d'axe : jamais de signe moins
+  assert.equal(U.graduation(-50000).replace(/\s/g, ' '), '500 €');
+  assert.equal(U.couleurGraduation(-1), 'var(--bad)');
 });

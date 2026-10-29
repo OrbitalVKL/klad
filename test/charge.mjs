@@ -13,3 +13,11 @@ export function charge(files, extra) {
 }
 
 export const json = o => JSON.parse(JSON.stringify(o));   // objets du contexte vm → objets ordinaires
+
+// Texte visible d'un rendu HTML, pour vérifier qu'aucun montant signé n'est affiché : scripts (données des infobulles)
+// et balises retirés, dates retirées ; une soustraction écrite entre deux termes (« 795 € A − 555 € B ») n'est pas un signe.
+export function texteVisible(h) {
+  return String(h).replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/\d{2}\/\d{2}\/\d{2,4}/g, '')
+    .replace(/([€A-Za-zÀ-ÿ»)]) − (?=\d)/g, '$1 moins ');
+}
+export const montantSigne = h => /[−-]\s?\d/.test(texteVisible(h));

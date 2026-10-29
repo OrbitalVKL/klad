@@ -82,23 +82,30 @@
     }).catch(e => toast('Enregistrement impossible : ' + (e.message || e), true));
     return chain;
   }
-  // Fichier choisi par le sélecteur Android (reprise) → texte, ou null si annulé.
-  async function choisirFichier() {
+  // Fichier choisi par le sélecteur Android → octets (relevé, éventuellement Excel), ou null si annulé.
+  async function choisirOctets() {
     const r = await V.importFile();
     if (!r.ok) { if (r.reason !== 'annule') throw new Error('Lecture impossible : ' + explain(r)); return null; }
-    const b = C.fromB64(r.data);
+    return C.fromB64(r.data);
+  }
+  // Fichier choisi par le sélecteur Android (reprise) → texte, ou null si annulé.
+  async function choisirFichier() {
+    const b = await choisirOctets();
+    if (b == null) return null;
     try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
     catch (e) { return new TextDecoder('windows-1252').decode(b); }      // relevé CSV exporté en Windows-1252
   }
-  const hooks = { save: () => mark(['*']), saveLog: () => mark(['journal']), flush, choisirFichier };
+  const hooks = { save: () => mark(['*']), saveLog: () => mark(['journal']), flush, choisirFichier, choisirOctets };
 
   // ------------------------------------------------------------ affichage
   const vPanel = $('vPanel');
   const mPanel = $('mPanel');
   function toast(msg, err) { if (A()) A().toast(msg, err); }
 
+  // Logo de Klad (même dessin que l'icône de l'appli).
+  const LOGO = '<svg viewBox="18 18 72 72" aria-hidden="true"><defs><linearGradient id="kg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3CB6B"/><stop offset="1" stop-color="#C98A1E"/></linearGradient></defs><rect x="18" y="18" width="72" height="72" fill="#1E3A5C"/><path fill="url(#kg)" d="M37 31h9.5v19.2h3.2L61.6 31h10.6L58.6 52.4 73.4 77H62.5L50.6 56.6h-4.1V77H37z"/></svg>';
   function head() {
-    return '<div class="vhead"><span class="logo big">К</span><div><b>Klad</b><small>' + esc(CFG.version || 'dev') +
+    return '<div class="vhead"><span class="logo big">' + LOGO + '</span><div><b>Klad</b><small>' + esc(CFG.version || 'dev') +
       (isNative ? '' : ' · navigateur') + '</small></div></div>' +
       (isNative ? '' : '<p class="note">Mode navigateur : coffre de démonstration, sans empreinte. Données fictives uniquement.</p>');
   }
@@ -115,7 +122,7 @@
     key = null; S = null;
     screen('<h2>Ouverture impossible</h2><p class="bad">' + esc(msg) + '</p><p class="muted">Rien n\'a été modifié. ' +
       'Si le problème persiste : désinstaller l\'appli, la réinstaller, puis restaurer une sauvegarde avec la phrase de récupération.</p>' +
-      '<div class="col"><button class="btn ghost" data-a="r">Réessayer</button></div>');
+      '<div class="col"><button class="btn" data-a="r">Réessayer</button></div>');
     on(vPanel, 'r', () => location.reload());
   }
 
@@ -207,7 +214,7 @@
   function askPin(title, sub) {
     return new Promise(resolve => {
       showModal('<h2>' + esc(title) + '</h2>' + (sub ? '<p class="muted">' + esc(sub) + '</p>' : '') +
-        '<div class="padhost"></div><div class="row center"><button class="btn ghost" data-a="x">Annuler</button></div>');
+        '<div class="padhost"></div><div class="row center"><button class="btn" data-a="x">Annuler</button></div>');
       makePad(mPanel.querySelector('.padhost'), async pin => { closeModal(); resolve(pin); });
       on(mPanel, 'x', () => { closeModal(); resolve(null); });
     });
@@ -216,7 +223,7 @@
   function askConfirm(title, text, yes) {
     return new Promise(resolve => {
       showModal('<h2>' + esc(title) + '</h2><p>' + esc(text) + '</p><div class="row center">' +
-        '<button class="btn danger" data-a="y">' + esc(yes) + '</button><button class="btn ghost" data-a="x">Annuler</button></div>');
+        '<button class="btn danger" data-a="y">' + esc(yes) + '</button><button class="btn" data-a="x">Annuler</button></div>');
       on(mPanel, 'y', () => { closeModal(); resolve(true); });
       on(mPanel, 'x', () => { closeModal(); resolve(false); });
     });
@@ -230,7 +237,7 @@
       '. Saisissez la phrase : 24 caractères, en 6 groupes de 4.</p>' +
       '<textarea class="phrase-in" rows="2" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"></textarea>' +
       '<p class="msg"></p><div class="row center"><button class="btn" data-a="go">Ouvrir la sauvegarde</button>' +
-      '<button class="btn ghost" data-a="back">' + esc(backLabel || 'Retour') + '</button></div>');
+      '<button class="btn" data-a="back">' + esc(backLabel || 'Retour') + '</button></div>');
     const msg = root.querySelector('.msg');
     on(root, 'back', onBack);
     on(root, 'go', async ev => {
@@ -261,8 +268,8 @@
     screen('<h2>Bienvenue</h2><p>Vos données sont chiffrées sur ce téléphone et s\'ouvrent avec un code à 6 chiffres' +
       (st.bioAvailable ? ' ou votre empreinte' : '') + '.</p>' +
       (hasProto() ? '<p class="note">Les données du prototype seront reprises et chiffrées dès la création du code.</p>' : '') +
-      '<div class="col"><button class="btn" data-a="new">Créer mon code</button>' +
-      '<button class="btn ghost" data-a="restore">Restaurer une sauvegarde</button></div>');
+      '<div class="col"><button class="btn primary" data-a="new">Créer mon code</button>' +
+      '<button class="btn" data-a="restore">Restaurer une sauvegarde</button></div>');
     on(vPanel, 'new', () => choosePin('Créer votre code', pin => createVault(pin, null)));
     on(vPanel, 'restore', restoreFirst);
   }
@@ -326,7 +333,7 @@
           '<p>Elle seule permet de <b>restaurer une sauvegarde</b> : nouveau téléphone, appli réinstallée ou code oublié.</p>' +
           '<p>Recopiez-la <b>sur papier</b> et gardez-la en lieu sûr. Elle ne sera plus affichée, et les captures d\'écran sont bloquées.</p>' +
           '<ol class="phrase">' + phrase.split('-').map(g => '<li>' + g + '</li>').join('') + '</ol>' +
-          '<div class="col"><button class="btn" data-a="ok">Je l\'ai recopiée</button></div>');
+          '<div class="col"><button class="btn primary" data-a="ok">Je l\'ai recopiée</button></div>');
         on(vPanel, 'ok', check);
       };
       const check = () => {
@@ -334,7 +341,7 @@
         const field = (i, id) => '<label>Groupe n° ' + (i + 1) + '<input id="' + id + '" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>';
         screen('<h2>Vérification</h2><p class="muted">Recopiez deux groupes de votre phrase, depuis votre papier.</p>' +
           field(a, 'g1') + field(b, 'g2') + '<p class="msg bad"></p>' +
-          '<div class="row center"><button class="btn" data-a="v">Vérifier</button><button class="btn ghost" data-a="back">Revoir la phrase</button></div>');
+          '<div class="row center"><button class="btn primary" data-a="v">Vérifier</button><button class="btn" data-a="back">Revoir la phrase</button></div>');
         on(vPanel, 'back', show);
         on(vPanel, 'v', async () => {
           if (!C.checkGroups(phrase, { [a]: $('g1').value, [b]: $('g2').value })) {
@@ -358,7 +365,7 @@
       screen('<h2>' + (again ? 'Réactiver l\'empreinte ?' : 'Déverrouiller par empreinte ?') + '</h2>' +
         '<p>' + (again ? 'Une nouvelle empreinte a été enregistrée sur ce téléphone : par sécurité, l\'empreinte avait été désactivée.'
           : 'Klad pourra s\'ouvrir avec votre empreinte. Le code reste toujours possible.') + '</p><p class="msg"></p>' +
-        '<div class="col"><button class="btn" data-a="y">Activer l\'empreinte</button><button class="btn ghost" data-a="n">Plus tard</button></div>');
+        '<div class="col"><button class="btn primary" data-a="y">Activer l\'empreinte</button><button class="btn" data-a="n">Plus tard</button></div>');
       const msg = vPanel.querySelector('.msg');
       on(vPanel, 'y', async ev => {
         ev.target.disabled = true;
@@ -410,7 +417,7 @@
       '<p class="note" id="pendNote"' + (pendingUrl ? '' : ' hidden') + '>Retour de la banque reçu : déverrouillez pour terminer la connexion.</p>' +
       (st.bio === 'invalidee' ? '<p class="note">Une nouvelle empreinte a été enregistrée sur ce téléphone : par sécurité, l\'empreinte est désactivée. Déverrouillez avec votre code.</p>' : '') +
       '<div class="padhost"></div>' +
-      (bioOn ? '<div class="row center"><button class="btn ghost" data-a="bio">Utiliser l\'empreinte</button></div>' : '') +
+      (bioOn ? '<div class="row center"><button class="btn" data-a="bio">Utiliser l\'empreinte</button></div>' : '') +
       '<p class="muted center small">Code oublié : désinstaller l\'appli, puis restaurer une sauvegarde avec la phrase de récupération.</p>');
     const pad = lockPad = makePad(vPanel.querySelector('.padhost'), async pin => {
       const r = await V.unlockPin({ pin });
@@ -569,7 +576,7 @@
     const d = B && B.dernier;
     const days = d ? Math.floor((Date.now() - Date.parse(d)) / 864e5) : null;
     $('sauvState').textContent = d ? 'Dernier export le ' + fmtDate(d) + '.' : 'Aucune sauvegarde exportée pour l\'instant.';
-    $('mSauv').textContent = d ? 'Dernier export le ' + fmtDate(d) : 'Aucune sauvegarde exportée';
+    ($('mSauv') || {}).textContent = d ? 'Dernier export le ' + fmtDate(d) : 'Aucune sauvegarde exportée';
     // « À vérifier » (accueil) et résumé Grafit : jours depuis le dernier export (null : jamais).
     A().infoSauvegarde({ jours: days, rappel: days == null || days >= RAPPEL_JOURS });
   }
@@ -582,7 +589,7 @@
       finally { if (b) b.disabled = false; if (key) renderSecu(); }
     };
   }
-  $('btnLock').addEventListener('click', () => lock());
+  document.addEventListener('click', ev => { if (ev.target.closest('#btnLock')) lock(); });
   $('btnBio').addEventListener('click', guard(toggleBio));
   $('btnPin').addEventListener('click', guard(changePin));
   $('btnExport').addEventListener('click', guard(exportNow));

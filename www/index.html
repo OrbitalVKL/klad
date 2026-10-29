@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" class="appm">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,71 +11,102 @@
   <!-- Écran de verrou, premier lancement, restauration : rempli par verrou.js -->
   <div id="verrou" class="screen"><div class="panel" id="vPanel"></div></div>
 
+  <!-- Appli : même structure que l'ancienne version sur téléphone (en-tête, écrans, barre d'onglets) -->
   <div id="appli" hidden>
-    <header class="top">
-      <span class="logo">К</span>
-      <h1 id="titre">Accueil</h1>
-      <button id="pastille" class="pastille" type="button" aria-label="État de la synchronisation">—</button>
+  <div class="wrap">
+    <header class="app-h" id="app-h">
+      <div class="ah-t"><span class="ah-e" id="ah-e"></span><h1 id="ah-title">Budget</h1></div>
+      <div class="ah-a">
+        <button type="button" class="ah-pill" id="ah-sync" aria-label="Synchroniser les banques"><span class="ic" aria-hidden="true">✓</span><span class="lb">—</span></button>
+        <button type="button" class="ah-ico" id="ah-search" aria-label="Rechercher un libellé" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+        <button type="button" class="ah-ico" id="ah-theme" aria-label="Changer de thème"></button>
+      </div>
     </header>
 
-    <main id="defil">
-      <div id="tirer" class="tirer" aria-hidden="true"><span>↻</span></div>
-      <section id="vAccueil" class="vue"></section>
-
-      <section id="vOps" class="vue" hidden>
-        <div class="outils">
-          <div class="rang">
-            <input id="opsQ" type="search" placeholder="Rechercher un libellé" autocomplete="off" spellcheck="false">
-            <select id="opsCompte" aria-label="Compte"></select>
-          </div>
-          <div id="opsFiltres" class="filtres"></div>
+    <!-- ================= BUDGET (perso ou commun) et OPÉRATIONS ================= -->
+    <div id="view-budget" class="vue" style="display:grid;gap:18px">
+      <section class="controls stick" aria-label="Filtres">
+        <div class="seg" role="group" aria-label="Périmètre">
+          <button type="button" data-scope="perso" aria-pressed="true">Perso</button>
+          <button type="button" data-scope="commun" aria-pressed="false">Commun</button>
         </div>
-        <div id="opsListe"></div>
+        <div class="cyc-nav" id="cyc-nav"></div>
       </section>
+      <section class="app-hero" id="app-hero" aria-label="Total"></section>
+      <section class="panel" id="bal-panel" aria-label="Soldes des comptes"></section>
+      <a class="app-seen" id="app-seen" href="#operations" hidden></a>
+      <div class="av-zone" id="av-zone" hidden></div>
+      <section class="panel obs-panel" id="actions" aria-label="Observations et recommandations"></section>
+      <section id="rav-m" aria-label="Reste à vivre" hidden></section>
+      <section class="panel" id="cm-plan" aria-label="Virements à mettre en place" hidden></section>
+      <section class="panel budget-main" id="budget-main"></section>
+      <div id="an-zone">
+        <section class="panel" id="tend-panel"></section>
+        <section class="panel" id="ops-panel">
+          <div class="panel-h"><h2>Opérations</h2>
+            <div class="row"><input type="search" id="q" placeholder="Rechercher un libellé…" aria-label="Rechercher un libellé" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="app-chips" id="app-chips" role="group" aria-label="Filtres des opérations"></div>
+          <div class="scroll tablewrap">
+            <table class="tx txv2"><colgroup><col style="width:34px"><col><col style="width:118px"></colgroup>
+              <tbody id="tx"></tbody>
+            </table>
+          </div>
+          <div id="tx-suite"></div>
+        </section>
+      </div>
+      <div id="ctr-zone" style="display:grid;gap:18px"></div>
+      <section class="panel" id="cats-panel"></section>
+      <section class="panel" id="rules-panel"></section>
+    </div>
 
-      <section id="vBudget" class="vue" hidden></section>
-
-      <section id="vPlus" class="vue" hidden>
-        <ul class="menu">
-          <li><button data-volet="secBanques">Banques et accès<small id="mBanques"></small></button></li>
-          <li><button data-volet="secComptes">Comptes<small id="mComptes"></small></button></li>
-          <li><button data-volet="secReprise">Import de reprise<small id="mReprise"></small></button></li>
-          <li><button data-volet="secClassement">Classement<small id="mClassement"></small></button></li>
-          <li><button data-volet="secObs">Observations<small id="mObs"></small></button></li>
-          <li><button data-volet="secImpots">Impôts<small id="mImpots"></small></button></li>
-          <li><button data-volet="secEpargne">Épargne<small>Livret, plan d'épargne entreprise</small></button></li>
-          <li><button data-volet="secAffichage">Affichage<small>Thème, mode démo</small></button></li>
-          <li><button data-volet="secModules">Modules<small id="mModules"></small></button></li>
-          <li><button data-volet="secSauv">Sauvegarde<small id="mSauv"></small></button></li>
-          <li><button data-volet="secVerrou">Verrou<small>Code, empreinte, effacement</small></button></li>
-          <li><button data-volet="secLog">Journal<small>Anonyme, à copier pour un diagnostic</small></button></li>
-          <li><button data-volet="secMaj">À propos et mise à jour<small id="ver"></small></button></li>
-        </ul>
-        <div class="row center"><button id="btnLock" class="btn ghost">Verrouiller</button></div>
+    <!-- ================= ÉQUILIBRE ================= -->
+    <div id="view-appart" class="vue" hidden style="display:grid;gap:18px"></div>
+    <!-- ================= IMPÔTS ================= -->
+    <div id="view-impots" class="vue" hidden style="display:grid;gap:18px"></div>
+    <!-- ================= ÉPARGNE ================= -->
+    <div id="view-epargne" class="vue" hidden style="display:grid;gap:18px"></div>
+    <!-- ================= RELEVÉS ET SAUVEGARDE ================= -->
+    <div id="view-data" class="vue" hidden style="display:grid;gap:18px">
+      <section class="panel" id="imp-panel"></section>
+      <section class="panel" id="save-panel">
+        <div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Sauvegarde</h2><span class="muted">où sont vos données, export et restauration</span></div>
+        <p class="note" style="margin-top:0"><b>État :</b> <span id="sauvState">…</span></p>
+        <div class="row" style="margin-top:10px">
+          <button id="btnExport" class="btn primary" type="button">Exporter ma sauvegarde</button>
+          <button id="btnRestore" class="btn" type="button">Restaurer depuis un fichier</button>
+        </div>
+        <details class="bnote"><summary>Comment c'est calculé</summary><p class="note">Tout ce que contient Klad (comptes, opérations, classement, budget, réglages) tient dans un seul fichier chiffré par votre phrase de récupération : gardez-en une copie hors du téléphone. Une restauration remplace toutes les données de ce téléphone.</p></details>
       </section>
-    </main>
+    </div>
 
-    <nav class="onglets">
-      <button data-onglet="vAccueil" class="on"><span aria-hidden="true">⌂</span>Accueil</button>
-      <button data-onglet="vOps"><span aria-hidden="true">≡</span>Opérations<i id="badgeOps" class="badge" hidden></i></button>
-      <button data-onglet="vBudget"><span aria-hidden="true">€</span>Budget</button>
-      <button data-onglet="vPlus"><span aria-hidden="true">⋯</span>Plus</button>
-    </nav>
+    <footer class="foot">Klad <b class="ver" id="ver"></b> · carnet de comptes personnel, données chiffrées sur ce téléphone</footer>
+  </div>
+  <nav class="app-tb" id="app-tb" aria-label="Navigation principale">
+    <button type="button" data-tab="budget" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>Budget</button>
+    <button type="button" data-tab="operations"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>Opérations<span class="tb-badge" id="tb-badge" hidden></span></button>
+    <button type="button" data-tab="commun"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="9" r="2.6"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15.5 14.2A5 5 0 0 1 21 19"/></svg>Commun</button>
+    <button type="button" data-tab="plus" id="tb-plus" aria-haspopup="dialog"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>Plus</button>
+  </nav>
+  <div class="app-ptr" id="app-ptr" aria-hidden="true"><span>↻</span></div>
   </div>
 
-  <!-- Volet qui monte du bas : reçoit une des sections rangées ci-dessous -->
-  <div id="volet" class="volet" hidden>
-    <div class="voile" data-fermer></div>
-    <div class="feuille" role="dialog" aria-modal="true" aria-labelledby="voletTitre">
-      <div class="vtete"><span class="poignee" aria-hidden="true"></span>
-        <button class="btn ghost small" data-retour hidden>‹ Retour</button>
-        <h2 id="voletTitre"></h2>
-        <button class="btn ghost small" data-fermer>Fermer</button></div>
-      <div id="voletCorps"></div>
-    </div>
+  <!-- Volet du bas (comme l'ancienne version) : reçoit une des sections rangées ci-dessous -->
+  <div id="volet" hidden>
+    <div class="sheet-scrim" data-fermer></div>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="voletTitre">
+      <div class="sh-grip" aria-hidden="true"></div>
+      <div class="sh-body">
+        <div class="sh-head"><button type="button" class="sh-back" data-retour hidden aria-label="Retour">‹</button>
+          <div class="t"><h2 id="voletTitre"></h2></div><button type="button" class="sh-x" data-fermer aria-label="Fermer">✕</button></div>
+        <div id="voletCorps"></div>
+      </div>
+    </section>
   </div>
 
   <div id="rangement" hidden>
+    <section id="secPlus" data-titre="Plus"><div id="plusCorps"></div></section>
+
     <section id="secBanques" data-titre="Banques et accès">
       <h3>Banques connectées</h3>
       <div id="connexions"></div>
@@ -89,7 +120,7 @@
           <option value="DE">Allemagne</option>
         </select>
         <input id="bankSearch" type="search" placeholder="Rechercher une banque">
-        <button id="btnLoadBanks" class="btn ghost small">Charger</button>
+        <button id="btnLoadBanks" class="btn small">Charger</button>
       </div>
       <ul id="banks" class="list"></ul>
 
@@ -105,20 +136,20 @@
       </details>
       <p id="keyState" class="muted"></p>
       <div class="row">
-        <button id="btnSaveKey" class="btn">Enregistrer</button>
-        <button id="btnTestKey" class="btn ghost">Tester la clé</button>
+        <button id="btnSaveKey" class="btn primary">Enregistrer</button>
+        <button id="btnTestKey" class="btn">Tester la clé</button>
       </div>
       <div id="appInfo"></div>
       <details class="adv"><summary>Adresse de retour bancaire</summary>
         <p class="muted">À déclarer dans le Control Panel Enable Banking (Allowed redirect URLs) :</p>
-        <div class="row"><input id="redirectUrl" spellcheck="false"><button id="btnCopyRedirect" class="btn ghost small">Copier</button></div>
+        <div class="row"><input id="redirectUrl" spellcheck="false"><button id="btnCopyRedirect" class="btn small">Copier</button></div>
       </details>
     </section>
 
     <section id="secComptes" data-titre="Comptes">
       <p class="muted">Libellé, rôle, ordre d'affichage. Les comptes masqués ne comptent pas dans les totaux.</p>
       <ul id="listeComptes" class="list comptes"></ul>
-      <div class="row"><button id="btnNouveauManuel" class="btn ghost small">Ajouter un compte manuel</button></div>
+      <div class="row"><button id="btnNouveauManuel" class="btn small">Ajouter un compte manuel</button></div>
     </section>
 
     <section id="secCompte" data-titre="Compte"><div id="formCompte"></div></section>
@@ -127,7 +158,7 @@
       <p class="muted">Fichier « klad-reprise » produit depuis l'ancienne version. Par compte, l'historique de la reprise fait foi
         jusqu'à sa dernière date ; au-delà, les données de la banque. Un nouvel import remplace le précédent.</p>
       <p id="repriseEtat" class="muted"></p>
-      <div class="row"><button id="btnChoisirReprise" class="btn">Choisir le fichier</button></div>
+      <div class="row"><button id="btnChoisirReprise" class="btn primary">Choisir le fichier</button></div>
       <div id="repriseApercu"></div>
     </section>
 
@@ -149,18 +180,11 @@
       <p class="muted" id="grafitEmpreinte"></p>
     </section>
 
-    <section id="secSauv" data-titre="Sauvegarde">
-      <p class="muted">Fichier chiffré par votre phrase de récupération, à garder hors du téléphone. <span id="sauvState"></span></p>
-      <div class="row">
-        <button id="btnExport" class="btn small">Exporter</button>
-        <button id="btnRestore" class="btn ghost small">Restaurer</button>
-      </div>
-    </section>
 
     <section id="secVerrou" data-titre="Verrou">
       <p class="muted" id="vaultInfo"></p>
-      <div class="row ligne"><div class="grow">Empreinte<small id="bioState" class="muted block"></small></div><button id="btnBio" class="btn ghost small">Activer</button></div>
-      <div class="row ligne"><div class="grow">Code à 6 chiffres</div><button id="btnPin" class="btn ghost small">Changer</button></div>
+      <div class="row ligne"><div class="grow">Empreinte<small id="bioState" class="muted block"></small></div><button id="btnBio" class="btn small">Activer</button></div>
+      <div class="row ligne"><div class="grow">Code à 6 chiffres</div><button id="btnPin" class="btn small">Changer</button></div>
       <div class="row ligne"><div class="grow">Tout effacer<small class="muted block">Clé, banques, opérations et journal de ce téléphone.</small></div><button id="btnWipe" class="btn danger small">Effacer</button></div>
     </section>
 
@@ -168,8 +192,8 @@
       <p class="muted">Journal anonyme (ni noms, ni banques, ni montants, ni identifiants) : peut être copié pour diagnostic.</p>
       <pre id="log"></pre>
       <div class="row">
-        <button id="btnCopyLog" class="btn ghost small">Copier le journal</button>
-        <button id="btnClearLog" class="btn ghost small">Vider</button>
+        <button id="btnCopyLog" class="btn small">Copier le journal</button>
+        <button id="btnClearLog" class="btn small">Vider</button>
       </div>
     </section>
 
@@ -178,8 +202,8 @@
       <p class="muted" id="majVer"></p>
       <p id="majState" class="muted"></p>
       <div class="row">
-        <button id="btnMajCheck" class="btn ghost small">Rechercher une mise à jour</button>
-        <button id="btnMajGo" class="btn small" hidden>Mettre à jour</button>
+        <button id="btnMajCheck" class="btn small">Rechercher une mise à jour</button>
+        <button id="btnMajGo" class="btn primary small" hidden>Mettre à jour</button>
       </div>
     </section>
 
@@ -192,21 +216,14 @@
     <section id="secClassement" data-titre="Classement"><div id="classementCorps"></div></section>
 
     <section id="secPoste" data-titre="Budget du poste"><div id="posteCorps"></div></section>
-    <section id="secContrats" data-titre="Contrats et échéances"><div id="contratsCorps"></div></section>
-    <section id="secTendance" data-titre="Tendance"><div id="tendanceCorps"></div></section>
-    <section id="secRav" data-titre="Reste à vivre"><div id="ravCorps"></div></section>
     <section id="secAjout" data-titre="Ajouter un poste"><div id="ajoutCorps"></div></section>
     <section id="secVirements" data-titre="Ordres permanents"><div id="virementsCorps"></div></section>
-    <section id="secEquilibre" data-titre="Équilibre des apports"><div id="equilibreCorps"></div></section>
-    <section id="secImpots" data-titre="Impôts"><div id="impotsCorps"></div></section>
-    <section id="secEpargne" data-titre="Épargne"><div id="epargneCorps"></div></section>
     <section id="secObs" data-titre="Observations"><div id="obsCorps"></div></section>
-    <section id="secResultats" data-titre="Résultats"><div id="resultatsCorps"></div></section>
   </div>
 
   <div id="modal" class="screen modal" hidden><div class="panel" id="mPanel"></div></div>
   <!-- Masque posé dès le passage en arrière-plan : rien de lisible au retour, avant le verrouillage éventuel -->
-  <div id="masque" class="screen masque" hidden><span class="logo big">К</span></div>
+  <div id="masque" class="screen masque" hidden><span class="logo big"><svg viewBox="18 18 72 72" aria-hidden="true"><defs><linearGradient id="kgm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3CB6B"/><stop offset="1" stop-color="#C98A1E"/></linearGradient></defs><rect x="18" y="18" width="72" height="72" fill="#1E3A5C"/><path fill="url(#kgm)" d="M37 31h9.5v19.2h3.2L61.6 31h10.6L58.6 52.4 73.4 77H62.5L50.6 56.6h-4.1V77H37z"/></svg></span></div>
 
   <div id="toast" role="status" aria-live="polite"></div>
 
@@ -218,6 +235,7 @@
   <script src="format.js"></script>
   <script src="modele.js"></script>
   <script src="reprise.js"></script>
+  <script src="xlsx.js"></script>
   <script src="releve.js"></script>
   <script src="classement.js"></script>
   <script src="carnet.js"></script>
@@ -228,6 +246,7 @@
   <script src="sync.js"></script>
   <script src="resume.js"></script>
   <script src="coffre.js"></script>
+  <script src="ui.js"></script>
   <script src="vues.js"></script>
   <script src="vbudget.js"></script>
   <script src="vcommun.js"></script>

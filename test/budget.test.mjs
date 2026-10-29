@@ -3,10 +3,10 @@
 // édition annulable, résumé Grafit (month, upcoming, BUDGET_OVER) sans motif interdit. Données fictives uniquement.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { charge, json } from './charge.mjs';
+import { charge, json, montantSigne } from './charge.mjs';
 import { repriseFictive } from './fictif.mjs';
 
-const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'reprise.js', 'classement.js', 'carnet.js', 'budget.js', 'resume.js', 'vues.js', 'vbudget.js']);
+const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'reprise.js', 'classement.js', 'carnet.js', 'budget.js', 'resume.js', 'ui.js', 'vues.js', 'vbudget.js']);
 const { KladModele: M, KladClasse: K, KladBudget: KB, KladResume: R, KladReprise: RP, KladCarnet: CN, KladVuesBudget: VB } = X;
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 let n = 0;
@@ -122,9 +122,9 @@ test('suivi du cycle : sections, date de dépense des cartes, hors budget et ép
   assert.deepEqual(json(c.revenus.lignes.map(x => [x.key, x.got, x.pm])), [['Personne A', 90000, 72000], ['Personne B', 60000, 48000]]);
   assert.equal(c.sections.fixe.lignes[0].etat.texte, 'prélevé');
   // rendu : aucun montant signé
-  const h = VB.ecran(ctx(S), 'perso', null, { ouverts: new Set(['c|Bars']) });
-  assert.ok(!/[−-]\s?\d/.test(h.replace(/<[^>]+>/g, ' ')), 'aucun montant négatif affiché');
-  assert.match(h, /dépassé de 40 €/);
+  const h = VB.suivi(ctx(S), 'perso', { ouverts: new Set(['c|Bars']) }).html;
+  assert.ok(!montantSigne(h), 'aucun montant négatif affiché');
+  assert.match(h.replace(/<[^>]+>/g, ' '), /Dépassé de\s+40\s€/);
 });
 
 test('reste à vivre : deux colonnes (dernier salaire, comptes courants)', () => {
@@ -137,7 +137,7 @@ test('reste à vivre : deux colonnes (dernier salaire, comptes courants)', () =>
   for (const c of S.modele.comptes) delete c.solde;
   const r2 = KB.suivi(ctx(S), 'perso', null).rav;
   assert.deepEqual([r2.comptes, r2.base, r2.valeur], [null, 'budget', 188000]);
-  assert.ok(!/[−-]\s?\d/.test(VB.detailRav(r).replace(/<[^>]+>/g, ' ')));
+  assert.ok(!montantSigne(VB.detailRav(r)));
   assert.match(VB.carteRav(r), /Reste à vivre jusqu'au 26\/11/);
 });
 
@@ -186,4 +186,34 @@ test('résumé Grafit : month, left_to_live, upcoming, BUDGET_OVER ; aucun motif
   assert.deepEqual(r.alerts.filter(a => a.code === 'BUDGET_OVER'), [{ level: 'caut', code: 'BUDGET_OVER', text: 'BARS +80 %' }]);
   const txt = JSON.stringify(Object.assign({}, r, { generated: 0 }));
   for (const motif of [/FR\d{2}/, /\d{5,}/, /NORD/, /FICTI/, /PRLV/, /@/]) assert.ok(!motif.test(txt), String(motif));
+});
+
+// ------------------------------------------------------------ Lot 9 : fonctions de l'ancienne version reprises
+test('tendance : revenus, dépenses et balance par mois ; une catégorie face à son budget', () => {
+  const { S } = etat();
+  const T = json(KB.tendanceMois(ctx(S), { scope: 'perso', from: '2026-08', to: '2026-10', mode: 'rd' }));
+  assert.deepEqual(T.mois, ['2026-08', '2026-09', '2026-10']);
+  assert.deepEqual(T.rev, [200000, 200000, 200000]);
+  assert.deepEqual(T.dep.slice(0, 2), [5000, 5000]);
+  assert.deepEqual(T.bal, T.rev.map((r, i) => r - T.dep[i]));
+  assert.ok(T.categories.includes('Bars'));
+  const C = json(KB.tendanceMois(ctx(S), { scope: 'perso', from: '2026-08', to: '2026-10', mode: 'cat:Bars' }));
+  assert.deepEqual([C.barres, C.ref, C.cat], [[0, 0, 9000], 5000, 'Bars']);
+  // balance cumulée
+  const Q = json(KB.tendanceMois(ctx(S), { scope: 'perso', from: '2026-08', to: '2026-10', mode: 'cum' }));
+  assert.equal(Q.ligne[2], T.bal[0] + T.bal[1] + T.bal[2]);
+});
+
+test('calculateur carburant : réglages du carnet, puis réglage annulable dans Klad', () => {
+  const { S } = etat();
+  assert.deepEqual(json(KB.carburant(S)), { ar: 0, jours: 20, autres: 0, conso: 5.5, prix: 2 });
+  S.carnet = { fuel: { ar: 40, jours: 20, autres: 100, conso: 6, prix: 1.8 } };
+  const c = json(KB.calculCarburant(ctx(S)));
+  assert.deepEqual([c.km, c.prevu], [900, 9720]);       // (40 × 20 + 100) km × 6 l / 100 km × 1,80 €
+  const avant = KB.reglerCarburant(S, { prix: 2, jours: -3 });
+  assert.deepEqual(json(S.budget.carburant), { ar: 40, jours: 20, autres: 100, conso: 6, prix: 2 });     // valeur négative ignorée
+  assert.equal(KB.calculCarburant(ctx(S)).prevu, 10800);
+  KB.annulerCarburant(S, avant);
+  assert.ok(!('carburant' in S.budget));
+  assert.equal(KB.calculCarburant(ctx(S)).prevu, 9720);
 });

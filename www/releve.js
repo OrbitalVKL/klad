@@ -1,4 +1,4 @@
-// Klad — import manuel d'un relevé (CSV ou JSON) dans un compte. Lecture reprise de l'ancienne version (colonnes
+// Klad — import manuel d'un relevé (CSV, Excel .xlsx via KladXlsx, ou JSON) dans un compte. Lecture reprise de l'ancienne version (colonnes
 // reconnues par leur intitulé, ordre jour/mois deviné, montants « 1 234,56 » ou « 1,234.56 ») ; format choisi selon le
 // rôle du compte : relevé bancaire (débit / crédit ou montant signé), carte à débit différé (dépenses en positif,
 // règlements écartés), paiement en ligne (colonnes nom / type / net ; virements, approvisionnements et retenues écartés).
@@ -149,6 +149,13 @@
   }
 
   const FORMATS = { courant: 'banque', commun: 'banque', epargne: 'banque', carte_differee: 'carte', paiement_en_ligne: 'portefeuille' };
+  // Tableau de lignes déjà lues (CSV, ou feuille Excel : valeurs texte, nombre, booléen, dates « AAAA-MM-JJ ») → mêmes
+  // règles pour tous : lignes vides retirées, colonnes reconnues par leur intitulé. → { lignes, stats, entete }.
+  function lireLignes(lignes, role, auj) {
+    const T = (Array.isArray(lignes) ? lignes : []).map(r => (Array.isArray(r) ? r : []).map(v => (v == null ? '' : v)))
+      .filter(r => r.some(x => String(x).trim()));
+    return depuisTableau(T, FORMATS[role] || 'banque', auj);
+  }
   // Lit un fichier (texte) pour un compte de rôle donné. → { lignes, stats, entete, sorte: 'csv' | 'json' }.
   function lire(texte, role, auj) {
     const t = String(texte || '').replace(/^﻿/, '').trim();
@@ -157,7 +164,29 @@
       try { o = JSON.parse(t); } catch (e) { throw new Error('Fichier JSON illisible.'); }
       return Object.assign(depuisJSON(o), { sorte: 'json' });
     }
-    return Object.assign(depuisTableau(lignesCSV(t), FORMATS[role] || 'banque', auj), { sorte: 'csv' });
+    return Object.assign(lireLignes(lignesCSV(t), role, auj), { sorte: 'csv' });
+  }
+  // Feuilles d'un classeur ([{ nom, lignes }], cf. KladXlsx.lire) : la première qui donne des opérations ; à défaut, la
+  // première dont l'en-tête est reconnu (pour ses statistiques). → { lignes, stats, entete, sorte: 'xlsx' }.
+  function lireFeuilles(feuilles, role, auj) {
+    let repli = null;
+    for (const f of Array.isArray(feuilles) ? feuilles : []) {
+      const r = lireLignes(f && f.lignes, role, auj);
+      if (r.lignes.length) return Object.assign(r, { sorte: 'xlsx' });
+      if (!repli || (!repli.entete && r.entete)) repli = r;
+    }
+    return Object.assign(repli || lireLignes([], role, auj), { sorte: 'xlsx' });
+  }
+  // Octets d'un fichier texte → texte (UTF-8, sinon Windows-1252 des relevés exportés sous Windows).
+  function texteDe(octets) {
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(octets); }
+    catch (e) { return new TextDecoder('windows-1252').decode(octets); }
+  }
+  // Fichier choisi (octets) : classeur Excel (reconnu à son contenu, pas à son nom) ou texte CSV / JSON.
+  async function lireFichier(octets, role, auj) {
+    const X = g.KladXlsx;
+    if (X && X.estClasseur(octets)) return lireFeuilles(await X.lire(octets), role, auj);
+    return lire(texteDe(octets), role, auj);
   }
 
   // ------------------------------------------------------------ intégration
@@ -191,5 +220,5 @@
     for (let i = list.length - 1; i >= 0; i--) if (set.has(list[i].id)) list.splice(i, 1);
   }
 
-  g.KladReleve = { lignesCSV, nombre, ordreDates, versISO, depuisTableau, depuisJSON, lire, integrer, retirer, FORMATS };
+  g.KladReleve = { lignesCSV, nombre, ordreDates, versISO, depuisTableau, depuisJSON, lire, lireLignes, lireFeuilles, lireFichier, texteDe, integrer, retirer, FORMATS };
 })(typeof window !== 'undefined' ? window : globalThis);

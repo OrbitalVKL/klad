@@ -3,9 +3,9 @@
 // paiement en ligne, JSON ; doublons ; annulation), mode démo (montants et noms masqués). Données fictives uniquement.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { charge, json } from './charge.mjs';
+import { charge, json, montantSigne } from './charge.mjs';
 
-const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'releve.js', 'affichage.js', 'vues.js', 'vbudget.js']);
+const X = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'carnet.js', 'budget.js', 'releve.js', 'affichage.js', 'ui.js', 'vues.js', 'vbudget.js']);
 const { KladModele: M, KladClasse: K, KladBudget: KB, KladReleve: RL, KladAffichage: AF, KladVuesBudget: VB } = X;
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 let n = 0;
@@ -33,7 +33,7 @@ test('contrats : ajout (poste deviné), nouveau poste, « → prévu », prévu 
   assert.equal(S.budget.contrats.length, 1);
   assert.equal(S.budget.contrats[0].poste, 'f|Assurance auto');
   const PP = json(KB.contratsParPoste(ctx(S), 'perso'));
-  assert.deepEqual(PP.map(x => [x.poste, x.budget, x.contrats, x.etat.texte]), [['f|Assurance auto', 4500, 5000, 'prévu 5,00 € de moins']]);
+  assert.deepEqual(PP.map(x => [x.poste, x.budget, x.contrats, x.etat.texte.replace(/\s/g, ' ')]), [['f|Assurance auto', 4500, 5000, 'prévu 5,00 € de moins']]);
   assert.equal(KB.contrats(ctx(S), 'perso')[0].etat.texte, 'conforme');
   // → prévu : le budget du poste prend le montant du contrat ; annulable
   const r = KB.versPrevu(S, 'perso', 'f|Assurance auto');
@@ -64,11 +64,12 @@ test('contrats : ajout (poste deviné), nouveau poste, « → prévu », prévu 
   assert.equal(S.budget.contrats.length, 0);
   // rendu : formulaire, bouton « → prévu », aucun montant signé
   KB.enregistrerContrat(S, ctx(S), { sc: 'perso', label: 'Assurance auto fictive', montant: 5000, motif: 'ASSUR AUTO' });
-  const h = VB.ecranContrats(ctx(S), 'perso', null);
-  assert.match(h, /data-ctedit="nouveau"/);
+  const h = VB.contrats(ctx(S), 'perso', null);
+  assert.match(h, /data-ctedit="liste"/);
+  assert.match(VB.contrats(ctx(S), 'perso', 'liste'), /data-ctedit="nouveau"/);
   assert.match(h, /data-versprevu="f\|Assurance auto"/);
-  assert.match(VB.ecranContrats(ctx(S), 'perso', 'nouveau'), /id="ctLabel"[\s\S]*id="ctPoste"[\s\S]*Nouveau poste fixe/);
-  assert.ok(!/[−-]\s?\d/.test(h.replace(/<[^>]+>/g, ' ').replace(/\d{2}\/\d{2}\/\d{2,4}/g, '')));
+  assert.match(VB.contrats(ctx(S), 'perso', 'nouveau'), /id="ctLabel"[\s\S]*id="ctPoste"[\s\S]*Nouveau poste fixe/);
+  assert.ok(!montantSigne(h));
 });
 
 test('base de calcul : fenêtre choisie, mois proposés ; « Tout aligner sur le réel habituel » annulable', () => {
@@ -79,8 +80,7 @@ test('base de calcul : fenêtre choisie, mois proposés ; « Tout aligner sur le
   const avant = KB.choisirReference(S, '2026-07');
   B = ctx(S);
   assert.equal(KB.fenetre(B).start, '2026-07');
-  assert.match(VB.baseCalcul(B, 'perso'), /<option value="2026-07" selected>Juillet 2026/);
-  assert.match(VB.ecran(B, 'perso', null, { ouverts: new Set() }), /Base de calcul · de juillet 2026 à septembre 2026 \(3 mois\)/);
+  assert.match(VB.teteBudget(B, 'perso', { mode: 'plan' }), /Base de calcul depuis <select id="bref">[\s\S]*<option value="2026-07" selected>juil\. 26/);
   // bars : médiane 40 € depuis juillet ; assurance : moyenne 50 €
   const r = KB.alignerTout(S, B, 'perso');
   assert.equal(r.n, 2);

@@ -412,6 +412,43 @@
     return { centimes: v, depuis: d, base: Math.round(+D.base * 100), date: D.date, n, compte: compte ? compte.id : null };
   }
 
+
+  // Intérêts estimés du livret pour l'année en cours, par quinzaine (règle des livrets réglementés : un versement compte
+  // à partir de la quinzaine suivante, un retrait dès la quinzaine en cours ; approché par le plus petit solde de la
+  // quinzaine), au taux saisi (bloc livret, sinon complément). → { centimes, taux, annee } ou null.
+  function livretInterets(B) {
+    const L = livret(B);
+    const S = B.S, D = (S.budget && S.budget.livret) || {}, C = isObj(complement(S).livret) ? complement(S).livret : {};
+    const taux = isFinite(+D.taux) && +D.taux > 0 ? +D.taux : isFinite(+C.taux) && +C.taux > 0 ? +C.taux : null;
+    if (!L || !taux) return null;
+    const map = (S.modele.reprise && S.modele.reprise.map) || {};
+    const cpt = C.compte ? (map[C.compte] || C.compte) : null;
+    let rx = null;
+    try { rx = new RegExp(C.motif || 'LIVRE|LIVRET', 'i'); } catch (e) { rx = /LIVRE|LIVRET/i; }
+    const mv = B.rows.filter(r => (cpt ? r.cid === cpt : r.role === 'courant') && rx.test(r.label)).map(r => [r.date, -r.m]);
+    // solde du livret à une date : solde saisi, plus les mouvements entre les deux dates
+    const solde = d => d >= L.date ? L.base + mv.filter(x => x[0] > L.date && x[0] <= d).reduce((t, x) => t + x[1], 0)
+      : L.base - mv.filter(x => x[0] > d && x[0] <= L.date).reduce((t, x) => t + x[1], 0);
+    const an = +B.auj.slice(0, 4);
+    let tot = 0;
+    for (let m = 1; m <= 12; m++) {
+      const mm = an + '-' + String(m).padStart(2, '0');
+      for (const [a, b] of [['01', '15'], ['16', null]]) {
+        const debut = mm + '-' + a, fin = b ? mm + '-' + b : KB().finMois(mm);
+        const v = Math.max(0, Math.min(solde(KB().plusJours(debut, -1)), solde(fin > B.auj ? B.auj : fin)));
+        tot += v * taux / 100 / 24;
+      }
+    }
+    return { centimes: Math.round(tot), taux, annee: an };
+  }
+  // Texte affiché sur la carte du compte livret (estimation du solde et des intérêts). → { idCompte: { centimes, texte } }.
+  function livretCarte(B) {
+    const L = livret(B);
+    if (!L || !L.compte) return {};
+    const I = livretInterets(B);
+    return { [L.compte]: { centimes: L.centimes, texte: I ? '≈ ' + KB().eur(I.centimes) + ' en ' + I.annee : 'taux à saisir (Épargne)' } };
+  }
+
   g.KladFisc = { PARAMS, PS_FONC, PASS, HYP0, PART_RULES, importer, fiscDe, irCalc, netSal, foyerCalc, tauxIndiv, contexte, annee, partage, texte,
-    regularisations, resteTexte, alertes, tfAnnee, tfPayee, alertesTF, taxeFonciere, pee, xirr, livret, pct1 };
+    regularisations, resteTexte, alertes, tfAnnee, tfPayee, alertesTF, taxeFonciere, pee, xirr, livret, livretInterets, livretCarte, pct1 };
 })(typeof window !== 'undefined' ? window : globalThis);

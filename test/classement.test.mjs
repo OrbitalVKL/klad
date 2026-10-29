@@ -210,3 +210,29 @@ test('motifs proposés pour un prélèvement : débits récurrents (2 mois au mo
     op(a, '2026-10-05', -300, 'PRLV SEPA ORGANISME FICTIF 3'), op(a, '2026-10-06', -300, 'CB UNE FOIS'), op(a, '2026-10-07', 300, 'VIR RECU ORGANISME FICTIF'));
   assert.deepEqual(json(K.propositions(S, k)), [{ motif: 'ORGANISME FICTIF', n: 3 }]);
 });
+
+test('catégories : création, renommage (règles suivies), suppression, nature ; règles ajoutées à la main ; annulation', () => {
+  const S = M.vide();
+  const a = M.nouveauCompte(S, { libelle: 'COURANT', role: 'courant' });
+  S.ops[a.id] = [op(a, '2026-10-20', -1500, 'CB BOUQUINISTE FICTIF')];
+  S.classement = K.nouveau();
+  const s0 = K.creerCategorie(S, 'Lecture', 'optionnelle');
+  assert.throws(() => K.creerCategorie(S, 'lecture'), /existe déjà/);
+  K.ajouterRegle(S, 'BOUQUINISTE', 'Lecture', 'Livres');
+  let r = K.classer(K.contexte(S, NOW), S.ops[a.id][0]);
+  assert.deepEqual([r.cat, r.sub], ['Lecture', 'Livres']);
+  K.renommerCategorie(S, 'Lecture', 'Livres & BD');
+  r = K.classer(K.contexte(S, NOW), S.ops[a.id][0]);
+  assert.equal(r.cat, 'Livres & BD');
+  assert.equal(S.classement.regles[0].cat, 'Livres & BD');
+  K.changerNature(S, 'Livres & BD', 'courante');
+  assert.equal(K.natureDe(S.classement, 'Livres & BD'), 'courante');
+  const s1 = K.supprimerCategorie(S, 'Livres & BD');
+  assert.ok(!K.listeCategories(S.classement).includes('Livres & BD'));
+  K.restaurer(S, s1);
+  assert.ok(K.listeCategories(S.classement).includes('Livres & BD'));
+  K.retirerRegle(S, 'bouquiniste');
+  assert.equal(S.classement.regles.length, 0);
+  K.restaurer(S, s0);
+  assert.ok(!K.listeCategories(S.classement).includes('Lecture'));
+});
