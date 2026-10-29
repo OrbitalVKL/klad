@@ -221,6 +221,20 @@ d'impôt, bulletins de paie déjà lus, hypothèses, logement, plan d'épargne e
   budget, solde, épargne réalisée, plus gros écarts — et répartition des dépenses (par nature, par catégorie).
 - Pas de lecture de mail, de Drive ni d'analyse par Claude (bulletins, avis, appels de fonds) : Lot 9.
 
+### Écarts comblés (0.8.1)
+
+- **Budget › Contrats** : ajout, modification et suppression d'un contrat (libellé, montant du document, périodicité, mot
+  du libellé bancaire, poste — deviné d'après le libellé, ou nouveau poste fixe —, source, note), annulables ; « Prévu du
+  poste et contrats » compare le budget de chaque poste au total mensuel de ses contrats, « → prévu » l'y aligne.
+- **Budget › Base de calcul** (en bas du cycle en cours) : mois de début du réel habituel (par défaut les 6 derniers mois
+  complets) et « Tout aligner sur le réel habituel », annulables.
+- **Plus › Affichage** : thème automatique, clair ou sombre (gardé sur le téléphone, hors coffre) ; mode démo (montants
+  multipliés par un facteur pris au hasard, noms des personnes et des banques remplacés, champs de saisie floutés ; en
+  mémoire seulement, rien n'est modifié).
+- **Plus › Comptes › (compte manuel) › Importer un relevé** : fichier CSV (relevé bancaire, relevé de carte, historique de
+  paiement en ligne, selon le rôle du compte ; lecture de l'ancienne version) ou JSON (`[{ date, label, amount }]` ou
+  opérations Enable Banking) ; opérations déjà présentes ignorées ; import annulable. Fichiers en UTF-8 ou Windows-1252.
+
 ### Sauvegarde et phrase de récupération
 
 Au premier lancement, Klad affiche une **phrase de récupération** : 24 caractères (120 bits aléatoires) en 6 groupes de 4, alphabet sans I, L, O, U. Elle est affichée une seule fois, à recopier sur papier, puis vérifiée par la ressaisie de 2 groupes.

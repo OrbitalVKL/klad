@@ -5,9 +5,10 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.8.0** — Lot 8 : impôts du foyer et taxe foncière, épargne (livret, PEE), observations et recommandations,
-résultats d'une période, répartition. (0.7.0 — Lot 7 : compte commun et équilibre des apports ; 0.6.0 — Lot 6 :
-budget par cycle, reste à vivre, contrats, échéances, tendance.)
+**0.8.1** — écarts comblés après l'inventaire : contrats modifiables (« → prévu »), base de calcul et « Tout aligner »,
+thème clair / sombre, mode démo, import manuel d'un relevé CSV ou JSON. (0.8.0 — Lot 8 : impôts, taxe foncière, épargne,
+observations, résultats, répartition ; 0.7.0 — Lot 7 : compte commun et équilibre ; 0.6.0 — Lot 6 : budget par cycle,
+reste à vivre, contrats, échéances, tendance.)
 
 Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts enchaînés sans validation intermédiaire
 (décisions par défaut notées dans chaque section « Décisions »).
@@ -83,6 +84,29 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
   complément ou du carnet, surchargés par `S.budget.reglages` ; jamais dans le code.
 - Reste à vivre : colonne « comptes courants » prioritaire pour Grafit (`left_to_live_basis` = `accounts`), sinon `budget`.
 
+## Inventaire des écarts avec l'ancienne version (0.8.1)
+
+Comblés en 0.8.1 (ni clé ni réglage personnel) : édition des contrats et « → prévu » ; base de calcul et « Tout aligner
+sur le réel habituel » ; thème ; mode démo ; import manuel CSV / JSON par compte manuel.
+
+Restent (à arbitrer pour le Lot 9 ou au-delà) :
+- Tendance : séries revenus / dépenses / balance par mois, solde cumulé et solde reconstitué, choix des comptes.
+- Compte commun : vue d'ensemble des parts par poste (tableau « Total retenu / Personne A / Personne B ») ; équilibre :
+  liste complète des mouvements filtrable par sorte, graphique de l'investissement cumulé de chacun.
+- Livret : estimation affichée sur la carte du compte livret (elle est dans Plus › Épargne).
+- Calculateur carburant (réglage `fuel` du carnet).
+- Import Excel (.xlsx) : l'ancienne version chargeait une bibliothèque en ligne ; à reprendre seulement avec une
+  bibliothèque embarquée (taille de l'appli).
+- Opérations « exceptionnelles » : réglage vide dans l'ancienne version (`EXC = {}`), rien à reprendre.
+- Avec clé ou réglage personnel (Lot 9) : lecture des bulletins de paie, avis et appels de fonds (Drive, Gmail / IMAP),
+  analyses par Claude, reprise définitive et bascule.
+
+Décisions 0.8.1 : contrats et base de calcul suivent l'ancienne version (poste deviné par les mots de 4 lettres ou plus,
+« → prévu » = total mensuel des contrats, ou échéance et périodicité d'un contrat non mensuel unique ; alignement à
+l'euro) ; import de relevé réservé aux comptes manuels (les comptes bancaires sont lus par Enable Banking : pas de
+doublon possible avec la synchro) ; mode démo sans facteur mémorisé (s'arrête au redémarrage) ; libellés courts des
+comptes non masqués en démo (ce sont aussi des mots de l'interface : « Commun »…).
+
 ## Points d'appui pour le Lot 9
 
 - Impôts : `KladFisc` (`contexte`, `annee`, `partage`, `regularisations`, `alertes`, `taxeFonciere`, `pee`, `livret`) ;
@@ -92,6 +116,8 @@ Nuit autonome du 28 au 29/10/2026 : lots 6, 7, 8 et inventaire des écarts encha
 - Observations : `KladObservations.audit(B)` (points), `observations(B, scope)` (à faire, masqués, infos).
 - Réglages du carnet encore inexploités : `excl` (opérations exceptionnelles, vide chez le propriétaire), `fuel`
   (calculateur carburant), `eq.mG/mS` (recalculés), `autoFiles` (soldes de l'ancienne synchro).
+- Import manuel : `KladReleve.lire(texte, role, auj)` puis `integrer(S, cid, lignes, now)` (source `fichier`) ; utile
+  pour la reprise définitive si un relevé manque.
 
 ## Points d'appui pour le Lot 8 (historique)
 

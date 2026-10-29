@@ -104,10 +104,21 @@
     }
     h += soldeCycle(s);
     if (scope === 'commun' && !past && g.KladVuesCommun) { try { h += g.KladVuesCommun.cartes(B, ui && ui.cartes); } catch (e) { h += '<p class="muted">Compte commun : calcul impossible.</p>'; } }
+    if (!past) h += baseCalcul(B, scope);
     h += '<p class="muted small">' + (per.cyc ? 'Cycle du dernier salaire à la veille du suivant. ' : '') +
       'Budget = votre budget mensuel (une charge trimestrielle ou annuelle ne compte que le mois de son échéance' + (scope === 'commun' ? ', sauf au compte commun où elle est provisionnée chaque mois' : '') +
       ') ; utilisé = opérations de la période, les paiements carte à leur date de paiement. Hors budget : postes sans budget.</p>';
     return h;
+  }
+
+  // Base de calcul du réel habituel (début de la référence) et « Tout aligner sur le réel habituel ».
+  function baseCalcul(B, scope) {
+    const W = KB().fenetre(B), L = KB().moisReference(B);
+    return '<details class="carte bbase"><summary>Base de calcul · de ' + esc(nomMois(W.start).toLowerCase()) + ' à ' + esc(nomMois(W.end).toLowerCase()) + ' (' + pluriel(W.months.length, 'mois', 'mois') + ')</summary>' +
+      '<label>Réel habituel calculé depuis<select id="bRef">' + L.map(m => '<option value="' + m + '"' + (m === W.start ? ' selected' : '') + '>' + esc(nomMois(m)) + '</option>').join('') + '</select></label>' +
+      (B.D.ref ? '<div class="row"><button class="lien" data-refdefaut="1">Revenir aux 6 derniers mois complets</button></div>' : '') +
+      '<p class="muted small">Moyenne des mois pour les charges fixes, médiane pour les dépenses courantes et optionnelles, réel des 12 derniers mois ÷ 12 pour les charges non mensuelles. Le dernier mois complet est ' + esc(nomMois(W.end).toLowerCase()) + '.</p>' +
+      '<div class="row"><button class="btn ghost small" data-alignertout="' + esc(scope) + '">Tout aligner sur le réel habituel</button></div></details>';
   }
 
   function ligne(B, scope, a, ouverts, s) {
@@ -215,16 +226,46 @@
   }
 
   // ------------------------------------------------------------ contrats et échéances
-  function ecranContrats(B, scope) {
+  // Formulaire d'un contrat (ed : identifiant du contrat, ou 'nouveau').
+  function formContrat(B, scope, ed) {
+    const c = ed === 'nouveau' ? { id: '', label: '', montant: 0, per: 1, motif: '', poste: '', src: '', note: '' } : (B.D.contrats || []).find(x => x.id === ed);
+    if (!c) return '';
+    const P = KB().postes(B, scope);
+    const keys = [...new Set(P.lignes.filter(a => !a.hidden && !a.lie).map(a => a.key).concat(c.poste ? [c.poste] : []))].filter(k => k[0] !== 'r')
+      .sort((a, b) => a.slice(2).localeCompare(b.slice(2), 'fr'));
+    return '<div class="carte ctrform" data-ctid="' + esc(c.id) + '"><b>' + (c.id ? 'Modifier le contrat' : 'Nouveau contrat') + '</b>' +
+      '<label>Libellé<input id="ctLabel" maxlength="80" autocomplete="off" value="' + esc(c.label) + '" placeholder="ex. Assurance habitation"></label>' +
+      '<div class="grp"><label>Montant du document<input id="ctMontant" inputmode="decimal" autocomplete="off" value="' + esc(c.montant ? F().versSaisie(c.montant) : '') + '"></label>' +
+      '<label>Périodicité<select id="ctPer">' + KB().PER.map(p => '<option value="' + p + '"' + (p === (+c.per || 1) ? ' selected' : '') + '>' + esc(PERLAB[p]) + '</option>').join('') + '</select></label></div>' +
+      '<label>Mot du libellé bancaire<input id="ctMotif" maxlength="200" autocomplete="off" spellcheck="false" value="' + esc(c.motif) + '" placeholder="plusieurs possibles, séparés par |"></label>' +
+      '<label>Poste du budget<select id="ctPoste"><option value="">' + (c.id ? '— aucun —' : 'deviner d\'après le libellé') + '</option>' +
+      keys.map(k => '<option value="' + esc(k) + '"' + (k === c.poste ? ' selected' : '') + '>' + esc(k.slice(2)) + '</option>').join('') +
+      '<option value="__nouveau">Nouveau poste fixe au nom du contrat</option></select></label>' +
+      '<label>Source<input id="ctSrc" maxlength="120" autocomplete="off" value="' + esc(c.src) + '" placeholder="contrat, avis, facture…"></label>' +
+      '<label>Note<input id="ctNote" maxlength="200" autocomplete="off" value="' + esc(c.note) + '"></label>' +
+      '<div class="row"><button class="btn" data-ct="ok">Enregistrer</button><button class="btn ghost" data-ct="fermer">Annuler</button>' +
+      (c.id ? '<span class="grow"></span><button class="btn danger small" data-ct="suppr">Supprimer</button>' : '') + '</div></div>';
+  }
+  function ecranContrats(B, scope, ed) {
     const L = KB().contrats(B, scope);
     let h = '<p class="muted">Montants des contrats et documents (pas des relevés), comparés au dernier prélèvement trouvé.</p>';
     h += '<div class="seg" role="group">' + ['perso', 'commun'].map(x => '<button data-scope="' + x + '" aria-pressed="' + (x === scope) + '">' + (x === 'perso' ? 'Perso' : 'Commun') + '</button>').join('') + '</div>';
+    if (ed === 'nouveau') h += formContrat(B, scope, ed);
     if (!L.length) h += '<p class="muted">Aucun contrat ' + (scope === 'commun' ? 'du compte commun' : 'perso') + '.</p>';
-    h += '<ul class="list ctr">' + L.map(c => '<li><div class="grow"><b>' + esc(c.label) + '</b><small>' + e2(c.montant) + ' ' + esc(PERLAB[c.per || 1]) +
+    h += '<ul class="list ctr">' + L.map(c => ed === c.id ? '<li class="edit">' + formContrat(B, scope, ed) + '</li>' : '<li><div class="grow"><b>' + esc(c.label) + '</b><small>' + e2(c.montant) + ' ' + esc(PERLAB[c.per || 1]) +
       (c.per > 1 ? ' (soit ' + e2(c.mensuel) + ' par mois)' : '') + (c.posteLabel ? ' · poste ' + esc(c.posteLabel) : '') + '</small>' +
       '<small>' + (c.dernier ? 'dernier prélèvement ' + e2(c.dernier.montant) + ' le ' + jjmmaa(c.dernier.date) : 'aucun prélèvement trouvé') +
       (c.prochaine ? ' · prochaine échéance le ' + jjmmaa(c.prochaine) : '') + '</small>' +
-      (c.src || c.note ? '<small>' + esc([c.src, c.note].filter(Boolean).join(' · ')) + '</small>' : '') + '</div>' + chip(c.etat) + '</li>').join('') + '</ul>';
+      (c.src || c.note ? '<small>' + esc([c.src, c.note].filter(Boolean).join(' · ')) + '</small>' : '') + '</div>' +
+      '<div class="droite">' + chip(c.etat) + '<button class="lien" data-ctedit="' + esc(c.id) + '">Modifier</button></div></li>').join('') + '</ul>';
+    if (ed !== 'nouveau') h += '<div class="row"><button class="btn ghost small" data-ctedit="nouveau">+ Ajouter un contrat</button></div>';
+    const PP = KB().contratsParPoste(B, scope);
+    if (PP.length) {
+      h += '<h3>Prévu du poste et contrats</h3><ul class="list">' + PP.map(x => '<li><div class="grow">' + esc(x.label) +
+        '<small>' + (x.budget == null ? 'poste absent du budget' : 'prévu ' + e2(x.budget) + ' par mois') + ' · contrats ' + e2(x.contrats) + ' par mois' + (x.n > 1 ? ' (' + x.n + ')' : '') + '</small></div>' +
+        '<div class="droite">' + chip(x.etat) + (x.etat.texte !== 'aligné' ? '<button class="lien" data-versprevu="' + esc(x.poste) + '">→ prévu</button>' : '') + '</div></li>').join('') + '</ul>' +
+        '<p class="muted small">« → prévu » reporte le total des contrats du poste dans le budget (annulable).</p>';
+    }
     const E = KB().echeances(B, 31);
     h += '<h3>Échéances des 31 prochains jours</h3>' + (E.length ? '<ul class="list">' + E.map(x => '<li><div class="grow">' + esc(x.label) +
       '<small>' + esc(jjmmaa(x.date) + ' · ' + ({ contrat: 'contrat', recurrent: 'prélèvement récurrent', carte: 'carte à débit différé' }[x.sorte]) + (x.scope === 'commun' ? ' · commun' : '')) + '</small></div><span class="m">' + esc(e2(x.montant)) + '</span></li>').join('') + '</ul>'
@@ -271,5 +312,5 @@
     return h;
   }
 
-  g.KladVuesBudget = { ecran, ligne, carteRav, detailRav, edition, ecranContrats, ecranTendance, libellePeriode, PERLAB };
+  g.KladVuesBudget = { ecran, ligne, baseCalcul, formContrat, carteRav, detailRav, edition, ecranContrats, ecranTendance, libellePeriode, PERLAB };
 })(typeof window !== 'undefined' ? window : globalThis);
