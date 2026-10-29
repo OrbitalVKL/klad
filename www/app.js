@@ -337,6 +337,7 @@
       it('🔎', 'Observations', nObs ? nObs + ' point(s) à faire' : 'Rien à faire', 'data-volet="secObs" data-empiler="1"') +
       it('📥', 'Import de reprise', r ? 'Importée le ' + F.date(r.importee.slice(0, 10)) + ', ' + r.nb + ' opération(s)' : 'Aucun import', 'data-volet="secReprise" data-empiler="1"') +
       it('🎨', 'Affichage', 'Thème, mode démo', 'data-volet="secAffichage" data-empiler="1"') +
+      it('✨', 'Extras', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : 'Mail, Claude', 'data-volet="secExtras" data-empiler="1"') +
       it('🧩', 'Modules', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : 'Lien Grafit', 'data-volet="secModules" data-empiler="1"') +
       it('🔒', 'Verrou', 'Code, empreinte, effacement', 'data-volet="secVerrou" data-empiler="1"') +
       it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog" data-empiler="1"') +
@@ -1058,7 +1059,7 @@
     toastAction = null; $('toast').className = '';
     ['app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
       'view-appart', 'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps']
+      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'extrasCorps', 'claudeCorps']
       .forEach(id => { const e = $(id); if (e) e.textContent = ''; });
     $('tb-badge').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'q'].forEach(id => { $(id).value = ''; });
