@@ -54,6 +54,20 @@ function fauxEB() {
   };
 }
 
+// Faux serveur Anthropic injecté dans la page (aucun réseau) : comptage de jetons et lecture d'un bulletin fictif.
+function fauxClaude() {
+  const vrai = window.fetch.bind(window);
+  window.KladFauxClaude = [];
+  window.fetch = async (url, o) => {
+    if (!String(url).startsWith('https://api.anthropic.com/')) return vrai(url, o);
+    window.KladFauxClaude.push({ url: String(url), headers: o.headers, body: o.body });
+    const rep = String(url).endsWith('/count_tokens') ? { input_tokens: 3000 }
+      : { model: 'claude-opus-5-5', stop_reason: 'end_turn', usage: { input_tokens: 3100, output_tokens: 400 }, content: [{ type: 'text', text: JSON.stringify({
+        employeur: 'Société fictive', mois_salaire: '2026-09', date_paiement: '2026-09-30', brut: 3200, net_imposable: 2500, prelevement_source: 120, taux_pas: 4.8, type_taux: 'personnalise' }) }] };
+    return new Response(JSON.stringify(rep), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+}
+
 function reprise() {
   const jour = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   return {
@@ -363,6 +377,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     page.setDefaultTimeout(8000);
     const erreurs = [];
     page.on('pageerror', e => erreurs.push(e.message));
+    await page.addInitScript(fauxClaude);
     await page.goto(base);
     const code = async () => { for (const k of '123456') await page.keyboard.press(k); };
     await page.getByRole('button', { name: 'Créer mon code' }).click();
@@ -543,6 +558,43 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.ok(rel.budget.courant.postes.length > 0 && rel.empreinte.cycles.courant.comptes.length > 0);
     assert.ok(!/FR76|sk-ant/.test(JSON.stringify(rel)));
     await page.locator('#volet [data-fermer]').last().click();
+    // Lot 9b : extras désactivés par défaut ; Claude activé → « Lire un bulletin » ; envoi confirmé (aperçu, coût), enregistrement
+    await page.locator('#app-tb [data-tab="plus"]').click();
+    assert.match(await page.locator('#plusCorps [data-volet="secExtras"]').innerText(), /Mail désactivé · Claude désactivé/);
+    await page.locator('#plusCorps [data-vue="impots"]').click();
+    assert.equal(await page.locator('#view-impots [data-lirebs]').count(), 0);
+    await plusVers('secExtras');
+    await page.locator('#extrasCorps [data-extra="claude"]').click();
+    await page.fill('#exCle', 'sk-ant-api03-' + 'f'.repeat(40));
+    await page.locator('#extrasCorps [data-exa="claudeok"]').click();
+    assert.equal(await page.evaluate(() => window.KladApp.etat().cle.claude.slice(0, 7)), 'sk-ant-');
+    await capture(page, '22-extras');
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('#app-tb [data-tab="plus"]').click();
+    await page.locator('#plusCorps [data-vue="impots"]').click();
+    const nbBs = await page.evaluate(() => Object.keys(window.KladApp.etat().budget.fisc.bs).length);
+    const [fb] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#view-impots [data-lirebs]').first().click()]);
+    await fb.setFiles({ name: 'bulletin.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 bulletin fictif') });
+    await page.waitForFunction(() => /environ|moins de/.test(document.getElementById('claudeCorps').textContent));
+    assert.match(await page.locator('#claudeCorps').innerText(), /Envoyé à Claude : le document « bulletin\.pdf »[\s\S]*Rien d'autre/);
+    await page.locator('#claudeCorps [data-cl="envoyer"]').click();
+    await page.waitForSelector('#claudeCorps [data-cl="enregistrer"]');
+    assert.match(await page.locator('#claudeCorps').innerText(), /Coût réel[\s\S]*Net imposable \(€\)[\s\S]*2\s500/);
+    await capture(page, '23-claude');
+    await page.locator('#claudeCorps [data-cl="enregistrer"]').click();
+    await page.waitForSelector('#toast.show.action');
+    assert.equal(await page.evaluate(() => Object.keys(window.KladApp.etat().budget.fisc.bs).length), nbBs + 1);
+    const envois = await page.evaluate(() => window.KladFauxClaude);
+    assert.equal(envois.length, 2);
+    for (const e of envois) { assert.ok(!e.body.includes('sk-ant-')); assert.ok(!/FICTI[FV]E? PAIE|SUPERMARCHE|FR76/.test(e.body)); }
+    assert.ok(!(await page.evaluate(() => window.KladApp.etat().journal.log.join('\n'))).includes('sk-ant-'));
+    // désactivé : le bouton disparaît
+    await plusVers('secExtras');
+    await page.locator('#extrasCorps [data-extra="claude"]').click();
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('#app-tb [data-tab="plus"]').click();
+    await page.locator('#plusCorps [data-vue="impots"]').click();
+    assert.equal(await page.locator('#view-impots [data-lirebs]').count(), 0);
 
     // Grafit : month et upcoming
     await plusVers('secModules');
@@ -556,6 +608,31 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.ok(Array.isArray(r.upcoming));
     const brut = JSON.stringify(r);
     for (const x of ['FICTI', 'PRLV', 'SUPERMARCHE']) assert.ok(!brut.includes(x), x);
+    assert.deepEqual(erreurs, []);
+  } finally {
+    await browser.close();
+    srv.close();
+  }
+});
+
+// Lot 9b : texte d'un PDF lu par pdf.js embarqué (aucun réseau) ; PDF fictif fabriqué par Chromium.
+test('parcours : lecture du texte d\'un PDF avec pdf.js embarqué', { skip: !chromium && !process.env.KLAD_PARCOURS && 'Playwright absent' }, async () => {
+  const srv = await serveur();
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const browser = await chromium.launch();
+  try {
+    const p0 = await browser.newPage();
+    await p0.setContent('<p>Résidence fictive</p><p>Appel exigible le 01/10/2026</p><p>Total appel copropriétaire 1 234,56</p>');
+    const pdf = await p0.pdf();
+    const page = await browser.newPage();
+    const erreurs = [];
+    page.on('pageerror', e => erreurs.push(e.message));
+    const autres = [];
+    page.on('request', r => { if (!r.url().startsWith(base)) autres.push(r.url()); });
+    await page.goto(base + 'index.html');
+    const t = await page.evaluate(async b64 => window.KladPdf.texte(Uint8Array.from(atob(b64), c => c.charCodeAt(0))), pdf.toString('base64'));
+    assert.match(t, /Résidence fictive[\s\S]*exigible le 01\/10\/2026[\s\S]*Total appel copropriétaire 1 234,56/);
+    assert.deepEqual(autres.filter(u => !u.startsWith('data:')), []);
     assert.deepEqual(erreurs, []);
   } finally {
     await browser.close();

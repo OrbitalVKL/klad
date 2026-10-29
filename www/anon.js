@@ -20,6 +20,7 @@
   // Filet de sécurité appliqué à chaque ligne du journal.
   function scrub(text) {
     return String(text == null ? '' : text)
+      .replace(/sk-ant-[\w-]+/g, '[clé]')
       .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[e-mail]')
       .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '…')
       .replace(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){10,30}\b/g, '[IBAN]')

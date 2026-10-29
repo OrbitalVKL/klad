@@ -1582,3 +1582,6 @@ ol.ecarts li { margin: 4px 0; }
 .demobar[hidden] { display: none; }
 .demobar button { all: unset; cursor: pointer; text-decoration: underline; font-weight: 600; }
 html.demo input:not([type="checkbox"]):not([type="radio"]), html.demo textarea, html.demo select { filter: blur(5px); }
+
+/* ---------- Klad : extras (Claude) ---------- */
+pre.cl-ap { white-space: pre-wrap; word-break: break-word; font: 12.5px/1.45 var(--mono); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-height: 40vh; overflow: auto; }
