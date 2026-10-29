@@ -37,7 +37,7 @@
     const c = Object.assign({}, isObj(X.commun) ? X.commun : {}, isObj(D.reglages) && isObj(D.reglages.commun) ? D.reglages.commun : {});
     const ap = isObj(X.appels) ? X.appels : {};
     const eq = Object.assign({}, isObj(X.equilibre) ? X.equilibre : {});
-    const P = st && isObj(st.P) ? st.P : {};
+    const P = st && g.KladCarnet ? g.KladCarnet.payload(st) : {};
     if (!Array.isArray(eq.ops) && Array.isArray(P.eqops)) eq.ops = P.eqops;
     if (!Array.isArray(eq.equip) && Array.isArray(P.equip)) eq.equip = P.equip;
     return {

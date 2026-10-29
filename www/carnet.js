@@ -1,5 +1,5 @@
 // Klad — classement repris du carnet de l'ancienne version (bloc « carnet » de la reprise, gardé chiffré) :
-// catégories (cats), règles de base (P.rules) et de l'utilisateur (rules), corrections ponctuelles (singles), opérations
+// catégories (cats), règles de base (P.rules, payload.rules ou _payload.rules) et de l'utilisateur (rules), corrections ponctuelles (singles), opérations
 // vues (seen), motifs de règlement des cartes et portefeuilles. Les mots-clés sont des données du carnet, jamais du code.
 //
 // Les corrections et les opérations vues du carnet sont indexées par la clé d'opération de l'ancienne version
@@ -29,11 +29,18 @@
     return isObj(carnet.state) ? Object.assign({}, carnet.state, carnet) : carnet;
   }
 
+  // Données figées de l'ancienne version (règles de base, budgets par défaut, revenu prévu, mouvements et équipements de
+  // l'équilibre) : « P » ou « payload » dans le carnet, « _payload » dans le fichier de reprise.
+  function payload(st) {
+    if (!isObj(st)) return {};
+    return isObj(st.P) ? st.P : isObj(st.payload) ? st.payload : isObj(st._payload) ? st._payload : {};
+  }
+
   // Le carnet contient-il de quoi classer ?
   function utilisable(carnet) {
     const st = racine(carnet);
     if (!st) return false;
-    const P = isObj(st.P) ? st.P : isObj(st.payload) ? st.payload : {};
+    const P = payload(st);
     return !!(arr(P.rules) || arr(st.baseRules) || arr(st.rules) || arr(st.userRules) || isObj(st.cats) || isObj(st.singles) || isObj(st.seen));
   }
 
@@ -90,7 +97,10 @@
     const st = racine(carnet);
     if (!st) throw new Error('Carnet absent.');
     const C = S.classement || K().nouveau();
-    const P = isObj(st.P) ? st.P : isObj(st.payload) ? st.payload : {};
+    const P = payload(st);
+    // partiel : seulement les règles de base et les catégories qui manquent (complément de la 0.9.3) ; règles de
+    // l'utilisateur, corrections, opérations vues et catégories déjà présentes restent comme dans Klad.
+    const partiel = !!opts.seulementBase;
     const X = isObj(st.klad) ? st.klad : {};
     const cats = isObj(st.cats) ? st.cats : {};
     const renommees = Object.assign({}, RENOMMEES, isObj(cats.renamed) ? cats.renamed : {});
@@ -118,12 +128,14 @@
     const natureConnue = {};
     const custom = isObj(cats.custom) ? cats.custom : {};
     for (const n of Object.keys(custom)) {
+      if (partiel && categories[n]) { natureConnue[n] = true; continue; }
       const nat = isObj(custom[n]) && K().NATURES.indexOf(custom[n].nat) >= 0 ? custom[n].nat : 'optionnelle';
       categories[n] = Object.assign({}, categories[n], { nature: nat, icone: (categories[n] && categories[n].icone) || K().iconeDe(C, n) });
       natureConnue[n] = true;
     }
     const icones = isObj(cats.icons) ? cats.icons : {};
     for (const n of Object.keys(icones)) {
+      if (partiel && categories[n]) continue;
       const sp = String(icones[n] || '');
       const ic = sp.indexOf('svg:') === 0 ? ICONES_SVG[sp.slice(4)] : sp.slice(0, 8);
       if (ic) categories[n] = Object.assign({ nature: K().natureDe(C, n) }, categories[n], { icone: ic });
@@ -137,7 +149,8 @@
         categories[cat].nature = NATURE_DE_TYPE[type];
       }
     }
-    for (const n of retirees.concat(Object.keys(renommees))) delete categories[n];
+    if (!partiel) for (const n of retirees.concat(Object.keys(renommees))) delete categories[n];
+    const avant = new Set(Object.keys(categories));
 
     // ---------------------------------------------------------- règles de base (ordre de l'ancienne version)
     const resoudre = resolveur(S, st);
@@ -175,6 +188,15 @@
       const m = remap(tr, x.cat, x.sub || x.cat, null);
       base.push(Object.assign(b, { cat: m.cat, sub: m.sub }));
       ajouter(m.cat, tr);
+    }
+
+    if (partiel) {
+      C.categories = categories;
+      C.base = base;
+      S.classement = C;
+      deduireMotifs(S, base);
+      C.import = Object.assign({}, C.import, { payload: true });
+      return { base: base.length, categories: Object.keys(categories).filter(n => !avant.has(n)).length };
     }
 
     // ---------------------------------------------------------- règles de l'utilisateur
@@ -252,7 +274,7 @@
       if (c.role === 'carte_differee') rapport.cartes++;
       if (c.role === 'paiement_en_ligne') rapport.portefeuilles++;
     }
-    C.import = { le: new Date(opts.now == null ? Date.now() : opts.now).toISOString(), rapport };
+    C.import = { le: new Date(opts.now == null ? Date.now() : opts.now).toISOString(), rapport, payload: true };
     return rapport;
   }
 
@@ -309,5 +331,5 @@
     return c => { let x = c; for (let i = 0; ren[x] && ren[x] !== x && i < 5; i++) x = ren[x]; return x; };
   }
 
-  g.KladCarnet = { utilisable, convertir, cleCarnet, sha256hex, BARS, renommeur, racine };
+  g.KladCarnet = { utilisable, convertir, cleCarnet, sha256hex, BARS, renommeur, racine, payload };
 })(typeof window !== 'undefined' ? window : globalThis);

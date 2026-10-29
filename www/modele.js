@@ -337,15 +337,28 @@
 
   // Intègre un relevé Enable Banking (opérations brutes) dans le compte cid.
   // Frontière de reprise : dates antérieures ignorées ; jour même accepté, sauf opération déjà dans la reprise.
+  // Crédit de règlement d'une carte ou d'un portefeuille (« prélèvement automatique … merci », « paiement reçu ») :
+  // écarté à l'import, comme dans l'ancienne version. Motif réglé dans la fiche du compte (« remboursements »,
+  // pré-rempli par le complément), jamais dans le code ; sans motif, rien n'est écarté.
+  function creditDeReglement(c, x) {
+    if (!c || (c.role !== 'carte_differee' && c.role !== 'paiement_en_ligne') || !(x.montant > 0)) return false;
+    const K = g.KladClasse;
+    const mots = K && c.prelevement ? K.motifs(c.prelevement.remboursements) : [];
+    if (!mots.length) return false;
+    const L = K.fold(x.libelle);
+    return mots.some(m => L.indexOf(m) >= 0);
+  }
+
   function integrer(S, cid, raw, now) {
     const c = compte(S, cid);
     const jour = jourLocal(now);
     const front = (c && c.frontiere) || '';
-    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, ignorees: 0, reprises: 0 };
+    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, ignorees: 0, reprises: 0, ecartees: 0 };
     const cands = [];
     for (const t of raw || []) {
       const x = depuisEB(t);
       if (!x || (front && x.date < front)) { st.ignorees++; continue; }
+      if (creditDeReglement(c, x)) { st.ecartees++; continue; }
       cands.push(x);
     }
     doterIds(cid, cands, 'h');
@@ -589,7 +602,7 @@
     V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId,
     vide, nouveauModele, compte, comptesTries, comptesDe, opsDe, roleDefaut, nouveauCompte, compteEB, empreinte,
     associerSession, supprimerCompte, remplacerCompte, reassocier, disponibles, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, bornesRecuperation, debutRecuperation,
-    appliquerFrontiere, soldePrefere, soldesLus, soldeAffiche, totalCourants, etatAcces, alerteCompte,
+    appliquerFrontiere, creditDeReglement, soldePrefere, soldesLus, soldeAffiche, totalCourants, etatAcces, alerteCompte,
     versBlocs, nomsOps, depuisBlocs, BLOC_OPS, depuis02, surChangement, signaler
   };
 })(typeof window !== 'undefined' ? window : globalThis);

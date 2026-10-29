@@ -109,7 +109,7 @@
   function toast(msg, err) { if (A()) A().toast(msg, err); }
 
   // Logo de Klad (même dessin que l'icône de l'appli).
-  const LOGO = '<svg viewBox="18 18 72 72" aria-hidden="true"><defs><linearGradient id="kg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3CB6B"/><stop offset="1" stop-color="#C98A1E"/></linearGradient></defs><rect x="18" y="18" width="72" height="72" fill="#1E3A5C"/><path fill="url(#kg)" d="M37 31h9.5v19.2h3.2L61.6 31h10.6L58.6 52.4 73.4 77H62.5L50.6 56.6h-4.1V77H37z"/></svg>';
+  const LOGO = '<svg viewBox="18 18 72 72" aria-hidden="true"><rect x="18" y="18" width="72" height="72" fill="#0A0C0E"/><path fill="#9E4A4A" d="M39.92,33.76H47.84V74.24H39.92ZM35.52,32H52.24V35.17H35.52ZM35.52,72.83H52.24V76H35.52ZM47.84,50.66C54.44,48.37 59.28,43.62 62.1,36.93L65.97,38.34C63.15,45.73 57.17,51.71 47.84,56.11ZM64.74,33.41A3.87,3.87 0 1 1 64.73,33.41ZM49.78,54.18L55.41,50.3L74.24,74.24H65.79ZM61.92,72.83H76.88V76H61.92Z"/></svg>';
   function head() {
     return '<div class="vhead"><span class="logo big">' + LOGO + '</span><div><b>Klad</b><small>' + esc(CFG.version || 'dev') +
       (isNative ? '' : ' · navigateur') + '</small></div></div>' +

@@ -165,7 +165,8 @@
     const point = f => essai(f);
     const meta = { version: x.version || 'dev', genere: new Date(now).toISOString(), aujourdhui: B.auj,
       synchro: M().comptesTries(S).filter(c => !c.masque).map(c => ({ ref: ref(c.id), libelle: c.libelle, lu: c.source.type === 'eb' ? (c.sync && c.sync.lu) || null : null, source: c.source.type })),
-      complement: !!(S.carnet && KB().racine(S.carnet) && KB().racine(S.carnet).klad), derniereSynchro: S.modele.sync.derniere || null };
+      complement: !!(S.carnet && KB().racine(S.carnet) && KB().racine(S.carnet).klad), derniereSynchro: S.modele.sync.derniere || null,
+      import: g.KladMigrations ? essai(() => g.KladMigrations.etatImport(S)) : null };
     return {
       format: FORMAT, v: V, source: 'klad', meta,
       comptes: point(() => comptes(S, B, now, ref)),

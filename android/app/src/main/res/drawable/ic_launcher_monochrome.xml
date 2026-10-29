@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Icône monochrome (icônes à thème d'Android 13 et plus) : le К seul, teinté par le système. -->
+<!-- Icône monochrome (icônes à thème d'Android 13 et plus) : le К seul, teinté par le système. Généré par scripts/icone.mjs. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,5 +7,5 @@
     android:viewportHeight="108">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M37,31h9.5v19.2h3.2L61.6,31h10.6L58.6,52.4 73.4,77H62.5L50.6,56.6h-4.1V77H37z" />
+        android:pathData="M39.92,33.76H47.84V74.24H39.92ZM35.52,32H52.24V35.17H35.52ZM35.52,72.83H52.24V76H35.52ZM47.84,50.66C54.44,48.37 59.28,43.62 62.1,36.93L65.97,38.34C63.15,45.73 57.17,51.71 47.84,56.11ZM64.74,33.41A3.87,3.87 0 1 1 64.73,33.41ZM49.78,54.18L55.41,50.3L74.24,74.24H65.79ZM61.92,72.83H76.88V76H61.92Z" />
 </vector>

@@ -550,11 +550,14 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     // 0.9.1 : relevé de contrôle (Plus › Contrôle) : confirmation, fichier JSON klad-controle v1
     await plusVers('secControle');
     assert.match(await page.locator('#controleCorps').innerText(), /Fichier personnel en clair/);
+    assert.match(await page.locator('#ctlImport').innerText(), /Import de l'ancienne version : \d+ règles de base, \d+ postes de budget, \d+ mouvements? d'équilibre/);
+    assert.doesNotMatch(await page.locator('#ctlImport').innerText(), /incomplet/);
     await page.locator('#controleCorps [data-ctl="exporter"]').click();
     const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('#controleCorps [data-ctl="exporter"]').click()]);
     assert.match(dl.suggestedFilename(), /^klad-controle-\d{8}-\d{4}\.json$/);
     const rel = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
     assert.deepEqual([rel.format, rel.v, rel.source], ['klad-controle', 1, 'klad']);
+    assert.ok(rel.meta.import.reglesBase > 0 && rel.meta.import.postes > 0);
     assert.ok(rel.budget.courant.postes.length > 0 && rel.empreinte.cycles.courant.comptes.length > 0);
     assert.ok(!/FR76|sk-ant/.test(JSON.stringify(rel)));
     await page.locator('#volet [data-fermer]').last().click();
