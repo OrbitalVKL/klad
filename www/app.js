@@ -820,7 +820,7 @@
 
   window.KladApp = {
     open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
-    ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, etat: () => S, hooks: () => hooks, esc, isNative,
+    ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, rendre, etat: () => S, hooks: () => hooks, esc, isNative,
     ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp
   };
 })();

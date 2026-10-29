@@ -461,6 +461,48 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await capture(page, '15-tendance');
     await page.locator('#volet [data-fermer]').last().click();
 
+    // 0.8.1 : contrat ajouté depuis le volet (annulable) ; base de calcul ; thème ; mode démo
+    await page.locator('#vBudget [data-ouvrir="secContrats"]').click();
+    await page.locator('#contratsCorps [data-ctedit="nouveau"]').click();
+    await page.fill('#ctLabel', 'Abonnement fictif');
+    await page.fill('#ctMontant', '12,50');
+    await page.fill('#ctMotif', 'ABONNEMENT FICTIF');
+    await page.locator('#contratsCorps [data-ct="ok"]').click();
+    await page.waitForSelector('#toast.show.action');
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 5);
+    assert.match(await page.locator('#contratsCorps').innerText(), /Abonnement fictif[\s\S]*12,50\s€/);
+    await capture(page, '19-contrats');
+    await page.locator('#toast button').click();
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
+    await page.locator('#volet [data-fermer]').last().click();
+    await page.locator('#vBudget details.bbase summary').click();
+    const refAvant = await page.evaluate(() => window.KladApp.etat().budget.ref);
+    const opts = await page.locator('#bRef option').evaluateAll(o => o.map(x => x.value));
+    await page.selectOption('#bRef', opts[1]);
+    await page.waitForSelector('#toast.show.action');
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.ref), opts[1]);
+    await page.locator('#toast button').click();
+    await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.ref), refAvant);
+    await page.locator('.onglets [data-onglet="vPlus"]').click();
+    await page.locator('#vPlus [data-volet="secAffichage"]').click();
+    await page.locator('#affichageCorps [data-theme-choix="sombre"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'sombre');
+    await capture(page, '20-theme-sombre');
+    await page.locator('#affichageCorps [data-theme-choix="auto"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme || 'auto'), 'auto');
+    const tot0 = await page.locator('#vBudget .bsec.fixe .gs').textContent();
+    await page.locator('#affichageCorps [data-demo="on"]').click();
+    await page.locator('.onglets [data-onglet="vBudget"]').click();
+    await page.waitForTimeout(150);
+    assert.ok(await page.locator('#demoBar').isVisible());
+    assert.notEqual(await page.locator('#vBudget .bsec.fixe .gs').textContent(), tot0);
+    await capture(page, '21-mode-demo');
+    await page.locator('#demoBar button').click();
+    assert.ok(!(await page.locator('#demoBar').isVisible()));
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('demo')), false);
+
     // Lot 8 : résultats, impôts, épargne, observations ; « À vérifier » signale les observations à faire
     await page.locator('.onglets [data-onglet="vBudget"]').click();
     await page.locator('#vBudget [data-ouvrir="secResultats"]').click();

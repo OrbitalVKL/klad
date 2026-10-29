@@ -95,10 +95,38 @@
         '<label>Sens<select id="fSens"><option value="cre">créditeur</option><option value="deb"' + (c && c.solde && c.solde.centimes < 0 ? ' selected' : '') + '>débiteur</option></select></label>' +
         '<label>Date du solde<input id="fSoldeDate" type="date" value="' + esc(c && c.solde ? c.solde.date : M.jourLocal(Date.now())) + '"></label></div>' : soldeTypes) +
       '<label class="inline"><input id="fMasque" type="checkbox"' + (c && c.masque ? ' checked' : '') + '> Masquer ce compte</label>' +
+      (c && manuel && window.KladReleve ? '<details class="adv"><summary>Importer un relevé (CSV ou JSON)</summary><p class="muted small">' + esc(TEXTE_RELEVE[KR().FORMATS[c.role] || 'banque']) +
+        ' Les opérations déjà présentes sont ignorées ; l\'import est annulable.</p><div class="row"><button class="btn ghost small" data-a="releve">Choisir le fichier</button></div></details>' : '') +
       '<p class="msg bad" id="fMsg"></p>' +
       '<div class="row"><button class="btn" data-a="ok">Enregistrer</button>' +
       (c && manuel ? '<span class="grow"></span><button class="btn danger small" data-a="del">Supprimer</button>' : '') + '</div>';
     majPrel();
+  }
+
+  const KR = () => window.KladReleve;
+  const TEXTE_RELEVE = {
+    banque: 'Relevé bancaire : colonnes Date, Libellé, puis Débit et Crédit ou Montant.',
+    carte: 'Relevé de carte : colonnes Date, Description, Montant (dépenses en positif) ; les règlements de la carte sont écartés.',
+    portefeuille: 'Historique de paiement en ligne : colonnes Date, Nom, Type, Net ; virements, approvisionnements et retenues écartés.'
+  };
+  async function importerReleve(cid) {
+    const h = A.hooks();
+    const texte = h.choisirFichier ? await h.choisirFichier() : null;
+    if (texte == null) return;
+    const c = M.compte(S(), cid);
+    if (!c) return;
+    const lu = KR().lire(texte, c.role, M.jourLocal(Date.now()));
+    if (!lu.entete) throw new Error('Aucune colonne « Date » reconnue : ce fichier n\'est pas un relevé lisible.');
+    if (!lu.lignes.length) throw new Error('Aucune opération lisible dans ce fichier' + (lu.stats.dateIllisible ? ' (' + lu.stats.dateIllisible + ' date(s) illisible(s))' : '') + '.');
+    const r = KR().integrer(S(), cid, lu.lignes, Date.now());
+    A.log('info', 'Relevé importé dans un compte manuel : ' + r.ajoutees.length + ' opération(s) ajoutée(s), ' + r.doublons + ' déjà présente(s).');
+    A.changed('import');
+    let msg = r.ajoutees.length ? r.ajoutees.length + ' opération(s) ajoutée(s), du ' + F.date(r.du) + ' au ' + F.date(r.au) + '.' : 'Toutes les opérations étaient déjà présentes : rien à ajouter.';
+    if (r.doublons && r.ajoutees.length) msg += ' ' + r.doublons + ' déjà présente(s).';
+    if (lu.stats.ecartees) msg += ' ' + lu.stats.ecartees + ' ligne(s) de règlement ou de virement écartée(s).';
+    if (lu.stats.dateIllisible) msg += ' ' + lu.stats.dateIllisible + ' date(s) illisible(s).';
+    if (r.ajoutees.length) A.toastAnnuler(msg, () => { KR().retirer(S(), cid, r.ajoutees); A.changed('import'); });
+    else A.toast(msg);
   }
 
   const NOMS_SOLDES = { CLBD: 'Comptable', ITAV: 'Disponible', XPCD: 'Prévisionnel', ITBD: 'Intrajournalier', CLAV: 'Disponible (clôture)', OPBD: 'Ouverture', PRCD: 'Veille', INFO: 'Info', OTHR: 'Autre' };
@@ -148,6 +176,7 @@
     const b = ev.target.closest('[data-a]');
     if (!b) return;
     if (b.dataset.a === 'ok') enregistrer();
+    else if (b.dataset.a === 'releve') { const id = edite; A.busy(b, () => importerReleve(id)); }
     else if (b.dataset.a === 'reass') {
       const cible = $('fReass').value;
       const n = M.compte(S(), cible);
@@ -441,5 +470,27 @@
         if (r) A.toast('Complément importé : ' + r.base + ' règles de base.');
       });
     }
+  });
+
+  // ------------------------------------------------------------ affichage : thème et mode démo
+  const AF = window.KladAffichage;
+  function renderAffichage() {
+    const t = AF.theme(), d = AF.demoActif();
+    $('affichageCorps').innerHTML = '<h3>Thème</h3><div class="seg" role="group" aria-label="Thème">' +
+      [['auto', 'Automatique'], ['clair', 'Clair'], ['sombre', 'Sombre']].map(([k, l]) => '<button data-theme-choix="' + k + '" aria-pressed="' + (k === t) + '">' + l + '</button>').join('') + '</div>' +
+      '<p class="muted small">Automatique : suit le réglage du téléphone. Gardé sur ce téléphone.</p>' +
+      '<h3>Mode démo</h3><p class="muted">Pour montrer l\'appli sans dévoiler vos chiffres : montants multipliés par un facteur pris au hasard, ' +
+      'noms des personnes et des banques remplacés, champs de saisie floutés. Rien n\'est modifié dans vos données ; le mode s\'arrête en quittant ou en relançant Klad.</p>' +
+      '<div class="row"><button class="btn' + (d ? ' ghost' : '') + ' small" data-demo="' + (d ? 'off' : 'on') + '">' + (d ? 'Quitter le mode démo' : 'Passer en mode démo') + '</button></div>';
+  }
+  A.preparer.secAffichage = () => renderAffichage();
+  AF.surArret = () => { if ($('affichageCorps').isConnected) renderAffichage(); };
+  $('affichageCorps').addEventListener('click', ev => {
+    const t = ev.target.closest('[data-theme-choix]');
+    if (t) { AF.choisirTheme(t.dataset.themeChoix); renderAffichage(); return; }
+    const d = ev.target.closest('[data-demo]');
+    if (!d) return;
+    if (d.dataset.demo === 'on') { AF.demarrerDemo(S()); A.log('info', 'Mode démo activé.'); A.fermerVolet(); }
+    else { AF.arreterDemo(); A.log('info', 'Mode démo arrêté.'); renderAffichage(); }
   });
 })();

@@ -86,7 +86,9 @@
   async function choisirFichier() {
     const r = await V.importFile();
     if (!r.ok) { if (r.reason !== 'annule') throw new Error('Lecture impossible : ' + explain(r)); return null; }
-    return new TextDecoder().decode(C.fromB64(r.data));
+    const b = C.fromB64(r.data);
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
+    catch (e) { return new TextDecoder('windows-1252').decode(b); }      // relevé CSV exporté en Windows-1252
   }
   const hooks = { save: () => mark(['*']), saveLog: () => mark(['journal']), flush, choisirFichier };
 

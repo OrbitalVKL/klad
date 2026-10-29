@@ -13,7 +13,7 @@
 
   const KC = window.KladCommun;
   const VC = window.KladVuesCommun;
-  const ui = { scope: 'perso', nav: null, ouverts: new Set(), cartes: new Set(), tendCat: '', ctrScope: 'perso', edit: null, ajout: null, sim: {} };
+  const ui = { scope: 'perso', nav: null, ouverts: new Set(), cartes: new Set(), tendCat: '', ctrScope: 'perso', ctrEdit: null, edit: null, ajout: null, sim: {} };
 
   function render() {
     const B = A.budget();
@@ -56,6 +56,16 @@
       annulable('Budget aligné sur ' + F.montant(+al.dataset.v) + '.', snap);
       return;
     }
+    if (t.closest('[data-refdefaut]')) { choisirRef(null); return; }
+    const at = t.closest('[data-alignertout]');
+    if (at) {
+      if (!A.confirmInline(at, 'Confirmer : tous les postes ?')) return;
+      const r = KB.alignerTout(S(), A.budget(), at.dataset.alignertout);
+      A.log('info', 'Budget : tous les postes alignés sur le réel habituel.');
+      A.changed('budget');
+      A.toastAnnuler(r.n + ' poste(s) alignés sur le réel habituel.', () => { KB.annulerAlignement(S(), at.dataset.alignertout, r.snap); A.changed('budget'); });
+      return;
+    }
     const ed = t.closest('[data-editer]');
     if (ed) { ui.edit = { scope: ui.scope, key: ed.dataset.editer }; A.ouvrirVolet('secPoste'); return; }
     const aj = t.closest('[data-ajout]');
@@ -65,6 +75,14 @@
     const p = t.closest('[data-poste]');
     if (p) { const k = p.dataset.poste; if (ui.ouverts.has(k)) ui.ouverts.delete(k); else ui.ouverts.add(k); render(); }
   });
+
+  function choisirRef(m) {
+    const avant = KB.choisirReference(S(), m);
+    A.log('info', 'Budget : base de calcul modifiée.');
+    A.changed('budget');
+    A.toastAnnuler('Base de calcul : ' + (m ? 'depuis ' + KB.nomMois(m) : '6 derniers mois complets') + '.', () => { KB.annulerReference(S(), avant); A.changed('budget'); });
+  }
+  $('vBudget').addEventListener('change', ev => { if (ev.target.id === 'bRef') choisirRef(ev.target.value); });
 
   // ------------------------------------------------------------ volet : budget d'un poste
   A.preparer.secPoste = o => {
@@ -147,10 +165,48 @@
   });
 
   // ------------------------------------------------------------ volets : contrats, tendance, reste à vivre
-  A.preparer.secContrats = () => { $('contratsCorps').innerHTML = VB.ecranContrats(A.budget(), ui.ctrScope); };
+  A.preparer.secContrats = o => { if (o && o.rendu && ui.ctrEdit) return; if (!o || !o.rendu) ui.ctrEdit = null; $('contratsCorps').innerHTML = VB.ecranContrats(A.budget(), ui.ctrScope, ui.ctrEdit); };
+  const rendreContrats = () => { $('contratsCorps').innerHTML = VB.ecranContrats(A.budget(), ui.ctrScope, ui.ctrEdit); };
+  function contratModifie(msg, snap) {
+    ui.ctrEdit = null;
+    A.changed('budget');
+    rendreContrats();
+    A.toastAnnuler(msg, () => { KB.annulerContrat(S(), snap); A.changed('budget'); rendreContrats(); });
+  }
   $('contratsCorps').addEventListener('click', ev => {
-    const b = ev.target.closest('[data-scope]');
-    if (b) { ui.ctrScope = b.dataset.scope; A.preparer.secContrats(); }
+    const t = ev.target;
+    const b = t.closest('[data-scope]');
+    if (b) { ui.ctrScope = b.dataset.scope; ui.ctrEdit = null; rendreContrats(); return; }
+    const e = t.closest('[data-ctedit]');
+    if (e) { ui.ctrEdit = e.dataset.ctedit; rendreContrats(); const f = $('ctLabel'); if (f) f.focus(); return; }
+    const vp = t.closest('[data-versprevu]');
+    if (vp) {
+      const r = KB.versPrevu(S(), ui.ctrScope, vp.dataset.versprevu);
+      A.log('info', 'Budget d\'un poste aligné sur ses contrats.');
+      A.changed('budget');
+      rendreContrats();
+      A.toastAnnuler('Prévu « ' + vp.dataset.versprevu.slice(2) + ' » : ' + F.montant(r.amt) + ' par mois.', () => { KB.annuler(S(), r.snap); A.changed('budget'); rendreContrats(); });
+      return;
+    }
+    const c = t.closest('[data-ct]');
+    if (!c) return;
+    const k = c.dataset.ct, form = c.closest('[data-ctid]'), id = form ? form.dataset.ctid : '';
+    if (k === 'fermer') { ui.ctrEdit = null; rendreContrats(); return; }
+    if (k === 'suppr') {
+      if (!A.confirmInline(c, 'Confirmer ?')) return;
+      const snap = KB.retirerContrat(S(), id);
+      A.log('info', 'Contrat supprimé.');
+      contratModifie('Contrat supprimé.', snap);
+      return;
+    }
+    const lab = $('ctLabel').value.trim(), mt = $('ctMontant').value.trim();
+    const montant = mt ? F.saisie(mt) : 0;
+    if (!lab) { A.toast('Indiquez le libellé du contrat.', true); return; }
+    if (montant == null) { A.toast('Montant illisible.', true); return; }
+    const snap = KB.enregistrerContrat(S(), A.budget(), { id: id || null, sc: ui.ctrScope, label: lab, montant, per: +$('ctPer').value || 1,
+      motif: $('ctMotif').value, poste: $('ctPoste').value, src: $('ctSrc').value, note: $('ctNote').value });
+    A.log('info', id ? 'Contrat modifié.' : 'Contrat ajouté.');
+    contratModifie(id ? 'Contrat enregistré.' : 'Contrat ajouté.', snap);
   });
   A.preparer.secTendance = () => { $('tendanceCorps').innerHTML = VB.ecranTendance(A.budget(), ui.scope, ui.tendCat); };
   $('tendanceCorps').addEventListener('click', ev => {

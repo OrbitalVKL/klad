@@ -699,6 +699,21 @@
         poste: c.poste, posteLabel: c.poste ? c.poste.slice(2) : '', budget: a ? (a.on ? a.amt : 0) : null });
     });
   }
+  // Prévu du poste face au total mensuel de ses contrats (« Prévu vs document » de l'ancienne version).
+  function contratsParPoste(B, scope) {
+    const L = contrats(B, scope), out = [], vus = {};
+    for (const c of L) {
+      if (!c.poste) continue;
+      let x = vus[c.poste];
+      if (!x) { x = vus[c.poste] = { poste: c.poste, label: c.posteLabel, budget: c.budget, contrats: 0, n: 0 }; out.push(x); }
+      x.contrats += c.mensuel; x.n++;
+    }
+    for (const x of out) {
+      if (x.budget == null) x.etat = { niveau: 'warn', texte: 'poste absent' };
+      else { const e = x.budget - x.contrats; x.etat = Math.abs(e) < DEMI ? { niveau: 'good', texte: 'aligné' } : { niveau: 'warn', texte: 'prévu ' + eur(Math.abs(e), true) + (e > 0 ? ' de plus' : ' de moins') }; }
+    }
+    return out;
+  }
 
   // ------------------------------------------------------------ tendance (12 cycles)
   // Dépenses par cycle (ou par mois pour le commun), par nature, et pour une catégorie choisie (avec son budget).
@@ -768,6 +783,94 @@
     const pl = donnees(S).plan[snap.scope] || (donnees(S).plan[snap.scope] = {});
     if (snap.avant === undefined) delete pl[snap.key]; else pl[snap.key] = snap.avant;
   }
+  // ------------------------------------------------------------ contrats : saisie, retrait, report dans le budget
+  // Instantané de la liste pour annuler.
+  const snapContrats = S => JSON.stringify(donnees(S).contrats || []);
+  // Poste deviné d'après le libellé du contrat (mots de 4 lettres ou plus communs avec le nom du poste), comme l'ancienne version.
+  function devinerPoste(B, scope, label) {
+    const w = fold(label).split(/[^A-Z0-9]+/).filter(x => x.length >= 4);
+    let best = '', sc = 0;
+    const keys = new Set(Object.keys(planDe(B, scope)).filter(k => k[1] === '|' && k[0] !== 'r').concat(postes(B, scope).lignes.map(a => a.key)));
+    for (const k of keys) { const L = fold(k.slice(2)); const n = w.filter(x => L.indexOf(x) >= 0).length; if (n > sc) { sc = n; best = k; } }
+    return best;
+  }
+  // c : { id?, sc, label, montant (centimes par échéance), per, motif, poste, src, note } ; poste '__nouveau' → poste fixe
+  // créé au nom du contrat. → instantané (liste des contrats et plan du périmètre) pour annuler.
+  function enregistrerContrat(S, B, c) {
+    const D = donnees(S);
+    const snap = { contrats: snapContrats(S), plan: JSON.stringify(D.plan || {}) };
+    const sc = c.sc === 'commun' ? 'commun' : 'perso';
+    const x = {
+      id: c.id || 'u' + Date.now().toString(36), sc, label: String(c.label || 'Contrat').trim().slice(0, 80) || 'Contrat',
+      montant: Math.max(0, Math.round(+c.montant || 0)), per: PER.indexOf(+c.per) >= 0 ? +c.per : 1, motif: String(c.motif || '').trim().slice(0, 200),
+      poste: typeof c.poste === 'string' ? c.poste : '', src: String(c.src || '').trim().slice(0, 120), note: String(c.note || '').trim().slice(0, 200)
+    };
+    if (x.poste === '__nouveau') {
+      x.poste = 'f|' + x.label.slice(0, 40);
+      const pl = D.plan[sc] || (D.plan[sc] = {});
+      pl[x.poste] = Object.assign({ on: true }, pl[x.poste]);
+      delete pl[x.poste].hidden;
+    } else if (!x.poste && B) x.poste = devinerPoste(B, sc, x.label);
+    D.contrats = D.contrats || [];
+    const i = D.contrats.findIndex(y => y.id === x.id);
+    if (i >= 0) D.contrats[i] = Object.assign({}, D.contrats[i], x); else D.contrats.push(x);
+    return snap;
+  }
+  function retirerContrat(S, id) {
+    const D = donnees(S);
+    const snap = { contrats: snapContrats(S), plan: JSON.stringify(D.plan || {}) };
+    D.contrats = (D.contrats || []).filter(c => c.id !== id);
+    return snap;
+  }
+  function annulerContrat(S, snap) { const D = donnees(S); D.contrats = JSON.parse(snap.contrats); D.plan = JSON.parse(snap.plan); }
+  // « → prévu » : le budget du poste prend le total mensuel de ses contrats (un seul contrat non mensuel : son échéance
+  // et sa périodicité). → instantané (annuler) et montant mensuel retenu.
+  function versPrevu(S, scope, key) {
+    const D = donnees(S);
+    const cs = (D.contrats || []).filter(c => c.sc === scope && c.poste === key);
+    const pl = D.plan[scope] || (D.plan[scope] = {});
+    const snap = { scope, key, avant: pl[key] === undefined ? undefined : JSON.parse(JSON.stringify(pl[key])) };
+    const p = Object.assign({ on: true }, pl[key]);
+    if (cs.length === 1 && (+cs[0].per || 1) > 1) { p.per = +cs[0].per; p.ech = cs[0].montant; p.amt = Math.round(p.ech / p.per); }
+    else { delete p.per; delete p.ech; p.amt = Math.round(cs.reduce((t, c) => t + c.montant / (+c.per || 1), 0)); }
+    p.on = true; delete p.f; delete p.hidden;
+    pl[key] = p;
+    return { snap, amt: p.amt };
+  }
+
+  // ------------------------------------------------------------ base de calcul et alignement de tous les postes
+  // Mois proposés comme début de la référence : du premier mois des données au dernier mois complet (récent d'abord).
+  function moisReference(B) {
+    const W = fenetre(B), out = [];
+    for (let m = W.end, i = 0; m >= premierMois(B) && i < 120; m = shift(m, -1), i++) out.push(m);
+    return out;
+  }
+  // m : 'AAAA-MM' ou null (6 derniers mois complets). → instantané (valeur précédente).
+  function choisirReference(S, m) {
+    const D = donnees(S), avant = D.ref || null;
+    D.ref = typeof m === 'string' && /^\d{4}-\d{2}$/.test(m) ? m : null;
+    return avant;
+  }
+  function annulerReference(S, avant) { donnees(S).ref = avant || null; }
+  // « Tout aligner sur le réel habituel » : chaque poste retenu (hors poste lié au commun) prend son réel habituel,
+  // arrondi à l'euro (échéance arrondie pour un poste non mensuel). → instantané du plan du périmètre.
+  function alignerTout(S, B, scope) {
+    const D = donnees(S);
+    const pl = D.plan[scope] || (D.plan[scope] = {});
+    const snap = JSON.stringify(pl);
+    let n = 0;
+    for (const a of postes(B, scope).lignes) {
+      if (!a.on || a.lie || a.key[0] === 'r') continue;
+      const p = pl[a.key] || { on: true };
+      if (a.per > 1) { p.ech = arrEuro(a.avg * a.per); p.amt = Math.round(p.ech / a.per); }
+      else p.amt = arrEuro(a.avg);
+      pl[a.key] = p;
+      n++;
+    }
+    return { snap, n };
+  }
+  function annulerAlignement(S, scope, snap) { donnees(S).plan[scope] = JSON.parse(snap); }
+
   // Postes qu'on peut ajouter à une section.
   function ajoutables(B, scope, nk) {
     const vus = new Set(postes(B, scope).lignes.filter(a => !a.hidden).map(a => a.key));
@@ -791,7 +894,8 @@
   g.KladBudget = {
     V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, nouveau, donnees, importer, reglages, contexte,
     cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
-    echeances, contrats, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
+    echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
+    devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement,
     shift, finMois, nomMois, eur, dernierDebit, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median
   };
 })(typeof window !== 'undefined' ? window : globalThis);
