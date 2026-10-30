@@ -156,6 +156,9 @@
     el.classList.toggle('collapsed', c);
     const h = el.querySelector(':scope>.panel-h h2');
     if (!h) return;
+    // section nommée par son titre (lecteur d'écran)
+    if (!h.id) h.id = el.id + '-t';
+    if (!el.hasAttribute('aria-label')) el.setAttribute('aria-labelledby', h.id);
     // Comme l'ancienne version : tout titre de section devient dépliant.
     if (!h.classList.contains('fold')) { h.classList.add('fold'); h.setAttribute('role', 'button'); h.tabIndex = 0; h.title = 'Replier / déplier'; }
     h.setAttribute('aria-expanded', String(!c));

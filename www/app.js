@@ -180,8 +180,9 @@
     rendus.forEach(fn => { try { fn({ theme: true }); } catch (e) { /* rendu suivant */ } });
     return n;
   }
-  // automatique : le téléphone a changé de thème, appli ouverte (graphiques et icône du thème redessinés)
-  AF.surTheme = () => { if (!S) return; chrome(); rendus.forEach(fn => { try { fn({ theme: true }); } catch (e) { /* rendu suivant */ } }); };
+  // automatique : le téléphone a changé de thème, appli ouverte ; ou palette changée (graphiques et icône du thème redessinés)
+  function redessiner() { if (!S) return; chrome(); rendus.forEach(fn => { try { fn({ theme: true }); } catch (e) { /* rendu suivant */ } }); }
+  AF.surTheme = redessiner;
   $('ah-theme').addEventListener('click', () => { const n = changerTheme(); toast('Thème : ' + (n === 'auto' ? 'automatique' : n) + '.'); });
   $('app-tb').addEventListener('click', ev => {
     const b = ev.target.closest('[data-tab]');
@@ -338,7 +339,7 @@
       it('🗂️', 'Classement', 'Catégories, règles, complément', 'data-volet="secClassement" data-empiler="1"') +
       it('🔎', 'Observations', nObs ? nObs + ' point(s) à faire' : 'Rien à faire', 'data-volet="secObs" data-empiler="1"') +
       it('📥', 'Import de reprise', r ? 'Importée le ' + F.date(r.importee.slice(0, 10)) + ', ' + r.nb + ' opération(s)' : 'Aucun import', 'data-volet="secReprise" data-empiler="1"') +
-      it('🎨', 'Affichage', 'Thème, mode démo', 'data-volet="secAffichage" data-empiler="1"') +
+      it('🎨', 'Affichage', 'Thème, palette, mode démo', 'data-volet="secAffichage" data-empiler="1"') +
       it('🧮', 'Contrôle', 'Relevé pour comparer avec l\'ancienne version', 'data-volet="secControle" data-empiler="1"') +
       it('✨', 'Extras', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : 'Mail, Claude', 'data-volet="secExtras" data-empiler="1"') +
       it('🧩', 'Modules', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : 'Lien Grafit', 'data-volet="secModules" data-empiler="1"') +
@@ -505,6 +506,14 @@
     if (ev.target.closest('[data-classer]')) ouvrirClasser(tr.dataset.c, tr.dataset.op);
     else ouvrirOp(tr.dataset.c, tr.dataset.op);
   });
+  // clavier (ou contacteur) : Entrée ou Espace sur une ligne ouvre son détail
+  $('tx').addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const tr = ev.target.closest('tr.txr[data-op]');
+    if (!tr || ev.target !== tr) return;
+    ev.preventDefault();
+    ouvrirOp(tr.dataset.c, tr.dataset.op);
+  });
   $('app-chips').addEventListener('click', ev => {
     const b = ev.target.closest('[data-f]');
     if (!b) return;
@@ -644,8 +653,10 @@
     if (!o) return;
     const r = KC.classer(ctx(), o);
     const cat = r.cat;
-    const mot = KC.suggestKw(o.libelle);
-    cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: !!mot, mot, compte: false, sens: '', toutes: false }, sub0: r.nc ? cat : r.sub };
+    // mot présent dans le libellé ; interrupteur coupé s'il ne retrouve aucune opération
+    const mot = KC.motPropose(o.libelle);
+    const trouve = !!mot && KC.concernees(S, mot, {}).length > 0;
+    cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: trouve, mot, compte: false, sens: '', toutes: false }, sub0: r.nc ? cat : r.sub };
     ouvrirVolet('secClasser', { empiler: !!empiler });
   }
   function nbConcernees() {
@@ -1118,7 +1129,7 @@
 
   window.KladApp = {
     open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
-    ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, rendre, renderHaut, chrome, vue: () => vue, scope: () => scope, periode, choisirPeriode, versOps, etat: () => S, hooks: () => hooks, esc, isNative,
+    ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, rendre, redessiner, renderHaut, chrome, vue: () => vue, scope: () => scope, periode, choisirPeriode, versOps, etat: () => S, hooks: () => hooks, esc, isNative,
     ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp
   };
 })();

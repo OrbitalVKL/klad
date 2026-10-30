@@ -177,6 +177,11 @@ test('« Classer » : mot-clé proposé, opérations concernées, règle (rempla
   const { S, a, b } = etat();
   assert.equal(K.suggestKw('CARTE 24/09 CAFE DU PORT 33000 FICTIF'), 'CAFE PORT');
   assert.equal(K.suggestKw('PRLV SEPA OPERATEUR FICTIF REF123'), 'OPERATEUR FICTIF');
+  // 0.10 : mot proposé présent tel quel dans le libellé
+  assert.equal(K.motPropose('CARTE 24/09 CAFE DU PORT 33000 FICTIF'), 'CAFE');
+  assert.equal(K.motPropose('PRLV SEPA OPERATEUR FICTIF REF123'), 'OPERATEUR FICTIF');
+  assert.equal(K.motPropose('CB CAFE 12 GARE'), 'CAFE');
+  assert.equal(K.motPropose('12/10'), '');
   const o = op(a, '2026-10-20', -450, 'CB CAFE DU PORT');
   S.ops[a.id].push(o, op(a, '2026-10-21', -450, 'CB CAFE DU PORT'), op(a, '2026-10-22', 100, 'REMB CAFE DU PORT'));
   S.ops[b.id].push(op(b, '2026-10-23', -450, 'CB CAFE DU PORT'));

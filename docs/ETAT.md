@@ -5,19 +5,18 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.9.4** — retours d'usage : mode clair réparé (le choix « Clair » / « Sombre » était écrit `clair` / `sombre`
-alors que la feuille de style attend `light` / `dark` ; thème appliqué avant le premier affichage, assombrissement
-automatique de la WebView désactivé, barres Android accordées au thème) ; opérations internes toujours visibles
-(filtre « Internes », mention « marquée interne à la main », « Annuler : compter en dépense ») ; filtre de période
-des opérations (raccourcis, personnalisée), pastille et totaux débit / crédit.
-(0.9.3 — correctif trouvé par le contrôle automatique sur le téléphone : les données figées de l'ancienne version
-rangées sous `carnet._payload` dans le fichier de reprise (règles de base, budgets par défaut, revenu prévu, mouvements
-et équipements de l'équilibre) n'étaient pas lues (`www/carnet.js` ne lisait que `P` et `payload`) ; migration au
-premier déverrouillage (`www/migrations.js`) qui complète les données déjà présentes ; crédits de règlement des cartes
-écartés à l'import ; état de l'import dans Plus › Contrôle. Nouvelle icône : К cyrillique rouge sur noir (couleurs de
-Grafit), logo de l'appli et du site assortis (`scripts/icone.mjs`) ; 0.9.2 — Lot 9b : extras facultatifs, mail et Claude ; 0.9.1 : relevé de contrôle, demandé comme « 0.8.2 » ; 0.9.0 —
-Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` gradué ; 0.8.1 : écarts comblés ;
-0.8.0 — Lot 8 ; 0.7.0 — Lot 7 ; 0.6.0 — Lot 6.)
+**0.10.0** — série UX, lot UX-1 « socle lisible » (`docs/ux/plan.md`) : couleurs AA en deux palettes au choix (Klad,
+Grafit noir et rouge), en clair et en sombre (jetons en fin de `www/style.css`, vérifiés par `test/contraste.test.mjs`) ;
+choix de la palette dans Plus › Affichage (clé `klad.palette`, appliquée avant le premier affichage par `theme.js`) ;
+polices de 12 px au moins ; zones d'appui de 48 dp ; lignes d'opérations en boutons nommés (« débit 14,50 € »), la
+catégorie de la ligne devient du texte (la ligne entière ouvre le détail, « Classer » y est le premier bouton ; glisser
+à gauche ouvre toujours « Classer ») ;
+sections nommées pour le lecteur d'écran ; mot proposé par « Classer aussi les autres » présent dans le libellé
+(`KladClasse.motPropose`), interrupteur coupé s'il ne trouve rien ; « abattement de … », « balance déficitaire ».
+Aucun calcul modifié. Écrans principaux : 0 contrôle de moins de 48 dp (187 en 0.9.4), 0 texte sous le seuil AA
+(406 en clair, 35 en sombre en 0.9.4).
+(0.9.4 — mode clair réparé, opérations internes visibles, filtre de période des opérations ; 0.9.3 — import incomplet
+corrigé, icône rouge et noire ; 0.9.2 — extras ; 0.9.1 — relevé de contrôle ; 0.9.0 — Lot 9a ; 0.8 → 0.6 : lots 8 à 6.)
 
 ## Feuille de route
 
@@ -35,11 +34,34 @@ Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` 
 | 9b | Extras (IMAP, Claude, sélecteur de PDF), désactivés par défaut | 0.9.2 | fait |
 | — | Correctif : import incomplet (`_payload`), migration, crédits de règlement de carte, icône rouge et noire | 0.9.3 | fait |
 | — | Retours d'usage : mode clair, opérations internes visibles, filtre de période des opérations | 0.9.4 | fait |
-| UX | Étude UX : audit, nouvelle organisation (2 variantes), maquette, plan (`docs/ux/`) ; aucun code de l'appli | — | fait, en attente de validation |
-| UX-1 → UX-7 | Socle lisible, Accueil, Opérations, Plus, Budget et Commun, Modules, rapidité et couleurs (`docs/ux/plan.md`) | 0.10.0 → 0.10.6 | après validation |
+| UX | Étude UX : audit, nouvelle organisation (2 variantes), maquette, plan (`docs/ux/`) ; aucun code de l'appli | — | fait, validée (variante A) |
+| UX-1 | Socle lisible : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées | 0.10.0 | fait |
+| UX-2 → UX-7 | Accueil, Opérations, Plus, Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.1 → 0.10.6 | en cours |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
-## Étude UX (docs/ux, en attente de validation du propriétaire)
+## Série UX (0.10.x, en cours)
+
+Décisions du propriétaire sur l'étude : variante A (Accueil, Opérations, Budget, Commun, Plus) ; Accueil complet ;
+Équilibre dans Commun ; Plus en page entière en 6 groupes ; thème retiré de l'en-tête (Réglages) ; **palette au choix**
+dans Réglages › Apparence, indépendante du thème : « Klad » ou « Grafit » (noir et rouge) ; les deux en AA, vérifiées
+en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé Grafit n'est pas concerné. 9c (1.0.0) après la série.
+
+- Mesures (même protocole à chaque lot) : `tools/mesures/` (jeu fictif de 3 ans, date figée 28/10/2026, coffre de
+  démonstration) : `node tools/mesures/mesurer.mjs [--www dossier] [--palette grafit] [--detail]` ; relevé
+  d'accessibilité dans la page (`audit.mjs` : contrôles sous 48 dp, zone d'appui comprise : marge invisible `::after`
+  ou étiquette ; contrastes AA ; police minimale) ; rapidité à CPU × 4 (déverrouillage → soldes et reste à vivre,
+  changement d'onglet, 40 défilements de la liste : nombre, maximum et total des tâches longues).
+- Garde-fous de chaque lot : `test/ux.test.mjs` (chiffres de l'accueil = fonctions de calcul et écrans d'origine ;
+  accessibilité des écrans principaux sous des seuils qui ne remontent jamais, palettes Klad et Grafit, clair et sombre),
+  lancé dans le parcours Chromium de la fabrication ; `test/contraste.test.mjs` (jetons) ; parité privée par le fichier
+  de reprise (relevé de contrôle de Klad identique avant / après, hors formulations voulues).
+- Mesures 0.9.4 (référence) : écrans principaux 331 contrôles, 187 sous 48 dp, 406 textes sous AA en clair, 35 en sombre,
+  police 10 px ; tous écrans 578 / 373 / 648 / 41 ; déverrouillage → reste à vivre 390 à 510 ms ; défilement : 23 à 27
+  tâches longues, 206 à 259 ms au plus, 3 080 à 3 570 ms au total.
+- 0.10.0 : écrans principaux et tous écrans : 0 sous 48 dp, 0 sous AA (clair et sombre, deux palettes), police 12 px ;
+  déverrouillage 390 à 430 ms ; défilement 23 à 26 tâches, 211 à 240 ms au plus, 3 060 à 3 320 ms au total.
+
+## Étude UX (docs/ux, validée)
 
 - `docs/ux/audit.md` : inventaire des écrans de la 0.9.4, tâches (appuis avant / après), heuristiques, accessibilité
   (contrastes, 48 dp, texte à 130 %), performance (déverrouillage 0,9 s à CPU × 4 dans le navigateur), 25 problèmes
@@ -125,7 +147,8 @@ Lot 9a : interface de l'ancienne version, fonctions restantes, `OVERDRAFT_RISK` 
   vérification avant enregistrement (annulable). Analyses : agrégats seulement (`KladExtras.agregats`), personnes
   désignées « personne A / B », gardées pour la session. Sélecteur de PDF : sélecteur Android (Drive compris).
 - Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées),
-  `klad.periode`, `klad.tendance` (liste fermée, `KladUI.pref`) ; aucune donnée.
+  `klad.periode`, `klad.tendance` (liste fermée, `KladUI.pref`), `klad.theme` et `klad.palette` (0.10, `klad` / `grafit`) ;
+  aucune donnée.
 
 - Lot 8 (0.8) : chiffres identiques à l'ancienne version (parité `outils/parite/lot8.mjs` : impôts avis et estimation,
   partage, régularisations, taxe foncière, livret, résultats perso et commun ; 0 écart). Observations : mêmes règles,

@@ -103,7 +103,8 @@ test('opérations : catégorie affichée, point bleu des non vues, filtres non v
   const cx = K.contexte(S, NOW);
   const l = Vu.ligne(S, S.ops[a.id][2], { ctx: cx });
   assert.match(l, /🏠/);
-  assert.match(texte(l), /Logement · Loyer ▾\s+règle/);
+  assert.match(texte(l), /Logement · Loyer\s+règle/);
+  assert.match(l, /role="button" tabindex="0" aria-label="[^"]*, débit [^"]*"/);
   assert.doesNotMatch(l, /unseen/);
   assert.match(Vu.ligne(S, S.ops[a.id][0], { ctx: cx }), /class="txr unseen encours"/);
   assert.deepEqual(json(Vu.filtrer(S, { nonVues: true }, cx).map(o => o.id)), ['o1']);

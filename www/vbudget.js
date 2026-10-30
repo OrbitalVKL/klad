@@ -400,7 +400,7 @@
     const y = v => pad.t + (hi - v) / (hi - lo || 1) * (H - pad.t - pad.b);
     let s = '';
     for (let v = lo; v <= hi + 1e-6; v += step) {
-      s += '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)" stroke-width="1"/><text x="' + (pad.l - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end" fill="' + U().couleurGraduation(v) + '" font-family="JetBrains Mono, monospace" font-size="10.5">' +
+      s += '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)" stroke-width="1"/><text x="' + (pad.l - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end" fill="' + U().couleurGraduation(v) + '" font-family="JetBrains Mono, monospace" font-size="12">' +
         U().graduation(v) + '</text>';
     }
     return { s, y };
@@ -424,7 +424,7 @@
       const barW = Math.max(2, Math.min(18, bw * 0.32));
       svg += '<line x1="' + pad.l + '" x2="' + (Wd - pad.r) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" stroke="var(--muted)" stroke-width="1"/>';
       const bar = (cx, v, dx, col) => { if (v <= 0) return ''; const top = y(v), h = y(0) - top, r = Math.min(4, barW / 2, h); return '<path d="M' + (cx + dx).toFixed(1) + ',' + y(0).toFixed(1) + ' v' + (-(h - r)).toFixed(1) + ' q0,' + (-r).toFixed(1) + ' ' + r.toFixed(1) + ',' + (-r).toFixed(1) + ' h' + (barW - 2 * r).toFixed(1) + ' q' + r.toFixed(1) + ',0 ' + r.toFixed(1) + ',' + r.toFixed(1) + ' v' + (h - r).toFixed(1) + ' z" fill="' + col + '"/>'; };
-      rm.forEach((m, i) => { const cx = x0(i) + bw / 2; svg += bar(cx, T.rev[i], -barW - 1, 'var(--rev)') + bar(cx, T.dep[i], 1, 'var(--dep)'); if (i % every === 0) svg += '<text x="' + cx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="10.5">' + esc(mLabel(m)) + '</text>'; });
+      rm.forEach((m, i) => { const cx = x0(i) + bw / 2; svg += bar(cx, T.rev[i], -barW - 1, 'var(--rev)') + bar(cx, T.dep[i], 1, 'var(--dep)'); if (i % every === 0) svg += '<text x="' + cx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + esc(mLabel(m)) + '</text>'; });
       svg += '<polyline fill="none" stroke="var(--sold)" stroke-width="2" stroke-linejoin="round" points="' + T.bal.map((v, i) => (x0(i) + bw / 2).toFixed(1) + ',' + y(v).toFixed(1)).join(' ') + '"/>';
       T.bal.forEach((v, i) => { svg += '<circle cx="' + (x0(i) + bw / 2).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="4" fill="' + (v >= 0 ? 'var(--good)' : 'var(--bad)') + '" stroke="var(--surface)" stroke-width="2"/>'; });
       rm.forEach((m, i) => tips.push([mLabel(m), [['var(--rev)', 'Revenus', e0(T.rev[i])], ['var(--dep)', 'Dépenses', e0(T.dep[i])], ['var(--sold)', 'Balance', sv(T.bal[i])]]]));
@@ -452,7 +452,7 @@
         svg += '<polyline fill="none" stroke="var(--sold)" stroke-width="2" stroke-linejoin="round" points="' + line.map((v, i) => v === null ? '' : (x0(i) + bw / 2).toFixed(1) + ',' + y(v).toFixed(1)).filter(Boolean).join(' ') + '"/>';
         line.forEach((v, i) => { if (v !== null) svg += '<circle cx="' + (x0(i) + bw / 2).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="3.5" fill="' + (v >= 0 ? 'var(--good)' : 'var(--bad)') + '" stroke="var(--surface)" stroke-width="2"/>'; });
       }
-      rm.forEach((m, i) => { if (i % every === 0) svg += '<text x="' + (x0(i) + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="10.5">' + esc(mLabel(m)) + '</text>'; });
+      rm.forEach((m, i) => { if (i % every === 0) svg += '<text x="' + (x0(i) + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + esc(mLabel(m)) + '</text>'; });
       rm.forEach((m, i) => tips.push([mLabel(m), bars ? [[mode === 'bal' ? (bars[i] < 0 ? 'var(--bad)' : 'var(--good)') : col, nom, mode === 'bal' ? sv(bars[i]) : e0(bars[i])]].concat(ref ? [['var(--ink-2)', 'Budget', e0(ref)]] : [])
         : [['var(--sold)', nom, line[i] === null ? '—' : mode === 'solde' ? F().solde(line[i]) : sv(line[i])]]]));
       if (titre.indexOf(lab) < 0 && mode !== 'solde') titre += ' · ' + lab;

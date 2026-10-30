@@ -257,10 +257,13 @@
       : !COMPTEE(r.type) ? '<span class="tx-tag" title="' + (r.type === 'epargne' ? 'versement d\'épargne' : 'hors budget') + ' : pas compté dans les dépenses">non comptée</span>' : '';
     const cat = esc(r.cat) + (r.sub && r.sub !== r.cat && r.sub !== 'Non classé' ? ' · ' + esc(r.sub) : '');
     const cls = 'txr' + (vue ? '' : ' unseen') + (o.statut === 'en_cours' ? ' encours' : '');
-    return '<tr class="' + cls + '" data-op="' + esc(o.id) + '" data-c="' + esc(o.compte) + '"><td class="ic">' + U().icoOp(C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '</td>' +
+    // ligne = bouton nommé (lecteur d'écran, clavier) : libellé, sens et montant, date, compte, catégorie, état
+    const nom = libelleCourt(o.libelle) + ', ' + (o.montant < 0 ? 'débit ' : 'crédit ') + F().montant(Math.abs(o.montant), cur) + ', ' + jjmm(o.date) +
+      (c ? ', ' + c.libelle : '') + ', ' + r.cat + (r.type === 'interne' ? ', interne' : '') + (o.statut === 'en_cours' ? ', en cours' : '') + (vue ? '' : ', non vue');
+    return '<tr class="' + cls + '" data-op="' + esc(o.id) + '" data-c="' + esc(o.compte) + '" role="button" tabindex="0" aria-label="' + esc(nom) + '"><td class="ic">' + U().icoOp(C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '</td>' +
       '<td class="lab"><div class="tl">' + (vue ? '' : '<span class="sr">Non vue. </span>') + esc(libelleCourt(o.libelle)) + '</div><div class="tm">' +
       (opt && opt.date ? '<span class="num">' + jjmm(o.date) + '</span> · ' : '') +
-      '<span class="acct">' + esc(c ? c.libelle : '') + '</span> <button class="tx-cat" type="button" data-classer="1" title="Changer la catégorie">' + cat + ' ▾</button>' +
+      '<span class="acct">' + esc(c ? c.libelle : '') + '</span> <span class="tx-cat">' + cat + '</span>' +
       (r.src === 'regle' ? '<span class="tx-tag" title="Classée par une de vos règles">règle</span>' : '') + nc +
       (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') + '</div></td>' +
       '<td class="amt' + (o.montant > 0 ? ' pos' : '') + (!COMPTEE(r.type) ? ' nc' : '') + '"><span class="amt-v">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></td></tr>';
