@@ -81,7 +81,7 @@ if (!args['sans-perf']) {
   }
   await ralentir(1);
   // défilement de toute la liste des opérations (période « tout », 40 défilements rapides)
-  await B.onglet('operations');
+  await B.operationsPerso();
   await page.evaluate(() => {
     window.__lt = [];
     new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask' });

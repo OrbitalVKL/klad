@@ -5,18 +5,15 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.0** — série UX, lot UX-1 « socle lisible » (`docs/ux/plan.md`) : couleurs AA en deux palettes au choix (Klad,
-Grafit noir et rouge), en clair et en sombre (jetons en fin de `www/style.css`, vérifiés par `test/contraste.test.mjs`) ;
-choix de la palette dans Plus › Affichage (clé `klad.palette`, appliquée avant le premier affichage par `theme.js`) ;
-polices de 12 px au moins ; zones d'appui de 48 dp ; lignes d'opérations en boutons nommés (« débit 14,50 € »), la
-catégorie de la ligne devient du texte (la ligne entière ouvre le détail, « Classer » y est le premier bouton ; glisser
-à gauche ouvre toujours « Classer ») ;
-sections nommées pour le lecteur d'écran ; mot proposé par « Classer aussi les autres » présent dans le libellé
-(`KladClasse.motPropose`), interrupteur coupé s'il ne trouve rien ; « abattement de … », « balance déficitaire ».
-Aucun calcul modifié. Écrans principaux : 0 contrôle de moins de 48 dp (187 en 0.9.4), 0 texte sous le seuil AA
-(406 en clair, 35 en sombre en 0.9.4).
-(0.9.4 — mode clair réparé, opérations internes visibles, filtre de période des opérations ; 0.9.3 — import incomplet
-corrigé, icône rouge et noire ; 0.9.2 — extras ; 0.9.1 — relevé de contrôle ; 0.9.0 — Lot 9a ; 0.8 → 0.6 : lots 8 à 6.)
+**0.10.1** — série UX, lot UX-2 « Accueil » : nouvel onglet Accueil, premier des 5 (Accueil, Opérations, Budget, Commun,
+Plus) : reste à vivre en tête (par jour, cycle écoulé, budget utilisé ; appui : détail du calcul), « À vérifier » en un
+bloc (compteurs ; « Bilan du cycle précédent » les 5 premiers jours d'un cycle), soldes en liste (carte à prélever,
+livret estimé, total disponible et après les cartes), « Ce cycle-ci » (4 postes, dépassés et à surveiller d'abord),
+commun (solde, fin de mois, virements, ordres à mettre en place), échéances des 31 jours, actions rapides. Rendu
+`www/vaccueil.js` (aucun calcul propre). L'onglet Budget perd son haut (grande carte, cartes, à voir, à vérifier) ;
+retour d'Android vers l'Accueil.
+(0.10.0 — UX-1 socle lisible : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées ; 0.9.4 — mode clair,
+opérations internes visibles, période des opérations ; 0.9.3 → 0.6 : correctifs et lots 9 à 6.)
 
 ## Feuille de route
 
@@ -36,7 +33,8 @@ corrigé, icône rouge et noire ; 0.9.2 — extras ; 0.9.1 — relevé de contr�
 | — | Retours d'usage : mode clair, opérations internes visibles, filtre de période des opérations | 0.9.4 | fait |
 | UX | Étude UX : audit, nouvelle organisation (2 variantes), maquette, plan (`docs/ux/`) ; aucun code de l'appli | — | fait, validée (variante A) |
 | UX-1 | Socle lisible : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées | 0.10.0 | fait |
-| UX-2 → UX-7 | Accueil, Opérations, Plus, Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.1 → 0.10.6 | en cours |
+| UX-2 | Accueil (onglet en tête, 5 onglets) | 0.10.1 | fait |
+| UX-3 → UX-7 | Opérations, Plus, Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.2 → 0.10.6 | en cours |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.x, en cours)
@@ -58,6 +56,9 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
 - Mesures 0.9.4 (référence) : écrans principaux 331 contrôles, 187 sous 48 dp, 406 textes sous AA en clair, 35 en sombre,
   police 10 px ; tous écrans 578 / 373 / 648 / 41 ; déverrouillage → reste à vivre 390 à 510 ms ; défilement : 23 à 27
   tâches longues, 206 à 259 ms au plus, 3 080 à 3 570 ms au total.
+- Le banc ouvre les opérations sur le périmètre perso (comme en 0.9.4) pour comparer les mêmes listes.
+- 0.10.1 : écrans principaux (Accueil compris) 275 contrôles, 0 sous 48 dp, 0 sous AA ; déverrouillage → soldes et reste
+  à vivre de l'Accueil 370 à 440 ms ; défilement 22 tâches, 208 ms au plus, 2 950 ms au total.
 - 0.10.0 : écrans principaux et tous écrans : 0 sous 48 dp, 0 sous AA (clair et sombre, deux palettes), police 12 px ;
   déverrouillage 390 à 430 ms ; défilement 23 à 26 tâches, 211 à 240 ms au plus, 3 060 à 3 320 ms au total.
 

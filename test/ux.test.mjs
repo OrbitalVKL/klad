@@ -20,27 +20,49 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
   const B = await ouvrir({});
   try {
     const { page } = B;
-    await B.onglet(B.onglets[0]);
+    const norm = t => t.replace(/[\s\u00a0\u202f]+/g, ' ');
+    const texte = async sel => norm(await page.locator(sel).first().innerText());
     const attendu = await page.evaluate(() => {
-      const A = window.KladApp, KB = window.KladBudget, F = window.KladFormat, M = window.KladModele, S = A.etat(), Bc = A.budget();
-      const rav = KB.suivi(Bc, 'perso', null).rav;
-      const soldes = M.comptesTries(S).filter(c => !c.masque).map(c => { const s = M.soldeAffiche(S, c); return s ? [c.libelle, F.montant(Math.abs(s.centimes))] : null; }).filter(Boolean);
-      const ech = KB.echeances(Bc, 31).map(e => [e.label, e.scope]);
-      return { rav: [F.montant(Math.abs(rav.budget.reste)), rav.comptes ? F.montant(Math.abs(rav.comptes.reste)) : null], soldes, ech };
+      const A = window.KladApp, KB = window.KladBudget, KC = window.KladCommun, F = window.KladFormat, M = window.KladModele, S = A.etat(), Bc = A.budget();
+      const res = KB.suivi(Bc, 'perso', null), rav = res.rav;
+      const soldes = M.comptesTries(S).filter(c => !c.masque && c.role !== 'carte_differee').map(c => { const s = M.soldeAffiche(S, c); return s ? [c.libelle, F.montant(Math.abs(s.centimes))] : null; }).filter(Boolean);
+      const ech = KB.echeances(Bc, 31).map(e => [e.label, e.scope, F.montant(e.montant)]);
+      const fdm = KC.finDeMois(Bc);
+      const postes = [];
+      for (const nk of ['courante', 'optionnelle']) for (const a of res.sections[nk].lignes) if (a.on && a.pm > 50) postes.push([a.label, KB.eur(a.cur), KB.eur(a.pm)]);
+      return { rav: [F.montant(Math.abs(rav.budget.reste)), F.montant(Math.abs(rav.comptes.reste))], soldes, ech, fdm: [F.montant(Math.abs(fdm.solde)), F.montant(Math.abs(fdm.end))], postes };
     });
-    const norm = t => t.replace(/[\s  ]+/g, ' ');
-    const rav = norm(await page.locator('[data-mesure="rav"], #rav-m').first().innerText());
-    for (const v of attendu.rav.filter(Boolean)) assert.ok(rav.includes(norm(v).replace(/,00 €$/, ' €')) || rav.includes(norm(v)), 'reste à vivre ' + v + ' dans « ' + rav + ' »');
-    const sold = norm(await page.locator('[data-mesure="soldes"], #bal-panel').first().innerText());
+    // Accueil
+    await B.onglet('accueil');
+    const rav = await texte('[data-mesure="rav"]');
+    for (const v of attendu.rav) assert.ok(rav.includes(norm(v)), 'reste à vivre ' + v + ' dans « ' + rav + ' »');
+    const sold = await texte('[data-mesure="soldes"]');
     for (const [lib, v] of attendu.soldes) { assert.ok(sold.includes(lib), lib); assert.ok(sold.includes(norm(v)), 'solde ' + lib + ' ' + v); }
-    // échéances des 31 jours : celles de Budget › Contrats (perso) et Commun › Contrats
-    assert.ok(attendu.ech.length > 0, 'échéances attendues dans le jeu fictif');
+    const cyc = await texte('#ac-cy + *, section[aria-labelledby="ac-cy"]');
+    const vus = attendu.postes.filter(([lib]) => cyc.includes(lib));
+    assert.ok(vus.length >= 1, 'postes du cycle sur l\'accueil');
+    for (const [lib, cur, pm] of vus) assert.ok(cyc.includes(lib + ' ' + norm(cur) + ' / ' + norm(pm)), 'poste ' + lib);
+    const cm = await texte('section[aria-labelledby="ac-cm"]');
+    for (const v of attendu.fdm) assert.ok(cm.includes(norm(v)), 'commun ' + v);
+    const ec = await texte('section[aria-labelledby="ac-ec"]');
+    const premieres = attendu.ech.filter(([lib]) => ec.includes(lib));
+    assert.ok(premieres.length >= Math.min(4, attendu.ech.length), 'échéances sur l\'accueil');
+    for (const [lib, , v] of premieres) assert.ok(ec.includes(lib) && ec.includes(norm(v)), 'échéance ' + lib);
+    // Écrans d'origine : reste à vivre de Budget, postes du budget, fin de mois et solde de Commun, contrats
+    await B.onglet('budget');
+    const rb = await texte('#rav-m');
+    for (const v of attendu.rav) assert.ok(rb.includes(norm(v)), 'Budget › reste à vivre ' + v);
+    for (let i = 0; i < 6; i++) { const b = page.locator('#budget-main .sec-tog[aria-expanded="false"]').first(); if (!(await b.count())) break; await b.click(); }
+    const bm = await texte('#budget-main');
+    for (const [lib] of vus) assert.ok(bm.includes(lib), 'Budget › poste ' + lib);
     for (const sc of ['perso', 'commun']) {
       await B.onglet(sc === 'perso' ? 'budget' : 'commun');
       await page.evaluate(() => { const p = document.getElementById('p-contrats'); if (p && p.classList.contains('collapsed')) p.querySelector('.panel-h h2.fold').click(); });
-      const ctr = norm(await page.locator('#p-contrats').innerText());
+      const ctr = await texte('#p-contrats');
       for (const [lib] of attendu.ech.filter(e => e[1] === sc)) assert.ok(ctr.includes(lib), 'échéance ' + sc + ' ' + lib);
     }
+    const bc = await texte('#bal-panel');
+    for (const v of attendu.fdm) assert.ok(bc.includes(norm(v)), 'Commun › fin de mois ' + v);
     assert.deepEqual(B.erreurs, []);
   } finally { await B.fin(); }
 });
