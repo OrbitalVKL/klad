@@ -127,15 +127,45 @@ test('préférences d\'affichage gardées sur le téléphone : liste fermée, se
   assert.throws(() => U.pref('cle', 'x'), /préférence inconnue/);       // jamais de donnée hors du coffre
   U.pref('periode', null);
   assert.equal(U.pref('periode'), null);
-  assert.equal(U.replie('cats-panel'), true);
+  assert.equal(U.replie('actions'), true);
   assert.equal(U.replie('budget-main'), false);
-  U.plier('cats-panel', false);
-  assert.equal(U.replie('cats-panel'), false);
-  assert.deepEqual(Object.keys(mem).sort(), ['klad.replis']);
+  U.plier('actions', false);
+  assert.equal(U.replie('actions'), false);
+  assert.deepEqual(Object.keys(mem).sort(), ['klad.replis.v', 'klad.replis.v2']);
   // calcul dans un champ de montant (comme l'ancienne version), sans eval
   assert.deepEqual(['29,99+64', '=566,19/3', '(10+5)*2', '1 200,50', '12-', 'alert(1)', '2*(3'].map(U.calcul), [93.99, 188.73, 30, 1200.5, null, null, null]);
   assert.deepEqual(['29,99+64', '=12', '12', '1 200,50'].map(U.estCalcul), [true, true, false, false]);
   // graduation d'axe : jamais de signe moins
   assert.equal(U.graduation(-50000).replace(/\s/g, ' '), '500 €');
   assert.equal(U.couleurGraduation(-1), 'var(--bad)');
+});
+
+// Série UX : préférences de la 0.9.4 retrouvées par la dernière version, sans passer par les versions intermédiaires.
+test('migration des préférences d\'affichage 0.9.4 → 0.10.x : sections repliées une seule fois, période, tendance, thème gardés', () => {
+  const mem = {
+    'klad.replis': JSON.stringify({ actions: 0, 'tend-panel': 1, 'p-contrats': 0, 'cats-panel': 0, 'rules-panel': 1, 'eq-ops-panel': 0, 'budget-main': 1 }),
+    'klad.periode': JSON.stringify({ from: '2025-11', to: '2026-10', n: 12 }), 'klad.tendance': JSON.stringify({ comptes: 'auto', mode: 'cum' }), 'klad.theme': 'sombre'
+  };
+  const avant = JSON.stringify(mem);
+  const localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  const { KladUI: U } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'ui.js'], { localStorage });
+  // sections gardées sous leur identifiant ; Tendance et Contrats (sous-vues) et Catégories / Règles (Plus) retirées
+  assert.equal(U.replie('actions'), false);
+  assert.equal(U.replie('budget-main'), true);
+  assert.equal(U.replie('eq-ops-panel'), false);
+  assert.equal(U.replie('tend-panel'), false);
+  assert.equal(U.replie('p-contrats'), false);
+  assert.deepEqual(JSON.parse(mem['klad.replis.v2']), { actions: 0, 'eq-ops-panel': 0, 'budget-main': 1 });
+  assert.equal(mem['klad.replis.v'], '2');
+  // ancienne clé intacte (retour arrière possible), autres préférences inchangées
+  for (const k of ['klad.replis', 'klad.periode', 'klad.tendance', 'klad.theme']) assert.equal(mem[k], JSON.parse(avant)[k], k);
+  assert.deepEqual(json(U.pref('periode')), { from: '2025-11', to: '2026-10', n: 12 });
+  assert.deepEqual(json(U.pref('tendance')), { comptes: 'auto', mode: 'cum' });
+  // une seule fois : une nouvelle lecture (appli relancée) ne refait pas la migration
+  U.plier('actions', true);
+  mem['klad.replis'] = JSON.stringify({ actions: 0 });
+  const { KladUI: U2 } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'ui.js'], { localStorage });
+  assert.equal(U2.replie('actions'), true);
+  // table de correspondance : identifiants inconnus gardés tels quels
+  assert.deepEqual(json(U.migrerPlis({ 'cats-panel': 1, 'x-panel': 1 })), { 'x-panel': 1 });
 });

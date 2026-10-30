@@ -29,7 +29,9 @@
 
   // ------------------------------------------------------------ « Virements à mettre en place » (cm-plan)
   // ui : { cartes: Set (sous-blocs dépliés) }.
-  function plan(B, ui) {
+  // partie (0.10.4, sous-vues de Commun) : 'mois' = virements seulement ; 'tresorerie' = appels de fonds, trésorerie
+  // et origine du solde, ouverts par défaut ; absent = tout (comme avant).
+  function plan(B, ui, partie) {
     const MR = KC().margeReelle(B);
     if (!MR) return '<div class="panel-h"><h2>Virements à mettre en place</h2></div><p class="note">Le solde du compte commun n\'est pas encore connu : virements, trésorerie et fin de mois apparaîtront avec le prochain relevé.</p>';
     const R = KC().reglages(B), D = KC().plan(B), V = B.D.virements || [], C = D.C;
@@ -66,10 +68,13 @@
       '<button class="btn" type="button" data-ouvrir="secVirements">Modifier les ordres</button></div></div>' +
       '<div class="cmp-grid">' + card('moi', R.moi) + card('autre', R.autre) + '</div>' +
       U().comment('« Demandé » = part de chacun des postes du budget commun (colonne « ma part » du mode Budget), regroupée par usage ; les charges trimestrielles comptent pour leur provision mensuelle. Les banques ne transmettent pas les ordres permanents : la liste se tient ici (« Modifier les ordres »), Klad vérifie chaque mois leur arrivée sur le compte commun.');
-    h += appels(B, ouv);
-    if (C) h += cmSub(ouv, 'cash', 'Trésorerie · 12 mois', '<span class="' + (C.min < 0 ? 'bad-t' : '') + '">plus bas <b class="num">' + s2(C.min) + '</b> le ' + jjmm(C.minAt) + '</span>', tresorerie(B, D, R), false);
+    if (partie === 'mois') return h;
+    if (partie === 'tresorerie') h = '<div class="panel-h"><h2>Trésorerie du compte commun</h2></div>';
+    const def = partie === 'tresorerie';
+    h += appels(B, ouv, def);
+    if (C) h += cmSub(ouv, 'cash', 'Trésorerie · 12 mois', '<span class="' + (C.min < 0 ? 'bad-t' : '') + '">plus bas <b class="num">' + s2(C.min) + '</b> le ' + jjmm(C.minAt) + '</span>', tresorerie(B, D, R), def);
     else h += cmSub(ouv, 'cash', 'Trésorerie · 12 mois', '', '<p class="note">Trésorerie indisponible : pas encore de solde pour le compte commun.</p>', false);
-    if (D.W) h += origine(B, D, ouv);
+    if (D.W) h += origine(B, D, ouv, def);
     return h;
   }
 
@@ -107,7 +112,7 @@
       '<span class="sb-l" style="margin-top:8px">Réserve · ' + e0(D.pW) + ' mis de côté par mois</span><p class="subs" style="margin:2px 0 0">' + Rz.join(' ') + '</p></div></div>';
   }
 
-  function appels(B, ouv) {
+  function appels(B, ouv, def) {
     const A = KC().appels(B), ks = Object.keys(A);
     if (!ks.length) return '';
     const tot = ks.reduce((t, k) => t + Math.max(0, A[k].reste), 0);
@@ -137,10 +142,10 @@
       (g.KladExtras && (g.KladExtras.actif(B.S, 'mail') || g.KladExtras.actif(B.S, 'claude')) ? '<div class="row">' +
         (g.KladExtras.actif(B.S, 'mail') ? '<button class="btn" type="button" data-liremails="1">Lire les mails</button>' : '') +
         (g.KladExtras.actif(B.S, 'claude') ? '<button class="btn" type="button" data-lireappel="1">Lire un appel (PDF)</button>' : '') + '</div>' : '') +
-      U().comment('Un appel de fonds par mail du syndic ; montant lu dans le PDF joint quand il est connu, sinon estimé d\'après le relevé du syndic ou l\'appel précédent. Les appels du relevé du syndic sans mail sont aussi comptés. Chaque virement du compte commun vers le syndic règle l\'appel le plus ancien en premier.'), tot > 50);
+      U().comment('Un appel de fonds par mail du syndic ; montant lu dans le PDF joint quand il est connu, sinon estimé d\'après le relevé du syndic ou l\'appel précédent. Les appels du relevé du syndic sans mail sont aussi comptés. Chaque virement du compte commun vers le syndic règle l\'appel le plus ancien en premier.'), tot > 50 || !!def);
   }
 
-  function origine(B, D, ouv) {
+  function origine(B, D, ouv, def) {
     const W = D.W;
     const tag = k => chip({ passager: 'warn', 'récurrent': 'bad', 'hors budget': 'info', 'écart': 'bad', marge: 'good', 'réserve': 'good' }[k] || 'info', k);
     const pourquoi = x => {
@@ -164,7 +169,7 @@
     const bits = [D.pas > 50 ? 'd\'échéances payées d\'un coup (' + e0(D.pas) + ', <b>passager</b>)' : '', hbv > 50 ? 'de dépenses hors budget (' + e0(hbv) + ')' : '', rec > 50 ? 'de contrats au-dessus du budget (' + e0(rec) + ' depuis ' + mo + ', <b>revient chaque mois</b>)' : ''].filter(Boolean);
     const concl = W.now < -50 ? (bits.length ? 'Le solde est débiteur à cause ' + bits.join(', ') + '.' : 'Le solde est débiteur : voir le détail poste par poste.') : (bits.length ? 'Écarts depuis ' + mo + ' : ' + bits.join(', ').replace(/^d'|^de /, '') + ', couverts par les marges des autres postes.' : 'Aucun écart notable depuis ' + mo + '.');
     return cmSub(ouv, 'why', D.pon > 0 ? 'Ce que le virement ponctuel compense' : 'D\'où vient le solde', '<span class="num' + (W.now < 0 ? ' bad-t' : '') + '">' + s2(W.now) + '</span>',
-      '<p class="subs" style="margin:0 0 6px">Du 1er ' + mo + ' ' + W.S.slice(0, 4) + ' à aujourd\'hui, poste par poste</p><p class="cm-concl">' + concl + '</p><div class="cr-calc why-l">' + rows + '</div>', D.pon > 0);
+      '<p class="subs" style="margin:0 0 6px">Du 1er ' + mo + ' ' + W.S.slice(0, 4) + ' à aujourd\'hui, poste par poste</p><p class="cm-concl">' + concl + '</p><div class="cr-calc why-l">' + rows + '</div>', D.pon > 0 || !!def);
   }
 
   // ------------------------------------------------------------ volet : ordres permanents

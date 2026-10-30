@@ -5,14 +5,15 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.3** — série UX, lot UX-4 « Plus » : Plus devient une page (onglet) : « Verrouiller maintenant » en tête, puis
-6 groupes : Comptes et banques (Banques et accès, Comptes, Relevés des comptes), Données (Sauvegarde, Importer : relevé
-d'un compte, reprise de l'ancienne version, complément ; Contrôle), Modules (Impôts, Épargne, Équilibre jusqu'à UX-5,
-Lien Grafit), Extras (Mail et Claude), Réglages (Apparence : thème Auto / Clair / Sombre et palette Klad / Grafit, mode
-démo ; Verrou ; Classement), Aide et à propos (Version et mise à jour, Journal). « Relevés et sauvegarde » coupé en deux
-écrans. Synchroniser, Thème et Observations quittent Plus (pastille et Accueil). L'icône de thème quitte l'en-tête.
-Écran ouvert depuis Plus : bouton Retour (en-tête, retour d'Android) vers l'écran d'où l'on vient.
-(0.10.2 — UX-3 : opérations ; 0.10.1 — UX-2 : Accueil ; 0.10.0 — UX-1 : socle lisible ; 0.9.4 et avant : lots 9 à 1.)
+**0.10.4** — série UX, lot UX-5 « Budget et Commun » : sous-vues en haut de l'écran. Budget : Suivi (reste à vivre,
+observations, budget mensuel, postes **dépassés d'abord**) · Tendance · Contrats ; Commun : Ce mois (solde, fin de mois,
+à voir, observations, marge réelle, virements à mettre en place, budget du commun) · Trésorerie (appels de fonds,
+trésorerie 12 mois, d'où vient le solde, ouverts ; tendance et contrats du commun) · Équilibre (écran Équilibre, quitte
+Plus). Sélecteur Perso / Commun retiré de Budget ; Catégories et Règles retirées du bas des deux onglets (Plus ›
+Réglages › Classement). Sections repliées : nouvelle clé `klad.replis.v2`, créée une fois depuis `klad.replis` (gardée)
+par une table de correspondance (`KladUI.MIGRATION_PLIS`).
+(0.10.3 — UX-4 : Plus en page, Apparence ; 0.10.2 — UX-3 : opérations ; 0.10.1 — UX-2 : Accueil ; 0.10.0 — UX-1 : socle
+lisible ; 0.9.4 et avant : lots 9 à 1.)
 
 ## Feuille de route
 
@@ -35,7 +36,8 @@ démo ; Verrou ; Classement), Aide et à propos (Version et mise à jour, Journa
 | UX-2 | Accueil (onglet en tête, 5 onglets) | 0.10.1 | fait |
 | UX-3 | Opérations : périmètre visible, tri une à une, détail en page | 0.10.2 | fait |
 | UX-4 | Plus en page (6 groupes), Apparence (thème et palette) | 0.10.3 | fait |
-| UX-5 → UX-7 | Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.4 → 0.10.6 | en cours |
+| UX-5 | Budget et Commun en sous-vues, migration des sections repliées | 0.10.4 | fait |
+| UX-6 → UX-7 | Modules, rapidité (`docs/ux/plan.md`) | 0.10.5 → 0.10.6 | en cours |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.x, en cours)
@@ -58,6 +60,8 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   police 10 px ; tous écrans 578 / 373 / 648 / 41 ; déverrouillage → reste à vivre 390 à 510 ms ; défilement : 23 à 27
   tâches longues, 206 à 259 ms au plus, 3 080 à 3 570 ms au total.
 - Le banc ouvre les opérations sur le périmètre perso (comme en 0.9.4) pour comparer les mêmes listes.
+- 0.10.4 : écrans principaux (sous-vues comprises) 395 contrôles, 0 sous 48 dp, 0 sous AA ; tous écrans 611 / 0 / 0 ;
+  déverrouillage 337 à 412 ms ; défilement 23 tâches, 274 ms au plus, 3 290 ms au total.
 - 0.10.3 : écrans principaux (Plus en page compris) 283 contrôles, 0 sous 48 dp, 0 sous AA ; tous écrans 523 / 0 / 0 ;
   déverrouillage 335 à 390 ms ; défilement 25 tâches, 263 ms au plus, 3 540 ms au total.
 - 0.10.2 : écrans principaux 285 contrôles, 0 sous 48 dp, 0 sous AA ; déverrouillage 390 à 440 ms ; défilement 23 tâches,
@@ -152,7 +156,8 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   avant chaque appel : aperçu de ce qui part et coût estimé (comptage de jetons gratuit) ; après : coût réel et
   vérification avant enregistrement (annulable). Analyses : agrégats seulement (`KladExtras.agregats`), personnes
   désignées « personne A / B », gardées pour la session. Sélecteur de PDF : sélecteur Android (Drive compris).
-- Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées),
+- Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées, jusqu'à la
+  0.10.3) puis `klad.replis.v2` et sa marque `klad.replis.v` (0.10.4),
   `klad.periode`, `klad.tendance`, `klad.opsPerimetre` (0.10.2 : `perso` / `commun` / `tout`) (liste fermée, `KladUI.pref`),
   `klad.theme` et `klad.palette` (0.10, `klad` / `grafit`) ;
   aucune donnée.

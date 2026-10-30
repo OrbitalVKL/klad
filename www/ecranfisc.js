@@ -46,7 +46,11 @@
     if (!B) return;
     const X = extras(), s = S();
     try {
-      if (v === 'appartement') poser('view-appart', VC.equilibre(B, ui.eq));
+      if (v === 'appartement') {          // Commun › Équilibre (0.10.4) : barre des sous-vues de Commun au-dessus
+        const EB = window.KladEcranBudget;
+        $('sv-eq').innerHTML = EB && EB.barre ? EB.barre('commun', 'equilibre') : '';
+        poser('appart-corps', VC.equilibre(B, ui.eq));
+      }
       else if (v === 'impots') poser('view-impots', VF.impots(B, { annee: ui.annee, lecture: !!(X && X.actif(s, 'claude')), analyse: !!(X && X.actif(s, 'claude')), texteAnalyse: X && X.analyse && X.analyse('impots') }));
       else if (v === 'epargne') poser('view-epargne', VF.epargne(B));
       else if (v === 'donnees') { $('imp-panel').innerHTML = Vu.releves(s, B, Date.now(), { synchro: false }); U.appliquerPli($('imp-panel')); U.appliquerPli($('save-panel')); }
