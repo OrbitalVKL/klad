@@ -24,7 +24,9 @@
   // ------------------------------------------------------------ état (déchiffré par verrou.js, en mémoire seulement)
   let S = null;
   let hooks = {};
-  const save = () => { if (hooks.save) hooks.save(); };
+  // 0.10.10 : pendant le mode démo, rien n'est enregistré ; l'état d'avant est rendu en sortant si quelque chose a changé.
+  let demoAvant = null, demoTouche = false;
+  const save = () => { if (demoAvant) { demoTouche = true; return; } if (hooks.save) hooks.save(); };
   const saveLog = () => { if (hooks.saveLog) hooks.saveLog(); };
 
   function defaultRedirect() {
@@ -1032,6 +1034,10 @@
   function synchro(raison) {
     if (!S) return Promise.resolve(null);
     if (syncP) return syncP;
+    if (AF.demoActif && AF.demoActif()) {
+      if (raison !== 'auto') toast('Synchronisation suspendue pendant le mode démo.');
+      return Promise.resolve(null);
+    }
     const comptes = S.modele.comptes.filter(c => c.source.type === 'eb' && !c.aReassocier && S.modele.connexions[c.source.connexion]);
     if (!comptes.length) {
       if (raison !== 'auto') toast('Aucun compte bancaire connecté.');
@@ -1300,6 +1306,8 @@
   }
 
   $('ver').textContent = 'v' + (CFG.version || 'dev') + (isNative ? '' : ' · navigateur');
+  // trois appuis sur le numéro de version : mode démo (0.10.10)
+  if (AF.surVersion) ['ver', 'majVer'].forEach(id => { if ($(id)) AF.surVersion($(id), () => S); });
 
   function open(state, h) {
     S = state; hooks = h || {}; CTX = null; BCTX = null;
@@ -1394,6 +1402,25 @@
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
 
+  // Mode démo (KladAffichage) : état d'avant gardé en entrant, rendu en sortant (rien n'a été enregistré entre-temps).
+  function demoDebut() {
+    if (!S) return;
+    const j = S.journal; S.journal = undefined;
+    try { demoAvant = JSON.stringify(S); } finally { S.journal = j; }
+    demoTouche = false;
+  }
+  function demoFin() {
+    const avant = demoAvant;
+    demoAvant = null;
+    if (!S || !avant || !demoTouche) { demoTouche = false; return; }
+    const j = S.journal;
+    for (const k of Object.keys(S)) delete S[k];
+    Object.assign(S, JSON.parse(avant));
+    S.journal = j;
+    demoTouche = false; CTX = null; BCTX = null; opCourante = null;
+    log('info', 'Mode démo : changements faits pendant la démo annulés.');
+  }
+
   // Verrouillage : l'état et tout ce qui était affiché sont effacés.
   function close() {
     // 0.10.9 : le verrouillage quitte le mode démo (captures d'écran de nouveau interdites)
@@ -1414,6 +1441,6 @@
   window.KladApp = {
     open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
     ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, rendre, redessiner, renderHaut, chrome, vue: () => vue, scope: () => scope, periode, choisirPeriode, versOps, etat: () => S, hooks: () => hooks, esc, isNative,
-    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp, trier
+    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp, trier, demoDebut, demoFin
   };
 })();

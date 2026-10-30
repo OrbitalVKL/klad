@@ -52,3 +52,52 @@ export function repriseMesures(fin) {
   r.accounts.push({ ref: 'r5', label: 'LIVRET', role: 'epargne', manual: true, balance: { amount: 640000, date: jour(fin, -3) } });
   return r;
 }
+
+// Variante « personnel » (0.10.10, test du mode démo) : même jeu, avec ce qu'un vrai carnet contient de personnel —
+// noms de personnes, employeur, catégories et postes créés, contrats avec références, copropriété et syndic, IBAN,
+// fin de carte, justificatifs. Tout est inventé ; PERSONNEL liste ce qui ne doit jamais s'afficher en mode démo.
+export const PERSONNEL = {
+  personnes: ['Aurore Ombelin', 'Basile Quenard'],
+  employeur: 'Zéphyrine Industries',
+  categories: ['Voyages Atlantide', 'Club Ornithologie Zéphyr', 'Bien-être'],
+  postes: ['Billets Atlantide', 'Anniversaire Aurore', 'Cotisation Ornithologie'],
+  banque: 'Banque Mirabelle',
+  intitule: 'M AURORE OMBELIN COMPTE CHEQUES',
+  iban: 'FR76 3000 4000 0312 3456 7890 143',
+  finCarte: '4242',
+  references: ['7788123', '2024-55871', 'CTR-990077', '2025-118'],
+  adresses: ['aurore.ombelin@example.org', 'imap.mirabelle-mail.example', 'ombelin-aurore.github.io'],
+  appId: '8f14e45f-ceea-467a-9b2c-1f0e2d3c4b5a',
+  textes: ['Résidence Les Mimosas', 'SYNDIC MIMOSAS GESTION', 'Cuisine Ombelin', 'Offre de prêt', 'Prêt Banque Mirabelle', 'Contrat Assurance Phénix', 'Forfait Galaxie Mobile', 'MIMOSAS', 'PHENIX', 'GALAXIE']
+};
+const REMPLACER = [
+  ['SOCIETE FICTIVE', 'ZEPHYRINE INDUSTRIES'], ['Société fictive', 'Zéphyrine Industries'],
+  ['VIR PERMANENT PERSONNE A', 'VIR PERMANENT AURORE OMBELIN'], ['VIR PERSONNE B', 'VIR M BASILE QUENARD'],
+  ['PERSONNE A', 'OMBELIN'], ['PERSONNE B', 'QUENARD'], ['Personne A', 'Aurore Ombelin'], ['Personne B', 'Basile Quenard'],
+  ['Copropriété fictive', 'Résidence Les Mimosas'], ['SYNDIC FICTIF', 'SYNDIC MIMOSAS GESTION'], ['PRLV SYNDIC', 'PRLV SYNDIC MIMOSAS'],
+  ['Prêt immobilier fictif', 'Prêt Banque Mirabelle n° 7788123'], ['Tableau fictif', 'Offre de prêt 2024-55871'],
+  ['Assurance auto fictive', 'Contrat Assurance Phénix CTR-990077'], ['Téléphone fictif', 'Forfait Galaxie Mobile'],
+  ['Cuisine fictive', 'Cuisine Ombelin'], ['facture fictive', 'Facture 2025-118']
+];
+export function reprisePersonnelle(fin) {
+  let t = JSON.stringify(repriseMesures(fin));
+  for (const [a, b] of REMPLACER) t = t.split(a).join(b);
+  const r = JSON.parse(t);
+  const C = r.carnet;
+  C.cats.custom['Voyages Atlantide'] = { nat: 'optionnelle' };
+  C.cats.custom['Club Ornithologie Zéphyr'] = { nat: 'optionnelle' };
+  C.P.rules.push(['ATLANTIDE', 'depense', 'Voyages Atlantide', 'Billets Atlantide', null],
+    ['ORNITHOLOGIE', 'depense', 'Club Ornithologie Zéphyr', 'Cotisation Ornithologie', null],
+    ['FLEURISTE', 'depense', 'Cadeaux', 'Anniversaire Aurore', null]);
+  const pad = n => String(n).padStart(2, '0');
+  for (let k = 0; k < 6; k++) {
+    const d = new Date(Date.UTC(+fin.slice(0, 4), +fin.slice(5, 7) - 1 - k, 11)).toISOString().slice(0, 10);
+    r.transactions.push({ account: 'r0', date: d, amount: -32000, label: 'CARTE ' + d.slice(8) + '/' + d.slice(5, 7) + ' ATLANTIDE AIRWAYS', status: 'comptabilisee' },
+      { account: 'r0', date: d, amount: -2500, label: 'PRLV CLUB ORNITHOLOGIE ZEPHYR CTR-' + pad(k) + '4471', status: 'comptabilisee' },
+      { account: 'r1', date: d, amount: -4500, label: 'CARTE ' + d.slice(8) + '/' + d.slice(5, 7) + ' FLEURISTE DES MIMOSAS', status: 'comptabilisee' });
+  }
+  r.transactions.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  C.appels.H.iban = PERSONNEL.iban;
+  r.accounts[0].iban_last4 = PERSONNEL.finCarte;
+  return r;
+}

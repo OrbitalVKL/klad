@@ -27,7 +27,7 @@ function serveur(WWW) {
   });
 }
 
-// o : { www, palette ('klad' | 'grafit'), theme ('clair' | 'sombre' | absent) } → banc { page, code, verrouiller, fermer, onglets, … }
+// o : { www, palette ('klad' | 'grafit'), theme ('clair' | 'sombre' | absent), reprise (fin → reprise, jeu des mesures par défaut) } → banc { page, code, verrouiller, fermer, onglets, … }
 export async function ouvrir(o) {
   o = o || {};
   const WWW = path.resolve(o.www || path.join(ICI, '../../www'));
@@ -57,7 +57,7 @@ export async function ouvrir(o) {
   await page.waitForSelector('#appli:not([hidden])');
   await page.evaluate(() => window.KladApp.ouvrirVolet('secReprise'));
   const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#btnChoisirReprise').click()]);
-  await fc.setFiles({ name: 'reprise.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(repriseMesures(AUJ))) });
+  await fc.setFiles({ name: 'reprise.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(o.reprise ? o.reprise(AUJ) : repriseMesures(AUJ))) });
   await page.waitForSelector('#repriseApercu [data-a="importer"]');
   await page.locator('#repriseApercu [data-a="importer"]').click();
   await page.waitForFunction(() => { const S = window.KladApp.etat(); return S && S.budget && S.classement && S.classement.import; });

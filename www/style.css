@@ -1578,7 +1578,7 @@ ol.ecarts li { margin: 4px 0; }
 }
 .demobar[hidden] { display: none; }
 .demobar button { all: unset; cursor: pointer; text-decoration: underline; font-weight: 600; }
-html.demo input:not([type="checkbox"]):not([type="radio"]), html.demo textarea, html.demo select { filter: blur(5px); }
+/* 0.10.10 : plus de flou, les valeurs des champs sont masquées (KladAffichage) */
 
 /* ---------- Klad : extras (Claude) ---------- */
 pre.cl-ap { white-space: pre-wrap; word-break: break-word; font: 12.5px/1.45 var(--mono); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-height: 40vh; overflow: auto; }
@@ -1915,3 +1915,33 @@ label.ctl{max-width:100%;min-width:0;flex-wrap:wrap}
    coincée à droite du nom, dans la même rangée) */
 .list.cats>li{flex-wrap:wrap}
 .list.cats>li>.edcat{flex:1 0 100%;width:100%}
+
+/* 0.10.10 : écran étroit (320 px) et texte agrandi (jusqu'à 200 %). Titres repliés à la ligne (puis réduits peu à peu par
+   KladUI.ajuster si un mot seul dépasse) ; montants toujours entiers : jamais coupés sur deux lignes ni tronqués, ils
+   passent à la ligne sous leur libellé ou sont réduits. Rien ne change quand tout tient. */
+.num, b.num, span.num, .hv, .kpi .v, .cr-r b, .mg-r b, .cm-min b, .wr-v b { white-space: nowrap; }
+html.appm header.app-h { flex-wrap: wrap; row-gap: 4px; }
+header.app-h h1, .panel-h h2, .ac-card h2, .kpi .eyebrow, .kpi-h { overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; min-width: 0; }
+.panel-h h2 { max-width: 100%; }
+.seg { flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
+.seg button { min-width: 0; text-align: center; }
+.cr-r, .mg-r, .wr-v, .cms-s { flex-wrap: wrap; }
+.cr-r { column-gap: 10px; }
+.cr-r > b, .cr-r > .num { margin-left: auto; }
+.wr-v { flex: 0 1 auto; justify-content: flex-end; min-width: 0; }
+details.cm-sub > summary .cms-s { white-space: normal; }
+.cm-min .subs, .cr-r .subs, .kpi .s { overflow-wrap: break-word; }
+.bal-row > .kpi .eyebrow { white-space: normal; overflow: visible; }
+.app-tb .tb-l { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fit-cache { visibility: hidden; }
+.dep-r { grid-template-columns: minmax(0, 1fr) auto; }
+.dep-r > :first-child { overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; min-width: 0; }
+html.appm .an-bar:not(.custom) .an-ctl { flex-wrap: wrap; }
+.ac-quick { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9em), 1fr)); }
+.ac-act { min-width: 0; overflow-wrap: break-word; }
+.ac-hero, .ac-poste, .ac-split .mini, .cm-min { grid-template-columns: minmax(0, 1fr); }
+.ac-hero > *, .ac-poste > *, .ac-split .mini > *, .cm-min > *, .ac-quick > * { min-width: 0; }
+.ac-hero .row2, .ac-poste .l1 { flex-wrap: wrap; }
+.ac-hero .lbl, .ac-hero .s, .mini .lbl, .ac-poste .l3, .cm-min .subs, .ac-act { overflow-wrap: break-word; white-space: normal; }
+ul.list li { flex-wrap: wrap; }
+@media (max-width:760px){ .cmp-grid, .cm-cash { grid-template-columns: minmax(0, 1fr); } }

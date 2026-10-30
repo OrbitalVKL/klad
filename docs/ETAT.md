@@ -5,30 +5,46 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.9** — correctif sur les retours de la 0.10.8. Décisions du propriétaire reportées : abandons « Liste d'origine »
+**0.10.10** — correctif avant la recette finale (réponse au rapport 0.10.9 ; icônes dessinées pour stationnement et
+courses, et texte agrandi simulé dans Chromium : validés).
+- Mode démo : rien de réel à l'écran (`www/demo.js`, `KladDemo`). Au démarrage du mode, un dictionnaire est tiré des
+  données : libellé de chaque opération (complet, court, 3 premiers mots, forme des observations), contrepartie → sa
+  sous-catégorie, sinon sa catégorie ; catégories créées par le propriétaire → « Catégorie N » (catégories d'office
+  gardées) ; postes (sous-catégories) qui ne sont pas faits que de mots courants (liste `KladDemo.MOTS`) → « Poste N »
+  (numéros stables : ordre alphabétique) ; personnes du commun (nom complet et chaque mot) → « Personne A / B » ;
+  employeurs (bulletins, PEE) → « Employeur » ; banques, intitulés, titulaires ; libellés de comptes qui ne sont pas des
+  mots courants → « Compte courant 1 »… ; contrats (nom et motif → poste, justificatif, note) ; virements permanents ;
+  copropriétés et syndics ; équilibre (mouvements → leur nature, équipements → « Équipement N ») ; motifs des réglages
+  et des règles ; messagerie. Motifs : adresses e-mail et web, identifiants (avant le dictionnaire), IBAN, références de
+  6 chiffres ou plus, « ABC-1234 », fins de carte « …1234 » (après). Appliqué au texte (y compris caché et aux données des
+  infobulles des graphiques), aux infobulles, `aria-label`, `placeholder` et aux valeurs des champs ; pastilles de
+  banque tirées du nom masqué. Champs en lecture seule (sauf les recherches), valeurs textuelles masquées « ••• »,
+  nombres multipliés. Rien n'est enregistré (sauvegarde bloquée, état d'avant rendu en sortant si quelque chose a
+  changé), ni synchronisé, ni écrit pour Grafit. Trois appuis sur le numéro de version (pied de page, Plus › Version)
+  activent ou arrêtent le mode. Bandeau « MODE DÉMO · chiffres et libellés fictifs · captures d'écran autorisées ».
+  Test `test/demo.test.mjs` : dictionnaire (node) ; parcours Chromium de tous les écrans et volets, postes dépliés,
+  séries de la tendance, recherche, comptes, sur le jeu fictif « personnel » (`tools/mesures/donnees.mjs`,
+  `reprisePersonnelle`, liste `PERSONNEL`) : aucun libellé d'opération, nom de catégorie créée, nom de personne,
+  employeur, banque, numéro ni adresse dans le DOM (contre-épreuve : sans le dictionnaire, 81 fuites) ; aucun champ
+  modifiable ; aucun bloc écrit ; état rendu en sortant. Outils : `test/demo-outils.mjs`.
+- Écran étroit (320 px) et texte agrandi (jusqu'à 200 %) : titres repliés à la ligne (césure française), rangées
+  libellé / montant repliées, grilles en `minmax(0, 1fr)` ; montants jamais coupés (`white-space: nowrap`) ;
+  réduction progressive (`KladUI.ajuster` : `zoom` de 8 % en 8 % jusqu'à 50 %) des titres, boutons de barres et montants
+  qui dépassent encore ; rien ne bouge sur un écran d'au moins 360 px avec un texte sous 110 % (cas ordinaire).
+  Libellés de la barre d'onglets en points de suspension. Test `test/champs.test.mjs` étendu aux textes des cartes
+  (`test/textes-outils.mjs`) : Accueil, Budget, Commun et leurs sous-vues, 320 / 360 / 412 px, texte 100 / 150 / 200 %.
+
+(0.10.9) — correctif sur les retours de la 0.10.8. Décisions du propriétaire reportées : abandons « Liste d'origine »
 des contrats et liste des bulletins de paie non lus (`docs/parite-fonctions.md`, « abandonné, décision du propriétaire ») ;
 base du reste à vivre « dernier salaire » par défaut et ordre des opérations gardé pour la session : validés.
 - Icônes : tout en icônes dessinées. Catégories d'office en `lu:<nom>` ; migration `dessins` (émojis d'office et repris,
   icônes reprises `svg:<nom>`, icônes vides → icône Lucide la plus proche, table `KladIcones.EMOJIS` / `SVG_REPRIS`,
   sinon proposée d'après le nom ; couleur de pastille inchangée ; en une fois, réversible `annulerDessins`) ; l'import du
   carnet convertit aussi ; affichage : toute icône non dessinée est montrée en icône dessinée (`KladIcones.versDessin`).
-- Champ « Nouvelle catégorie » tronqué sur le téléphone : cause trouvée, le contour du champ touché (2 px + 2 px de
-  décalage) dépassait de la zone défilante du volet (`.sh-body`, `overflow-y:auto`), qui le coupait net des deux côtés ;
-  zone défilante élargie de 6 px de chaque côté (marge intérieure compensée). Règle générale sur les champs
-  (`box-sizing:border-box`, `max-width:100%`, `min-width:0` ; étiquettes `label.ctl` repliables) ; marges de sécurité
-  gauche / droite du volet. Corrigés au passage : fiche dépliée d'une catégorie coincée à droite de son nom (Plus ›
-  Classement, déjà en 0.10.8), listes déroulantes trop larges à 320 px ou en texte agrandi (Équilibre, Impôts, Tendance,
-  Relevés). Test `test/champs.test.mjs` : écrans, volets et formulaires à 320, 360, 412 px, texte à 100, 150, 200 %
-  (simulé par `text-size-adjust` sur un écran mobile : le réglage d'Android n'est pas reproductible tel quel dans Chromium).
-- Plus › Aide et à propos › Diagnostic d'affichage (`www/diagaff.js`) : volet « Nouvelle catégorie (test) » (rien
-  n'enregistré), champ touché, mesures copiées (appareil, Android, WebView, textZoom, échelle de police, densité et
-  taille d'affichage, écran en CSS px, devicePixelRatio, marges de sécurité, rectangles du champ, de l'étiquette, du
-  formulaire, de la zone défilante et du volet, constat). Plugin `KladAffichage.diagnostic()` (aucun identifiant).
-- Captures d'écran autorisées seulement en mode démo : `KladAffichage.captures({ autoriser })` retire FLAG_SECURE en
-  entrant, le rétablit en sortant, au verrouillage (le verrouillage quitte le mode démo) et à chaque passage en
-  arrière-plan (`handleOnPause`) ; bandeau « MODE DÉMO · chiffres fictifs · captures d'écran autorisées ». Limite : le
-  mode démo masque montants et noms (personnes, banques, intitulés) mais pas les libellés des opérations ni les noms de
-  catégories (dit dans Réglages › Apparence). Test `test/demo.test.mjs`.
+- Champ « Nouvelle catégorie » tronqué sur le téléphone : zone défilante du volet élargie ; test `test/champs.test.mjs`.
+- Plus › Aide et à propos › Diagnostic d'affichage (`www/diagaff.js`, plugin `KladAffichage.diagnostic()`).
+- Captures d'écran autorisées seulement en mode démo (`KladAffichage.captures`, FLAG_SECURE rétabli en sortant, au
+  verrouillage et en arrière-plan).
 
 (0.10.8) — parité des fonctions avec l'ancienne version : `docs/parite-fonctions.md` (326 fonctions de la v65,
 téléphone et ordinateur ; 226 identiques, 85 adaptées, 12 abandonnées par décision, 2 abandons à décider, 1 manquante
@@ -84,6 +100,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Retours sur la série UX : détail des postes, icônes des catégories, base du reste à vivre, gestes | 0.10.7 | fait |
 | — | Parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) et petites fonctions manquantes | 0.10.8 | fait |
 | — | Correctif : icônes toutes dessinées, champs des volets, diagnostic d'affichage, captures en mode démo | 0.10.9 | fait |
+| — | Correctif : mode démo sans rien de réel à l'écran, titres et montants à 320 px et texte à 200 % | 0.10.10 | fait, recette finale en cours |
 | 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
@@ -218,6 +235,13 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   désignées « personne A / B », gardées pour la session. Sélecteur de PDF : sélecteur Android (Drive compris).
 - Captures d'écran (0.10.9) : interdites (FLAG_SECURE) sauf pendant le mode démo, au premier plan ; décision du
   propriétaire. Hors mode démo, rien ne change.
+- Mode démo (0.10.10) : rien de réel à l'écran (dictionnaire tiré des données, `KladDemo`), champs en lecture seule
+  (sauf les recherches : ce qu'on y tape soi-même reste affiché), rien d'enregistré ni synchronisé ; décisions prises par
+  défaut, à valider : un poste fait seulement de mots courants (« Courses », « Assurance habitation ») garde son nom,
+  sinon « Poste N » ; libellé d'un compte fait de mots courants (« Commun ») gardé ; nombres des champs multipliés comme
+  les montants.
+- Textes (0.10.10) : titres repliés puis réduits, montants entiers, de 320 à 412 px et texte de 100 à 200 % (Accueil,
+  Budget, Commun).
 - Champs de saisie (0.10.9) : jamais hors de leur conteneur ni de l'écran, contour entier, de 320 à 412 px et texte de
   100 à 200 % (`test/champs.test.mjs`, lancé dans le parcours Chromium de la fabrication).
 - Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées, jusqu'à la
@@ -292,14 +316,16 @@ Restent :
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
 
-## Points d'appui laissés par la 0.10.9
+## Points d'appui laissés par la 0.10.10
 
-- Banc de mesure : `ouvrir({ mobile: true })` puis `texte(pc)` (taille du texte simulée) ; `releve` de
-  `test/champs.test.mjs` réutilisable pour d'autres contrôles de débordement.
-- Reste vu au banc, hors champs : à 320 px et texte à 200 %, quelques titres et montants de Budget et Commun
-  (« Observations et recommandations », « Marge réelle du commun ») dépassent de leur carte (texte, pas de champ).
-- Diagnostic d'affichage : à demander au propriétaire si un défaut d'affichage persiste sur le téléphone ; mode démo
-  pour une capture (libellés des opérations visibles : à masquer si besoin dans un lot suivant).
+- Mode démo : `KladDemo.construire(S, { ctx, B })` → dictionnaire ; `KladDemo.masquer(texte, D)` ; balayage du DOM et
+  origines rendues en sortant dans `KladAffichage` (`texteDemo`, `surVersion`) ; `KladApp.demoDebut` / `demoFin`
+  (état d'avant gardé en JSON, journal à part). Un nouvel écran qui affiche une donnée nouvelle (autre que celles du
+  dictionnaire) doit l'ajouter dans `construire` ; le test du parcours (`test/demo.test.mjs`) le signale si le jeu
+  « personnel » la contient (ajouter alors la donnée au jeu et à `PERSONNEL`).
+- Textes : `KladUI.ajuster` (sélecteurs `AJUSTER`, cadres `CADRE`) ; relevé `releveTextes` réutilisable pour d'autres
+  écrans (Opérations, volets) si un débordement est signalé.
+- Diagnostic d'affichage (0.10.9) : à demander au propriétaire si un défaut d'affichage persiste sur le téléphone.
 
 ## Points d'appui laissés par la 0.10.8 (parité des fonctions)
 

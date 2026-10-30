@@ -2,10 +2,13 @@
 // texte à 100, 150 et 200 % (taille de police d'Android, appliquée au texte seulement), chaque champ (input, select,
 // textarea) des écrans, volets et formulaires reste dans son conteneur et dans l'écran, et son contour de mise en
 // évidence (champ touché) n'est coupé par aucune zone qui défile ou masque son contenu.
+// 0.10.10 : textes des cartes (Accueil, Budget, Commun et leurs sous-vues) : dans leur carte et dans l'écran, montants
+// jamais coupés sur deux lignes ni tronqués (test/textes-outils.mjs).
 // Sauté si Playwright et Chromium ne sont pas installés, sauf avec KLAD_PARCOURS=obligatoire (fabrication GitHub Actions).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ouvrir, playwright } from '../tools/mesures/banc.mjs';
+import { releveTextes } from './textes-outils.mjs';
 
 const PW = playwright();
 const SAUT = !PW && !process.env.KLAD_PARCOURS && 'Playwright absent';
@@ -89,4 +92,34 @@ test('champs : dans leur conteneur et dans l\'écran, contour entier (320 à 412
   } finally { await B.fin(); }
   assert.ok(vus.size >= 30, vus.size + ' écrans et volets parcourus');
   assert.deepEqual([...defauts].map(([k, c]) => k + ' (' + c + ')'), [], 'champs qui débordent');
+});
+
+test('textes des cartes : titres repliés ou réduits, montants entiers (Accueil, Budget, Commun ; 320 à 412 px, texte de 100 à 200 %)', { skip: SAUT, timeout: 900000 }, async () => {
+  const B = await ouvrir({ mobile: true });
+  const defauts = new Map();
+  let n = 0;
+  try {
+    const { page } = B;
+    let cfg = '', W = 0;
+    const f = async nom => { n++; for (const d of await page.evaluate(releveTextes, ['#appli', W])) { const k = nom + ' › ' + d; if (!defauts.has(k)) defauts.set(k, cfg); } };
+    for (const largeur of LARGEURS) {
+      await page.setViewportSize({ width: largeur, height: 800 });
+      W = largeur;
+      for (const pc of TEXTES) {
+        cfg = largeur + ' px, texte ' + pc + ' %';
+        await B.texte(pc);
+        for (const t of ['accueil', 'budget', 'commun']) {
+          await B.onglet(t);
+          await B.pause(150);
+          await f(t);
+          const sv = await page.$$eval('[data-sousvue]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.sousvue))]);
+          for (const s of sv) { await page.locator('[data-sousvue="' + s + '"]:visible').first().click(); await B.pause(250); await f(t + '›' + s); }
+        }
+      }
+    }
+    await B.texte(100);
+    assert.deepEqual(B.erreurs, [], 'aucune erreur dans la page');
+  } finally { await B.fin(); }
+  assert.ok(n >= 60, n + ' écrans relevés');
+  assert.deepEqual([...defauts].map(([k, c]) => k + ' (' + c + ')'), [], 'textes qui débordent');
 });

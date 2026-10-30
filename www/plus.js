@@ -555,9 +555,12 @@
       '<h3>Palette</h3><div class="seg" role="group" aria-label="Palette">' +
       [['klad', 'Klad'], ['grafit', 'Grafit']].map(([k, l]) => '<button data-palette-choix="' + k + '" aria-pressed="' + (k === p) + '">' + l + '</button>').join('') + '</div>' +
       '<p class="muted small">Klad : couleurs habituelles. Grafit : noir et rouge, comme l\'icône. Indépendante du thème, gardée sur ce téléphone.</p>' +
-      '<h3>Mode démo</h3><p class="muted">Pour montrer l\'appli sans dévoiler vos chiffres : montants multipliés par un facteur pris au hasard, ' +
-      'noms des personnes et des banques remplacés, champs de saisie floutés. Rien n\'est modifié dans vos données ; le mode s\'arrête en quittant, au verrouillage ou en relançant Klad.</p>' +
-      '<p class="muted small">Captures d\'écran autorisées pendant le mode démo seulement (pour montrer un défaut d\'affichage). Les libellés des opérations et les noms des catégories restent ceux de vos données : vérifiez la capture avant de l\'envoyer.</p>' +
+      '<h3>Mode démo</h3><p class="muted">Pour montrer l\'appli sans rien dévoiler : montants multipliés par un facteur pris au hasard ; ' +
+      'libellés des opérations remplacés par leur sous-catégorie ; catégories et postes que vous avez créés renommés « Catégorie 1 », « Poste 2 »… ; ' +
+      'noms des personnes, de l\'employeur et des banques remplacés ; numéros (IBAN, références, fins de carte) et adresses masqués ; ' +
+      'champs de saisie en lecture seule, valeurs des réglages masquées. Rien n\'est enregistré ni synchronisé ; le mode s\'arrête en quittant, au verrouillage ou en relançant Klad. ' +
+      'Trois appuis sur le numéro de version l\'activent ou l\'arrêtent aussi.</p>' +
+      '<p class="muted small">Captures d\'écran autorisées pendant le mode démo seulement (chiffres et libellés fictifs).</p>' +
       '<div class="row"><button class="btn' + (d ? ' ghost' : '') + ' small" data-demo="' + (d ? 'off' : 'on') + '">' + (d ? 'Quitter le mode démo' : 'Passer en mode démo') + '</button></div>';
   }
   A.preparer.secAffichage = () => renderAffichage();
