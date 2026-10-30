@@ -107,6 +107,38 @@
     return true;
   }
 
+  // 0.10.7 « icones » : chaque catégorie reçoit une icône. Celles qui n'en ont pas (rien d'enregistré, ou la lettre de
+  // repli) reçoivent celle que la banque propose d'après leur nom ; les icônes déjà présentes (reprises de l'ancienne
+  // version ou choisies) ne changent pas. Idempotente, réversible (annulerIcones). → { n, noms } ou null.
+  const ICONES = 'icones';
+  function icones(S, now) {
+    const I = g.KladIcones;
+    if (!S || !S.classement || !isObj(S.classement.categories) || !I || !I.liste().length) return null;
+    if (isObj(S.modele.migrations) && S.modele.migrations[ICONES]) return null;
+    const C = S.classement, avant = {}, noms = [];
+    for (const n of Object.keys(C.categories)) {
+      const c = C.categories[n];
+      if (!isObj(c) || !I.absente(c.icone) || (g.KladClasse && g.KladClasse.CATEGORIES[n] && c.icone == null)) continue;
+      avant[n] = c.icone === undefined ? null : c.icone;
+      c.icone = I.proposer(n);
+      noms.push(n);
+    }
+    S.modele.migrations = isObj(S.modele.migrations) ? S.modele.migrations : {};
+    S.modele.migrations[ICONES] = { le: new Date(now == null ? Date.now() : now).toISOString(), n: noms.length, avant };
+    return { n: noms.length, noms };
+  }
+  function annulerIcones(S) {
+    const m = S && isObj(S.modele.migrations) ? S.modele.migrations[ICONES] : null;
+    if (!m) return false;
+    const C = S.classement;
+    if (C && isObj(C.categories)) for (const n of Object.keys(m.avant || {})) {
+      if (!isObj(C.categories[n])) continue;
+      if (m.avant[n] == null) delete C.categories[n].icone; else C.categories[n].icone = m.avant[n];
+    }
+    delete S.modele.migrations[ICONES];
+    return true;
+  }
+
   // État de l'import de l'ancienne version (Plus › Contrôle, relevé de contrôle).
   function etatImport(S) {
     const cx = contenu(S);
@@ -121,5 +153,5 @@
     };
   }
 
-  g.KladMigrations = { payload, annulerPayload, etatImport, contenu, faite };
+  g.KladMigrations = { payload, annulerPayload, icones, annulerIcones, etatImport, contenu, faite };
 })(typeof window !== 'undefined' ? window : globalThis);

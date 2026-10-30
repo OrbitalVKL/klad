@@ -289,6 +289,26 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
       for (let i = 1; i <= 5; i++) el.dispatchEvent(new TouchEvent('touchmove', { touches: [tc(x + dx * i / 5)], changedTouches: [tc(x + dx * i / 5)], bubbles: true }));
       el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [tc(x + dx)], bubbles: true }));
     }, dx);
+    // 0.10.7 : pendant le glissement, l'action apparaît sous la ligne (« Vue » / « Classer »), seuil marqué, vibration au seuil
+    const pendant = (t, dx) => ligneOp(t).evaluate((el, dx) => {
+      window.__vib = 0; navigator.vibrate = () => { window.__vib++; return true; };
+      const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const tc = (cx) => new Touch({ identifier: 1, target: el, clientX: cx, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { touches: [tc(x)], changedTouches: [tc(x)], bubbles: true }));
+      const etat = [];
+      for (const d of [Math.sign(dx) * 30, Math.sign(dx) * 60, dx]) {
+        el.dispatchEvent(new TouchEvent('touchmove', { touches: [tc(x + d)], changedTouches: [tc(x + d)], bubbles: true }));
+        const a = el.querySelector('.sw-act');
+        etat.push([a ? a.textContent : '', el.classList.contains('sw-go'), window.__vib]);
+      }
+      el.dispatchEvent(new TouchEvent('touchmove', { touches: [tc(x)], changedTouches: [tc(x)], bubbles: true }));    // revenu au départ : rien
+      el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [tc(x)], bubbles: true }));
+      return etat;
+    }, dx);
+    assert.deepEqual(await pendant('SALAIRE FICTIF', 120), [['Vue', false, 0], ['Vue', false, 0], ['Vue', true, 1]]);
+    assert.deepEqual(await pendant('CB EPICERIE FICTIVE', -120), [['Classer', false, 0], ['Classer', false, 0], ['Classer', true, 1]]);
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator('#tx .sw-act').count(), 0, 'action retirée après le geste');
     await glisser('SALAIRE FICTIF', 120);
     await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '1');
     await glisser('CB EPICERIE FICTIVE', -120);
@@ -478,6 +498,22 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     // section dépliée ; montant d'un poste modifié en mode Budget, annulation
     await page.locator('#budget-main [data-sec="courante"]').first().click();
     assert.ok(await page.locator('#budget-main tr', { hasText: 'Alimentation' }).count() >= 1);
+    // 0.10.7 : toucher le nom d'un poste déplie ses opérations (exactement celles comptées dans « utilisé ») ;
+    // un poste sans opération (début de cycle) affiche « Aucune opération sur cette période »
+    const nDet = () => page.locator('#budget-main tr.det [data-op]').count();
+    const postesOps = await page.evaluate(() => { const s = window.KladBudget.suivi(window.KladApp.budget(), 'perso', null); return ['courante', 'optionnelle'].flatMap(k => s.sections[k].lignes).map(a => [a.key, a.ops.length]); });
+    for (const [cle, nOps] of postesOps) {
+      const sec = page.locator('#budget-main button.sec-tog[aria-expanded="false"]');
+      for (let i = 0; i < 6 && await sec.count(); i++) await sec.first().click();
+      const d0 = await nDet();
+      const nom = page.locator('#budget-main .poste-nom[data-poste="' + cle + '"]');
+      await nom.click();
+      assert.equal(await nom.getAttribute('aria-expanded'), 'true', cle);
+      assert.equal(await nDet() - d0, nOps, cle);
+      if (!nOps) assert.ok(await page.locator('#budget-main tr.det', { hasText: 'Aucune opération sur cette période' }).count() >= 1, cle);
+      await nom.click();
+      assert.equal(await nDet(), d0, cle);
+    }
     await page.locator('#budget-main [data-bmode="plan"]').click();
     await page.locator('#budget-main [data-pamt="c|Alimentation"]').fill('250');
     await page.locator('#budget-main [data-pamt="c|Alimentation"]').press('Tab');
@@ -865,7 +901,18 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.equal(r.month.cycle, 'salary');
     assert.equal(typeof r.commun.balance, 'number');
     assert.equal(typeof r.commun.overdraft_risk, 'boolean');
-    assert.ok(r.month.budget > 0 && Array.isArray(r.month.top) && r.month.left_to_live_basis === 'accounts');
+    assert.ok(r.month.budget > 0 && Array.isArray(r.month.top) && r.month.left_to_live_basis === 'budget');
+    // 0.10.7 : base du reste à vivre choisie sur l'Accueil → le résumé Grafit suit (comptes courants)
+    await page.evaluate(() => window.KladApp.fermerVolet(true));
+    await page.locator('#app-tb [data-tab="accueil"]').click();
+    await page.locator('#view-accueil [data-ravbase="comptes"]').click();
+    assert.equal(await page.locator('#view-accueil [data-ravbase="comptes"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.evaluate(() => window.KladApp.etat().budget.reglages.rav), 'comptes');
+    await page.waitForFunction(() => JSON.parse(window.KladLienGrafit.demo()).month.left_to_live_basis === 'accounts');
+    const r2 = JSON.parse(await page.evaluate(() => window.KladLienGrafit.demo()));
+    const rv = await page.evaluate(() => window.KladBudget.suivi(window.KladApp.budget(), 'perso', null).rav);
+    assert.equal(r2.month.left_to_live, Math.round(rv.comptes.reste) / 100);
+    assert.equal(r.month.left_to_live, Math.round(rv.budget.reste) / 100);
     assert.ok(Array.isArray(r.upcoming));
     const brut = JSON.stringify(r);
     for (const x of ['FICTI', 'PRLV', 'SUPERMARCHE']) assert.ok(!brut.includes(x), x);

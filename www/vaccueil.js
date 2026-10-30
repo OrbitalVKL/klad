@@ -26,25 +26,28 @@
     (droite ? '<span class="r">' + esc(droite) + '</span>' : '') + '</h2>' + corps + '</section>';
 
   // ------------------------------------------------------------ 1. reste à vivre
-  // res : KladBudget.suivi(B, 'perso', null). Grand chiffre : colonne « dernier salaire » ; dessous, « comptes courants ».
-  function reste(res) {
+  // res : KladBudget.suivi(B, 'perso', null) ; base : « salaire » ou « comptes » (KladBudget.baseRav, 0.10.7). Grand
+  // chiffre : la colonne choisie ; dessous, l'autre. Interrupteur à deux positions sous la carte (hors du bouton).
+  function reste(res, base) {
     const rav = res && res.rav;
     if (!rav) return '<section class="ac-hero" data-mesure="rav" aria-label="Reste à vivre"><span class="lbl">Reste à vivre</span><span class="v">—</span>' +
       '<span class="s">Il se calcule sur le cycle de salaire en cours, dès que le budget est repris ou réglé.</span></section>';
-    const b = rav.budget, c = rav.comptes;
+    const x = KB().ravChoisi(rav, base), b = x.col, c = x.autre;
+    const surQuoi = x.choix === 'comptes' ? 'sur les comptes courants' : 'sur le dernier salaire';
     const restants = Math.max(1, res.nbJours - res.jour + 1);
     const ecoule = Math.round(Math.min(1, res.jour / res.nbJours) * 100);
     const utilise = res.total && res.total.P > DEMI ? Math.round(res.total.C / res.total.P * 100) : null;
     const grand = b.reste >= 0 ? F().montant(b.reste) : F().montant(-b.reste);
     const parJour = b.reste > 0 ? 'soit ' + KB().eur(Math.floor(b.reste / restants)) + ' par jour pendant ' + pluriel(restants, 'jour') : 'budget du cycle dépassé';
-    const comptes = c ? 'sur les comptes courants : ' + (c.reste >= 0 ? F().montant(c.reste) : F().montant(-c.reste) + ' en dépassement') : '';
-    return '<button type="button" class="ac-hero" data-mesure="rav" data-aller="rav" aria-label="' + esc('Reste à vivre jusqu\'au ' + U().jjmm(rav.fin) + ' : ' + grand +
-      (b.reste < 0 ? ' en dépassement' : '') + ' sur le dernier salaire' + (comptes ? ', ' + comptes : '') + '. Détail du calcul') + '">' +
+    const autre = c ? (x.choix === 'comptes' ? 'sur le dernier salaire : ' : 'sur les comptes courants : ') + (c.reste >= 0 ? F().montant(c.reste) : F().montant(-c.reste) + ' en dépassement') : '';
+    return '<div class="ac-hero-w" data-mesure="rav"><button type="button" class="ac-hero" data-aller="rav" aria-label="' + esc('Reste à vivre jusqu\'au ' + U().jjmm(rav.fin) + ' : ' + grand +
+      (b.reste < 0 ? ' en dépassement' : '') + ' ' + surQuoi + (autre ? ', ' + autre : '') + '. Détail du calcul') + '">' +
       '<span class="lbl">Reste à vivre jusqu\'au ' + esc(U().jjmm(rav.fin)) + '</span>' +
       '<span class="v num">' + esc(grand) + (b.reste < 0 ? '<small> dépassé</small>' : '') + '</span>' +
-      '<span class="s">' + esc(parJour) + (comptes ? ' · ' + esc(comptes) : '') + '</span>' +
+      '<span class="s">' + esc(surQuoi) + ' · ' + esc(parJour) + (autre ? ' · ' + esc(autre) : '') + '</span>' +
       '<span class="prog" aria-hidden="true"><i style="width:' + ecoule + '%"></i></span>' +
-      '<span class="row2"><span>cycle écoulé ' + ecoule + ' %</span>' + (utilise != null ? '<span>budget utilisé ' + utilise + ' %</span>' : '') + '</span></button>';
+      '<span class="row2"><span>cycle écoulé ' + ecoule + ' %</span>' + (utilise != null ? '<span>budget utilisé ' + utilise + ' %</span>' : '') + '</span></button>' +
+      U().interrupteurRav(x.choix, !!rav.comptes) + '</div>';
   }
 
   // ------------------------------------------------------------ 2. « À vérifier » (un seul bloc, masqué s'il n'y a rien)
@@ -162,7 +165,7 @@
     const L = Vu().lignesAVerifier(d.S, d.now, d.ext);
     const bl = bilan(d.res);
     if (bl) L.push(bl);
-    return reste(d.res) + aVerifier(L) + soldes(d.S, d.now, { dettes: d.dettes, livrets: d.livrets }) + cycle(d.B, d.res) +
+    return reste(d.res, KB().baseRav(d.S)) + aVerifier(L) + soldes(d.S, d.now, { dettes: d.dettes, livrets: d.livrets }) + cycle(d.B, d.res) +
       commun(d.fdm, d.plan, d.R || {}, M().jourLocal(d.now)) + echeances(d.ech) + actions();
   }
   // Sur-titre de l'en-tête : « Cycle du 27/10 au 26/11 · jour 4 sur 31 ».

@@ -349,13 +349,14 @@
         it('🎨', 'Apparence', 'Thème ' + ({ auto: 'automatique', clair: 'clair', sombre: 'sombre' }[t]) + ' · palette ' + (p === 'grafit' ? 'Grafit' : 'Klad') + ' · mode démo', 'data-volet="secAffichage"') +
         it('🔒', 'Verrou', 'Code, empreinte, effacement', 'data-volet="secVerrou"') +
         it('🗂️', 'Classement', 'Catégories, règles, complément', 'data-volet="secClassement"') +
-        it('📐', 'Budget', 'Cycle de salaire, base de calcul, personnes du commun', 'data-volet="secReglBudget"')) +
+        it('📐', 'Budget', 'Cycle de salaire, reste à vivre affiché, base de calcul, personnes du commun', 'data-volet="secReglBudget"')) +
       grp('Aide et à propos',
         it('ℹ️', 'Version et mise à jour', 'Version ' + (CFG.version || 'dev'), 'data-volet="secMaj"') +
         it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog"'));
   }
   // Réglages › Budget (0.10.5) : réglages du budget rassemblés (lecture ; la base de calcul se change dans Budget, mode
-  // « Budget » ; le cycle de salaire et les personnes viennent du complément, modifiables ici au Lot 9c).
+  // « Budget » ; le cycle de salaire et les personnes viennent du complément, modifiables ici au Lot 9c). 0.10.7 : base
+  // du reste à vivre affichée (interrupteur, réglage du budget).
   preparer.secReglBudget = () => {
     const KB = window.KladBudget;
     let R = null, per = null, ref = null;
@@ -368,6 +369,8 @@
       l('Compte du salaire', c ? c.libelle : 'tous les comptes perso') +
       l('Libellé reconnu', sal && sal.motifs.length ? sal.motifs.join(', ') : 'non réglé') +
       l('Montant minimum', sal && sal.min ? KB.eur(sal.min) : 'aucun') + '</ul>' +
+      '<h3>Reste à vivre affiché</h3><p class="muted small">Sur l\'Accueil et dans le résumé lu par Grafit. Le détail montre toujours les deux colonnes.</p>' +
+      U.interrupteurRav(KB.baseRav(S), !!(per && budget() && (KB.suivi(budget(), 'perso', null).rav || {}).comptes)) +
       '<h3>Base de calcul du réel habituel</h3><ul class="list">' + l('Depuis', ref ? U.mLong(ref) : 'automatique') + '</ul>' +
       '<div class="row"><button type="button" class="btn" data-a="base">Modifier dans Budget</button></div>' +
       '<h3>Compte commun</h3><ul class="list">' + l('Personnes', cm && (cm.moi || cm.autre) ? [cm.moi, cm.autre].filter(Boolean).join(' et ') : 'non réglées') + '</ul>' +
@@ -524,8 +527,21 @@
   preparer.secRav = () => {
     let rav = null;
     try { const B = budget(); rav = B ? window.KladBudget.suivi(B, 'perso', null).rav : null; } catch (e) { rav = null; }
-    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav) : '';
+    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav, window.KladBudget.baseRav(S)) : '';
   };
+  // Base du reste à vivre (0.10.7) : interrupteur de l'Accueil, du détail et du Budget ; réglage du budget (Réglages ›
+  // Budget), suivi par le résumé Grafit.
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest && ev.target.closest('[data-ravbase]');
+    if (!b || !S || b.disabled || !window.KladBudget) return;
+    ev.stopPropagation();
+    if (window.KladBudget.baseRav(S) === b.dataset.ravbase) return;
+    window.KladBudget.choisirBaseRav(S, b.dataset.ravbase);
+    log('info', 'Reste à vivre : base « ' + window.KladBudget.BASES_RAV[window.KladBudget.baseRav(S)] + ' ».');
+    changed('budget');
+    if ($('secRav').closest('#volet')) preparer.secRav();
+    if ($('reglBudgetCorps').closest('#volet')) preparer.secReglBudget();
+  }, true);
   function versOps(f) {
     f = Object.assign({}, f || {});
     perimOps = f.perimetre || 'tout';            // depuis l'Accueil : les compteurs portent sur perso et commun
@@ -686,8 +702,29 @@
 
   // ------------------------------------------------------------ gestes sur une opération (comme l'ancienne version)
   // Glisser vers la droite : vue / non vue ; vers la gauche : volet « Classer ». Le détail de l'opération offre les
-  // mêmes actions par boutons.
+  // mêmes actions par boutons. 0.10.7 : pendant le glissement, l'action qui va se produire apparaît sous la ligne
+  // (icône et mot : « Vue » ou « Non vue » à droite, « Classer » à gauche), fond plus soutenu une fois le seuil atteint,
+  // retour haptique léger au seuil (si le téléphone le permet). « Réduire les animations » : la ligne ne bouge pas,
+  // l'action s'affiche par-dessus, sans transition.
   let finGeste = 0;
+  const ICO_GESTE = {
+    vue: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg>',
+    nonvue: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>',
+    classer: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor"/></svg>'
+  };
+  // Action affichée sous la ligne : sens 'r' (vue / non vue) ou 'l' (classer).
+  function actionGeste(tr, sens) {
+    let el = tr.querySelector(':scope > .sw-act');
+    const k = sens === 'r' ? (tr.classList.contains('unseen') ? 'vue' : 'nonvue') : 'classer';
+    if (el && el.dataset.k === k) return el;
+    if (!el) { el = document.createElement('div'); el.className = 'sw-act'; el.setAttribute('aria-hidden', 'true'); tr.insertBefore(el, tr.firstChild); }
+    el.dataset.k = k;
+    el.className = 'sw-act sw-' + k;
+    el.innerHTML = '<span class="sw-in">' + ICO_GESTE[k] + '<b>' + ({ vue: 'Vue', nonvue: 'Non vue', classer: 'Classer' }[k]) + '</b></span>';
+    return el;
+  }
+  const vibrer = () => { try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* sans vibreur */ } };
+  const animationsReduites = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   (function () {
     const box = $('tx');
     let G = null;
@@ -695,7 +732,7 @@
     box.addEventListener('touchstart', ev => {
       const tr = ev.target.closest('div.txr[data-op]');
       if (!tr || ev.touches.length > 1) { G = null; return; }
-      G = { tr, x: ev.touches[0].clientX, y: ev.touches[0].clientY, dx: 0, lock: false };
+      G = { tr, x: ev.touches[0].clientX, y: ev.touches[0].clientY, dx: 0, lock: false, go: false };
     }, { passive: true });
     box.addEventListener('touchmove', ev => {
       if (!G) return;
@@ -705,9 +742,13 @@
         else { if (Math.abs(dy) > 12) G = null; return; }
       }
       G.dx = dx;
-      const c = Math.max(-150, Math.min(150, dx)), tr = G.tr;
-      tr.classList.add('swiping'); tr.classList.toggle('sw-r', c > 0); tr.classList.toggle('sw-l', c < 0); tr.classList.toggle('sw-go', Math.abs(c) >= SEUIL);
-      tr.style.setProperty('--sx', c + 'px');
+      const c = Math.max(-150, Math.min(150, dx)), tr = G.tr, go = Math.abs(c) >= SEUIL;
+      actionGeste(tr, c >= 0 ? 'r' : 'l');
+      tr.classList.add('swiping'); tr.classList.toggle('sw-r', c > 0); tr.classList.toggle('sw-l', c < 0); tr.classList.toggle('sw-go', go);
+      tr.classList.toggle('sw-fixe', animationsReduites());
+      if (go && !G.go) vibrer();
+      G.go = go;
+      tr.style.setProperty('--sx', (animationsReduites() ? 0 : c) + 'px');
     }, { passive: true });
     const fin = () => {
       if (!G) return;
@@ -715,10 +756,11 @@
       G = null;
       if (!lock) return;
       finGeste = Date.now();
-      tr.classList.add('sw-back'); tr.style.setProperty('--sx', '0px');
-      setTimeout(() => { tr.classList.remove('swiping', 'sw-r', 'sw-l', 'sw-go', 'sw-back', 'was-seen'); tr.style.removeProperty('--sx'); }, 220);
+      const nettoyer = () => { tr.classList.remove('swiping', 'sw-r', 'sw-l', 'sw-go', 'sw-back', 'sw-fixe', 'was-seen'); tr.style.removeProperty('--sx'); const a = tr.querySelector(':scope > .sw-act'); if (a) a.remove(); };
+      if (animationsReduites()) nettoyer();
+      else { tr.classList.add('sw-back'); tr.style.setProperty('--sx', '0px'); setTimeout(nettoyer, 220); }
       if (dx >= SEUIL) basculerVue(tr.dataset.c, tr.dataset.op);
-      else if (dx <= -SEUIL) setTimeout(() => ouvrirClasser(tr.dataset.c, tr.dataset.op), 120);
+      else if (dx <= -SEUIL) setTimeout(() => ouvrirClasser(tr.dataset.c, tr.dataset.op), animationsReduites() ? 0 : 120);
     };
     box.addEventListener('touchend', fin, { passive: true });
     box.addEventListener('touchcancel', fin, { passive: true });
@@ -1307,6 +1349,13 @@
           }
         } catch (e) { log('err', 'Mise à jour des réglages : ' + (e.message || e)); }
       }
+      // 0.10.7 : une icône pour chaque catégorie (proposée d'après le nom ; les icônes déjà présentes sont gardées).
+      if (window.KladMigrations && window.KladMigrations.icones && s0.classement) {
+        try {
+          const r = window.KladMigrations.icones(s0, Date.now());
+          if (r && r.n) { log('ok', 'Icônes : ' + r.n + ' catégorie(s) sans icône en ont reçu une (modifiable dans Plus › Classement).'); modifie = true; }
+        } catch (e) { log('err', 'Icônes : ' + (e.message || e)); }
+      }
       if (init || modifie || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
@@ -1319,7 +1368,7 @@
     toastAction = null; $('toast').className = '';
     ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'sv-bar', 'sv-eq', 'appart-corps', 'cm-tres', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
       'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps']
+      'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'iconeCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps']
       .forEach(id => { const e = $(id); if (e) e.textContent = ''; });
     $('tb-badge').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'q'].forEach(id => { $(id).value = ''; });

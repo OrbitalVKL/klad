@@ -69,9 +69,15 @@
     const c = C && C.categories && C.categories[cat];
     return (c && c.nature) || (CATEGORIES[cat] && CATEGORIES[cat][0]) || 'optionnelle';
   }
+  // Icône enregistrée, sinon celle d'office, sinon une icône de la banque proposée d'après le nom (0.10.7, KladIcones),
+  // sinon l'initiale (sans la banque, dans les anciens tests).
   function iconeDe(C, cat) {
     const c = C && C.categories && C.categories[cat];
-    return (c && c.icone) || (CATEGORIES[cat] && CATEGORIES[cat][1]) || (String(cat || '?').trim().charAt(0).toUpperCase() || '?');
+    const I = g.KladIcones;
+    if (c && c.icone && !(I && I.absente(c.icone))) return c.icone;
+    if (CATEGORIES[cat]) return CATEGORIES[cat][1];
+    if (I) return I.proposer(cat);
+    return (c && c.icone) || (String(cat || '?').trim().charAt(0).toUpperCase() || '?');
   }
   const typeDeNature = n => n === 'revenu' ? 'revenu' : n === 'interne' ? 'interne' : n === 'epargne' ? 'epargne' : n === 'hors_budget' ? 'horsbudget' : 'depense';
   const typeDe = (C, cat) => typeDeNature(natureDe(C, cat));

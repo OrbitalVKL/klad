@@ -186,7 +186,9 @@
       .map(x => ({ label: libellePoste(S, x.a.label) || 'POSTE', spent: euros(Math.round(x.a.cur)), budget: euros(Math.round(x.a.pm)) }));
     const month = { cycle: per.cyc ? 'salary' : 'calendar', from: per.start, to: per.end, spent: euros(Math.round(s.total.C)),
       budget: euros(Math.round(s.total.P)), left: euros(Math.round(s.total.P - s.total.C)), income: euros(Math.round(s.revenus.c)), top };
-    if (s.rav) { month.left_to_live = euros(Math.round(s.rav.valeur)); month.left_to_live_basis = s.rav.base; }
+    // reste à vivre : la colonne choisie par le propriétaire (Réglages › Budget, 0.10.7), « dernier salaire » par défaut
+    const rv = KB().ravChoisi(s.rav, KB().baseRav(S));
+    if (rv) { month.left_to_live = euros(Math.round(rv.col.reste)); month.left_to_live_basis = rv.base; }
     const comptes = new Map(S.modele.comptes.map(c => [c.libelle, c]));
     const upcoming = KB().echeances(B, 31).slice(0, 10).map(e => ({
       date: e.date, label: e.sorte === 'carte' && comptes.get(e.label) ? libelle(comptes.get(e.label)) : (libellePoste(S, e.poste || e.label) || 'ECHEANCE'),
