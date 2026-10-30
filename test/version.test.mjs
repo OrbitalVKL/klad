@@ -28,7 +28,8 @@ test('workflow Android : publication par changement de version', () => {
 test('workflow Android : chaque test Chromium (sauté sans Playwright) est lancé dans le parcours Chromium', () => {
   const yml = read('.github/workflows/android.yml');
   const ligne = (yml.match(/^\s+node --test (test\/\S+\.test\.mjs ?)+$/m) || [''])[0];
-  for (const f of fs.readdirSync(new URL('../test/', import.meta.url)).filter(f => f.endsWith('.test.mjs'))) {
-    if (/skip: SAUT/.test(read('test/' + f))) assert.ok(ligne.includes('test/' + f), f + ' absent du parcours Chromium');
+  // fichier dont un test est sauté sans Playwright : « Playwright absent » (ce fichier-ci excepté)
+  for (const f of fs.readdirSync(new URL('../test/', import.meta.url)).filter(f => f.endsWith('.test.mjs') && f !== 'version.test.mjs')) {
+    if (/Playwright absent/.test(read('test/' + f))) assert.ok(ligne.includes('test/' + f), f + ' absent du parcours Chromium');
   }
 });
