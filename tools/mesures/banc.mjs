@@ -33,8 +33,9 @@ export async function ouvrir(o) {
   const WWW = path.resolve(o.www || path.join(ICI, '../../www'));
   const { chromium } = playwright();
   const srv = await serveur(WWW);
+  // o.mobile : écran de téléphone (isMobile), nécessaire pour simuler la taille du texte d'Android (texte(), 0.10.9).
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, hasTouch: true, reducedMotion: 'reduce', locale: 'fr-FR' });
+  const ctx = await browser.newContext({ viewport: { width: o.largeur || 412, height: 915 }, hasTouch: true, isMobile: !!o.mobile, reducedMotion: 'reduce', locale: 'fr-FR' });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
   const erreurs = [];
@@ -148,6 +149,15 @@ export async function ouvrir(o) {
     await page.emulateMedia({ colorScheme: t === 'sombre' ? 'dark' : 'light', reducedMotion: 'reduce' });
     await pause(100);
   }
+  // Taille du texte en % (comme « taille de police » d'Android, que la WebView applique au texte seulement) ; o.mobile requis.
+  async function texte(pc) {
+    await page.evaluate(pc => {
+      let st = document.getElementById('banc-texte');
+      if (!st) { st = document.createElement('style'); st.id = 'banc-texte'; document.head.appendChild(st); }
+      st.textContent = pc && pc !== 100 ? 'html{-webkit-text-size-adjust:' + pc + '%;text-size-adjust:' + pc + '%}' : '';
+    }, pc);
+    await pause(60);
+  }
   async function fin() { await browser.close(); srv.close(); }
-  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, ecransPrincipaux, ecransPlus, theme, fin };
+  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, ecransPrincipaux, ecransPlus, theme, texte, fin };
 }

@@ -23,22 +23,21 @@
     interne: 'Mouvement interne', epargne: 'Épargne', hors_budget: 'Hors budget'
   };
   // Catégories proposées d'office (génériques) : [nature, icône].
+  // Icônes dessinées (banque Lucide, « lu:<nom> », 0.10.9) ; les émojis des versions précédentes sont convertis par la
+  // migration « dessins ».
   const CATEGORIES = {
-    'Logement': ['fixe', '🏠'], 'Assurances': ['fixe', '🛡️'], 'Abonnements & télécom': ['fixe', '📱'], 'Crédits': ['fixe', '💳'],
-    'Impôts': ['fixe', '🏛️'], 'Banque': ['fixe', '🏦'],
-    'Alimentation': ['courante', '🥖'], 'Courses': ['courante', '🛒'], 'Carburant': ['courante', '⛽'], 'Voiture': ['courante', '🔧'],
-    'Transport': ['courante', '🚗'], 'Parking': ['courante', '🅿️'], 'Santé': ['courante', '💊'], 'Formation & éducation': ['courante', '🎓'],
-    'Espèces': ['courante', '💶'],
-    'Appartement': ['optionnelle', '🛋️'], 'Bars': ['optionnelle', '🍺'], 'Restaurant': ['optionnelle', '🍔'], 'Events': ['optionnelle', '🎟️'],
-    'Shopping': ['optionnelle', '🛍️'], 'Vacances': ['optionnelle', '🏖️'], 'Cadeaux': ['optionnelle', '🎁'], 'Sport': ['optionnelle', '🏋️'],
-    'Virements à des proches': ['optionnelle', '🤝'], 'Divers': ['optionnelle', '📦'], 'Autres': ['optionnelle', '❔'],
-    'Salaire': ['revenu', '💼'], 'Remboursements santé': ['revenu', '🩺'], 'Remboursements entre amis': ['revenu', '🤝'],
-    'Famille': ['revenu', '👪'], 'Ventes': ['revenu', '🏷️'], 'Autres revenus': ['revenu', '💰'],
-    'Apports compte commun': ['revenu', '📥'], 'Virements internes': ['interne', '🔁'], 'Épargne': ['epargne', '🐷']
+    'Logement': ['fixe', 'lu:house'], 'Assurances': ['fixe', 'lu:shield'], 'Abonnements & télécom': ['fixe', 'lu:smartphone'], 'Crédits': ['fixe', 'lu:credit-card'],
+    'Impôts': ['fixe', 'lu:landmark'], 'Banque': ['fixe', 'lu:university'],
+    'Alimentation': ['courante', 'lu:croissant'], 'Courses': ['courante', 'lu:shopping-cart'], 'Carburant': ['courante', 'lu:fuel'], 'Voiture': ['courante', 'lu:wrench'],
+    'Transport': ['courante', 'lu:car'], 'Parking': ['courante', 'lu:square-letter-p'], 'Santé': ['courante', 'lu:pill'], 'Formation & éducation': ['courante', 'lu:graduation-cap'],
+    'Espèces': ['courante', 'lu:banknote'],
+    'Appartement': ['optionnelle', 'lu:sofa'], 'Bars': ['optionnelle', 'lu:beer'], 'Restaurant': ['optionnelle', 'lu:hamburger'], 'Events': ['optionnelle', 'lu:ticket'],
+    'Shopping': ['optionnelle', 'lu:shopping-bag'], 'Vacances': ['optionnelle', 'lu:tree-palm'], 'Cadeaux': ['optionnelle', 'lu:gift'], 'Sport': ['optionnelle', 'lu:dumbbell'],
+    'Virements à des proches': ['optionnelle', 'lu:handshake'], 'Divers': ['optionnelle', 'lu:package'], 'Autres': ['optionnelle', 'lu:circle-question-mark'],
+    'Salaire': ['revenu', 'lu:briefcase'], 'Remboursements santé': ['revenu', 'lu:stethoscope'], 'Remboursements entre amis': ['revenu', 'lu:handshake'],
+    'Famille': ['revenu', 'lu:users'], 'Ventes': ['revenu', 'lu:tag'], 'Autres revenus': ['revenu', 'lu:coins'],
+    'Apports compte commun': ['revenu', 'lu:banknote-arrow-down'], 'Virements internes': ['interne', 'lu:repeat'], 'Épargne': ['epargne', 'lu:piggy-bank']
   };
-  const ICONES = ['🛒', '🥖', '🍔', '🍽️', '🍕', '☕', '🍺', '🍷', '🎁', '🛍️', '👕', '💄', '💊', '🏥', '💇', '🚗', '⛽', '🔧', '🚆',
-    '🚌', '✈️', '🅿️', '🏠', '🛋️', '🔨', '🌱', '💡', '📱', '💻', '🎮', '🎬', '🎟️', '🎵', '⚽', '🏋️', '🏖️', '🏦', '💳', '🏛️',
-    '🛡️', '📄', '🎓', '👶', '🐶', '🤝', '💶', '💰', '🐷', '⭐', '❤️', '📦', '🔁', '🔑', '💼', '🩺', '👪', '🏷️', '🧾', '❔'];
   const DEFAUTS = {
     debit: { cat: 'Autres', sub: 'Non classé' }, credit: { cat: 'Autres revenus', sub: 'Autres revenus' },
     carte: { cat: 'Shopping' }, interne: { cat: 'Virements internes' }
@@ -69,12 +68,12 @@
     const c = C && C.categories && C.categories[cat];
     return (c && c.nature) || (CATEGORIES[cat] && CATEGORIES[cat][0]) || 'optionnelle';
   }
-  // Icône enregistrée, sinon celle d'office, sinon une icône de la banque proposée d'après le nom (0.10.7, KladIcones),
-  // sinon l'initiale (sans la banque, dans les anciens tests).
+  // Icône enregistrée (en icône dessinée, 0.10.9), sinon celle d'office, sinon une icône de la banque proposée d'après le
+  // nom (0.10.7, KladIcones), sinon l'initiale (sans la banque, dans les anciens tests).
   function iconeDe(C, cat) {
     const c = C && C.categories && C.categories[cat];
     const I = g.KladIcones;
-    if (c && c.icone && !(I && I.absente(c.icone))) return c.icone;
+    if (c && c.icone && !(I && I.absente(c.icone))) return I && I.liste().length ? I.versDessin(c.icone, cat) : c.icone;
     if (CATEGORIES[cat]) return CATEGORIES[cat][1];
     if (I) return I.proposer(cat);
     return (c && c.icone) || (String(cat || '?').trim().charAt(0).toUpperCase() || '?');
@@ -531,7 +530,7 @@
   }
 
   g.KladClasse = {
-    V, NATURES, NOMS_NATURES, CATEGORIES, ICONES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
+    V, NATURES, NOMS_NATURES, CATEGORIES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
     aRapprocher, marquerInterne, annulerInterne, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,

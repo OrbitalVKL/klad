@@ -39,12 +39,11 @@
     const C = KC.donnees(S());
     const ic = U.iconeDe(C, cat), col = U.couleurDe(cat, C);
     const sug = I.suggerer(cat, 8);
-    const emoji = ic && !/^(lu|svg):/.test(String(ic)) && !I.absente(ic) ? ic : null;
     $('iconeCorps').innerHTML =
       '<div class="ic-tete">' + U.cico(C, cat).replace('class="cico', 'class="cico ic-apercu') + '<div class="t"><b>' + esc(cat) + '</b><span>' + esc(KC.NOMS_NATURES[KC.natureDe(C, cat)] || '') + '</span></div></div>' +
       '<h3 id="icCoulT">Couleur de la pastille</h3><div class="ic-coul" role="group" aria-labelledby="icCoulT">' +
       COULEURS.map(([v, n]) => '<button type="button" data-coul="' + v + '" aria-pressed="' + (v === col) + '" aria-label="Couleur ' + esc(n) + '" style="--sw:' + v + '"></button>').join('') + '</div>' +
-      (sug.length || emoji ? '<h3>Suggérées pour « ' + esc(cat) + ' »</h3><div class="ic-grille">' + (emoji ? '<button type="button" class="ic-b on ic-emoji" data-garder="1" aria-pressed="true" aria-label="Garder l\'icône actuelle" style="--cc:' + esc(col) + '">' + esc(emoji) + '</button>' : '') +
+      (sug.length ? '<h3>Suggérées pour « ' + esc(cat) + ' »</h3><div class="ic-grille">' +
         sug.map(n => bouton(n, ic, col)).join('') + '</div>' : '') +
       '<h3>Toutes les icônes <span class="muted small" id="icNb"></span></h3>' +
       '<label class="sh-l"><span class="sh-lab">Rechercher</span><input class="sh-in" id="icQ" type="search" autocomplete="off" spellcheck="false" placeholder="courses, bar, essence, loyer, sport…" value="' + esc(q) + '"></label>' +

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { charge, json } from './charge.mjs';
 
-const { KladModele: M, KladVues: Vu, KladClasse: K } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'classement.js', 'ui.js', 'vues.js']);
+const { KladModele: M, KladVues: Vu, KladClasse: K } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'icones-donnees.js', 'icones.js', 'classement.js', 'ui.js', 'vues.js']);
 const NOW = Date.parse('2026-10-28T10:00:00Z');
 const texte = h => h.replace(/<[a-z\/][^>]*>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/[\u00a0\u202f]/g, ' ');
 const SIGNE = /[\u2212\u2012\u2013-]\s?\d[\d\s]*,\d\d/;
@@ -102,7 +102,7 @@ test('opérations : catégorie affichée, point bleu des non vues, filtres non v
   S.modele.vues = { depuis: '2026-10-25' };
   const cx = K.contexte(S, NOW);
   const l = Vu.ligne(S, S.ops[a.id][2], { ctx: cx });
-  assert.match(l, /🏠/);
+  assert.match(l, /class="cico svg"[^>]*title="Logement"[^>]*><svg class="lu"/);      // icône dessinée (0.10.9)
   assert.match(texte(l), /Logement · Loyer\s+règle/);
   assert.match(l, /role="button" tabindex="0" aria-label="[^"]*, débit [^"]*"/);
   assert.doesNotMatch(l, /unseen/);

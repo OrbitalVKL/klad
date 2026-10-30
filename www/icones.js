@@ -80,5 +80,33 @@
   // Une icône est « absente » si rien n'est enregistré ou si c'est la lettre de repli (initiale du nom).
   const absente = ic => ic == null || String(ic).trim() === '' || /^[A-Za-z0-9?]$/.test(String(ic).trim());
 
-  g.KladIcones = { PREFIXE, DEFAUT, svg, nomDe, existe, liste, chercher, suggerer, proposer, absente, mots };
+  // 0.10.9 : tout en icônes dessinées. Émojis des catégories (d'office, de l'ancienne version, de la banque d'émojis des
+  // versions précédentes) et icônes reprises (« svg:<nom> ») → icône Lucide la plus proche.
+  const EMOJIS = {
+    '🏠': 'house', '🛡': 'shield', '📱': 'smartphone', '💳': 'credit-card', '🏛': 'landmark', '🏦': 'university', '🥖': 'croissant',
+    '🛒': 'shopping-cart', '⛽': 'fuel', '🔧': 'wrench', '🚗': 'car', '🅿': 'square-letter-p', '💊': 'pill', '🎓': 'graduation-cap',
+    '💶': 'banknote', '🛋': 'sofa', '🍺': 'beer', '🍻': 'beer', '🍔': 'hamburger', '🎟': 'ticket', '🛍': 'shopping-bag', '🏖': 'tree-palm',
+    '🎁': 'gift', '🏋': 'dumbbell', '🤝': 'handshake', '📦': 'package', '❔': 'circle-question-mark', '❓': 'circle-question-mark',
+    '💼': 'briefcase', '🩺': 'stethoscope', '👪': 'users', '🏷': 'tag', '💰': 'coins', '📥': 'banknote-arrow-down', '🔁': 'repeat',
+    '🐷': 'piggy-bank', '🍽': 'utensils', '🍕': 'pizza', '☕': 'coffee', '🍷': 'wine', '👕': 'shirt', '💄': 'perfume-bottle',
+    '🏥': 'hospital', '💇': 'scissors', '🚆': 'train-front', '🚌': 'bus', '✈': 'plane', '🔨': 'hammer', '🌱': 'sprout', '💡': 'lightbulb',
+    '💻': 'laptop', '🎮': 'gamepad-2', '🎬': 'clapperboard', '🎵': 'eighth-note', '⚽': 'volleyball', '📄': 'file-text', '👶': 'baby',
+    '🐶': 'dog', '⭐': 'star', '❤': 'heart', '🔑': 'key', '🧾': 'receipt', '🤖': 'bot', '🐾': 'paw-print', '🧸': 'toy-brick',
+    '💝': 'heart-handshake', '💞': 'heart', '📈': 'trending-up', '🚲': 'bike', '🍞': 'croissant', '🚕': 'car-taxi-front', '🚇': 'tram-front',
+    '🏨': 'hotel', '🎉': 'party-popper', '🎨': 'palette', '📚': 'book', '📖': 'book-open', '🐱': 'cat', '💸': 'banknote-arrow-up',
+    '🧴': 'spray-can', '🧹': 'broom-sparkles', '📺': 'tv', '🎧': 'headphones', '📷': 'camera', '⚡': 'zap', '💧': 'droplet', '🔥': 'flame'
+  };
+  const SVG_REPRIS = { lamp: 'lamp', star: 'star', dumbbell: 'dumbbell', parking: 'square-letter-p' };
+  // Icône dessinée (« lu:<nom> ») pour une icône enregistrée : gardée si déjà dessinée, sinon l'équivalent de l'émoji ou de
+  // l'icône reprise, sinon celle proposée d'après le nom de la catégorie.
+  function versDessin(ic, nomCat) {
+    if (nomDe(ic)) return ic;
+    const s = String(ic == null ? '' : ic).trim();
+    let n = s.indexOf('svg:') === 0 ? SVG_REPRIS[s.slice(4)] : EMOJIS[s.replace(/[\uFE0E\uFE0F]/g, '')];
+    if (!n && s && !absente(s)) n = EMOJIS[Array.from(s.replace(/[\uFE0E\uFE0F]/g, ''))[0]];
+    return n && existe(n) ? PREFIXE + n : proposer(nomCat);
+  }
+  const dessinee = ic => !!nomDe(ic);
+
+  g.KladIcones = { PREFIXE, DEFAUT, svg, nomDe, existe, liste, chercher, suggerer, proposer, absente, mots, EMOJIS, SVG_REPRIS, versDessin, dessinee };
 })(typeof window !== 'undefined' ? window : globalThis);

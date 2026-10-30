@@ -48,12 +48,12 @@
     'Remboursements entre amis': '#0d9488', 'Famille': '#65a30d', 'Ventes': '#ca8a04', 'Autres revenus': '#15803d', 'Apports compte commun': '#15803d',
     'Épargne': '#be185d', 'Virements internes': '#94a3b8'
   };
-  const DEVINE = [[/\bIA\b|\bAI\b|INTELLIGENCE ARTIF/, '🤖', '#6d28d9'], [/SPORT|GYM|FITNESS|ESCALADE|SALLE/, '🏋️', '#0284c7'], [/ANIMA|CHAT|CHIEN|VETO/, '🐾', '#a16207'],
-    [/ENFANT|BEBE|CRECHE|NOUNOU/, '🧸', '#db2777'], [/MAISON|DECO|BRICO|JARDIN|MEUBLE/, '🛋️', '#a16207'], [/COURSE|SUPERMARCHE|MARCHE/, '🛒', '#16a34a'],
-    [/CADEAU/, '🎁', '#c026d3'], [/VOYAGE|VACANCE|HOTEL|AVION/, '✈️', '#0d9488'], [/LIVRE|CULTURE|MUSIQUE|JEU|LOISIR/, '🎮', '#7c3aed'],
-    [/BEAUTE|COIFF|SOIN|VETEMENT|MODE/, '👕', '#9333ea'], [/ABONNEMENT|STREAMING|LOGICIEL|SERVICE/, '📱', '#0ea5e9'], [/DON|ASSO|CHARIT/, '💝', '#e11d48'],
-    [/PRO|TRAVAIL|BUREAU|ENTREPRISE/, '💼', '#475569'], [/EPARGNE|INVEST|BOURSE/, '📈', '#be185d'], [/SANTE|PHARMA|MEDEC/, '💊', '#dc2626'],
-    [/IMPOT|TAXE/, '🏛️', '#6b7280'], [/VOITURE|AUTO|MOTO|VELO/, '🚲', '#0891b2']];
+  const DEVINE = [[/\bIA\b|\bAI\b|INTELLIGENCE ARTIF/, 'lu:bot', '#6d28d9'], [/SPORT|GYM|FITNESS|ESCALADE|SALLE/, 'lu:dumbbell', '#0284c7'], [/ANIMA|CHAT|CHIEN|VETO/, 'lu:paw-print', '#a16207'],
+    [/ENFANT|BEBE|CRECHE|NOUNOU/, 'lu:toy-brick', '#db2777'], [/MAISON|DECO|BRICO|JARDIN|MEUBLE/, 'lu:sofa', '#a16207'], [/COURSE|SUPERMARCHE|MARCHE/, 'lu:shopping-cart', '#16a34a'],
+    [/CADEAU/, 'lu:gift', '#c026d3'], [/VOYAGE|VACANCE|HOTEL|AVION/, 'lu:plane', '#0d9488'], [/LIVRE|CULTURE|MUSIQUE|JEU|LOISIR/, 'lu:gamepad-2', '#7c3aed'],
+    [/BEAUTE|COIFF|SOIN|VETEMENT|MODE/, 'lu:shirt', '#9333ea'], [/ABONNEMENT|STREAMING|LOGICIEL|SERVICE/, 'lu:smartphone', '#0ea5e9'], [/DON|ASSO|CHARIT/, 'lu:heart-handshake', '#e11d48'],
+    [/PRO|TRAVAIL|BUREAU|ENTREPRISE/, 'lu:briefcase', '#475569'], [/EPARGNE|INVEST|BOURSE/, 'lu:trending-up', '#be185d'], [/SANTE|PHARMA|MEDEC/, 'lu:pill', '#dc2626'],
+    [/IMPOT|TAXE/, 'lu:landmark', '#6b7280'], [/VOITURE|AUTO|MOTO|VELO/, 'lu:bike', '#0891b2']];
   const SVG = {
     lamp: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8l3 8H5z"/><path d="M12 11v7"/><path d="M8 21h8"/></svg>',
     star: '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="#dc2626" d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21.2l1.6-7L2 9.5l7.1-.6z"/></svg>',
@@ -78,8 +78,8 @@
     for (const [rx, , c] of DEVINE) if (rx.test(f)) return c;
     return '#8b95a1';
   }
-  // Icône d'une catégorie : celle enregistrée (émoji, icône reprise ou « lu:<nom> »), sinon celle d'office, sinon une
-  // icône de la banque proposée d'après le nom (0.10.7 : plus de lettre de repli).
+  // Icône d'une catégorie : celle enregistrée (« lu:<nom> » ; 0.10.9 : émojis et icônes reprises affichés en icône
+  // dessinée), sinon celle d'office, sinon une icône de la banque proposée d'après le nom (0.10.7 : plus de lettre de repli).
   function iconeDe(C, cat) {
     const i = K().iconeDe(C, cat);
     const I = g.KladIcones;
@@ -99,13 +99,13 @@
   }
   // Icône d'une opération : stationnement et courses ont la leur (comme l'ancienne version).
   function icoOp(C, r) {
-    if (r.sub === 'Charges parking' || /PARKING|INDIGO|EFFIA|ONEPARK/i.test(r.label || '')) return cico(C, r.cat, 'svg:parking');
-    if (r.sub === 'Courses') return cico(C, r.cat, '🛒');
+    if (r.sub === 'Charges parking' || /PARKING|INDIGO|EFFIA|ONEPARK/i.test(r.label || '')) return cico(C, r.cat, 'lu:square-letter-p');
+    if (r.sub === 'Courses') return cico(C, r.cat, 'lu:shopping-cart');
     return cico(C, r.cat);
   }
   // Icône d'un poste du budget.
   function icoPoste(C, a) {
-    if (a.label === 'Charges parking') return cico(C, 'Logement', 'svg:parking');
+    if (a.label === 'Charges parking') return cico(C, 'Logement', 'lu:square-letter-p');
     return cico(C, a.nat === 'fixe' ? (a.cat || 'Logement') : a.label);
   }
 

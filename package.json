@@ -1,6 +1,6 @@
 {
   "name": "klad",
-  "version": "0.10.8",
+  "version": "0.10.9",
   "private": true,
   "description": "Klad (Клад) — carnet de comptes personnel pour Android. Données chiffrées, verrou par code ou empreinte.",
   "scripts": {

@@ -139,6 +139,39 @@
     return true;
   }
 
+  // 0.10.9 « dessins » : tout en icônes dessinées. Chaque catégorie dont l'icône n'est pas une icône de la banque (émoji
+  // d'office ou repris, icône reprise « svg:<nom> », rien, lettre de repli) reçoit l'icône Lucide la plus proche
+  // (KladIcones.versDessin) ; la couleur de la pastille ne change pas (réglage à part). En une seule fois, idempotente,
+  // réversible (annulerDessins). → { n, noms } ou null.
+  const DESSINS = 'dessins';
+  function dessins(S, now) {
+    const I = g.KladIcones;
+    if (!S || !S.classement || !isObj(S.classement.categories) || !I || !I.liste().length) return null;
+    if (isObj(S.modele.migrations) && S.modele.migrations[DESSINS]) return null;
+    const C = S.classement, avant = {}, noms = [];
+    for (const n of Object.keys(C.categories)) {
+      const c = C.categories[n];
+      if (!isObj(c) || I.dessinee(c.icone)) continue;
+      avant[n] = c.icone === undefined ? null : c.icone;
+      c.icone = I.versDessin(c.icone, n);
+      noms.push(n);
+    }
+    S.modele.migrations = isObj(S.modele.migrations) ? S.modele.migrations : {};
+    S.modele.migrations[DESSINS] = { le: new Date(now == null ? Date.now() : now).toISOString(), n: noms.length, avant };
+    return { n: noms.length, noms };
+  }
+  function annulerDessins(S) {
+    const m = S && isObj(S.modele.migrations) ? S.modele.migrations[DESSINS] : null;
+    if (!m) return false;
+    const C = S.classement;
+    if (C && isObj(C.categories)) for (const n of Object.keys(m.avant || {})) {
+      if (!isObj(C.categories[n])) continue;
+      if (m.avant[n] == null) delete C.categories[n].icone; else C.categories[n].icone = m.avant[n];
+    }
+    delete S.modele.migrations[DESSINS];
+    return true;
+  }
+
   // État de l'import de l'ancienne version (Plus › Contrôle, relevé de contrôle).
   function etatImport(S) {
     const cx = contenu(S);
@@ -153,5 +186,5 @@
     };
   }
 
-  g.KladMigrations = { payload, annulerPayload, icones, annulerIcones, etatImport, contenu, faite };
+  g.KladMigrations = { payload, annulerPayload, icones, annulerIcones, dessins, annulerDessins, etatImport, contenu, faite };
 })(typeof window !== 'undefined' ? window : globalThis);

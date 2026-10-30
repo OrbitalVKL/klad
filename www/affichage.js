@@ -2,6 +2,8 @@
 // sur ce téléphone (stockage local, hors coffre, sans donnée personnelle). Le mode démo ne vit qu'en mémoire : montants
 // multipliés par un facteur tiré au hasard, noms des personnes, des banques et intitulés bancaires remplacés par des alias,
 // champs de saisie floutés ; rien n'est modifié dans les données. Quitter (ou relancer l'appli) rend l'affichage réel.
+// 0.10.9 : captures d'écran autorisées seulement pendant le mode démo (plugin natif KladAffichage.captures : FLAG_SECURE
+// retiré en entrant, rétabli en sortant, au verrouillage et quand l'appli passe en arrière-plan).
 (function (g) {
   'use strict';
 
@@ -102,6 +104,12 @@
     // plus longs d'abord (un intitulé peut contenir un nom) ; mots entiers seulement
     return out.sort((a, b) => b[0].length - a[0].length).map(([n, r]) => [new RegExp('(?<![\\p{L}\\d])' + esc(n) + '(?![\\p{L}\\d])', 'giu'), r]);
   }
+  // Captures d'écran (Android) : autorisées seulement pendant le mode démo.
+  function captures(autoriser) {
+    const P = g.Capacitor && g.Capacitor.Plugins && g.Capacitor.Plugins.KladAffichage;
+    if (!P || !P.captures) return;
+    Promise.resolve(P.captures({ autoriser: !!autoriser })).catch(() => { /* ancienne version de l'appli native : écran toujours protégé */ });
+  }
   const facteur = () => Math.round((Math.random() < 0.5 ? 0.62 + Math.random() * 0.2 : 1.18 + Math.random() * 0.27) * 1000) / 1000;
 
   // ------------------------------------------------------------ mode démo (DOM)
@@ -132,21 +140,25 @@
     let b = d.getElementById('demoBar');
     if (!b) {
       b = d.createElement('div'); b.id = 'demoBar'; b.className = 'demobar';
-      b.innerHTML = '<span>MODE DÉMO · chiffres fictifs</span><button type="button">Quitter</button>';
+      b.innerHTML = '<span>MODE DÉMO · chiffres fictifs · captures d\'écran autorisées</span><button type="button">Quitter</button>';
       d.body.appendChild(b);
       b.querySelector('button').addEventListener('click', () => arreterDemo());
     }
     b.hidden = false;
     if (!demo.obs) { demo.obs = new g.MutationObserver(planifier); demo.obs.observe(d.body, { subtree: true, childList: true, characterData: true }); }
     balayer();
+    captures(true);
   }
-  function arreterDemo() {
+  // o.sansRendu : au verrouillage (rien à réafficher).
+  function arreterDemo(o) {
     const d = g.document;
+    captures(false);
     demo.on = false; demo.k = 1; demo.alias = [];
     if (demo.obs) { demo.obs.disconnect(); demo.obs = null; }
     demo.faits = new WeakMap();
     d.documentElement.classList.remove('demo');
     const b = d.getElementById('demoBar'); if (b) b.hidden = true;
+    if (o && o.sansRendu) return;
     if (g.KladApp && g.KladApp.rendre) g.KladApp.rendre();
     if (g.KladAffichage.surArret) g.KladAffichage.surArret();
   }

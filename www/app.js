@@ -352,7 +352,8 @@
         it('📐', 'Budget', 'Cycle de salaire, reste à vivre affiché, base de calcul, personnes du commun', 'data-volet="secReglBudget"')) +
       grp('Aide et à propos',
         it('ℹ️', 'Version et mise à jour', 'Version ' + (CFG.version || 'dev'), 'data-volet="secMaj"') +
-        it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog"'));
+        it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog"') +
+        it('📏', 'Diagnostic d\'affichage', 'Mesures de l\'écran copiées, sans donnée personnelle', 'data-plus="diagaff"'));
   }
   // Réglages › Budget (0.10.5) : réglages du budget rassemblés (lecture ; la base de calcul se change dans Budget, mode
   // « Budget » ; le cycle de salaire et les personnes viennent du complément, modifiables ici au Lot 9c). 0.10.7 : base
@@ -1382,19 +1383,28 @@
           if (r && r.n) { log('ok', 'Icônes : ' + r.n + ' catégorie(s) sans icône en ont reçu une (modifiable dans Plus › Classement).'); modifie = true; }
         } catch (e) { log('err', 'Icônes : ' + (e.message || e)); }
       }
+      // 0.10.9 : tout en icônes dessinées (émojis d'office et repris remplacés par l'icône la plus proche ; couleur gardée).
+      if (window.KladMigrations && window.KladMigrations.dessins && s0.classement) {
+        try {
+          const r = window.KladMigrations.dessins(s0, Date.now());
+          if (r && r.n) { log('ok', 'Icônes : ' + r.n + ' émoji(s) de catégorie remplacé(s) par une icône dessinée (modifiable dans Plus › Classement).'); modifie = true; }
+        } catch (e) { log('err', 'Icônes dessinées : ' + (e.message || e)); }
+      }
       if (init || modifie || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
 
   // Verrouillage : l'état et tout ce qui était affiché sont effacés.
   function close() {
+    // 0.10.9 : le verrouillage quitte le mode démo (captures d'écran de nouveau interdites)
+    if (AF.demoActif && AF.demoActif()) AF.arreterDemo({ sansRendu: true });
     S = null; hooks = {}; bankList = []; handled = {}; opsListe = []; opsFin = 0; CTX = null; BCTX = null; cls = null; opCourante = null;
     filtre.cat = ''; filtre.nonVues = false; filtre.compte = ''; tri = null; triOp = null; retourDe = {};
     fermerVolet(true);
     toastAction = null; $('toast').className = '';
     ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'sv-bar', 'sv-eq', 'appart-corps', 'cm-tres', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
       'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'iconeCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps']
+      'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'iconeCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps', 'diagAffCorps']
       .forEach(id => { const e = $(id); if (e) e.textContent = ''; });
     $('tb-badge').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'q'].forEach(id => { $(id).value = ''; });

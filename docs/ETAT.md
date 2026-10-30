@@ -5,7 +5,32 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.8** — parité des fonctions avec l'ancienne version : `docs/parite-fonctions.md` (326 fonctions de la v65,
+**0.10.9** — correctif sur les retours de la 0.10.8. Décisions du propriétaire reportées : abandons « Liste d'origine »
+des contrats et liste des bulletins de paie non lus (`docs/parite-fonctions.md`, « abandonné, décision du propriétaire ») ;
+base du reste à vivre « dernier salaire » par défaut et ordre des opérations gardé pour la session : validés.
+- Icônes : tout en icônes dessinées. Catégories d'office en `lu:<nom>` ; migration `dessins` (émojis d'office et repris,
+  icônes reprises `svg:<nom>`, icônes vides → icône Lucide la plus proche, table `KladIcones.EMOJIS` / `SVG_REPRIS`,
+  sinon proposée d'après le nom ; couleur de pastille inchangée ; en une fois, réversible `annulerDessins`) ; l'import du
+  carnet convertit aussi ; affichage : toute icône non dessinée est montrée en icône dessinée (`KladIcones.versDessin`).
+- Champ « Nouvelle catégorie » tronqué sur le téléphone : cause trouvée, le contour du champ touché (2 px + 2 px de
+  décalage) dépassait de la zone défilante du volet (`.sh-body`, `overflow-y:auto`), qui le coupait net des deux côtés ;
+  zone défilante élargie de 6 px de chaque côté (marge intérieure compensée). Règle générale sur les champs
+  (`box-sizing:border-box`, `max-width:100%`, `min-width:0` ; étiquettes `label.ctl` repliables) ; marges de sécurité
+  gauche / droite du volet. Corrigés au passage : fiche dépliée d'une catégorie coincée à droite de son nom (Plus ›
+  Classement, déjà en 0.10.8), listes déroulantes trop larges à 320 px ou en texte agrandi (Équilibre, Impôts, Tendance,
+  Relevés). Test `test/champs.test.mjs` : écrans, volets et formulaires à 320, 360, 412 px, texte à 100, 150, 200 %
+  (simulé par `text-size-adjust` sur un écran mobile : le réglage d'Android n'est pas reproductible tel quel dans Chromium).
+- Plus › Aide et à propos › Diagnostic d'affichage (`www/diagaff.js`) : volet « Nouvelle catégorie (test) » (rien
+  n'enregistré), champ touché, mesures copiées (appareil, Android, WebView, textZoom, échelle de police, densité et
+  taille d'affichage, écran en CSS px, devicePixelRatio, marges de sécurité, rectangles du champ, de l'étiquette, du
+  formulaire, de la zone défilante et du volet, constat). Plugin `KladAffichage.diagnostic()` (aucun identifiant).
+- Captures d'écran autorisées seulement en mode démo : `KladAffichage.captures({ autoriser })` retire FLAG_SECURE en
+  entrant, le rétablit en sortant, au verrouillage (le verrouillage quitte le mode démo) et à chaque passage en
+  arrière-plan (`handleOnPause`) ; bandeau « MODE DÉMO · chiffres fictifs · captures d'écran autorisées ». Limite : le
+  mode démo masque montants et noms (personnes, banques, intitulés) mais pas les libellés des opérations ni les noms de
+  catégories (dit dans Réglages › Apparence). Test `test/demo.test.mjs`.
+
+(0.10.8) — parité des fonctions avec l'ancienne version : `docs/parite-fonctions.md` (326 fonctions de la v65,
 téléphone et ordinateur ; 226 identiques, 85 adaptées, 12 abandonnées par décision, 2 abandons à décider, 1 manquante
 pour la 9c). Rétablies ou ajoutées : renommer et supprimer une catégorie, ajouter une règle à la main (perdus en 0.10.4,
 rétablis dans Plus › Classement, annulables) ; aperçu des 8 opérations concernées par une règle (volet Classer, nouvelle
@@ -58,6 +83,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | UX-7 | Rapidité : Accueil d'abord, liste allégée | 0.10.6 | fait |
 | — | Retours sur la série UX : détail des postes, icônes des catégories, base du reste à vivre, gestes | 0.10.7 | fait |
 | — | Parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) et petites fonctions manquantes | 0.10.8 | fait |
+| — | Correctif : icônes toutes dessinées, champs des volets, diagnostic d'affichage, captures en mode démo | 0.10.9 | fait |
 | 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
@@ -190,6 +216,10 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   avant chaque appel : aperçu de ce qui part et coût estimé (comptage de jetons gratuit) ; après : coût réel et
   vérification avant enregistrement (annulable). Analyses : agrégats seulement (`KladExtras.agregats`), personnes
   désignées « personne A / B », gardées pour la session. Sélecteur de PDF : sélecteur Android (Drive compris).
+- Captures d'écran (0.10.9) : interdites (FLAG_SECURE) sauf pendant le mode démo, au premier plan ; décision du
+  propriétaire. Hors mode démo, rien ne change.
+- Champs de saisie (0.10.9) : jamais hors de leur conteneur ni de l'écran, contour entier, de 320 à 412 px et texte de
+  100 à 200 % (`test/champs.test.mjs`, lancé dans le parcours Chromium de la fabrication).
 - Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées, jusqu'à la
   0.10.3) puis `klad.replis.v2` et sa marque `klad.replis.v` (0.10.4),
   `klad.periode`, `klad.tendance`, `klad.opsPerimetre` (0.10.2 : `perso` / `commun` / `tout`) (liste fermée, `KladUI.pref`),
@@ -238,7 +268,7 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   `comptes`), même valeur sur l'Accueil et dans Grafit (`left_to_live_basis` = `budget` ou `accounts`) ; sans solde
   connu, colonne « dernier salaire ». Avant la 0.10.7, Grafit prenait d'office les comptes courants.
 - Icônes de catégories (0.10.7) : `C.categories[n].icone` = émoji, `svg:<nom>` (repris) ou `lu:<nom>` (banque Lucide,
-  `KladIcones`) ; `C.categories[n].couleur` = `#rrggbb` (choisie dans Klad, prioritaire sur le complément). Plus de lettre
+  `KladIcones`) ; depuis la 0.10.9, uniquement `lu:<nom>` (migration `dessins`, import du carnet converti) ; `C.categories[n].couleur` = `#rrggbb` (choisie dans Klad, prioritaire sur le complément). Plus de lettre
   de repli : une icône est proposée d'après le nom (`KladIcones.proposer`).
 - Décisions validées par le propriétaire sur la série UX : catégorie en texte dans les lignes (option A), liste ouverte
   sur « Tout » depuis l'Accueil, recherche par catégorie, contrats et tendance du commun dans Commun › Trésorerie,
@@ -262,12 +292,21 @@ Restent :
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
 
+## Points d'appui laissés par la 0.10.9
+
+- Banc de mesure : `ouvrir({ mobile: true })` puis `texte(pc)` (taille du texte simulée) ; `releve` de
+  `test/champs.test.mjs` réutilisable pour d'autres contrôles de débordement.
+- Reste vu au banc, hors champs : à 320 px et texte à 200 %, quelques titres et montants de Budget et Commun
+  (« Observations et recommandations », « Marge réelle du commun ») dépassent de leur carte (texte, pas de champ).
+- Diagnostic d'affichage : à demander au propriétaire si un défaut d'affichage persiste sur le téléphone ; mode démo
+  pour une capture (libellés des opérations visibles : à masquer si besoin dans un lot suivant).
+
 ## Points d'appui laissés par la 0.10.8 (parité des fonctions)
 
 - `docs/parite-fonctions.md` : inventaire des fonctions de la v65 (téléphone et ordinateur) et statut dans Klad.
 - Catégories et règles gérées dans Plus › Classement (`plus.js:renderClassement`) ; les vues `vbudget.js:categories`,
   `regles` et leurs gestionnaires dans `ecranbudget.js` ne sont plus affichées (gardées, à retirer un jour).
-- Questions ouvertes au propriétaire (abandons à décider) : « Liste d'origine » des contrats, liste des bulletins de paie
+- Abandons tranchés en 0.10.9 (décision du propriétaire) : « Liste d'origine » des contrats, liste des bulletins de paie
   non lus. Manquant pour la 9c : pastille « charge récurrente sur le compte secondaire » (compte secondaire réglable).
 - Mesures : `tools/mesures/banc.mjs` parcourt aussi Plus › Classement (nouvelle catégorie, catégorie dépliée) et le
   sélecteur d'icône (0.10.7 : 671 contrôles sur les écrans principaux, 0 sous 48 dp, 0 sous AA).
