@@ -643,6 +643,23 @@
     return { budget, comptes, fin: res.per.end, base: comptes ? 'accounts' : 'budget', valeur: comptes ? comptes.reste : budget.reste };
   }
 
+  // Base affichée du reste à vivre (0.10.7) : réglage du budget `reglages.rav`, « salaire » (par défaut, colonne
+  // « dernier salaire ») ou « comptes » (colonne « comptes courants »). Aucun calcul : choix d'une des deux colonnes.
+  const BASES_RAV = { salaire: 'Dernier salaire', comptes: 'Comptes courants' };
+  function baseRav(S) { const r = S && S.budget && S.budget.reglages; return r && r.rav === 'comptes' ? 'comptes' : 'salaire'; }
+  function choisirBaseRav(S, base) {
+    const B = donnees(S);
+    B.reglages = Object.assign({}, isObj(B.reglages) ? B.reglages : {}, { rav: base === 'comptes' ? 'comptes' : 'salaire' });
+    return B.reglages.rav;
+  }
+  // → { choix ('salaire' | 'comptes'), col (colonne), autre (l'autre colonne ou null), base ('budget' | 'accounts') } ;
+  // sans solde connu, la colonne « comptes courants » n'existe pas : « dernier salaire ».
+  function ravChoisi(rav, base) {
+    if (!rav) return null;
+    if (base === 'comptes' && rav.comptes) return { choix: 'comptes', col: rav.comptes, autre: rav.budget, base: 'accounts' };
+    return { choix: 'salaire', col: rav.budget, autre: rav.comptes, base: 'budget' };
+  }
+
   // ------------------------------------------------------------ échéances à venir (31 jours)
   // Contrats (prochaine échéance après le dernier prélèvement), prélèvements récurrents détectés (hors contrats),
   // dette des cartes à débit différé au jour du prélèvement. → [{ date, montant (centimes > 0), label, sorte, scope }].
@@ -1024,7 +1041,7 @@
   }
 
   g.KladBudget = {
-    V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, nouveau, donnees, importer, reglages, contexte,
+    V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, BASES_RAV, baseRav, choisirBaseRav, ravChoisi, nouveau, donnees, importer, reglages, contexte,
     cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
     devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement,

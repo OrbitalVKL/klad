@@ -9,6 +9,7 @@
   const KO = () => g.KladObservations;
   const K = () => g.KladClasse;
   const F = () => g.KladFormat;
+  const U = () => g.KladUI;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const eu = n => Math.round(Math.abs(+n || 0)).toLocaleString('fr-FR').replace(/[ \u00a0]/g, '\u202f') + '\u00a0€';       // euros (module fiscal)
   const eu2 = n => Math.abs(+n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[ \u00a0]/g, '\u202f') + '\u00a0€';
@@ -243,7 +244,7 @@
     h += '<div class="carte bsolde"><b>Solde de la période</b><div class="grand">' + solde(R.net) + '</div><div class="rangee"><span>Prévu par le budget</span><span>' + solde(R.netP) + '</span></div>' +
       (scope === 'commun' ? '' : '<div class="rangee"><span>Épargne réalisée</span><span>' + e0(R.sav) + '</span></div>') +
       '<div class="rangee"><span>Total des dépenses</span><span>' + e0(R.depR) + ' pour ' + e0(R.depP) + ' de budget</span></div>' + (R.OUT > 50 ? '<div class="rangee"><span class="hb">dont hors budget et dépassements</span><span>' + e0(R.OUT) + '</span></div>' : '') + '</div>';
-    h += '<h4>Plus gros écarts</h4>' + (R.over.length ? '<ol class="ecarts">' + R.over.slice(0, 3).map(o => '<li>' + esc(K().iconeDe(C, o.cat)) + ' <b>' + esc(o.label) + '</b> ' + (o.budget > 50 ? '<span class="bad">' + e0(o.ecart) + ' de plus</span> <small class="muted">(' + e0(o.reel) + ' consommés pour ' + e0(o.budget) + ' de budget)</small>' : '<span class="hb">' + e0(o.ecart) + ' hors budget</span>') + '</li>').join('') + '</ol>' : '<p class="muted">Aucun dépassement : budget tenu.</p>');
+    h += '<h4>Plus gros écarts</h4>' + (R.over.length ? '<ol class="ecarts">' + R.over.slice(0, 3).map(o => '<li>' + U().cico(C, o.cat) + ' <b>' + esc(o.label) + '</b> ' + (o.budget > 50 ? '<span class="bad">' + e0(o.ecart) + ' de plus</span> <small class="muted">(' + e0(o.reel) + ' consommés pour ' + e0(o.budget) + ' de budget)</small>' : '<span class="hb">' + e0(o.ecart) + ' hors budget</span>') + '</li>').join('') + '</ol>' : '<p class="muted">Aucun dépassement : budget tenu.</p>');
     h += repartition(B, scope, P.start, P.end, 'Répartition des dépenses de la période');
     const per = KB().periode(B, scope, null);
     if (!(nav && per.past)) h += repartition(B, scope, per.start, per.upto, 'Répartition des dépenses en cours');

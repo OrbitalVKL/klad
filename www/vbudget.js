@@ -67,6 +67,8 @@
     const ouv = ui.ouverts || new Set();
     const secOpen = k => ouv.has('m|' + k);
     const secBtn = (k, n) => ' <button class="linkbtn more sec-tog" type="button" data-sec="' + k + '" aria-expanded="' + secOpen(k) + '">' + (secOpen(k) ? 'replier ▴' : 'voir les ' + n + ' ▾') + '</button>';
+    // nom du poste : touchable (déplie ses opérations et ses contrats, ou « aucune opération »), comme « N op. ▾ »
+    const nomPoste = (k, html, op) => '<button class="poste-nom" type="button" data-poste="' + esc(k) + '" aria-expanded="' + op + '">' + html + '</button>';
     const more = (k, n, op) => ' <button class="linkbtn more" type="button" data-poste="' + esc(k) + '" aria-expanded="' + op + '">' + (op ? 'masquer ▴' : n + ' op. ▾') + '</button>';
     const lab = libellePeriode(per);
     const HL = past ? ['', 'Budget', 'Consommé', 'Écart', ''] : ['', 'Budget', '', 'projection', ''];
@@ -104,10 +106,11 @@
     if (secOpen('rev')) {
       for (const x of R.lignes) {
         const k = 'rev|' + x.key, op = ouv.has(k);
-        rev += '<tr class="cat n-rev"><td>' + U().cico(C, scope === 'commun' ? KB().APPORTS : x.key) + ' ' + esc(x.key) + (x.ops.length ? more(k, x.ops.length, op) : '') + '</td>' +
+        rev += '<tr class="cat n-rev"><td>' + nomPoste(k, U().cico(C, scope === 'commun' ? KB().APPORTS : x.key) + ' ' + esc(x.key), op) + (x.ops.length ? more(k, x.ops.length, op) : '') + '</td>' +
           td(1, 'r num', x.pm ? fmt(x.pm) : '—') + '<td class="conso" data-l="reçu"><div class="cs-t"><b class="num pos-t">' + (x.got ? '+' + fmt(x.got) : '—') + '</b>' + (x.got ? '<span class="subs"> reçu</span>' : '') + (past && x.pm > DEMI ? ecTxt(x.got, x.pm) : '') + '</div></td>' +
           (past ? ecCell(x.pm, x.got, true) : '<td class="hide-s"></td>') + '<td>' + chip(x.etat) + '</td></tr>';
         if (op) for (const o of x.ops.slice().reverse()) rev += detRow(esc(jjmm(o.date) + ' · ' + g.KladVues.libelleCourt(o.label)), esc('+' + e2(o.m)), o, 'n-rev');
+        if (op && !x.ops.length) rev += detRow('<span class="muted">Aucune opération sur cette période.</span>', '', null, 'vide n-rev');
         if (op && scope === 'perso' && !past) rev += '<tr class="det n-rev"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-editer="r|' + esc(x.key) + '">Modifier le revenu attendu</button></td></tr>';
       }
     }
@@ -118,7 +121,7 @@
     const ligne = (a, nk, sec) => {
       const op = ouv.has(a.key), nOps = (a.ops || []).length, cs = a.contrats || [];
       const isLk = scope === 'perso' && a.lie, lkOp = isLk && ouv.has('lk|split');
-      let h = '<tr class="cat n-' + (sec || nk) + (a.on ? '' : ' off') + '"><td>' + U().icoPoste(C, a) + ' ' + esc(a.label) +
+      let h = '<tr class="cat n-' + (sec || nk) + (a.on ? '' : ' off') + '"><td>' + nomPoste(a.key, U().icoPoste(C, a) + ' ' + esc(a.label), op) +
         (isLk ? ' <button class="linkbtn more lk-tog" type="button" data-poste="lk|split" aria-expanded="' + lkOp + '">' + (lkOp ? 'répartition ▴' : 'répartition ▾') + '</button>' : '') +
         (nOps ? more(a.key, nOps, op) : cs.length ? ' <button class="linkbtn more" type="button" data-poste="' + esc(a.key) + '" aria-expanded="' + op + '">' + (op ? 'masquer ▴' : (cs.length > 1 ? cs.length + ' contrats' : 'contrat') + ' ▾') + '</button>' : '') +
         (a.per > 1 ? ' <span class="subs">· échéance ' + fmt(a.ech) + '</span>' : '') + '</td>' +
@@ -134,6 +137,7 @@
       if (op) {
         for (const c of cs) h += '<tr class="det ctr-det' + c2 + '"><td class="subs" style="padding-left:34px">📄 <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + esc(PERLAB[c.per || 1]) + (c.src ? ' · ' + esc(c.src) : '') + '</td><td></td><td class="r num subs">' + e2(c.montant) + '</td><td class="hide-s"></td><td></td></tr>';
         for (const r of a.ops || []) h += detRow(esc(jjmm(r.od) + ' · ' + g.KladVues.libelleCourt(r.label)), esc(e2(-r.m)), r, c2.trim());
+        if (!nOps && !cs.length) h += detRow('<span class="muted">Aucune opération sur cette période.</span>', '', null, 'vide' + c2);
         if (!past && !a.lie) h += '<tr class="det' + c2 + '"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-editer="' + esc(a.key) + '">Modifier le budget</button></td></tr>';
       }
       if (a.cause) h += '<tr class="det cause' + c2 + '"><td colspan="5" class="subs"><span class="cz">⚠ Cause</span> ' + esc(a.cause.texte) +
@@ -362,6 +366,7 @@
 
   // ------------------------------------------------------------ reste à vivre (perso) et marge réelle (commun)
   function ravM(B, scope, ui) {
+    const S0 = B.S;
     const per = KB().periode(B, scope, ui.nav);
     if (per.past) return '';
     const col = v => v < 0 ? 'var(--bad)' : 'var(--good)';
@@ -376,7 +381,8 @@
       const noms = B.comptes.filter(x => x.role === 'courant').map(x => x.libelle).join(' + ');
       return '<details class="mg-det"' + (ui.ravOuvert ? ' open' : '') + ' data-rav="1"><summary><span class="rav">Reste à vivre jusqu\'au ' + jjmm(rav.fin) + '</span> <span class="mg-r"><b class="num" style="color:' + col(b.reste) + '">' + m2(b.reste) + '</b> <span class="subs">sur le dernier salaire</span></span> <span class="sep">·</span> ' +
         '<span class="mg-r"><b class="num" style="color:' + col(c.reste) + '">' + m2(c.reste) + '</b> <span class="subs">sur les comptes courants</span></span> <span class="mg-more">détail</span></summary>' +
-        '<div class="tablewrap"><table class="rav-t"><thead><tr><th></th><th>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th>Comptes courants</th></tr></thead><tbody>' +
+        U().interrupteurRav(KB().baseRav(S0), true) +
+        '<div class="tablewrap"><table class="rav-t rav-' + KB().baseRav(S0) + '"><thead><tr><th></th><th' + (KB().baseRav(S0) === 'salaire' ? ' class="rav-on"' : '') + '>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th' + (KB().baseRav(S0) === 'comptes' ? ' class="rav-on"' : '') + '>Comptes courants</th></tr></thead><tbody>' +
         R('Base <span class="subs">salaire / soldes ' + esc(noms) + '</span>', b.base, c.base, 'b') +
         R('− Charges fixes <span class="subs">prélevées / encore à venir</span>', b.fixes, c.fixes, 'b') +
         R('= Marge', b.marge, c.marge, 'mg') +
@@ -589,12 +595,15 @@
       '<div class="row center"><button type="button" class="btn" data-pe="aligner">Aligner sur le réel habituel</button><button type="button" class="btn danger small" data-pe="retirer">' + (key[0] === 'm' ? 'Supprimer le poste' : 'Retirer du budget') + '</button></div>';
     return h;
   }
-  function detailRav(rav) {
+  // base (0.10.7) : colonne choisie (« salaire » ou « comptes »), mise en avant ; les deux colonnes restent affichées.
+  function detailRav(rav, base) {
     if (!rav) return '<p class="muted">Le reste à vivre se calcule sur le cycle en cours du périmètre perso.</p>';
-    const b = rav.budget, c = rav.comptes;
+    const b = rav.budget, c = rav.comptes, x = KB().ravChoisi(rav, base);
+    const on = k => x.choix === k ? ' class="rav-on"' : '';
     const cel = x => x == null ? '<td class="muted">—</td>' : '<td class="num">' + (x < -DEMI / 2 ? '<span class="bad">' + esc(e2(-x)) + ' en dépassement</span>' : esc(e2(x))) + '</td>';
     const L = (lab, sub, x, y, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><th>' + lab + (sub ? '<span class="subs"> ' + sub + '</span>' : '') + '</th>' + cel(x) + cel(y) + '</tr>';
-    return '<div class="tablewrap"><table class="rav-t"><thead><tr><th></th><th>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th>Comptes courants</th></tr></thead><tbody>' +
+    return '<p class="rav-tete">Affiché sur l\'Accueil et dans Grafit :</p>' + U().interrupteurRav(x.choix, !!c) +
+      '<div class="tablewrap"><table class="rav-t rav-' + x.choix + '"><thead><tr><th></th><th' + on('salaire') + '>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th' + on('comptes') + '>Comptes courants</th></tr></thead><tbody>' +
       L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') + L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
       L('= Marge', '', b.marge, c && c.marge, 'mg') + L('− Variable', 'dépensé / reste du budget', b.variable, c && c.variable, 'b') +
       L('= Reste à vivre', '', b.reste, c && c.reste, 'rv') + '</tbody></table></div>' +

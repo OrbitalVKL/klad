@@ -68,26 +68,34 @@
     const p = X.pastilles && typeof X.pastilles === 'object' ? Object.keys(X.pastilles).map(k => [fold(k), X.pastilles[k]]) : [];
     EXT = { couleurs: c, pastilles: p.filter(x => Array.isArray(x[1]) && x[1].length >= 2) };
   }
-  function couleurDe(cat) {
+  // C (facultatif) : classement ; une couleur choisie dans Klad (sélecteur d'icône, 0.10.7) passe avant le reste.
+  function couleurDe(cat, C) {
+    const c = C && C.categories && C.categories[cat];
+    if (c && typeof c.couleur === 'string' && /^#[0-9a-f]{6}$/i.test(c.couleur)) return c.couleur;
     if (EXT.couleurs[cat]) return String(EXT.couleurs[cat]);
     if (COULEURS[cat]) return COULEURS[cat];
     const f = fold(cat);
     for (const [rx, , c] of DEVINE) if (rx.test(f)) return c;
     return '#8b95a1';
   }
+  // Icône d'une catégorie : celle enregistrée (émoji, icône reprise ou « lu:<nom> »), sinon celle d'office, sinon une
+  // icône de la banque proposée d'après le nom (0.10.7 : plus de lettre de repli).
   function iconeDe(C, cat) {
     const i = K().iconeDe(C, cat);
-    const d = K().CATEGORIES[cat] || (C && C.categories && C.categories[cat]);
-    if (d) return i;
-    const f = fold(cat);
-    for (const [rx, ic] of DEVINE) if (rx.test(f)) return ic;
-    return i;
+    const I = g.KladIcones;
+    if (!I || !I.absente(i)) return i;
+    return I.proposer(cat);
   }
-  const iconHtml = spec => String(spec).startsWith('svg:') ? (SVG[String(spec).slice(4)] || '') : esc(spec);
+  const iconHtml = spec => {
+    const s = String(spec);
+    if (s.startsWith('svg:')) return SVG[s.slice(4)] || '';
+    if (s.startsWith('lu:') && g.KladIcones) return g.KladIcones.svg(s.slice(3));
+    return esc(spec);
+  };
   // Pastille ronde colorée d'une catégorie (spec : icône imposée, ex. « svg:parking »).
   function cico(C, cat, spec) {
-    const sp = spec || iconeDe(C, cat), col = couleurDe(cat);
-    return '<span class="cico' + (String(sp).startsWith('svg:') ? ' svg' : '') + '" style="--cc:' + esc(col) + ';color:' + esc(col) + '" title="' + esc(cat) + '" aria-hidden="true">' + iconHtml(sp) + '</span>';
+    const sp = spec || iconeDe(C, cat), col = couleurDe(cat, C);
+    return '<span class="cico' + (/^(svg|lu):/.test(String(sp)) ? ' svg' : '') + '" style="--cc:' + esc(col) + ';color:' + esc(col) + '" title="' + esc(cat) + '" aria-hidden="true">' + iconHtml(sp) + '</span>';
   }
   // Icône d'une opération : stationnement et courses ont la leur (comme l'ancienne version).
   function icoOp(C, r) {
@@ -99,6 +107,13 @@
   function icoPoste(C, a) {
     if (a.label === 'Charges parking') return cico(C, 'Logement', 'svg:parking');
     return cico(C, a.nat === 'fixe' ? (a.cat || 'Logement') : a.label);
+  }
+
+  // ------------------------------------------------------------ reste à vivre : interrupteur de la base affichée (0.10.7)
+  // base : « salaire » ou « comptes » ; sans solde connu, « Comptes courants » est désactivé.
+  function interrupteurRav(base, avecComptes) {
+    const b = (k, t) => '<button type="button" data-ravbase="' + k + '" aria-pressed="' + (base === k) + '"' + (k === 'comptes' && !avecComptes ? ' disabled' : '') + '>' + t + '</button>';
+    return '<div class="seg rav-base" role="group" aria-label="Base du reste à vivre">' + b('salaire', 'Dernier salaire') + b('comptes', 'Comptes courants') + '</div>';
   }
 
   // ------------------------------------------------------------ pastille de banque (initiales sur la couleur de la banque)
@@ -213,7 +228,7 @@
 
   g.KladUI = {
     esc, e0, e2, plus0, plus2, MOIS, MOIS_L, mLabel, mLong, dfr, jjmm, jjmmaa, dLong, pluriel, chip,
-    COULEURS, SVG, reglerApparence, couleurDe, iconeDe, iconHtml, cico, icoOp, icoPoste, bico,
+    interrupteurRav, COULEURS, SVG, reglerApparence, couleurDe, iconeDe, iconHtml, cico, icoOp, icoPoste, bico,
     replie, plier, migrerPlis, MIGRATION_PLIS, pref, PREFS, tete, appliquerPli, comment, graduation, couleurGraduation, calcul, estCalcul
   };
 })(typeof window !== 'undefined' ? window : globalThis);

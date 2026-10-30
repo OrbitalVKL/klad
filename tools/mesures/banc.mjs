@@ -109,6 +109,22 @@ export async function ouvrir(o) {
       if (cl) { await cl.click(); await pause(250); await f('classer', await portee()); }
     }
     await fermer();
+    // 0.10.7 : catégories (nouvelle catégorie ouverte, une catégorie dépliée) et sélecteur d'icône
+    if (await page.evaluate(() => !!window.KladSelIcone)) {
+      await page.evaluate(() => window.KladApp.ouvrirVolet('secClassement'));
+      await pause(250);
+      if (await page.locator('#classementCorps [data-a="nc-ouvrir"]').count()) await page.locator('#classementCorps [data-a="nc-ouvrir"]').click();
+      if (!(await page.locator('#classementCorps .edcat').count())) await page.locator('#classementCorps [data-cat]').first().click();
+      await pause(150);
+      await f('classement', await portee());
+      await page.evaluate(() => window.KladSelIcone.ouvrir(document.querySelector('#classementCorps [data-cat]').dataset.cat));
+      await pause(250);
+      await f('icone', await portee());
+      await page.fill('#icQ', 'courses');
+      await pause(150);
+      await f('icone›recherche', await portee());
+      await fermer();
+    }
   }
   // Entrées de Plus (volets et écrans ouverts depuis Plus).
   async function ecransPlus(f) {

@@ -130,6 +130,9 @@
     }
     const bm = t.closest('[data-bmode]');
     if (bm) { ui.mode = bm.dataset.bmode; render(); return; }
+    // poste ou revenu du Suivi : déplier ses opérations (perdu en 0.9.0, rétabli en 0.10.7)
+    const po = t.closest('[data-poste]');
+    if (po) { const k = po.dataset.poste; if (ui.ouverts.has(k)) ui.ouverts.delete(k); else ui.ouverts.add(k); render(); return; }
     const sg = t.closest('[data-sec]');
     if (sg) { const k = 'm|' + sg.dataset.sec; if (ui.ouverts.has(k)) ui.ouverts.delete(k); else ui.ouverts.add(k); render(); return; }
     const cl = t.closest('[data-classer][data-op]');

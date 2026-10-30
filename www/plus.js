@@ -10,6 +10,7 @@
   const Vu = window.KladVues;
   const KC = window.KladClasse;
   const CN = window.KladCarnet;
+  const U = window.KladUI;
   const $ = id => document.getElementById(id);
   const esc = Vu.esc;
   const S = () => A.etat();
@@ -371,7 +372,7 @@
     } catch (e) { A.log('err', 'Classement : ' + (e.message || e)); return null; }
   }
 
-  let catEditee = null;
+  let catEditee = null, ajoutCat = false;
   function renderClassement() {
     const s = S();
     const C = KC.donnees(s);
@@ -390,14 +391,20 @@
       (r.depuis ? ', opérations vues jusqu\'au ' + esc(F.date(r.depuis)) : '') + '.' : 'Aucun classement repris de l\'ancienne version.') + '</p>';
     h += '<div class="row">' + (s.carnet != null && CN.utilisable(s.carnet) ? '<button class="btn small" data-a="reprendre">Reprendre depuis l\'ancienne version</button>' : '') +
       '<button class="btn small" data-a="complement">Importer un complément</button></div>';
-    h += '<h3>Catégories</h3><p class="muted small">Nombre d\'opérations sur 12 mois. Touchez une catégorie pour changer sa nature ou son icône.</p><ul class="list cats">' +
-      cats.map(c => '<li><button class="lien-cat" data-cat="' + esc(c) + '"><span class="ico" aria-hidden="true">' + esc(KC.iconeDe(C, c)) + '</span><span class="grow">' + esc(c) +
+    // 0.10.7 : « Nouvelle catégorie » en haut de la section ; champs pleine largeur (aucun débordement à 130 %) ;
+    // icône et couleur dans le sélecteur (volet du bas).
+    h += '<h3>Catégories</h3>' +
+      (ajoutCat ? '<div class="nc-form"><label class="sh-l"><span class="sh-lab">Nom de la nouvelle catégorie</span><input class="sh-in" id="ncNom" maxlength="40" autocomplete="off" placeholder="ex. Bien être"></label>' +
+        '<label class="sh-l"><span class="sh-lab">Nature</span><select class="sh-in" id="ncNature">' + natOpts('optionnelle') + '</select></label>' +
+        '<p class="muted small">Une icône est proposée d\'après le nom ; vous pourrez la changer ensuite.</p>' +
+        '<div class="row"><button class="btn primary" data-a="nouvelle">Créer la catégorie</button><button class="btn" data-a="nc-annuler">Annuler</button></div></div>'
+        : '<div class="row"><button class="btn primary" data-a="nc-ouvrir">+ Nouvelle catégorie</button></div>') +
+      '<p class="muted small">Nombre d\'opérations sur 12 mois. Touchez une catégorie pour changer sa nature, son icône ou sa couleur.</p><ul class="list cats">' +
+      cats.map(c => '<li><button class="lien-cat" data-cat="' + esc(c) + '" aria-expanded="' + (catEditee === c) + '">' + U.cico(C, c).replace('class="cico', 'class="cico ico') + '<span class="grow">' + esc(c) +
         '<small>' + esc(KC.NOMS_NATURES[KC.natureDe(C, c)]) + '</small></span><span class="muted">' + (nb[c] || 0) + '</span></button>' +
-        (catEditee === c ? '<div class="edcat"><label>Nature<select data-nature="' + esc(c) + '">' + natOpts(KC.natureDe(C, c)) + '</select></label>' +
-          '<div class="icones">' + KC.ICONES.map(i => '<button type="button" data-icone="' + esc(i) + '" aria-label="Icône ' + esc(i) + '"' + (i === KC.iconeDe(C, c) ? ' class="on"' : '') + '>' + esc(i) + '</button>').join('') + '</div></div>' : '') +
-        '</li>').join('') + '</ul>' +
-      '<div class="grp"><label>Nouvelle catégorie<input id="ncNom" maxlength="40" autocomplete="off"></label><label>Nature<select id="ncNature">' + natOpts('optionnelle') + '</select></label></div>' +
-      '<div class="row"><button class="btn primary small" data-a="nouvelle">Ajouter</button></div>';
+        (catEditee === c ? '<div class="edcat"><label class="sh-l"><span class="sh-lab">Nature</span><select class="sh-in" data-nature="' + esc(c) + '">' + natOpts(KC.natureDe(C, c)) + '</select></label>' +
+          '<button type="button" class="btn ic-choisir" data-iconecat="' + esc(c) + '">' + U.cico(C, c) + ' Icône et couleur…</button></div>' : '') +
+        '</li>').join('') + '</ul>';
     const regles = C.regles || [];
     h += '<h3>Vos règles</h3>' + (regles.length ? '<ul class="list">' + regles.map((u, i) => {
       const cpt = u.compte && M.compte(s, u.compte);
@@ -427,11 +434,8 @@
     const C = KC.donnees(s);
     const cat = ev.target.closest('[data-cat]');
     if (cat) { catEditee = catEditee === cat.dataset.cat ? null : cat.dataset.cat; renderClassement(); return; }
-    const ic = ev.target.closest('[data-icone]');
-    if (ic && catEditee) {
-      C.categories[catEditee] = Object.assign({ nature: KC.natureDe(C, catEditee) }, C.categories[catEditee], { icone: ic.dataset.icone });
-      A.changed('classement'); return;
-    }
+    const ic = ev.target.closest('[data-iconecat]');
+    if (ic) { window.KladSelIcone.ouvrir(ic.dataset.iconecat); return; }
     const sup = ev.target.closest('[data-suppr]');
     if (sup) {
       if (!A.confirmInline(sup, 'Confirmer ?')) return;
@@ -444,15 +448,21 @@
     }
     const b = ev.target.closest('[data-a]');
     if (!b) return;
-    if (b.dataset.a === 'nouvelle') {
+    if (b.dataset.a === 'nc-ouvrir' || b.dataset.a === 'nc-annuler') {
+      ajoutCat = b.dataset.a === 'nc-ouvrir';
+      renderClassement();
+      if (ajoutCat) { const e = $('ncNom'); if (e) e.focus(); }
+    } else if (b.dataset.a === 'nouvelle') {
       const nom = $('ncNom').value.trim().slice(0, 40);
       if (!nom) { A.toast('Indiquez un nom de catégorie.', true); return; }
       const k = KC.fold(nom);
       const dup = KC.listeCategories(C).find(c => KC.fold(c) === k);
       if (dup) { A.toast('La catégorie « ' + dup + ' » existe déjà.', true); return; }
       C.categories[nom] = { nature: $('ncNature').value, icone: KC.iconeDe(C, nom) };
+      ajoutCat = false; catEditee = nom;
       A.log('info', 'Catégorie ajoutée.');
       A.changed('classement');
+      window.KladSelIcone.ouvrir(nom);           // icône proposée d'après le nom : à confirmer ou changer
     } else if (b.dataset.a === 'reprendre') {
       if (!A.confirmInline(b, 'Confirmer : règles et corrections reprises à nouveau')) return;
       reprendreClassement(s).then(r => { if (r) A.toast('Classement repris : ' + r.base + ' règles de base, ' + r.regles + ' règles.'); });

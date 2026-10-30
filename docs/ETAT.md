@@ -5,16 +5,24 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.6** — fin de la série UX (UX-1 → UX-7, `docs/ux/plan.md`, variante A). UX-7 « rapidité » : l'Accueil est dessiné
-d'abord après le déverrouillage (autres écrans, résumé Grafit, reprise et synchro ensuite) ; plus de second calcul
-complet juste après l'ouverture quand rien n'a changé ; journal mis en page seulement quand il est affiché ; liste des
-opérations sans tableau (une rangée en grille par opération, un bloc par jour, jours hors écran non dessinés par
-`content-visibility`), suite chargée par petites tranches, une par image.
-Série complète : 0.10.0 socle lisible (couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées) ; 0.10.1
-Accueil ; 0.10.2 Opérations (Perso · Commun · Tout, trier une à une, détail en page) ; 0.10.3 Plus en page (6 groupes,
-Apparence) ; 0.10.4 Budget et Commun en sous-vues ; 0.10.5 Impôts et Épargne en sous-vues, Réglages › Budget ; 0.10.6
-rapidité. Aucun calcul modifié (relevé de contrôle identique, hors le titre « Balance déficitaire »).
-(0.9.4 — mode clair, opérations internes visibles, période des opérations ; 0.9.3 → 0.6 : correctifs et lots 9 à 6.)
+**0.10.7** — retours du propriétaire sur la série UX (acceptée). Corrections :
+- Budget › Suivi : toucher un poste (son nom ou « N op. ▾ », « contrat ▾ ») déplie de nouveau ses opérations et contrats
+  (le gestionnaire `[data-poste]` avait disparu en 0.9.0) ; poste sans opération : « Aucune opération sur cette période ».
+  Test `test/budgetdetail.test.mjs` : pour chaque poste et revenu (accents, « & », « / », postes c|/f|, cycle vide le
+  jour du salaire, reprise et complément), le détail liste exactement les opérations comptées dans « utilisé ».
+- Plus › Classement : « + Nouvelle catégorie » en haut de la section, formulaire pleine largeur (champs `sh-in`) ;
+  champs des volets bornés à la largeur (aucun débordement à 360 / 412 px, texte à 130 %).
+- Icônes des catégories : banque Lucide embarquée (396 icônes, ISC), sélecteur en volet du bas (recherche par mots
+  français, suggestions d'après le nom, couleur de la pastille) ; migration `icones` (catégories sans icône ou avec la
+  lettre de repli → icône proposée ; icônes reprises gardées ; réversible).
+- Reste à vivre : interrupteur « Dernier salaire / Comptes courants » sur la carte de l'Accueil, dans son détail, dans
+  Budget et dans Réglages › Budget ; réglage `S.budget.reglages.rav` (`salaire` par défaut) ; le résumé Grafit suit
+  (`left_to_live`, `left_to_live_basis`). Aucun calcul modifié (choix d'une des deux colonnes).
+- Gestes sur les opérations : action affichée sous la ligne pendant le glissement (« Vue » / « Non vue », « Classer »),
+  fond soutenu au seuil, vibration légère au seuil (permission Android `VIBRATE`) ; « réduire les animations » : la
+  ligne ne bouge pas, l'action s'affiche par-dessus.
+(0.10.6 — fin de la série UX (UX-1 → UX-7, `docs/ux/plan.md`, variante A) ; 0.10.0 → 0.10.5 : socle lisible, Accueil,
+Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 0.9.4 → 0.6 : correctifs et lots 9 à 6.)
 
 ## Feuille de route
 
@@ -40,7 +48,9 @@ rapidité. Aucun calcul modifié (relevé de contrôle identique, hors le titre 
 | UX-5 | Budget et Commun en sous-vues, migration des sections repliées | 0.10.4 | fait |
 | UX-6 | Impôts et Épargne en sous-vues, Réglages › Budget | 0.10.5 | fait |
 | UX-7 | Rapidité : Accueil d'abord, liste allégée | 0.10.6 | fait |
-| 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après la recette de la 0.10.6 |
+| — | Retours sur la série UX : détail des postes, icônes des catégories, base du reste à vivre, gestes | 0.10.7 | fait |
+| — | Parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) et petites fonctions manquantes | 0.10.8 | prévu |
+| 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -176,7 +186,7 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   0.10.3) puis `klad.replis.v2` et sa marque `klad.replis.v` (0.10.4),
   `klad.periode`, `klad.tendance`, `klad.opsPerimetre` (0.10.2 : `perso` / `commun` / `tout`) (liste fermée, `KladUI.pref`),
   `klad.theme` et `klad.palette` (0.10, `klad` / `grafit`) ;
-  aucune donnée.
+  aucune donnée. La base du reste à vivre n'en fait pas partie : elle est dans le coffre (budget), lue par le résumé Grafit.
 
 - Lot 8 (0.8) : chiffres identiques à l'ancienne version (parité `outils/parite/lot8.mjs` : impôts avis et estimation,
   partage, régularisations, taxe foncière, livret, résultats perso et commun ; 0 écart). Observations : mêmes règles,
@@ -216,7 +226,15 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
 - Cycle perso = cycle de salaire, sans bascule « depuis le 1er » (choix du propriétaire) ; repli sur le mois civil.
 - Réglages propres au propriétaire (critères du salaire, noms des personnes du commun) : `klad.salaire`, `klad.commun` du
   complément ou du carnet, surchargés par `S.budget.reglages` ; jamais dans le code.
-- Reste à vivre : colonne « comptes courants » prioritaire pour Grafit (`left_to_live_basis` = `accounts`), sinon `budget`.
+- Reste à vivre (0.10.7) : base affichée au choix du propriétaire (`S.budget.reglages.rav` : `salaire` par défaut, ou
+  `comptes`), même valeur sur l'Accueil et dans Grafit (`left_to_live_basis` = `budget` ou `accounts`) ; sans solde
+  connu, colonne « dernier salaire ». Avant la 0.10.7, Grafit prenait d'office les comptes courants.
+- Icônes de catégories (0.10.7) : `C.categories[n].icone` = émoji, `svg:<nom>` (repris) ou `lu:<nom>` (banque Lucide,
+  `KladIcones`) ; `C.categories[n].couleur` = `#rrggbb` (choisie dans Klad, prioritaire sur le complément). Plus de lettre
+  de repli : une icône est proposée d'après le nom (`KladIcones.proposer`).
+- Décisions validées par le propriétaire sur la série UX : catégorie en texte dans les lignes (option A), liste ouverte
+  sur « Tout » depuis l'Accueil, recherche par catégorie, contrats et tendance du commun dans Commun › Trésorerie,
+  sous-vue gardée pour la session seulement, palette dès UX-1. Réglages › Budget devient modifiable en 9c.
 
 ## Inventaire des écarts avec l'ancienne version (0.9.0)
 
@@ -236,10 +254,19 @@ Restent :
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
 
+## Points d'appui pour la 0.10.8 (parité des fonctions)
+
+- `docs/parite-fonctions.md` : inventaire des fonctions de la v65 (téléphone et ordinateur) et statut dans Klad.
+- Écrans de catégories et de règles complets dans `vbudget.js` (`categories`, `regles`) et gestionnaires dans
+  `ecranbudget.js` (`[data-catren]`, `[data-catsup]`, `[data-nradd]`), non affichés depuis la 0.10.4 : à brancher dans
+  Plus › Classement ; moteur `KladClasse.renommerCategorie`, `supprimerCategorie`.
+- Mesures : `tools/mesures/banc.mjs` parcourt aussi Plus › Classement (nouvelle catégorie, catégorie dépliée) et le
+  sélecteur d'icône (0.10.7 : 671 contrôles sur les écrans principaux, 0 sous 48 dp, 0 sous AA).
+
 ## Points d'appui pour le Lot 9c (1.0.0, à publier seulement après « recette OK »)
 
 - Place prévue dans l'interface (série UX) : Plus › Réglages › Budget (`secReglBudget`, aujourd'hui en lecture : cycle de
-  salaire, base de calcul, personnes du commun) pour les réglages du complément ; Plus › Données › Importer (`secImporter`)
+  salaire, base de calcul, personnes du commun ; seul l'interrupteur du reste à vivre y est modifiable depuis la 0.10.7) pour les réglages du complément ; Plus › Données › Importer (`secImporter`)
   pour le complément et la reprise ; Plus › Données › Sauvegarde (écran `sauvegarde`) pour la sauvegarde vérifiée.
 - Navigation : écrans « page » avec Retour par la table `RETOUR` de `www/app.js` ; sous-vues par `data-sousvue`
   (`KladEcranBudget.barre`, `SV` d'`ecranfisc.js`) ; préférences d'affichage par la liste fermée `KladUI.PREFS`.

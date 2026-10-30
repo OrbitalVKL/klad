@@ -138,6 +138,15 @@ test('reste à vivre : deux colonnes (dernier salaire, comptes courants)', () =>
   const r2 = KB.suivi(ctx(S), 'perso', null).rav;
   assert.deepEqual([r2.comptes, r2.base, r2.valeur], [null, 'budget', 188000]);
   assert.ok(!montantSigne(VB.detailRav(r)));
+  // 0.10.7 : choix d'une colonne, aucun calcul ; le détail montre toujours les deux colonnes
+  assert.deepEqual(json(KB.ravChoisi(r, 'salaire')), { choix: 'salaire', col: json(r.budget), autre: json(r.comptes), base: 'budget' });
+  assert.deepEqual(json(KB.ravChoisi(r, 'comptes')), { choix: 'comptes', col: json(r.comptes), autre: json(r.budget), base: 'accounts' });
+  assert.equal(KB.ravChoisi(r2, 'comptes').choix, 'salaire');
+  for (const b of ['salaire', 'comptes']) {
+    const h = VB.detailRav(r, b);
+    assert.match(h, /Dernier salaire[\s\S]*Comptes courants/);
+    assert.match(h, new RegExp('data-ravbase="' + b + '" aria-pressed="true"'));
+  }
   assert.match(VB.carteRav(r), /Reste à vivre jusqu'au 26\/11/);
 });
 
@@ -181,7 +190,20 @@ test('résumé Grafit : month, left_to_live, upcoming, BUDGET_OVER ; aucun motif
   const r = json(R.construire(S, NOW, {}));
   assert.deepEqual(r.month, { cycle: 'salary', from: '2026-10-27', to: '2026-11-26', spent: 120, budget: 300, left: 180, income: 2000,
     top: [{ label: 'BARS', spent: 90, budget: 50 }, { label: 'ALIMENTATION', spent: 30, budget: 200 }, { label: 'ASSURANCE AUTO', spent: 0, budget: 50 }],
-    left_to_live: 1280, left_to_live_basis: 'accounts' });
+    left_to_live: 1880, left_to_live_basis: 'budget' });
+  // 0.10.7 : base choisie par le propriétaire (Réglages › Budget) ; « dernier salaire » par défaut
+  assert.equal(KB.baseRav(S), 'salaire');
+  KB.choisirBaseRav(S, 'comptes');
+  assert.deepEqual(json(S.budget.reglages).rav, 'comptes');
+  const r2 = json(R.construire(S, NOW, {}));
+  assert.deepEqual([r2.month.left_to_live, r2.month.left_to_live_basis], [1280, 'accounts']);
+  // sans solde connu, la colonne « comptes courants » n'existe pas : dernier salaire
+  const soldes = S.modele.comptes.map(c => c.solde);
+  for (const c of S.modele.comptes) delete c.solde;
+  const r3 = json(R.construire(S, NOW, {}));
+  assert.deepEqual([r3.month.left_to_live, r3.month.left_to_live_basis], [1880, 'budget']);
+  S.modele.comptes.forEach((c, i) => { c.solde = soldes[i]; });
+  KB.choisirBaseRav(S, 'salaire');
   assert.deepEqual(r.upcoming, [{ date: '2026-11-05', label: 'PRET', amount: -1200, kind: 'recurring' }, { date: '2026-11-05', label: 'CARTE', amount: -40, kind: 'card' }, { date: '2026-11-10', label: 'ASSURANCE AUTO', amount: -50, kind: 'contract' }]);
   assert.deepEqual(r.alerts.filter(a => a.code === 'BUDGET_OVER'), [{ level: 'caut', code: 'BUDGET_OVER', text: 'BARS +80 %' }]);
   // identifiants de comptes : tirés au hasard (8 caractères), ils peuvent contenir 5 chiffres de suite
