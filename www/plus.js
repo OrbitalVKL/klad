@@ -372,7 +372,13 @@
     } catch (e) { A.log('err', 'Classement : ' + (e.message || e)); return null; }
   }
 
-  let catEditee = null, ajoutCat = false;
+  let catEditee = null, ajoutCat = false, catRen = null, ajoutRegle = null;
+  // Compteur et aperçu des opérations dont le libellé contient le mot (règle à la main).
+  function apercuRegle(s, mot) {
+    if (!String(mot || '').trim()) return '<p class="muted small">Saisissez un mot du libellé.</p>';
+    const L = KC.concernees(s, mot, {});
+    return '<p class="muted small" aria-live="polite">' + L.length + ' opération' + (L.length > 1 ? 's contiennent' : ' contient') + ' « ' + esc(String(mot).trim()) + ' »</p>' + Vu.apercuRegle(s, L);
+  }
   function renderClassement() {
     const s = S();
     const C = KC.donnees(s);
@@ -403,10 +409,19 @@
       cats.map(c => '<li><button class="lien-cat" data-cat="' + esc(c) + '" aria-expanded="' + (catEditee === c) + '">' + U.cico(C, c).replace('class="cico', 'class="cico ico') + '<span class="grow">' + esc(c) +
         '<small>' + esc(KC.NOMS_NATURES[KC.natureDe(C, c)]) + '</small></span><span class="muted">' + (nb[c] || 0) + '</span></button>' +
         (catEditee === c ? '<div class="edcat"><label class="sh-l"><span class="sh-lab">Nature</span><select class="sh-in" data-nature="' + esc(c) + '">' + natOpts(KC.natureDe(C, c)) + '</select></label>' +
-          '<button type="button" class="btn ic-choisir" data-iconecat="' + esc(c) + '">' + U.cico(C, c) + ' Icône et couleur…</button></div>' : '') +
+          '<button type="button" class="btn ic-choisir" data-iconecat="' + esc(c) + '">' + U.cico(C, c) + ' Icône et couleur…</button>' +
+          (catRen === c ? '<label class="sh-l"><span class="sh-lab">Nouveau nom</span><input class="sh-in" id="catRenNom" maxlength="40" autocomplete="off" value="' + esc(c) + '"></label>' +
+            '<div class="row"><button class="btn primary" data-a="ren-ok">Renommer</button><button class="btn" data-a="ren-non">Annuler</button></div>'
+            : '<div class="row"><button class="btn" data-catren="' + esc(c) + '">Renommer</button><button class="btn danger" data-catsup="' + esc(c) + '">Supprimer</button></div>') +
+          '<p class="muted small">Renommer garde les opérations, les règles et le budget. Une catégorie supprimée n\'apparaît plus ; ses opérations passent en « Autres ».</p></div>' : '') +
         '</li>').join('') + '</ul>';
     const regles = C.regles || [];
-    h += '<h3>Vos règles</h3>' + (regles.length ? '<ul class="list">' + regles.map((u, i) => {
+    // 0.10.8 : règle ajoutée à la main (mot, catégorie), avec l'aperçu des opérations concernées
+    h += '<h3>Vos règles</h3>' + (ajoutRegle ? '<div class="nc-form"><label class="sh-l"><span class="sh-lab">Mot du libellé</span><input class="sh-in" id="nrMot" maxlength="60" autocomplete="off" spellcheck="false" placeholder="ex. BOULANGERIE" value="' + esc(ajoutRegle.mot) + '"></label>' +
+      '<label class="sh-l"><span class="sh-lab">Catégorie</span><select class="sh-in" id="nrCat">' + cats.map(c => '<option' + (c === ajoutRegle.cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label>' +
+      '<div id="nrApercu">' + apercuRegle(s, ajoutRegle.mot) + '</div>' +
+      '<div class="row"><button class="btn primary" data-a="nr-ok">Ajouter la règle</button><button class="btn" data-a="nr-annuler">Annuler</button></div></div>'
+      : '<div class="row"><button class="btn primary" data-a="nr-ouvrir">+ Nouvelle règle</button></div>') + (regles.length ? '<ul class="list">' + regles.map((u, i) => {
       const cpt = u.compte && M.compte(s, u.compte);
       const n = KC.concernees(s, u.mot, { compte: u.compte, sens: u.sens }).length;
       return '<li><div class="grow"><b>' + esc(u.mot) + '</b> → ' + esc(u.cat + (u.sub && u.sub !== u.cat ? ' › ' + u.sub : '')) +
@@ -422,6 +437,11 @@
     ($('mClassement') || {}).textContent = C ? KC.listeCategories(C).length + ' catégories, ' + (C.regles || []).length + ' règle(s)' : 'Catégories et règles';
   });
 
+  $('classementCorps').addEventListener('input', ev => {
+    if (ev.target.id !== 'nrMot' || !ajoutRegle) return;
+    ajoutRegle.mot = ev.target.value;
+    $('nrApercu').innerHTML = apercuRegle(S(), ajoutRegle.mot);
+  });
   $('classementCorps').addEventListener('change', ev => {
     const n = ev.target.closest('[data-nature]');
     if (!n) return;
@@ -436,6 +456,19 @@
     if (cat) { catEditee = catEditee === cat.dataset.cat ? null : cat.dataset.cat; renderClassement(); return; }
     const ic = ev.target.closest('[data-iconecat]');
     if (ic) { window.KladSelIcone.ouvrir(ic.dataset.iconecat); return; }
+    // 0.10.8 : renommer, supprimer une catégorie (annulables), comme l'ancienne version
+    const cr = ev.target.closest('[data-catren]');
+    if (cr) { catRen = cr.dataset.catren; renderClassement(); const i = $('catRenNom'); if (i) { i.focus(); i.select(); } return; }
+    const cs = ev.target.closest('[data-catsup]');
+    if (cs) {
+      if (!A.confirmInline(cs, 'Confirmer la suppression')) return;
+      const nom = cs.dataset.catsup, snap = KC.supprimerCategorie(s, nom);
+      catEditee = null;
+      A.log('info', 'Catégorie supprimée.');
+      A.changed('classement');
+      A.toastAnnuler('Catégorie « ' + nom + ' » supprimée : ses opérations passent en « Autres ».', () => { KC.restaurer(S(), snap); A.changed('classement'); });
+      return;
+    }
     const sup = ev.target.closest('[data-suppr]');
     if (sup) {
       if (!A.confirmInline(sup, 'Confirmer ?')) return;
@@ -448,6 +481,35 @@
     }
     const b = ev.target.closest('[data-a]');
     if (!b) return;
+    if (b.dataset.a === 'ren-non') { catRen = null; renderClassement(); return; }
+    if (b.dataset.a === 'ren-ok') {
+      try {
+        const nv = $('catRenNom').value.trim(), snap = KC.renommerCategorie(s, catRen, nv);
+        catRen = null;
+        if (!snap) { renderClassement(); return; }
+        catEditee = nv;
+        A.log('info', 'Catégorie renommée.');
+        A.changed('classement');
+        A.toastAnnuler('Catégorie renommée en « ' + nv + ' ».', () => { KC.restaurer(S(), snap); A.changed('classement'); });
+      } catch (e) { A.toast(e.message, true); }
+      return;
+    }
+    if (b.dataset.a === 'nr-ouvrir' || b.dataset.a === 'nr-annuler') {
+      ajoutRegle = b.dataset.a === 'nr-ouvrir' ? { mot: '', cat: KC.listeCategories(C)[0] || 'Autres' } : null;
+      renderClassement();
+      if (ajoutRegle) { const e = $('nrMot'); if (e) e.focus(); }
+      return;
+    }
+    if (b.dataset.a === 'nr-ok') {
+      try {
+        const mot = $('nrMot').value, cat = $('nrCat').value, snap = KC.ajouterRegle(s, mot, cat);
+        ajoutRegle = null;
+        A.log('info', 'Règle de classement ajoutée.');
+        A.changed('classement');
+        A.toastAnnuler('Règle « ' + mot.trim() + ' » ajoutée.', () => { KC.restaurer(S(), snap); A.changed('classement'); });
+      } catch (e) { A.toast(e.message, true); }
+      return;
+    }
     if (b.dataset.a === 'nc-ouvrir' || b.dataset.a === 'nc-annuler') {
       ajoutCat = b.dataset.a === 'nc-ouvrir';
       renderClassement();

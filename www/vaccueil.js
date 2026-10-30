@@ -67,7 +67,7 @@
   function soldes(S, now, o) {
     const L = Vu().comptesDe(S, 'perso');
     if (!L.length) return carte('ac-so', 'Soldes', '', '<p class="note">Connectez une banque (Plus › Banques et accès) ou importez la reprise de l\'ancienne version.</p>', ' data-mesure="soldes"');
-    let total = 0, n = 0, cartes = 0, lu = '';
+    let total = 0, n = 0, cartes = 0, lu = '', ep = 0, nep = 0;
     const lignes = L.map(c => {
       const eb = c.source.type === 'eb', t = eb && c.sync && c.sync.lu;
       if (t && t > lu) lu = t;
@@ -83,6 +83,7 @@
       const s = lv ? { centimes: lv.centimes, dateRef: s0 && s0.dateRef } : s0;
       if (!s) return li(U().bico(S, c), c.libelle, c.source.type === 'manuel' ? 'solde à saisir' : 'solde pas encore lu', 'data-compte="' + esc(c.id) + '"', '—');
       if (c.role === 'courant' || c.role === 'commun') { total += s.centimes; n++; }
+      else if (c.role === 'epargne') { ep += s.centimes; nep++; }
       const ancien = eb && (!t || now - Date.parse(t) > 30 * 3600e3);
       const sous = lv ? 'estimé · intérêts ' + lv.texte : (c.source.type === 'manuel' ? 'saisi le ' + U().jjmm(s.dateRef || s.lu) : (t ? 'relevé de ' + hhmm(t) + (ancien ? ' · ancien' : '') : 'au ' + U().jjmm(s.dateRef)));
       const v = s.centimes;
@@ -91,7 +92,9 @@
         c.libelle + ', ' + F().montant(Math.abs(v)) + (v < 0 ? ' débiteur' : '') + ', ' + sous);
     }).join('');
     const tot = n ? '<p class="ac-tot">Total disponible (courants et commun) : <b class="num' + (total < 0 ? ' bad-t' : '') + '">' + esc(F().solde(total)) + '</b>' +
-      (cartes ? ' · après les cartes : <b class="num' + (total - cartes < 0 ? ' bad-t' : '') + '">' + esc(F().solde(total - cartes)) + '</b>' : '') + '</p>' : '';
+      (cartes ? ' · après les cartes : <b class="num' + (total - cartes < 0 ? ' bad-t' : '') + '">' + esc(F().solde(total - cartes)) + '</b>' : '') + '</p>' +
+      // 0.10.8 : total de tous les comptes, dont épargne (tuile « Total » de l'ancienne version)
+      (nep ? '<p class="ac-tot">Tous les comptes : <b class="num' + (total + ep < 0 ? ' bad-t' : '') + '">' + esc(F().solde(total + ep)) + '</b> · dont épargne <b class="num">' + esc(F().solde(ep)) + '</b></p>' : '') : '';
     return carte('ac-so', 'Soldes', lu ? 'relevés de ' + hhmm(lu) : '', lignes + tot, ' data-mesure="soldes"');
   }
 
