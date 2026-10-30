@@ -382,6 +382,11 @@
     st.items.push(Object.assign({ id: 'o' + Date.now().toString(36) + st.items.length, on: true }, item));
     return avant;
   }
+  // Dépense de l'équilibre ajoutée depuis une opération (0.10.8 : pastille sur la ligne, pas de second ajout).
+  function equipementDeOp(S, opId) {
+    const st = S && S.budget && S.budget.equilibre;
+    return st && Array.isArray(st.items) ? st.items.find(x => x && x.src === 'op' && x.op === opId) || null : null;
+  }
   function retirerEquipement(S, id) { const st = etatEq(S); const avant = JSON.stringify(st); st.items = (st.items || []).filter(x => x.id !== id); return avant; }
   function annulerEquilibre(S, avant) { S.budget.equilibre = JSON.parse(avant); }
 
@@ -465,5 +470,5 @@
   }
 
   g.KladCommun = { USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
-    sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer };
+    sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -572,7 +572,7 @@
   });
 
   // ------------------------------------------------------------ opérations (liste par jour, recherche, filtres)
-  const filtre = { compte: '', q: '', cat: '', nonVues: false };
+  const filtre = { compte: '', q: '', cat: '', nonVues: false, ordre: 'date' };   // ordre (0.10.8) : gardé pour la session
   // Périmètre de la liste (Perso · Commun · Tout), toujours visible ; le dernier choix est gardé sur ce téléphone.
   let perimOps = ['perso', 'commun', 'tout'].indexOf(U.pref('opsPerimetre')) >= 0 ? U.pref('opsPerimetre') : 'perso';
   let opsListe = [], opsFin = 0;
@@ -589,7 +589,7 @@
       if (filtre.cat && filtre.cat[0] !== '_' && !cx.C.categories[filtre.cat]) filtre.cat = '';
       const bp = bornesOps();
       filtre.du = bp.du; filtre.au = bp.au; filtre.per = perOps.k;
-      opsListe = Vu.filtrer(S, filtre, cx);
+      opsListe = Vu.ordonner(Vu.filtrer(S, filtre, cx), filtre.ordre, cx);
       opsFin = 0;
       const base = Object.assign({}, filtre, { cat: '', nonVues: false });
       const unseen = Vu.filtrer(S, Object.assign({}, base, { nonVues: true }), cx).length;
@@ -619,7 +619,8 @@
   }
   function plus(nbJours) {
     if (opsFin >= opsListe.length) return;
-    const r = Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx() });
+    const r = Vu.ordreParJour(filtre.ordre) ? Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx() })
+      : Vu.trancheSansJours(S, opsListe, opsFin, nbJours * 2, { ctx: ctx() });
     $('tx').insertAdjacentHTML('beforeend', r.html);
     opsFin = r.fin;
     $('tx-suite').innerHTML = opsFin < opsListe.length ? '<div class="row center"><button type="button" class="btn" data-suite>Afficher plus</button></div>' : '';
@@ -673,6 +674,7 @@
     if (ev.target.id === 'opsCat') filtre.cat = ev.target.value;
     else if (ev.target.id === 'opsCompte') filtre.compte = ev.target.value;
     else if (ev.target.id === 'opsPer') perOps.k = ev.target.value;
+    else if (ev.target.id === 'opsOrdre') filtre.ordre = ev.target.value;
     else return;
     opsFin = 0; renderOps(true);
   });
@@ -841,11 +843,12 @@
     cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: trouve, mot, compte: false, sens: '', toutes: false }, sub0: r.nc ? cat : r.sub, tri: !!(opts && opts.tri) };
     ouvrirVolet('secClasser', { empiler: !!empiler, titre: opts && opts.titre });
   }
-  function nbConcernees() {
+  function concerneesCls() {
     const st = cls.st;
-    if (!st.autres || !st.mot.trim()) return 0;
-    return KC.concernees(S, st.mot, { compte: st.compte ? cls.cid : null, sens: st.sens }).length;
+    if (!st.autres || !st.mot.trim()) return [];
+    return KC.concernees(S, st.mot, { compte: st.compte ? cls.cid : null, sens: st.sens });
   }
+  const nbConcernees = () => concerneesCls().length;
   function equilibrePossible(o) {
     const c = M.compte(S, o.compte);
     return !!(window.KladCommun && c && c.role !== 'commun' && o.montant < 0);
@@ -853,10 +856,13 @@
   function renderClasser() {
     const o = cls && trouverOp(cls.cid, cls.id);
     if (!o) { $('clsCorps').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
-    $('clsCorps').innerHTML = Vu.classer(S, o, ctx(), cls.st, nbConcernees(), { equilibre: equilibrePossible(o), tri: cls.tri && !!tri });
+    const L = concerneesCls();
+    $('clsCorps').innerHTML = Vu.classer(S, o, ctx(), cls.st, L.length, { equilibre: equilibrePossible(o), tri: cls.tri && !!tri, apercu: L });
   }
   function majCompte() {
-    const n = nbConcernees(), st = cls.st;
+    const L = concerneesCls(), n = L.length, st = cls.st;
+    const ap = $('clsApercu');
+    if (ap) ap.innerHTML = st.autres ? Vu.apercuRegle(S, L) : '';
     $('clsN').textContent = st.autres ? (st.mot.trim() ? n + ' opération' + (n > 1 ? 's contiennent' : ' contient') + ' « ' + st.mot.trim() + ' »' : 'Saisissez un mot du libellé') : 'Seule cette opération sera classée';
     document.querySelector('#clsCorps [data-a="go"]').textContent = 'Classer en ' + st.cat + (st.autres && n > 1 ? ' (' + n + ')' : '');
   }
@@ -962,6 +968,14 @@
     const o = trouverOp(cls.cid, cls.id);
     if (!o) return;
     const R = window.KladCommun.reglages(budget());
+    // 0.10.8 : une opération n'est ajoutée qu'une fois (sinon double compte dans l'équilibre)
+    const deja = window.KladCommun.equipementDeOp(S, o.id);
+    if (deja) {
+      $('clsCorps').innerHTML = '<div class="sh-lab">Déjà dans l\'équilibre des apports</div><p>« ' + esc(deja.label) + ' », ' + esc(F.montant((deja.moi || 0) + (deja.autre || 0))) +
+        ' (' + esc((deja.moi ? (R.moi || 'Moi') : '') + (deja.moi && deja.autre ? ' et ' : '') + (deja.autre ? (R.autre || 'l\'autre personne') : '')) + ').</p>' +
+        '<p class="muted small">Pour la modifier, retirez-la puis ajoutez-la de nouveau.</p><button type="button" class="btn danger" data-a="lkretirer">Retirer de l\'équilibre</button>';
+      return;
+    }
     $('clsCorps').innerHTML = '<div class="sh-lab">Ajouter à l\'équilibre des apports</div>' +
       '<label class="sh-l"><span class="sh-lab">Libellé</span><input type="text" class="sh-in" id="lkLab" maxlength="80" value="' + esc(Vu.libelleCourt(o.libelle)) + '"></label>' +
       '<label class="sh-l"><span class="sh-lab">Montant</span><input type="text" class="sh-in" id="lkMt" inputmode="decimal" value="' + esc(F.versSaisie(Math.abs(o.montant))) + '"></label>' +
@@ -969,8 +983,20 @@
       '<button type="button" class="sh-go" data-a="lkok">Ajouter à l\'équilibre</button>';
   }
   $('clsCorps').addEventListener('click', ev => {
+    const rt = ev.target.closest('[data-a="lkretirer"]');
+    if (rt && cls) {
+      const it = window.KladCommun.equipementDeOp(S, cls.id);
+      if (!it) return;
+      const avant = window.KladCommun.retirerEquipement(S, it.id);
+      log('info', 'Dépense retirée de l\'équilibre.');
+      fermerVolet();
+      changed('budget');
+      toastAnnuler('Dépense retirée de l\'équilibre.', () => { window.KladCommun.annulerEquilibre(S, avant); changed('budget'); });
+      return;
+    }
     if (!ev.target.closest('[data-a="lkok"]') || !cls) return;
     const o = trouverOp(cls.cid, cls.id);
+    if (window.KladCommun.equipementDeOp(S, o.id)) return;
     const m = F.saisie($('lkMt').value), lab = $('lkLab').value.trim().slice(0, 80), qui = $('lkQui').value;
     if (!lab || m == null || !m) { toast('Indiquez un libellé et un montant.', true); return; }
     const part = qui === 'moitie' ? [Math.round(m / 2), m - Math.round(m / 2)] : qui === 'moi' ? [m, 0] : [0, m];

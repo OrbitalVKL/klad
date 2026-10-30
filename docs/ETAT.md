@@ -5,7 +5,15 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.7** — retours du propriétaire sur la série UX (acceptée). Corrections :
+**0.10.8** — parité des fonctions avec l'ancienne version : `docs/parite-fonctions.md` (326 fonctions de la v65,
+téléphone et ordinateur ; 226 identiques, 85 adaptées, 12 abandonnées par décision, 2 abandons à décider, 1 manquante
+pour la 9c). Rétablies ou ajoutées : renommer et supprimer une catégorie, ajouter une règle à la main (perdus en 0.10.4,
+rétablis dans Plus › Classement, annulables) ; aperçu des 8 opérations concernées par une règle (volet Classer, nouvelle
+règle) ; pastille « équilibre » sur une opération ajoutée à l'équilibre et un seul ajout par opération (retrait
+possible) ; tri des opérations (plus récentes, plus anciennes, plus grosses dépenses, par catégorie ; gardé pour la
+session) ; Accueil › Soldes : « Tous les comptes … dont épargne ». Aucun calcul modifié. Test `test/parite.test.mjs`.
+
+(0.10.7) — retours du propriétaire sur la série UX (acceptée). Corrections :
 - Budget › Suivi : toucher un poste (son nom ou « N op. ▾ », « contrat ▾ ») déplie de nouveau ses opérations et contrats
   (le gestionnaire `[data-poste]` avait disparu en 0.9.0) ; poste sans opération : « Aucune opération sur cette période ».
   Test `test/budgetdetail.test.mjs` : pour chaque poste et revenu (accents, « & », « / », postes c|/f|, cycle vide le
@@ -49,7 +57,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | UX-6 | Impôts et Épargne en sous-vues, Réglages › Budget | 0.10.5 | fait |
 | UX-7 | Rapidité : Accueil d'abord, liste allégée | 0.10.6 | fait |
 | — | Retours sur la série UX : détail des postes, icônes des catégories, base du reste à vivre, gestes | 0.10.7 | fait |
-| — | Parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) et petites fonctions manquantes | 0.10.8 | prévu |
+| — | Parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) et petites fonctions manquantes | 0.10.8 | fait |
 | 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
@@ -185,7 +193,7 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
 - Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées, jusqu'à la
   0.10.3) puis `klad.replis.v2` et sa marque `klad.replis.v` (0.10.4),
   `klad.periode`, `klad.tendance`, `klad.opsPerimetre` (0.10.2 : `perso` / `commun` / `tout`) (liste fermée, `KladUI.pref`),
-  `klad.theme` et `klad.palette` (0.10, `klad` / `grafit`) ;
+  `klad.theme` et `klad.palette` (0.10, `klad` / `grafit`) ; l'ordre de la liste des opérations (0.10.8) est gardé pour la session seulement ;
   aucune donnée. La base du reste à vivre n'en fait pas partie : elle est dans le coffre (budget), lue par le résumé Grafit.
 
 - Lot 8 (0.8) : chiffres identiques à l'ancienne version (parité `outils/parite/lot8.mjs` : impôts avis et estimation,
@@ -254,12 +262,13 @@ Restent :
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
 
-## Points d'appui pour la 0.10.8 (parité des fonctions)
+## Points d'appui laissés par la 0.10.8 (parité des fonctions)
 
 - `docs/parite-fonctions.md` : inventaire des fonctions de la v65 (téléphone et ordinateur) et statut dans Klad.
-- Écrans de catégories et de règles complets dans `vbudget.js` (`categories`, `regles`) et gestionnaires dans
-  `ecranbudget.js` (`[data-catren]`, `[data-catsup]`, `[data-nradd]`), non affichés depuis la 0.10.4 : à brancher dans
-  Plus › Classement ; moteur `KladClasse.renommerCategorie`, `supprimerCategorie`.
+- Catégories et règles gérées dans Plus › Classement (`plus.js:renderClassement`) ; les vues `vbudget.js:categories`,
+  `regles` et leurs gestionnaires dans `ecranbudget.js` ne sont plus affichées (gardées, à retirer un jour).
+- Questions ouvertes au propriétaire (abandons à décider) : « Liste d'origine » des contrats, liste des bulletins de paie
+  non lus. Manquant pour la 9c : pastille « charge récurrente sur le compte secondaire » (compte secondaire réglable).
 - Mesures : `tools/mesures/banc.mjs` parcourt aussi Plus › Classement (nouvelle catégorie, catégorie dépliée) et le
   sélecteur d'icône (0.10.7 : 671 contrôles sur les écrans principaux, 0 sous 48 dp, 0 sous AA).
 

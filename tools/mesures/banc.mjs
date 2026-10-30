@@ -114,6 +114,7 @@ export async function ouvrir(o) {
       await page.evaluate(() => window.KladApp.ouvrirVolet('secClassement'));
       await pause(250);
       if (await page.locator('#classementCorps [data-a="nc-ouvrir"]').count()) await page.locator('#classementCorps [data-a="nc-ouvrir"]').click();
+      if (await page.locator('#classementCorps [data-a="nr-ouvrir"]').count()) await page.locator('#classementCorps [data-a="nr-ouvrir"]').click();   // 0.10.8
       if (!(await page.locator('#classementCorps .edcat').count())) await page.locator('#classementCorps [data-cat]').first().click();
       await pause(150);
       await f('classement', await portee());

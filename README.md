@@ -2,7 +2,7 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 0.10.7 — nouvelle organisation de l'interface (série UX : Accueil, Opérations, Budget, Commun, Plus ; palettes Klad et Grafit) ; icônes des catégories (banque Lucide embarquée), base du reste à vivre au choix.** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 0.10.8 — nouvelle organisation de l'interface (série UX : Accueil, Opérations, Budget, Commun, Plus ; palettes Klad et Grafit) ; icônes des catégories (banque Lucide embarquée), base du reste à vivre au choix ; parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`).** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
@@ -27,6 +27,7 @@ Aucune donnée personnelle n'est présente dans ce dépôt. Chaque utilisateur f
 | `tools/controle/` | Contrôle automatique Klad / ancienne version : relevé calculé par l'ancienne version (exécutée dans Chromium à date figée) et comparaison de deux relevés, rapport en français ; mode d'emploi et format dans `tools/controle/README.md`. Code seulement, aucune donnée. |
 | `site/` | Site GitHub Pages : présentation, `retour.html` (retour bancaire → `klad://eb?code=…&state=…`) et `maquette/` (maquette cliquable de l'étude UX, données fictives). |
 | `docs/ux/` | Étude UX : audit, nouvelle organisation proposée, plan de lots, captures (données fictives). |
+| `docs/parite-fonctions.md` | Inventaire des fonctions de l'ancienne version (téléphone et ordinateur) et leur statut dans Klad (0.10.8). |
 | `scripts/prepare-android.mjs` | Déduit l'identifiant d'appli du compte GitHub et le nom du dépôt, ajoute le lien profond, numérote la version. |
 | `scripts/version.mjs` | Étiquette de publication `v<version>` déduite de `package.json`. |
 | `scripts/banque-icones.mjs` | Régénère `www/icones-donnees.js` à partir de `lucide-static` (sélection d'environ 400 icônes, mots-clés français) ; aucun réseau à l'exécution de l'appli. |

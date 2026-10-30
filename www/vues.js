@@ -271,6 +271,7 @@
       (opt && opt.date ? '<span class="num">' + jjmm(o.date) + '</span> · ' : '') +
       '<span class="acct">' + esc(c ? c.libelle : '') + '</span> <span class="tx-cat">' + cat + '</span>' +
       (r.src === 'regle' ? '<span class="tx-tag" title="Classée par une de vos règles">règle</span>' : '') + nc +
+      (g.KladCommun && g.KladCommun.equipementDeOp(S, o.id) ? '<span class="tx-tag eq" title="Ajoutée à l\'équilibre des apports">équilibre</span>' : '') +
       (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') + '</div></div>' +
       '<div class="amt' + (o.montant > 0 ? ' pos' : '') + (!COMPTEE(r.type) ? ' nc' : '') + '"><span class="amt-v">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></div></div>';
   }
@@ -300,6 +301,27 @@
     return { html: h, fin: i };
   }
 
+  // Ordre de la liste (0.10.8, comme l'ancienne version) : plus récentes (par jour), plus anciennes (par jour), plus grosses
+  // dépenses, par catégorie (puis plus récentes). ops : déjà filtrées, plus récentes d'abord.
+  const ORDRES = [['date', 'Plus récentes'], ['old', 'Plus anciennes'], ['amt', 'Plus grosses dépenses'], ['cat', 'Par catégorie']];
+  const ordreParJour = o => !o || o === 'date' || o === 'old';
+  function ordonner(ops, ordre, ctx) {
+    if (!ordre || ordre === 'date') return ops;
+    const L = ops.slice();
+    if (ordre === 'old') return L.reverse();
+    if (ordre === 'amt') return L.sort((a, b) => a.montant - b.montant);
+    if (ordre === 'cat' && ctx) {
+      const c = new Map(L.map(o => [o, K().classer(ctx, o).cat]));
+      return L.sort((a, b) => String(c.get(a)).localeCompare(String(c.get(b)), 'fr') || (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    }
+    return L;
+  }
+  // Tranche sans en-têtes de jour (ordres « plus grosses dépenses », « par catégorie ») : date sur chaque ligne.
+  function trancheSansJours(S, ops, debut, n, opt) {
+    const fin = Math.min(ops.length, debut + n);
+    return { html: '<div class="tx-j tx-plat">' + ops.slice(debut, fin).map(o => ligne(S, o, { ctx: opt && opt.ctx, date: true })).join('') + '</div>', fin };
+  }
+
   // Puces des filtres (Toutes, Non vues, Non classées, Catégorie, Compte, Tout marquer vu).
   function filtres(S, f, ctx, nb) {
     const cats = K().listeCategories(ctx.C);
@@ -314,6 +336,8 @@
       PERIODES.map(([k, l]) => '<option value="' + k + '"' + (k === (f.per || 'tout') ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
       '<select id="opsCat" aria-label="Filtrer par catégorie" class="' + (f.cat && f.cat[0] !== '_' ? 'on' : '') + '"><option value="">Catégorie</option>' +
       cats.map(c => '<option value="' + esc(c) + '"' + (c === f.cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select>' +
+      '<select id="opsOrdre" aria-label="Trier les opérations" class="' + (f.ordre && f.ordre !== 'date' ? 'on' : '') + '">' +
+      ORDRES.map(([k, l]) => '<option value="' + k + '"' + (k === (f.ordre || 'date') ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
       (comptes.length > 1 || f.compte ? '<select id="opsCompte" aria-label="Filtrer par compte" class="' + (f.compte ? 'on' : '') + '"><option value="">Compte</option>' +
         comptes.map(c => '<option value="' + esc(c.id) + '"' + (c.id === f.compte ? ' selected' : '') + '>' + esc(c.libelle) + '</option>').join('') + '</select>' : '') +
       (nb.visiblesNonVues ? '<button type="button" class="ch-link" data-f="toutVu">Tout marquer vu</button>' : '');
@@ -363,6 +387,16 @@
 
   // ------------------------------------------------------------ volet « Classer » (comme l'ancienne version)
   // st : { cat, sub, autres (bool), mot, compte (bool), sens ('' | 'debit' | 'credit'), toutes (bool) } ; n : opérations concernées.
+  // Aperçu des opérations concernées par une règle (0.10.8, comme l'ancienne version) : les 8 plus récentes.
+  function apercuRegle(S, ops) {
+    if (!ops || !ops.length) return '';
+    const L = ops.slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0).slice(0, 8);
+    return '<ul class="rl-apercu" aria-label="Opérations concernées (les plus récentes)">' + L.map(o => {
+      const c = M().compte(S, o.compte);
+      return '<li><span class="d">' + esc(jjmm(o.date)) + '</span><span class="l">' + esc(libelleCourt(o.libelle)) + '</span><span class="num' + (o.montant > 0 ? ' pos-t' : '') + '">' +
+        esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), (c && c.devise) || 'EUR')) + '</span></li>';
+    }).join('') + (ops.length > 8 ? '<li class="muted">et ' + (ops.length - 8) + ' autre' + (ops.length - 8 > 1 ? 's' : '') + '</li>' : '') + '</ul>';
+  }
   // opt : { equilibre: bool } (bouton « Ajouter à l'équilibre »).
   function classer(S, o, ctx, st, n, opt) {
     const c = M().compte(S, o.compte);
@@ -379,13 +413,13 @@
       '<div class="sh-rule"><div class="rl"><div><b>Classer aussi les autres</b><span>Toutes les opérations dont le libellé contient :</span></div>' +
       '<button type="button" class="tgl" role="switch" id="clsAutres" aria-checked="' + !!st.autres + '" aria-label="Créer une règle"></button></div>' +
       '<input type="text" id="clsMot" aria-label="Mot du libellé" autocomplete="off" spellcheck="false" value="' + esc(st.mot) + '"' + (st.autres ? '' : ' disabled style="opacity:.5"') + '>' +
-      '<span class="cnt" id="clsN">' + esc(comptes) + '</span>' +
+      '<span class="cnt" id="clsN">' + esc(comptes) + '</span><div id="clsApercu">' + (st.autres && opt && opt.apercu ? apercuRegle(S, opt.apercu) : '') + '</div>' +
       (st.autres ? '<div class="rl2"><label class="inline"><input type="checkbox" id="clsCompte"' + (st.compte ? ' checked' : '') + '> seulement ' + esc(c ? c.libelle : 'ce compte') + '</label>' +
         '<select id="clsSens" aria-label="Sens"><option value="">débits et crédits</option><option value="debit"' + (st.sens === 'debit' ? ' selected' : '') + '>débits seulement</option>' +
         '<option value="credit"' + (st.sens === 'credit' ? ' selected' : '') + '>crédits seulement</option></select></div>' : '') + '</div>' +
       '<button type="button" class="sh-go" data-a="go">Classer en ' + esc(st.cat) + (st.autres && n > 1 ? ' (' + n + ')' : '') + '</button>' +
       (opt && opt.tri ? '<button type="button" class="btn sh-passer" data-a="passer">Passer</button>' : '') +
-      (opt && opt.equilibre ? '<button type="button" class="sh-alt" data-a="equilibre">🏠 Ajouter à l\'équilibre</button>' : '');
+      (opt && opt.equilibre ? '<button type="button" class="sh-alt" data-a="equilibre">🏠 ' + (g.KladCommun && g.KladCommun.equipementDeOp(S, o.id) ? 'Déjà dans l\'équilibre…' : 'Ajouter à l\'équilibre') + '</button>' : '');
   }
 
 
@@ -443,5 +477,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, filtres, detail, classer, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, classer, apercuRegle, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);
