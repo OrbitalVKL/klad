@@ -1790,3 +1790,23 @@ html:not(.ops-mode) #ops-scope{display:none}
 .pl-lock{width:100%;min-height:52px!important;border-radius:14px!important;font-size:15px!important;display:flex;align-items:center;justify-content:center;gap:8px}
 .pl-grp{background:var(--surface);border-radius:20px;padding:6px 14px 4px}
 .pl-grp h2.sh-lab{margin:8px 2px 2px;font-size:12.5px}
+
+/* ============================================================ 0.10.4 : sous-vues de Budget et de Commun (UX-5) */
+html.appm .controls.stick > .seg{display:none}
+.sv-bar{min-width:0}
+.sousvues{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;border-radius:14px!important;padding:4px!important;background:var(--surface-2)}
+.sousvues button{height:44px;border-radius:10px!important;padding:0!important;text-align:center;font-size:14px!important}
+.sousvues button[aria-pressed="true"]{background:var(--surface)!important;color:var(--ink)!important;box-shadow:0 1px 3px rgba(20,32,28,.14)}
+html.appm #view-budget > .sv-bar{order:1}
+html.ops-mode #view-budget > .sv-bar{display:none!important}
+html.appm #cats-panel,html.appm #rules-panel{display:none!important}
+html.appm #view-budget[data-sv="suivi"] :is(#tend-panel,#ctr-zone,#cm-tres),
+html.appm #view-budget[data-sv="tendance"] :is(#actions,#rav-m,#budget-main,#ctr-zone,#cm-plan,#cm-tres),
+html.appm #view-budget[data-sv="contrats"] :is(#actions,#rav-m,#budget-main,#tend-panel,#cm-plan,#cm-tres),
+html.appm #view-budget[data-sv="mois"] :is(#tend-panel,#ctr-zone,#cm-tres),
+html.appm #view-budget[data-sv="tresorerie"] :is(#app-hero,#bal-panel,#app-seen,#actions,#rav-m,#budget-main,#cm-plan){display:none!important}
+html.ops-mode #view-budget[data-sv] #an-zone{display:block!important}
+.dep-l{display:grid;gap:2px;margin:0 0 12px;padding:10px 12px;border-radius:14px;background:var(--bad-soft)}
+.dep-r{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--bad) 20%,transparent)}
+.dep-l .sh-lab + .dep-r{border-top:0}
+.dep-r .bad-t{grid-column:1 / -1;font-size:13px;font-weight:700}

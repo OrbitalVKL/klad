@@ -130,11 +130,11 @@
   // Équilibre, Impôts, Épargne, Relevés et sauvegarde.
   const VUES = { accueil: 'view-accueil', budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', operation: 'view-op', plus: 'view-plus',
     appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data', sauvegarde: 'view-save' };
-  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', plus: 'Plus', appartement: 'Équilibre',
+  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', plus: 'Plus', appartement: 'Commun',
     impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés des comptes', sauvegarde: 'Sauvegarde' };
   // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient
   // (par défaut : la liste des opérations, Plus).
-  const RETOUR = { operation: 'operations', appartement: 'plus', impots: 'plus', epargne: 'plus', donnees: 'plus', sauvegarde: 'plus' };
+  const RETOUR = { operation: 'operations', impots: 'plus', epargne: 'plus', donnees: 'plus', sauvegarde: 'plus' };
   let retourDe = {};
   const pos = {};                    // position de défilement de chaque écran
   let vue = 'accueil', scope = 'perso';
@@ -159,7 +159,7 @@
   }
   // En-tête : titre, ligne du dessus (période), pastille de synchro, recherche (opérations), thème.
   function chrome() {
-    const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue;
+    const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue === 'appartement' ? 'commun' : vue;
     $('ah-back').hidden = !RETOUR[vue];
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('ah-title').textContent = TITRES[vue] || 'Accueil';
@@ -172,6 +172,8 @@
         if (per && per.past) e += ' · terminé'; } catch (x) { e = ''; }
     } else if (S && vue === 'operations') {
       e = (perOps.k === 'tout' ? 'Toutes' : bornesOps().libelle) + ' · ' + ({ perso: 'Perso', commun: 'Commun', tout: 'Perso et commun' }[perimOps]);
+    } else if (S && vue === 'appartement') {
+      e = 'Équilibre des apports';
     } else if (S && vue === 'operation') {
       const o = opCourante && trouverOp(opCourante[0], opCourante[1]);
       e = o ? F.jour(o.date) : '';
@@ -339,7 +341,6 @@
       grp('Modules',
         it('🏛️', 'Impôts', 'Avis, prélèvements, partage, taxe foncière', 'data-vue="impots"') +
         it('🐷', 'Épargne', 'Livret, plan d\'épargne', 'data-vue="epargne"') +
-        it('🏠', 'Équilibre de l\'appartement', 'Qui doit combien à qui', 'data-vue="appartement"') +
         it('🧩', 'Lien Grafit', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : 'Résumé pour Grafit', 'data-volet="secModules"')) +
       grp('Extras',
         it('✨', 'Mail et Claude', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : 'Mail, Claude', 'data-volet="secExtras"')) +
@@ -460,7 +461,7 @@
       if (k === 'nonvues') versOps({ nonVues: true });
       else if (k === 'nonclassees' || k === 'rapprocher') versOps({ cat: k === 'nonclassees' ? '__nc' : '__rap' });
       else if (k === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
-      else if (k === 'bilan') { montrer('budget', { force: true, haut: true }); if (window.KladEcranBudget && window.KladEcranBudget.cyclePrecedent) window.KladEcranBudget.cyclePrecedent(); }
+      else if (k === 'bilan') { if (window.KladEcranBudget) window.KladEcranBudget.ui.sv.perso = 'suivi'; montrer('budget', { force: true, haut: true }); if (window.KladEcranBudget && window.KladEcranBudget.cyclePrecedent) window.KladEcranBudget.cyclePrecedent(); }
       else if (AV[k]) ouvrirVolet(AV[k]);
       return;
     }
@@ -475,11 +476,11 @@
     if (a) {
       const k = a.dataset.aller;
       if (k === 'rav') ouvrirVolet('secRav');
-      else if (k === 'budget' || k === 'commun') montrer(k, { force: true, haut: true });
-      else if (k === 'contrats-perso' || k === 'contrats-commun') {
-        montrer(k === 'contrats-perso' ? 'budget' : 'commun', { force: true });
-        const p = $('p-contrats');
-        if (p) { if (p.classList.contains('collapsed')) p.querySelector('.panel-h h2.fold').click(); requestAnimationFrame(() => { p.scrollIntoView(); window.scrollBy(0, -70); }); }
+      else if (k === 'budget' || k === 'commun' || k === 'contrats-perso' || k === 'contrats-commun') {
+        // sous-vue : Budget › Suivi, Commun › Ce mois, Budget › Contrats, Commun › Trésorerie (contrats du commun)
+        const EB = window.KladEcranBudget, perso = k === 'budget' || k === 'contrats-perso';
+        if (EB) EB.ui.sv[perso ? 'perso' : 'commun'] = k === 'budget' ? 'suivi' : k === 'commun' ? 'mois' : perso ? 'contrats' : 'tresorerie';
+        montrer(perso ? 'budget' : 'commun', { force: true, haut: true });
       }
       return;
     }
@@ -1264,8 +1265,8 @@
     filtre.cat = ''; filtre.nonVues = false; filtre.compte = ''; tri = null; triOp = null; retourDe = {};
     fermerVolet(true);
     toastAction = null; $('toast').className = '';
-    ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
-      'view-appart', 'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
+    ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'sv-bar', 'sv-eq', 'appart-corps', 'cm-tres', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
+      'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
       'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps']
       .forEach(id => { const e = $(id); if (e) e.textContent = ''; });
     $('tb-badge').hidden = true;

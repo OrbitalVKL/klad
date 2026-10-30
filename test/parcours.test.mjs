@@ -500,7 +500,10 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.match(b, /Mois en cours/);
     assert.match(b, /Personne A[\s\S]*Personne B/);
     assert.match(b, /Solde du compte commun/);
-    assert.match(b, /Marge réelle du commun[\s\S]*Virements à mettre en place[\s\S]*Trésorerie · 12 mois[\s\S]*Budget mensuel/);
+    // 0.10.4 : sous-vues Ce mois · Trésorerie · Équilibre ; plus de sélecteur Perso / Commun, ni de catégories en bas
+    assert.match(b, /Ce mois[\s\S]*Trésorerie[\s\S]*Équilibre[\s\S]*Marge réelle du commun[\s\S]*Virements à mettre en place[\s\S]*Budget mensuel/);
+    assert.doesNotMatch(b, /Trésorerie · 12 mois|Règles de classement/);
+    assert.equal(await page.locator('#view-budget [data-scope="perso"]').isVisible(), false);
     assert.match(await page.locator('#bal-panel').innerText(), /Fin de mois estimée/i);
     assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
     await capture(page, '14-budget-commun');
@@ -514,21 +517,26 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.virements[0].montant), 80000);
-    // Équilibre (Plus) : reste à combler, simulation
-    await page.locator('#app-tb [data-tab="plus"]').click();
-    await page.locator('#plusCorps [data-vue="appartement"]').click();
-    assert.equal(await page.locator('#ah-back').isVisible(), true);          // écran ouvert par Plus : Retour vers Plus
+    // Commun › Trésorerie : 12 mois, appels de fonds, d'où vient le solde (ouverts)
+    await page.locator('#view-budget [data-sousvue="tresorerie"]').click();
+    assert.match(await page.locator('#cm-tres').innerText(), /Trésorerie · 12 mois/);
+    assert.equal(await page.locator('#cm-plan').isVisible(), false);
+    // Commun › Équilibre : reste à combler, simulation
+    await page.locator('#view-budget [data-sousvue="equilibre"]').click();
+    assert.equal(await page.locator('#app-tb [data-tab="commun"]').getAttribute('aria-current'), 'page');
+    assert.equal(await page.locator('#sv-eq [data-sousvue="equilibre"]').getAttribute('aria-pressed'), 'true');
     assert.match(await page.locator('#view-appart').innerText(), /Reste à combler[\s\S]*Personne A doit encore investir/i);
     await page.fill('#eqSimY', '100000');
     await page.waitForFunction(() => /Équilibre atteint tout de suite/.test(document.getElementById('eqSimOut').textContent));
     await capture(page, '16-equilibre');
 
-    // contrats et échéances (commun), tendance (perso)
-    await page.locator('#app-tb [data-tab="commun"]').click();
-    await deplier('p-contrats');
+    // contrats et échéances (commun, dans Trésorerie), tendance (perso, sous-vue Tendance)
+    await page.locator('#sv-eq [data-sousvue="tresorerie"]').click();
+    assert.equal(await page.locator('#app-tb [data-tab="commun"]').getAttribute('aria-current'), 'page');
     assert.match(await page.locator('#p-contrats').innerText(), /Prêt immobilier fictif[\s\S]*Échéances des 31 prochains jours/i);
     await page.locator('#app-tb [data-tab="budget"]').click();
-    await deplier('tend-panel');
+    await page.locator('#view-budget [data-sousvue="tendance"]').click();
+    assert.equal(await page.locator('#budget-main').isVisible(), false);
     assert.ok(await page.locator('#tend-panel svg rect').count() >= 3);
     await page.selectOption('#tend-mode', 'cat:Alimentation');
     await page.waitForTimeout(150);
@@ -536,7 +544,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await capture(page, '15-tendance');
 
     // contrat ajouté (annulable) ; base de calcul ; thème ; mode démo
-    await deplier('p-contrats');
+    await page.locator('#view-budget [data-sousvue="contrats"]').click();
     await page.locator('#p-contrats [data-ctedit="liste"]').click();
     await page.locator('#p-contrats [data-ctedit="nouveau"]').click();
     await page.fill('#ctLabel', 'Abonnement fictif');
@@ -550,6 +558,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
+    await page.locator('#view-budget [data-sousvue="suivi"]').click();
     await page.locator('#budget-main [data-bmode="plan"]').click();
     const refAvant = await page.evaluate(() => window.KladApp.etat().budget.ref);
     const opts = await page.locator('#bref option').evaluateAll(o => o.map(x => x.value));

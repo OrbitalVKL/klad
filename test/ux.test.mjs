@@ -57,10 +57,14 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
     for (const [lib] of vus) assert.ok(bm.includes(lib), 'Budget › poste ' + lib);
     for (const sc of ['perso', 'commun']) {
       await B.onglet(sc === 'perso' ? 'budget' : 'commun');
+      const sv = page.locator('#view-budget [data-sousvue="' + (sc === 'perso' ? 'contrats' : 'tresorerie') + '"]');
+      if (await sv.count()) { await sv.click(); await B.pause(200); }
       await page.evaluate(() => { const p = document.getElementById('p-contrats'); if (p && p.classList.contains('collapsed')) p.querySelector('.panel-h h2.fold').click(); });
       const ctr = await texte('#p-contrats');
       for (const [lib] of attendu.ech.filter(e => e[1] === sc)) assert.ok(ctr.includes(lib), 'échéance ' + sc + ' ' + lib);
     }
+    const svm = page.locator('#view-budget [data-sousvue="mois"]');
+    if (await svm.count()) { await svm.click(); await B.pause(200); }
     const bc = await texte('#bal-panel');
     for (const v of attendu.fdm) assert.ok(bc.includes(norm(v)), 'Commun › fin de mois ' + v);
     assert.deepEqual(B.erreurs, []);

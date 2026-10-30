@@ -16,10 +16,14 @@
   const S = () => A.etat();
 
   const tend = Object.assign({ comptes: 'auto', mode: 'rd' }, U.pref('tendance') || {});
-  const ui = { nav: null, mode: 'suivi', ouverts: new Set(), ouvertsPlan: new Set(), cartes: new Set(), ctrEdit: null, edit: null, ajout: null, ravOuvert: false, choixPer: false, catRen: null, sim: {} };
+  const ui = { sv: { perso: 'suivi', commun: 'mois' }, nav: null, mode: 'suivi', ouverts: new Set(), ouvertsPlan: new Set(), cartes: new Set(), ctrEdit: null, edit: null, ajout: null, ravOuvert: false, choixPer: false, catRen: null, sim: {} };
   let scopeRendu = null;
 
-  const PANNEAUX = ['actions', 'cm-plan', 'budget-main', 'tend-panel', 'p-contrats', 'cats-panel', 'rules-panel'];
+  const PANNEAUX = ['actions', 'cm-plan', 'cm-tres', 'budget-main', 'tend-panel', 'p-contrats'];
+  // Sous-vues (0.10.4) : Budget = Suivi · Tendance · Contrats ; Commun = Ce mois · Trésorerie · Équilibre (écran Équilibre).
+  const SOUSVUES = { perso: [['suivi', 'Suivi'], ['tendance', 'Tendance'], ['contrats', 'Contrats']], commun: [['mois', 'Ce mois'], ['tresorerie', 'Trésorerie'], ['equilibre', 'Équilibre']] };
+  const barre = (scope, actif) => '<div class="seg sousvues" role="group" aria-label="' + (scope === 'commun' ? 'Commun' : 'Budget') + ' : sous-vues">' +
+    SOUSVUES[scope].map(([k, l]) => '<button type="button" data-sousvue="' + k + '" aria-pressed="' + (k === actif) + '">' + l + '</button>').join('') + '</div>';
   function plis(root) { (root || document).querySelectorAll('.panel[id]').forEach(U.appliquerPli); }
 
   // ------------------------------------------------------------ rendu
@@ -31,19 +35,46 @@
     const scope = A.scope();
     if (scopeRendu !== scope) { ui.nav = null; ui.ouverts.clear(); scopeRendu = scope; }
     const sur = (id, fn) => { try { $(id).innerHTML = fn(); } catch (e) { $(id).innerHTML = '<p class="muted">Calcul impossible.</p>'; A.log('err', 'Budget (' + id + ') : ' + (e.message || e)); } };
+    const sv = ui.sv[scope] === 'equilibre' ? 'mois' : ui.sv[scope];
+    $('view-budget').dataset.sv = sv;
+    $('sv-bar').innerHTML = barre(scope, sv);
     sur('cyc-nav', () => VB.cycNav(B, scope, ui.nav));
     sur('actions', () => VB.observations(B, scope, { analyse: !!(window.KladExtras && window.KladExtras.actif(S(), 'claude')), texteAnalyse: window.KladExtras && window.KladExtras.analyse && window.KladExtras.analyse(scope) }));
     const rav = (() => { try { return VB.ravM(B, scope, ui); } catch (e) { return ''; } })();
     $('rav-m').innerHTML = rav; $('rav-m').hidden = !rav;
-    const cm = scope === 'commun' && VC && VC.plan ? (() => { try { return VC.plan(B, ui); } catch (e) { A.log('err', 'Commun : ' + (e.message || e)); return ''; } })() : '';
+    const planC = partie => scope === 'commun' && VC && VC.plan ? (() => { try { return VC.plan(B, ui, partie); } catch (e) { A.log('err', 'Commun : ' + (e.message || e)); return ''; } })() : '';
+    const cm = planC('mois'), ct = planC('tresorerie');
     $('cm-plan').innerHTML = cm; $('cm-plan').hidden = !cm;
-    sur('budget-main', () => VB.teteBudget(B, scope, ui) + (ui.mode === 'plan' ? VB.plan(B, scope, { ouverts: ui.ouvertsPlan }) : VB.suivi(B, scope, ui).html));
+    $('cm-tres').innerHTML = ct; $('cm-tres').hidden = !ct;
+    sur('budget-main', () => VB.teteBudget(B, scope, ui) + (ui.mode === 'plan' ? VB.plan(B, scope, { ouverts: ui.ouvertsPlan }) : depasses(B, scope) + VB.suivi(B, scope, ui).html));
     sur('tend-panel', () => VB.tendance(B, scope, tend, periodeTendance(B)));
     sur('ctr-zone', () => '<section class="panel" id="p-contrats">' + VB.contrats(B, scope, ui.ctrEdit) + '</section>');
-    sur('cats-panel', () => VB.categories(S(), B, ui.catRen));
-    sur('rules-panel', () => VB.regles(S(), B));
+    // Catégories et règles : Plus › Réglages › Classement (0.10.4)
+    $('cats-panel').innerHTML = ''; $('rules-panel').innerHTML = '';
     plis($('view-budget'));
+    // une sous-vue ne s'ouvre jamais sur une section repliée seule
+    for (const id of ['tend-panel', 'p-contrats']) { const p = $(id); if (p) { p.classList.add('force-open'); U.appliquerPli(p); } }
   }
+  // Suivi : postes dépassés d'abord (mêmes chiffres que les sections du budget, KladBudget.suivi).
+  function depasses(B, scope) {
+    const res = KB.suivi(B, scope, ui.nav), L = (res.depasses || []).filter(a => a.on && a.pm > 50);
+    if (!L.length) return '';
+    return '<div class="dep-l" role="group" aria-label="Postes dépassés"><div class="sh-lab">Dépassés</div>' + L.map(a =>
+      '<div class="dep-r"><span>' + U.esc(a.label) + '</span><span class="num">' + U.esc(KB.eur(a.cur)) + ' <span class="muted">/ ' + U.esc(KB.eur(a.pm)) + '</span></span>' +
+      '<span class="bad-t">dépassé de ' + U.esc(KB.eur(a.cur - a.pm)) + '</span></div>').join('') + '</div>';
+  }
+  // Choix d'une sous-vue (barre en haut de Budget, de Commun et de l'écran Équilibre).
+  function sousVue(k) {
+    const scope = A.vue() === 'appartement' ? 'commun' : A.scope();
+    if (scope === 'commun' && k === 'equilibre') { ui.sv.commun = 'equilibre'; A.montrer('appartement', { force: true, haut: true }); return; }
+    ui.sv[scope] = k;
+    if (A.vue() !== (scope === 'commun' ? 'commun' : 'budget')) A.montrer(scope === 'commun' ? 'commun' : 'budget', { force: true, haut: true });
+    else { render(); window.scrollTo(0, 0); }
+  }
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-sousvue]');
+    if (b && A.etat()) sousVue(b.dataset.sousvue);
+  });
   A.rendus.push(o => { if (!o || !o.theme) render(); });
   window.addEventListener('resize', () => { clearTimeout(render.t); render.t = setTimeout(() => { if (A.etat()) render(); }, 250); });
 
@@ -463,5 +494,5 @@
     const per = KB.periode(B, A.scope(), null);
     if (per.prev) { ui.nav = per.prev; ui.ouverts.clear(); render(); A.chrome(); }
   }
-  window.KladEcranBudget = { ui, render, PANNEAUX, cyclePrecedent };
+  window.KladEcranBudget = { ui, render, PANNEAUX, cyclePrecedent, sousVue, barre };
 })();

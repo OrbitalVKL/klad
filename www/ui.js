@@ -121,14 +121,37 @@
   }
 
   // ------------------------------------------------------------ sections dépliantes (mémoire de l'état sur ce téléphone)
-  const CLE_PLIS = 'klad.replis';
-  // Repliées au départ, comme l'ancienne version.
-  const REPLIES = { actions: 1, 'p-contrats': 1, 'cats-panel': 1, 'rules-panel': 1, 'eq-uses-panel': 1, 'eq-ops-panel': 1 };
+  // 0.10.4 (sous-vues de Budget et Commun) : l'état est gardé sous « klad.replis.v2 », créé une seule fois à partir de
+  // « klad.replis » par la table MIGRATION_PLIS (marque « klad.replis.v » = 2). L'ancienne clé n'est pas effacée : une
+  // version antérieure réinstallée la retrouve telle quelle.
+  const CLE_ANCIENNE = 'klad.replis', CLE_PLIS = 'klad.replis.v2', CLE_MARQUE = 'klad.replis.v';
+  // ancien identifiant → nouveau (null : section disparue, ou toujours ouverte dans sa sous-vue)
+  const MIGRATION_PLIS = { 'tend-panel': null, 'p-contrats': null, 'cats-panel': null, 'rules-panel': null };
+  // Repliées au départ, comme l'ancienne version (Tendance et Contrats ont leur sous-vue, toujours ouvertes).
+  const REPLIES = { actions: 1, 'eq-uses-panel': 1, 'eq-ops-panel': 1 };
   let plis = null;
+  function migrerPlis(ancien) {
+    const out = {};
+    for (const k of Object.keys(ancien || {})) {
+      const n = k in MIGRATION_PLIS ? MIGRATION_PLIS[k] : k;
+      if (n) out[n] = ancien[k] ? 1 : 0;
+    }
+    return out;
+  }
   function lirePlis() {
     if (plis) return plis;
     plis = {};
-    try { const t = g.localStorage && g.localStorage.getItem(CLE_PLIS); if (t) plis = JSON.parse(t) || {}; } catch (e) { plis = {}; }
+    try {
+      const L = g.localStorage;
+      if (L && L.getItem(CLE_MARQUE) !== '2') {
+        let a = {};
+        try { a = JSON.parse(L.getItem(CLE_ANCIENNE) || '{}') || {}; } catch (e) { a = {}; }
+        L.setItem(CLE_PLIS, JSON.stringify(migrerPlis(a)));
+        L.setItem(CLE_MARQUE, '2');
+      }
+      const t = L && L.getItem(CLE_PLIS);
+      if (t) plis = JSON.parse(t) || {};
+    } catch (e) { plis = {}; }
     return plis;
   }
   const replie = id => { const p = lirePlis(); return id in p ? !!p[id] : !!REPLIES[id]; };
@@ -191,6 +214,6 @@
   g.KladUI = {
     esc, e0, e2, plus0, plus2, MOIS, MOIS_L, mLabel, mLong, dfr, jjmm, jjmmaa, dLong, pluriel, chip,
     COULEURS, SVG, reglerApparence, couleurDe, iconeDe, iconHtml, cico, icoOp, icoPoste, bico,
-    replie, plier, pref, PREFS, tete, appliquerPli, comment, graduation, couleurGraduation, calcul, estCalcul
+    replie, plier, migrerPlis, MIGRATION_PLIS, pref, PREFS, tete, appliquerPli, comment, graduation, couleurGraduation, calcul, estCalcul
   };
 })(typeof window !== 'undefined' ? window : globalThis);
