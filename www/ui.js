@@ -122,17 +122,72 @@
     const cx = c && c.source && c.source.connexion && S && S.modele.connexions[c.source.connexion];
     const nom = (cx && cx.banque) || '';
     const F2 = fold(nom + ' ' + (c ? c.libelle : ''));
-    const p = EXT.pastilles.find(x => x[0] && F2.indexOf(x[0]) >= 0);
+    // mode démo (0.10.10) : initiales et couleur tirées du nom masqué (« Banque A »), jamais du complément
+    const AF = g.KladAffichage, demo = !!(AF && AF.demoActif && AF.demoActif());
+    const p = !demo && EXT.pastilles.find(x => x[0] && F2.indexOf(x[0]) >= 0);
     let t, col;
     if (p) { t = String(p[1][0]).slice(0, 3); col = String(p[1][1]); }
     else {
-      const base = nom || (c ? c.libelle : '?');
+      let base = nom || (c ? c.libelle : '?');
+      if (demo) base = AF.texteDemo(base);
       const mots = base.replace(/[^A-Za-zÀ-ÿ0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
       t = mots.length === 1 && mots[0].length <= 3 ? mots[0].toUpperCase() : mots.slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
       let h = 0; for (const ch of base) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
       col = TEINTES[h % TEINTES.length];
     }
     return '<span class="bico' + (petit ? ' sm' : '') + '" style="--bc:' + esc(col) + '" aria-hidden="true">' + esc(t) + '</span>';
+  }
+
+  // ------------------------------------------------------------ textes qui ne tiennent pas (0.10.10)
+  // Écran étroit et texte agrandi : un titre dont un mot seul dépasse, ou un montant (jamais coupé) plus large que sa
+  // carte, est réduit peu à peu (zoom de 8 % en 8 %, jusqu'à 50 %) ; les barres de l'équilibre cachent un libellé qui
+  // ne tient toujours pas. Rien ne bouge quand tout tient (cas ordinaire).
+  const AJUSTER = 'header.app-h h1, .panel-h h2, .ac-card h2, .seg button, .ac-act, .hv, .ac-hero .v, .mini .v, .kpi .v, .kpi .eyebrow, .num, .cr-r b, .mg-r b, .cm-min b, .wr-v b, .wr-v .chip, .eqh-bar i span, .chip';
+  const CADRE = '.panel, .subpanel, .dep-l, .kpi, .ac-hero, .mini, .ac-quick, .ac-card, .cmp-card, .app-hero, .sh-rule, .eqh-bar i, .seg, header.app-h, .wrap, .sh-body';
+  function deborde(e) {
+    const r = e.getBoundingClientRect();
+    if (r.width < 1) return false;
+    const W = g.innerWidth || 0;
+    if (W && (r.left < -0.5 || r.right > W + 0.5)) return true;
+    // texte plus large que sa propre boîte (bouton d'une barre, montant en bloc)
+    if (g.getComputedStyle(e).display !== 'inline' && e.scrollWidth > e.clientWidth + 1) return true;
+    for (let a = e.parentElement; a && a !== g.document.body; a = a.parentElement) {
+      const ca = g.getComputedStyle(a);
+      const cadre = a.matches(CADRE);
+      if (!cadre && ca.overflowX === 'visible') continue;
+      if (/auto|scroll/.test(ca.overflowX)) return false;          // défilement horizontal voulu
+      const ar = a.getBoundingClientRect();
+      const g0 = ar.left + (parseFloat(ca.borderLeftWidth) || 0), d0 = ar.right - (parseFloat(ca.borderRightWidth) || 0);
+      if (r.left < g0 - 0.5 || r.right > d0 + 0.5) return true;
+      if (cadre) return false;
+    }
+    return false;
+  }
+  let ajustes = false;
+  function ajuster(racine) {
+    const d = g.document;
+    if (!d || !g.getComputedStyle || !d.body) return;
+    // cas ordinaire (écran d'au moins 360 px, texte à moins de 110 % : le corps est écrit en 14 px) : rien à faire
+    const zt = (parseFloat(g.getComputedStyle(d.body).fontSize) || 14) / 14;
+    if (!ajustes && (g.innerWidth || 0) >= 360 && zt < 1.1) return;
+    ajustes = true;
+    const L = [...(racine || d).querySelectorAll(AJUSTER)].filter(e => e.style.zoom || e.classList.contains('fit-cache') || e.getClientRects().length);
+    for (const e of L) { if (e.style.zoom) e.style.zoom = ''; e.classList.remove('fit-cache'); }
+    for (const e of L.filter(deborde)) {
+      let k = 1;
+      while (k > 0.54 && deborde(e)) { k = Math.round((k - 0.08) * 100) / 100; e.style.zoom = String(k); }
+      if (deborde(e) && e.matches('.eqh-bar i span')) e.classList.add('fit-cache');
+    }
+  }
+  let ajustP = false;
+  function ajusterBientot() { if (ajustP) return; ajustP = true; (g.requestAnimationFrame || setTimeout)(() => { ajustP = false; ajuster(); }); }
+  if (g.document && g.MutationObserver) {
+    const go = () => {
+      new g.MutationObserver(ajusterBientot).observe(g.document.body, { childList: true, subtree: true, characterData: true });
+      g.addEventListener('resize', ajusterBientot);
+      ajusterBientot();
+    };
+    if (g.document.body) go(); else g.addEventListener('DOMContentLoaded', go);
   }
 
   // ------------------------------------------------------------ sections dépliantes (mémoire de l'état sur ce téléphone)
@@ -226,7 +281,7 @@
   // Note « Comment c'est calculé » repliable.
   const comment = t => '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">' + t + '</p></details>';
 
-  g.KladUI = {
+  g.KladUI = { ajuster, ajusterBientot,
     esc, e0, e2, plus0, plus2, MOIS, MOIS_L, mLabel, mLong, dfr, jjmm, jjmmaa, dLong, pluriel, chip,
     interrupteurRav, COULEURS, SVG, reglerApparence, couleurDe, iconeDe, iconHtml, cico, icoOp, icoPoste, bico,
     replie, plier, migrerPlis, MIGRATION_PLIS, pref, PREFS, tete, appliquerPli, comment, graduation, couleurGraduation, calcul, estCalcul
