@@ -24,3 +24,11 @@ test('workflow Android : publication par changement de version', () => {
   assert.doesNotMatch(yml, /^\s+tags:/m, 'plus de déclenchement par étiquette');
   assert.doesNotMatch(yml, /^\s+release:/m, 'plus de déclenchement par publication manuelle');
 });
+
+test('workflow Android : chaque test Chromium (sauté sans Playwright) est lancé dans le parcours Chromium', () => {
+  const yml = read('.github/workflows/android.yml');
+  const ligne = (yml.match(/^\s+node --test (test\/\S+\.test\.mjs ?)+$/m) || [''])[0];
+  for (const f of fs.readdirSync(new URL('../test/', import.meta.url)).filter(f => f.endsWith('.test.mjs'))) {
+    if (/skip: SAUT/.test(read('test/' + f))) assert.ok(ligne.includes('test/' + f), f + ' absent du parcours Chromium');
+  }
+});
