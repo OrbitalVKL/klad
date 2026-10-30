@@ -33,7 +33,7 @@
 
   // ------------------------------------------------------------ données (bloc « budget », sous-objets fisc, tf, pee)
   function racineCarnet(S) { return S.carnet ? KB().racine(S.carnet) : null; }
-  function complement(S) { const st = racineCarnet(S); return st && isObj(st.klad) ? st.klad : {}; }
+  function complement(S) { return KB().complement(S); }
 
   // Import du carnet (fisc, tf, pee, livret) : copie, le carnet reste intact. → rapport.
   function importer(S, carnet) {

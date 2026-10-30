@@ -72,7 +72,7 @@ if (step === 'web') {
 
   write('www/config.js',
     '// Généré par scripts/prepare-android.mjs — ne pas modifier.\n' +
-    'window.KLAD_CONFIG = ' + JSON.stringify({ owner, repo, version: pkg.version, build: buildNo + ' · ' + sha }) + ';\n');
+    'window.KLAD_CONFIG = ' + JSON.stringify({ owner, repo, version: pkg.version, build: buildNo + ' · ' + sha, date: new Date().toISOString().slice(0, 10) }) + ';\n');
 
   // Exécution Capacitor sans outil d'assemblage : copie du fichier autonome de @capacitor/core.
   const candidates = ['dist/capacitor.js', 'dist/capacitor.min.js'].map(f => path.join(root, 'node_modules/@capacitor/core', f));

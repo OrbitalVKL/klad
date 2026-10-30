@@ -21,8 +21,8 @@
   const rxSur = (m, f) => { try { return m ? new RegExp(m, f == null ? 'i' : f) : null; } catch (e) { return null; } };
 
   function reglages(B) {
-    const st = B.S.carnet ? KB().racine(B.S.carnet) : null;
-    const X = st && isObj(st.klad) && isObj(st.klad.observations) ? st.klad.observations : {};
+    const K0 = KB().complement(B.S);
+    const X = isObj(K0.observations) ? K0.observations : {};
     const map = (B.S.modele.reprise && B.S.modele.reprise.map) || {};
     const cpt = r => r ? M().compte(B.S, map[r] || r) : null;
     return { secondaire: cpt(X.secondaire), principal: cpt(X.principal), pret: rxSur(X.motifPret || 'ECH PRET'), salaireMin: Math.round((+X.salaireMin || 1000) * 100) };
@@ -274,5 +274,5 @@
     return { total: dep, natures: ['fixe', 'courante', 'optionnelle'].filter(k => nat[k] > DEMI).map(k => ({ k, v: nat[k] })), categories: parCat };
   }
 
-  g.KladObservations = { reglages, audit, observations, masque, fait, reafficher, annulerFait, periodePrecedente, resultats, repartition };
+  g.KladObservations = { reglages, recurrentsSecondaire, audit, observations, masque, fait, reafficher, annulerFait, periodePrecedente, resultats, repartition };
 })(typeof window !== 'undefined' ? window : globalThis);

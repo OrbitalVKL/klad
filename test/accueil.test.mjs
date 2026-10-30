@@ -38,7 +38,7 @@ test('accueil : blocs dans l\'ordre, chiffres des fonctions de calcul, aucun mon
   assert.match(h, /data-mesure="rav"/);
   assert.match(h, /data-mesure="soldes"/);
   assert.match(h, /aria-label="COURANT, [^"]+"/);
-  assert.match(h, /Aucune sauvegarde exportée/);
+  assert.match(h, /Aucune sauvegarde vérifiée/);
 });
 
 test('accueil : « Bilan du cycle précédent » les 5 premiers jours d\'un cycle seulement', () => {

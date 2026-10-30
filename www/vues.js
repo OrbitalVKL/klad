@@ -63,7 +63,7 @@
     const err = S.modele.comptes.filter(c => c.source.type === 'eb' && c.sync && c.sync.erreur).length;
     if (err) L.push({ cle: 'sync', texte: 'Synchronisation en échec (' + pluriel(err, 'compte') + ')', niveau: 'caut' });
     const sv = e.sauvegarde;
-    if (sv && (sv.jours == null || sv.jours >= 30)) L.push({ cle: 'sauvegarde', texte: sv.jours == null ? 'Aucune sauvegarde exportée' : 'Dernière sauvegarde il y a ' + sv.jours + ' jours', niveau: 'info' });
+    if (sv && (sv.jours == null || sv.jours >= 30)) L.push({ cle: 'sauvegarde', texte: sv.jours == null ? (sv.exportee ? 'Sauvegarde exportée, à vérifier' : 'Aucune sauvegarde vérifiée') : 'Dernière sauvegarde vérifiée il y a ' + sv.jours + ' jours', niveau: 'info' });
     if (e.maj) L.push({ cle: 'maj', texte: 'Mise à jour : Klad ' + e.maj + ' est disponible', niveau: 'info' });
     return L;
   }

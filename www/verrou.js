@@ -236,13 +236,21 @@
   }
 
   // Formulaire « phrase de récupération » pour ouvrir le fichier text. onOk({ payload, bk }).
-  function phraseForm(root, text, onOk, onBack, backLabel) {
+  // Préférences d'affichage gardées dans la sauvegarde (1.0) : thème et palette de ce téléphone.
+  const prefsAffichage = () => { const AF = window.KladAffichage; return AF ? { theme: AF.theme(), palette: AF.palette() } : null; };
+  function appliquerPrefs(p) {
+    const AF = window.KladAffichage;
+    if (!AF || !p || typeof p !== 'object') return;
+    try { if (AF.THEMES.indexOf(p.theme) >= 0) AF.choisirTheme(p.theme); if (AF.PALETTES.indexOf(p.palette) >= 0) AF.choisirPalette(p.palette); } catch (e) { /* préférence illisible : ignorée */ }
+  }
+
+  function phraseForm(root, text, onOk, onBack, backLabel, goLabel) {
     const h = C.readBackupHeader(text);
     root.insertAdjacentHTML('beforeend',
       '<h2>Phrase de récupération</h2><p class="muted">Sauvegarde du ' + esc(fmtDate(h.date || '')) +
       '. Saisissez la phrase : 24 caractères, en 6 groupes de 4.</p>' +
       '<textarea class="phrase-in" rows="2" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"></textarea>' +
-      '<p class="msg"></p><div class="row center"><button class="btn" data-a="go">Ouvrir la sauvegarde</button>' +
+      '<p class="msg"></p><div class="row center"><button class="btn" data-a="go">' + esc(goLabel || 'Ouvrir la sauvegarde') + '</button>' +
       '<button class="btn" data-a="back">' + esc(backLabel || 'Retour') + '</button></div>');
     const msg = root.querySelector('.msg');
     on(root, 'back', onBack);
@@ -310,8 +318,9 @@
         const R = await C.depuisSauvegarde(restored.payload);
         const blocs = KladModele.versBlocs(R);
         for (const n of Object.keys(blocs)) await store.put(n, blocs[n]);
-        B = restored.bk;
+        B = Object.assign({}, restored.bk, { verifiee: { le: new Date().toISOString(), date: restored.bk.dernier || null } });   // restaurée : lue en entier
         await store.put('sauvegarde', B);
+        appliquerPrefs(restored.payload.prefs);
       }
       await afterKey(pin, true);
     } catch (e) { fatal(e.message || String(e)); }
@@ -501,7 +510,8 @@
     const N = await C.depuisSauvegarde(res.payload);
     N.journal = S.journal;
     S = N;
-    B = Object.assign({}, res.bk, { dernier: (B && B.dernier) || res.bk.dernier });
+    B = Object.assign({}, res.bk, { dernier: (B && B.dernier) || res.bk.dernier, verifiee: { le: new Date().toISOString(), date: res.bk.dernier || null } });
+    appliquerPrefs(res.payload.prefs);
     A().close();
     A().open(S, hooks);
     mark(['*', 'sauvegarde']);
@@ -514,7 +524,7 @@
   // ------------------------------------------------------------ section « Sécurité »
   async function exportNow() {
     await flush();
-    const text = await C.exportBackup(B, C.contenuSauvegarde(S));
+    const text = await C.exportBackup(B, C.contenuSauvegarde(S, prefsAffichage()));
     const name = 'klad-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.klad';
     const r = await V.exportFile({ name, data: C.toB64(new TextEncoder().encode(text)) });
     if (r.ok) {
@@ -524,6 +534,48 @@
       toast('Sauvegarde exportée.');
       renderSecu();
     } else if (r.reason !== 'annule') toast('Export impossible : ' + explain(r), true);
+  }
+
+  // Vérifier une sauvegarde (1.0) : le fichier est ouvert avec la phrase et comparé bloc par bloc aux données
+  // actuelles ; rien n'est écrasé. Lisible et complète : elle devient la sauvegarde vérifiée (rappel à 30 jours).
+  const NOMS_BLOCS = { cle: 'Clés (Enable Banking, Claude, messagerie)', modele: 'Comptes, banques et réglages', soldes: 'Soldes', carnet: 'Reprise et complément',
+    classement: 'Classement', budget: 'Budget et réglages du budget', prefs: 'Apparence (thème, palette)' };
+  function nomBloc(n) {
+    if (NOMS_BLOCS[n]) return NOMS_BLOCS[n];
+    const m = /^ops-(.+)-(\d{4})$/.exec(n);
+    if (!m) return n;
+    const c = S && S.modele.comptes.find(x => x.id === m[1]);
+    return 'Opérations ' + m[2] + ' · ' + (c ? c.libelle : 'compte retiré');
+  }
+  async function verifierSauvegarde() {
+    await flush();
+    const text = await pickBackup();
+    if (!text) return;
+    const h = C.readBackupHeader(text);
+    const res = await new Promise(resolve => {
+      showModal('');
+      phraseForm(mPanel, text, r => { closeModal(); resolve(r); }, () => { closeModal(); resolve(null); }, 'Annuler', 'Vérifier');
+    });
+    if (!res) return;
+    const r = C.comparerSauvegarde(res.payload, S, prefsAffichage());
+    const ok = r.lisible && r.complete;
+    if (ok) {
+      B.verifiee = { le: new Date().toISOString(), date: h.date || null };
+      mark(['sauvegarde']);
+      await flush();
+    }
+    A().log(ok ? 'ok' : 'warn', 'Sauvegarde vérifiée : ' + (ok ? 'complète et lisible' : 'incomplète') + (r.differents.length + r.manquants.length ? ', ' + (r.differents.length + r.manquants.length) + ' bloc(s) différent(s) des données actuelles' : '') + '.');
+    const li = L => L.map(n => '<li>' + esc(nomBloc(n)) + '</li>').join('');
+    const cles = 'Clés présentes dans le fichier : Enable Banking ' + (r.cles.eb ? 'oui' : 'non') + ', Claude ' + (r.cles.claude ? 'oui' : 'non') + ', messagerie ' + (r.cles.mail ? 'oui' : 'non') + '.';
+    $('sauvVerif').hidden = false;
+    $('sauvVerif').innerHTML = (ok && !r.differents.length && !r.manquants.length && !r.enTrop.length
+      ? '<p><b>✓ Sauvegarde complète et lisible.</b> Fichier du ' + esc(fmtDate(h.date || '')) + ' : identique aux données actuelles.</p>'
+      : (ok ? '<p><b>✓ Sauvegarde complète et lisible</b> (fichier du ' + esc(fmtDate(h.date || '')) + ').</p>' : '<p><b>⚠ Sauvegarde incomplète.</b> Exportez une nouvelle sauvegarde, puis vérifiez-la.</p>') +
+        '<p>Ce qui diffère des données actuelles (normal si des opérations sont arrivées depuis) :</p><ul>' +
+        li(r.differents) + li(r.manquants.map(n => n)).replace(/<\/li>/g, ' (absent du fichier)</li>') + li(r.enTrop).replace(/<\/li>/g, ' (plus présent aujourd\'hui)</li>') + '</ul>') +
+      '<p class="muted small">' + esc(cles) + ' Rien n\'a été modifié sur ce téléphone.</p>';
+    renderSecu();
+    toast(ok ? 'Sauvegarde complète et lisible.' : 'Sauvegarde incomplète.', !ok);
   }
 
   async function changePin() {
@@ -579,12 +631,15 @@
     $('vaultInfo').textContent = isNative
       ? 'Clés gardées par ' + (st.strongBox ? 'la puce sécurisée du téléphone (StrongBox).' : 'le Keystore Android.')
       : 'Mode navigateur : coffre de démonstration.';
-    const d = B && B.dernier;
-    const days = d ? Math.floor((Date.now() - Date.parse(d)) / 864e5) : null;
-    $('sauvState').textContent = d ? 'Dernier export le ' + fmtDate(d) + '.' : 'Aucune sauvegarde exportée pour l\'instant.';
-    ($('mSauv') || {}).textContent = d ? 'Dernier export le ' + fmtDate(d) : 'Aucune sauvegarde exportée';
-    // « À vérifier » (accueil) et résumé Grafit : jours depuis le dernier export (null : jamais).
-    A().infoSauvegarde({ jours: days, rappel: days == null || days >= RAPPEL_JOURS });
+    const d = B && B.dernier, v = B && B.verifiee;
+    // 1.0 : le rappel compte depuis la dernière sauvegarde vérifiée (date du fichier), pas depuis le dernier export.
+    const ref = v ? (v.date || v.le) : null;
+    const days = ref ? Math.max(0, Math.floor((Date.now() - Date.parse(ref)) / 864e5)) : null;
+    $('sauvState').textContent = (d ? 'Dernier export le ' + fmtDate(d) + '. ' : 'Aucune sauvegarde exportée pour l\'instant. ') +
+      (v ? 'Dernière sauvegarde vérifiée : fichier du ' + fmtDate(ref) + ' (vérifiée le ' + fmtDate(v.le) + ').' : 'Aucune sauvegarde vérifiée : exportez-la, puis « Vérifier une sauvegarde ».');
+    ($('mSauv') || {}).textContent = v ? 'Vérifiée : fichier du ' + fmtDate(ref) : d ? 'Exportée le ' + fmtDate(d) + ', à vérifier' : 'Aucune sauvegarde exportée';
+    // « À vérifier » (accueil) et résumé Grafit : jours depuis la dernière sauvegarde vérifiée (null : aucune).
+    A().infoSauvegarde({ jours: days, rappel: days == null || days >= RAPPEL_JOURS, exportee: !!d, verifiee: !!v });
   }
 
   function guard(fn) {
@@ -600,6 +655,7 @@
   $('btnPin').addEventListener('click', guard(changePin));
   $('btnExport').addEventListener('click', guard(exportNow));
   $('btnRestore').addEventListener('click', guard(restoreInApp));
+  $('btnVerifier').addEventListener('click', guard(verifierSauvegarde));
   $('btnWipe').addEventListener('click', guard(wipeAll));
 
   // ------------------------------------------------------------ retour bancaire klad://eb

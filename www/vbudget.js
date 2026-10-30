@@ -96,7 +96,11 @@
           : (c > DEMI && !rev ? '<span class="cs-r hb">sans budget</span>' : '')) + '</div></td>';
     };
     const cpt = id => B.comptes.find(x => x.id === id);
-    const detRow = (labHtml, amt, r, cls) => '<tr class="det' + (cls ? ' ' + cls : '') + '"><td class="subs" style="padding-left:34px">' + (r ? U().bico(S0, cpt(r.cid), true) + ' ' : '') + labHtml +
+    // 1.0 : pastille « récurrent » sur une charge récurrente du compte secondaire (réglé dans Plus › Réglages › Budget)
+    const RS = g.KladReglages ? g.KladReglages.recurrentsSecondaire(B) : null;
+    const recSec = r => RS && r.m < 0 && r.cid === RS.compte.id && RS.montants.has(-r.m)
+      ? ' <span class="chip warn" title="' + esc('Charge récurrente sur le ' + RS.compte.libelle + ' : à basculer sur ' + (RS.principal ? RS.principal.libelle : 'le compte courant principal')) + '">récurrent sur ' + esc(RS.compte.libelle) + '</span>' : '';
+    const detRow = (labHtml, amt, r, cls) => '<tr class="det' + (cls ? ' ' + cls : '') + '"><td class="subs" style="padding-left:34px">' + (r ? U().bico(S0, cpt(r.cid), true) + ' ' : '') + labHtml + (r ? recSec(r) : '') +
       (r ? ' <button class="linkbtn cls-op" type="button" data-op="' + esc(r.id) + '" data-c="' + esc(r.cid) + '" data-classer="1">classer ▾</button>' : '') + '</td><td></td><td class="r num subs cs-det">' + amt + '</td><td class="hide-s"></td><td></td></tr>';
 
     // revenus
@@ -539,33 +543,6 @@
       (c.id ? '<span class="grow"></span><button class="btn danger small" type="button" data-ct="suppr">Supprimer</button>' : '') + '</div></div>';
   }
 
-  // ------------------------------------------------------------ catégories et règles (comme l'ancienne version)
-  function categories(S, B, ren) {
-    const C = B.cx.C, cats = K().listeCategories(C), n = {};
-    for (const r of B.rows) n[r.cat] = (n[r.cat] || 0) + 1;
-    const NAT = K().NOMS_NATURES;
-    return U().tete('Catégories', '<span class="muted">créer, renommer, supprimer, choisir la nature</span>') +
-      '<div class="row addshare" style="margin-bottom:10px"><input type="text" id="nc-name" placeholder="Nouvelle catégorie, ex. Cadeaux" aria-label="Nouvelle catégorie">' +
-      '<select id="nc-nat" aria-label="Nature de la catégorie">' + ['revenu', 'fixe', 'courante', 'optionnelle'].map(k => '<option value="' + k + '"' + (k === 'optionnelle' ? ' selected' : '') + '>' + esc(NAT[k]) + '</option>').join('') + '</select>' +
-      '<button class="btn primary" type="button" data-ncadd="1">Créer la catégorie</button></div>' +
-      '<div class="tablewrap"><table class="cats"><thead><tr><th>Catégorie</th><th>Nature</th><th class="r">Opérations</th><th></th></tr></thead><tbody>' +
-      cats.map(c => c === ren ? '<tr><td colspan="4"><div class="row"><input type="text" id="cat-ren" value="' + esc(c) + '" maxlength="40" aria-label="Nouveau nom de ' + esc(c) + '"><button class="btn primary" type="button" data-catrenok="1">Renommer</button><button class="btn" type="button" data-catrenno="1">Annuler</button></div></td></tr>'
-        : '<tr><td>' + U().cico(C, c) + ' ' + esc(c) + '</td><td><select data-catnat="' + esc(c) + '" aria-label="Nature de ' + esc(c) + '">' + K().NATURES.map(k => '<option value="' + k + '"' + (K().natureDe(C, c) === k ? ' selected' : '') + '>' + esc(NAT[k]) + '</option>').join('') + '</select></td>' +
-        '<td class="r num">' + (n[c] || 0) + '</td><td class="r"><button class="linkbtn" type="button" data-catren="' + esc(c) + '">renommer</button> <button class="linkbtn" type="button" data-catsup="' + esc(c) + '">supprimer</button></td></tr>').join('') + '</tbody></table></div>' +
-      '<p class="note">Une catégorie supprimée n\'apparaît plus ; ses opérations passent en « Autres » (vous pouvez ensuite les reclasser). Renommer garde les opérations et les règles.</p>';
-  }
-  function regles(S, B) {
-    const C = B.cx.C, L = (C.regles || []).slice().sort((a, b) => String(a.mot || '').localeCompare(String(b.mot || ''), 'fr'));
-    return U().tete('Règles de classement', '<span class="muted">appliquées à toutes les opérations, passées et futures</span>') +
-      '<div class="row" style="margin-bottom:10px"><input type="text" id="nr-kw" placeholder="Mot du libellé, ex. CHARGEMAP" aria-label="Mot du libellé" autocomplete="off" spellcheck="false">' +
-      '<select id="nr-cat" aria-label="Catégorie de la règle">' + K().listeCategories(C).map(c => '<option>' + esc(c) + '</option>').join('') + '</select>' +
-      '<button class="btn primary" type="button" data-nradd="1">Ajouter la règle</button><span class="muted" id="nr-count"></span></div>' +
-      '<div class="tablewrap"><table class="cats"><thead><tr><th>Libellé contenant</th><th>Catégorie</th><th class="r">Opérations</th><th></th></tr></thead><tbody>' +
-      (L.length ? L.map(r => '<tr><td class="num">' + esc(r.mot) + '</td><td>' + U().cico(C, r.cat) + ' ' + esc(r.cat) + (r.sub && r.sub !== r.cat ? ' <span class="subs">· ' + esc(r.sub) + '</span>' : '') + '</td>' +
-        '<td class="r num">' + K().concernees(S, r.mot, { compte: r.compte || null, sens: r.sens || '' }).length + '</td><td class="r"><button class="linkbtn" type="button" data-nrsup="' + esc(r.id || r.mot) + '">supprimer</button></td></tr>').join('')
-        : '<tr><td colspan="4" class="muted">Aucune règle : classez une opération avec « Classer aussi les autres ».</td></tr>') + '</tbody></table></div>';
-  }
-
   // ------------------------------------------------------------ volets : édition d'un poste, reste à vivre
   function edition(B, scope, key) {
     const C = B.cx.C;
@@ -639,5 +616,5 @@
     return h;
   }
 
-  g.KladVuesBudget = { observations, libellePeriode, cycNav, teteBudget, suivi, plan, carburant, totBar, repartition, ravM, tendance, contrats, formContrat, categories, regles, edition, detailRav, carteRav, PERLAB, NAT_LABEL };
+  g.KladVuesBudget = { observations, libellePeriode, cycNav, teteBudget, suivi, plan, carburant, totBar, repartition, ravM, tendance, contrats, formContrat, edition, detailRav, carteRav, PERLAB, NAT_LABEL };
 })(typeof window !== 'undefined' ? window : globalThis);

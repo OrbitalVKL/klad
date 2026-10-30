@@ -32,7 +32,7 @@
   function reglages(B) {
     const S = B.S;
     const st = S.carnet ? KB().racine(S.carnet) : null;
-    const X = st && isObj(st.klad) ? st.klad : {};
+    const X = KB().complement(S);
     const D = S.budget || {};
     const c = Object.assign({}, isObj(X.commun) ? X.commun : {}, isObj(D.reglages) && isObj(D.reglages.commun) ? D.reglages.commun : {});
     const ap = isObj(X.appels) ? X.appels : {};

@@ -63,8 +63,6 @@
         </section>
       </div>
       <div id="ctr-zone" style="display:grid;gap:18px"></div>
-      <section class="panel" id="cats-panel"></section>
-      <section class="panel" id="rules-panel"></section>
     </div>
 
     <!-- ================= DÉTAIL D'UNE OPÉRATION (page, 0.10.2) ================= -->
@@ -88,9 +86,16 @@
         <p class="note" style="margin-top:0"><b>État :</b> <span id="sauvState">…</span></p>
         <div class="row" style="margin-top:10px">
           <button id="btnExport" class="btn primary" type="button">Exporter ma sauvegarde</button>
+          <button id="btnVerifier" class="btn" type="button">Vérifier une sauvegarde</button>
           <button id="btnRestore" class="btn" type="button">Restaurer depuis un fichier</button>
         </div>
-        <details class="bnote"><summary>Comment c'est calculé</summary><p class="note">Tout ce que contient Klad (comptes, opérations, classement, budget, réglages) tient dans un seul fichier chiffré par votre phrase de récupération : gardez-en une copie hors du téléphone. Une restauration remplace toutes les données de ce téléphone.</p></details>
+        <div id="sauvVerif" class="sv-verif" aria-live="polite" hidden></div>
+        <ol class="sv-etapes">
+          <li>« Exporter ma sauvegarde » : choisissez un endroit <b>hors du téléphone</b> (par exemple Google Drive).</li>
+          <li>Gardez la phrase de récupération <b>ailleurs que le fichier</b> (sur papier).</li>
+          <li>« Vérifier une sauvegarde » : ouvrez le fichier enregistré et saisissez la phrase. Rien n'est remplacé.</li>
+        </ol>
+        <details class="bnote"><summary>Comment c'est calculé</summary><p class="note">Tout ce que contient Klad (comptes, opérations, classement, budget, complément et réglages, clés Enable Banking et Claude, mot de passe de messagerie, apparence ; pas le journal) tient dans un seul fichier chiffré par votre phrase de récupération : gardez-en une copie hors du téléphone. La vérification ouvre le fichier avec la phrase et le compare aux données actuelles sans rien remplacer. Une restauration remplace toutes les données de ce téléphone. Rappel tant qu'aucune sauvegarde n'est vérifiée, puis 30 jours après la dernière vérifiée.</p></details>
       </section>
     </div>
 
@@ -122,6 +127,9 @@
   <div id="rangement" hidden>
     <section id="secReglBudget" data-titre="Réglages du budget"><div id="reglBudgetCorps"></div></section>
     <section id="secImporter" data-titre="Importer"><div id="importerCorps"></div></section>
+    <section id="secReglages" data-titre="Réglages du complément"><div id="reglagesCorps"></div></section>
+    <section id="secReglTheme" data-titre="Réglage"><div id="reglThemeCorps"></div></section>
+    <section id="secReglAvance" data-titre="Éditeur avancé"><div id="reglAvanceCorps"></div></section>
 
     <section id="secBanques" data-titre="Banques et accès">
       <h3>Banques connectées</h3>
@@ -213,9 +221,11 @@
       </div>
     </section>
 
-    <section id="secMaj" data-titre="Version et mise à jour">
+    <section id="secMaj" data-titre="À propos et mise à jour">
       <p>Klad (Клад), carnet de comptes personnel. Données chiffrées sur ce téléphone.</p>
       <p class="muted" id="majVer"></p>
+      <p class="muted" id="majDate"></p>
+      <div class="row"><button id="btnNotes" class="btn small" type="button">Notes de version</button></div>
       <p id="majState" class="muted"></p>
       <div class="row">
         <button id="btnMajCheck" class="btn small">Rechercher une mise à jour</button>
@@ -281,6 +291,7 @@
   <script src="vfisc.js"></script>
   <script src="app.js"></script>
   <script src="plus.js"></script>
+  <script src="reglages.js"></script>
   <script src="selicone.js"></script>
   <script src="diagaff.js"></script>
   <script src="ecranbudget.js"></script>

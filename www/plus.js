@@ -396,7 +396,7 @@
       pl(r.base, 'règle') + ' de base, ' + pl(r.regles, 'règle') + ' personnelle' + (r.regles > 1 ? 's' : '') + ', ' + r.correctionsRetrouvees + ' correction(s) retrouvée(s) sur ' + r.corrections +
       (r.depuis ? ', opérations vues jusqu\'au ' + esc(F.date(r.depuis)) : '') + '.' : 'Aucun classement repris de l\'ancienne version.') + '</p>';
     h += '<div class="row">' + (s.carnet != null && CN.utilisable(s.carnet) ? '<button class="btn small" data-a="reprendre">Reprendre depuis l\'ancienne version</button>' : '') +
-      '<button class="btn small" data-a="complement">Importer un complément</button></div>';
+      '<button class="btn small" data-volet="secImporter" data-empiler="1">Importer un complément</button></div>';
     // 0.10.7 : « Nouvelle catégorie » en haut de la section ; champs pleine largeur (aucun débordement à 130 %) ;
     // icône et couleur dans le sélecteur (volet du bas).
     h += '<h3>Catégories</h3>' +
@@ -528,20 +528,6 @@
     } else if (b.dataset.a === 'reprendre') {
       if (!A.confirmInline(b, 'Confirmer : règles et corrections reprises à nouveau')) return;
       reprendreClassement(s).then(r => { if (r) A.toast('Classement repris : ' + r.base + ' règles de base, ' + r.regles + ' règles.'); });
-    } else if (b.dataset.a === 'complement') {
-      A.busy(b, async () => {
-        const h = A.hooks();
-        const texte = h.choisirFichier ? await h.choisirFichier() : null;
-        if (texte == null) return;
-        let o;
-        try { o = JSON.parse(texte); } catch (e) { throw new Error('Fichier illisible (JSON attendu).'); }
-        if (!o || o.format !== 'klad-complement' || o.v !== 1 || !o.klad || typeof o.klad !== 'object') throw new Error('Ce fichier n\'est pas un complément de classement Klad.');
-        if (s.carnet == null || typeof s.carnet !== 'object') throw new Error('Importez d\'abord la reprise de l\'ancienne version.');
-        s.carnet.klad = Object.assign({}, s.carnet.klad, o.klad);
-        A.log('info', 'Complément de classement importé.');
-        const r = await reprendreClassement(s);
-        if (r) A.toast('Complément importé : ' + r.base + ' règles de base.');
-      });
     }
   });
 
@@ -575,4 +561,7 @@
     if (d.dataset.demo === 'on') { AF.demarrerDemo(S()); A.log('info', 'Mode démo activé.'); A.fermerVolet(); }
     else { AF.arreterDemo(); A.log('info', 'Mode démo arrêté.'); renderAffichage(); }
   });
+
+  // 1.0 : reprise du classement après l'import d'un complément (Plus › Données › Importer, reglages.js)
+  window.KladPlus = { reprendreClassement };
 })();

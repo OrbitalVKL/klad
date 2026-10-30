@@ -127,10 +127,27 @@
     return B.import;
   }
 
+  // Complément effectif (1.0) : complément importé (extension « klad » du carnet) < réglages du complément saisis dans
+  // Klad (S.modele.reglages.complement : une clé présente remplace celle du complément ; null la retire). Sans réglage
+  // saisi, le complément tel quel (aucun calcul ne change).
+  function surcharger(S, klad) {
+    const C = isObj(klad) ? klad : {};
+    const O = S && S.modele && isObj(S.modele.reglages) && isObj(S.modele.reglages.complement) ? S.modele.reglages.complement : null;
+    if (!O || !Object.keys(O).length) return C;
+    const R = Object.assign({}, C);
+    for (const k of Object.keys(O)) { if (O[k] === null) delete R[k]; else R[k] = O[k]; }
+    return R;
+  }
+  function complement(S) {
+    const st = S && S.carnet ? racine(S.carnet) : null;
+    return surcharger(S, st && isObj(st.klad) ? st.klad : null);
+  }
+
   // Réglages : ceux de Klad, sinon ceux du complément / carnet (extension « klad »).
+  // 1.0 : cycle « salaire » (défaut) ou « mois » civil ; part de « moi » par défaut des postes du commun (50 %).
   function reglages(S) {
     const B = S.budget || {};
-    const X = (S.carnet && isObj(racine(S.carnet).klad)) ? racine(S.carnet).klad : {};
+    const X = complement(S);
     const r = Object.assign({}, isObj(X.salaire) ? X.salaire : {}, isObj(B.reglages) && isObj(B.reglages.salaire) ? B.reglages.salaire : {});
     const c = Object.assign({}, isObj(X.commun) ? X.commun : {}, isObj(B.reglages) && isObj(B.reglages.commun) ? B.reglages.commun : {});
     const map = (S.modele.reprise && S.modele.reprise.map) || {};
@@ -146,8 +163,10 @@
       commun: {
         moi: typeof c.moi === 'string' && c.moi.trim() ? c.moi.trim() : null,
         autre: typeof c.autre === 'string' && c.autre.trim() ? c.autre.trim() : null,
-        contribution: typeof c.contribution === 'string' && c.contribution.trim() ? c.contribution.trim() : CONTRIBUTION
-      }
+        contribution: typeof c.contribution === 'string' && c.contribution.trim() ? c.contribution.trim() : CONTRIBUTION,
+        part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50
+      },
+      cycle: isObj(B.reglages) && B.reglages.cycle === 'mois' ? 'mois' : 'salaire'
     };
   }
 
@@ -201,6 +220,7 @@
   // Cycle en cours : du dernier salaire reçu à la veille du même jour le mois suivant (prolongé jusqu'à aujourd'hui).
   function cycleCourant(B) {
     if ('cyc' in B.memo) return B.memo.cyc;
+    if (B.R.cycle === 'mois') return (B.memo.cyc = null);
     let last = null;
     for (let i = B.rows.length - 1; i >= 0; i--) { const r = B.rows[i]; if (estSalaireRef(B, r)) { last = r; break; } }
     if (!last) for (let i = B.rows.length - 1; i >= 0; i--) { const r = B.rows[i]; if (estSalaire(B, r)) { last = r; break; } }
@@ -218,6 +238,7 @@
   // Débuts de cycle : un salaire ouvre un cycle s'il arrive au moins « ecart » jours après le précédent.
   function debuts(B) {
     if (B.memo.debuts) return B.memo.debuts;
+    if (B.R.cycle === 'mois') return (B.memo.debuts = []);
     const cur = cycleCourant(B), R = B.R.salaire;
     const sal = B.rows.filter(r => estSalaire(B, r) && r.m >= R.minCycle);
     const st = [];
@@ -252,7 +273,7 @@
     const cyc = scope === 'perso' ? (past ? cyclePasse(B, nav) : cycleCourant(B)) : null;
     const pm0 = !past ? curM : isD ? (cyc ? moisMilieu(cyc) : nav.slice(0, 7)) : nav;
     const start = cyc ? cyc.start : pm0 + '-01', end = cyc ? cyc.end : finMois(pm0), upto = past ? end : B.auj;
-    const parCycle = scope === 'perso' && (cyc || !past);
+    const parCycle = scope === 'perso' && B.R.cycle !== 'mois' && (cyc || !past);
     let prev, next;
     if (parCycle) {
       const st = debuts(B);
@@ -327,7 +348,7 @@
   }
 
   // Répartition du compte commun : ma part (pourcentage « pg » de chaque poste) et celle de l'autre personne.
-  function partDe(B, key) { const p = planDe(B, 'commun')[key] || {}; return { pg: p.pg != null ? +p.pg : 50, elig: !!p.elig }; }
+  function partDe(B, key) { const p = planDe(B, 'commun')[key] || {}; return { pg: p.pg != null ? +p.pg : B.R.commun.part, elig: !!p.elig }; }
   function parts(B) {
     if (B.memo.parts) return B.memo.parts;
     const t = { moi: 0, autre: 0, eqMoi: 0, eqAutre: 0, neMontant: 0, neMoi: 0 };
@@ -1042,7 +1063,7 @@
 
   g.KladBudget = {
     V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, BASES_RAV, baseRav, choisirBaseRav, ravChoisi, nouveau, donnees, importer, reglages, contexte,
-    cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
+    complement, surcharger, cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
     devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement,
     shift, finMois, nomMois, eur, dernierDebit, tendanceMois, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median, planCarnet

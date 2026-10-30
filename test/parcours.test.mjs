@@ -688,7 +688,9 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     }
     // Réglages › Budget : cycle de salaire, base de calcul, personnes du commun
     await plusVers('secReglBudget');
-    assert.match(await page.locator('#reglBudgetCorps').innerText(), /Cycle de salaire[\s\S]*Cycle en cours[\s\S]*Base de calcul[\s\S]*Personne A et Personne B/);
+    assert.match(await page.locator('#reglBudgetCorps').innerText(), /Cycle de salaire[\s\S]*Cycle en cours[\s\S]*Base de calcul[\s\S]*Compte commun[\s\S]*Compte secondaire/);
+    assert.equal(await page.locator('#rg-commun-moi').inputValue(), 'Personne A');      // 1.0 : modifiable
+    assert.equal(await page.locator('#rg-commun-autre').inputValue(), 'Personne B');
     await page.locator('#volet [data-fermer]').last().click();
     // 0.10.3 : les observations s'ouvrent depuis l'Accueil (« À vérifier »), plus depuis Plus
     await page.locator('#app-tb [data-tab="accueil"]').click();

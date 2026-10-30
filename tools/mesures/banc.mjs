@@ -161,5 +161,5 @@ export async function ouvrir(o) {
     await pause(60);
   }
   async function fin() { await browser.close(); srv.close(); }
-  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, ecransPrincipaux, ecransPlus, theme, texte, fin };
+  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, ecransPrincipaux, ecransPlus, theme, texte, fin, phrase: groupes.join('-') };
 }

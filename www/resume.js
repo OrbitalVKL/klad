@@ -92,7 +92,7 @@
     });
     if (at && at.unseen) out.push({ level: 'info', code: 'TO_REVIEW', text: at.unseen + (at.unseen > 1 ? ' OPÉRATIONS À VOIR' : ' OPÉRATION À VOIR') });
     const sv = ext && ext.sauvegarde;
-    if (sv && sv.jours == null) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · JAMAIS' });
+    if (sv && sv.jours == null) out.push({ level: 'info', code: 'BACKUP_DUE', text: sv.exportee ? 'SAUVEGARDE · À VÉRIFIER' : 'SAUVEGARDE · JAMAIS' });
     else if (sv && sv.jours >= 30) out.push({ level: 'info', code: 'BACKUP_DUE', text: 'SAUVEGARDE · ' + sv.jours + ' J' });
     if (ext && ext.maj && /^\d+\.\d+\.\d+$/.test(ext.maj)) out.push({ level: 'info', code: 'UPDATE_AVAILABLE', text: 'KLAD ' + ext.maj });
     for (const b of (ext && ext.budgetOver) || []) out.push({ level: 'caut', code: 'BUDGET_OVER', text: b });

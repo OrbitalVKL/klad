@@ -339,7 +339,7 @@
         it('🧾', 'Relevés des comptes', 'État de chaque compte, relevé manuel', 'data-vue="donnees"')) +
       grp('Données',
         it('💾', 'Sauvegarde', 'Export chiffré, restauration', 'data-vue="sauvegarde"') +
-        it('📥', 'Importer', 'Relevé d\'un compte, reprise de l\'ancienne version, complément', 'data-volet="secImporter"') +
+        it('📥', 'Importer', 'Relevé d\'un compte, reprise et complément, avec aperçu', 'data-volet="secImporter"') +
         it('🧮', 'Contrôle', 'Relevé pour comparer avec l\'ancienne version', 'data-volet="secControle"')) +
       grp('Modules',
         it('🏛️', 'Impôts', 'Avis, prélèvements, partage, taxe foncière', 'data-vue="impots"') +
@@ -350,54 +350,15 @@
       grp('Réglages',
         it('🎨', 'Apparence', 'Thème ' + ({ auto: 'automatique', clair: 'clair', sombre: 'sombre' }[t]) + ' · palette ' + (p === 'grafit' ? 'Grafit' : 'Klad') + ' · mode démo', 'data-volet="secAffichage"') +
         it('🔒', 'Verrou', 'Code, empreinte, effacement', 'data-volet="secVerrou"') +
-        it('🗂️', 'Classement', 'Catégories, règles, complément', 'data-volet="secClassement"') +
-        it('📐', 'Budget', 'Cycle de salaire, reste à vivre affiché, base de calcul, personnes du commun', 'data-volet="secReglBudget"')) +
+        it('🗂️', 'Classement', 'Catégories, règles', 'data-volet="secClassement"') +
+        it('📐', 'Budget', 'Cycle, salaire, reste à vivre affiché, personnes du commun, compte secondaire', 'data-volet="secReglBudget"') +
+        it('🧰', 'Complément', 'Motifs, mots-clés, taxe foncière, livret, PEE, carburant, éditeur avancé', 'data-volet="secReglages"')) +
       grp('Aide et à propos',
-        it('ℹ️', 'Version et mise à jour', 'Version ' + (CFG.version || 'dev'), 'data-volet="secMaj"') +
+        it('ℹ️', 'À propos', 'Version ' + (CFG.version || 'dev') + (CFG.date ? ' du ' + CFG.date.split('-').reverse().join('/') : '') + ', notes de version, mise à jour', 'data-volet="secMaj"') +
         it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog"') +
         it('📏', 'Diagnostic d\'affichage', 'Mesures de l\'écran copiées, sans donnée personnelle', 'data-plus="diagaff"'));
   }
-  // Réglages › Budget (0.10.5) : réglages du budget rassemblés (lecture ; la base de calcul se change dans Budget, mode
-  // « Budget » ; le cycle de salaire et les personnes viennent du complément, modifiables ici au Lot 9c). 0.10.7 : base
-  // du reste à vivre affichée (interrupteur, réglage du budget).
-  preparer.secReglBudget = () => {
-    const KB = window.KladBudget;
-    let R = null, per = null, ref = null;
-    try { R = KB.reglages(S); const B = budget(); per = B ? KB.periode(B, 'perso', null) : null; ref = S.budget && S.budget.ref; } catch (e) { R = null; }
-    const sal = R && R.salaire, cm = R && R.commun;
-    const c = sal && sal.compte ? M.compte(S, sal.compte) : null;
-    const l = (t, v) => '<li><div class="grow">' + esc(t) + '<small>' + esc(v) + '</small></div></li>';
-    $('reglBudgetCorps').innerHTML = '<h3>Cycle de salaire</h3><ul class="list">' +
-      l('Cycle en cours', per && per.cyc ? 'du ' + U.jjmm(per.cyc.start) + ' au ' + U.jjmm(per.cyc.end) : 'mois civil (salaire non reconnu)') +
-      l('Compte du salaire', c ? c.libelle : 'tous les comptes perso') +
-      l('Libellé reconnu', sal && sal.motifs.length ? sal.motifs.join(', ') : 'non réglé') +
-      l('Montant minimum', sal && sal.min ? KB.eur(sal.min) : 'aucun') + '</ul>' +
-      '<h3>Reste à vivre affiché</h3><p class="muted small">Sur l\'Accueil et dans le résumé lu par Grafit. Le détail montre toujours les deux colonnes.</p>' +
-      U.interrupteurRav(KB.baseRav(S), !!(per && budget() && (KB.suivi(budget(), 'perso', null).rav || {}).comptes)) +
-      '<h3>Base de calcul du réel habituel</h3><ul class="list">' + l('Depuis', ref ? U.mLong(ref) : 'automatique') + '</ul>' +
-      '<div class="row"><button type="button" class="btn" data-a="base">Modifier dans Budget</button></div>' +
-      '<h3>Compte commun</h3><ul class="list">' + l('Personnes', cm && (cm.moi || cm.autre) ? [cm.moi, cm.autre].filter(Boolean).join(' et ') : 'non réglées') + '</ul>' +
-      '<p class="note">Le cycle de salaire et les personnes viennent des réglages de l\'ancienne version ; ils deviendront modifiables ici avec la version 1.0.</p>';
-  };
-  $('reglBudgetCorps').addEventListener('click', ev => {
-    if (!ev.target.closest('[data-a="base"]')) return;
-    const EB = window.KladEcranBudget;
-    if (EB) { EB.ui.sv.perso = 'suivi'; EB.ui.mode = 'plan'; }
-    fermerVolet(true);
-    montrer('budget', { force: true, haut: true });
-    const b = $('bref');
-    if (b) requestAnimationFrame(() => { b.scrollIntoView(); window.scrollBy(0, -90); });
-  });
-
-  // Données › Importer : les trois imports au même endroit.
-  preparer.secImporter = () => {
-    const r = S.modele.reprise;
-    const it = (ic, t, s2, attr) => '<button type="button" class="sh-li" ' + attr + '><span class="ic" aria-hidden="true">' + ic + '</span><span>' + esc(t) + (s2 ? '<small>' + esc(s2) + '</small>' : '') + '</span><span class="r" aria-hidden="true">›</span></button>';
-    $('importerCorps').innerHTML = '<div class="sh-list">' +
-      it('🧾', 'Relevé d\'un compte', 'CSV, JSON ou Excel, depuis Relevés des comptes', 'data-vue="donnees"') +
-      it('📦', 'Reprise de l\'ancienne version', r ? 'Importée le ' + F.date(r.importee.slice(0, 10)) + ', ' + r.nb + ' opération(s)' : 'Aucun import', 'data-volet="secReprise" data-empiler="1"') +
-      it('🗂️', 'Complément de classement', 'Dans Classement : « Importer un complément »', 'data-volet="secClassement" data-empiler="1"') + '</div>';
-  };
+  // Réglages › Budget, Réglages › Complément et Données › Importer : reglages.js (1.0).
 
   // Tableaux trop larges sur téléphone : chaque ligne devient une carte, l'intitulé de colonne est recopié dans chaque
   // case (comme l'ancienne version).
@@ -1429,9 +1390,9 @@
     filtre.cat = ''; filtre.nonVues = false; filtre.compte = ''; tri = null; triOp = null; retourDe = {};
     fermerVolet(true);
     toastAction = null; $('toast').className = '';
-    ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'sv-bar', 'sv-eq', 'appart-corps', 'cm-tres', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
+    ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'sv-bar', 'sv-eq', 'appart-corps', 'cm-tres', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone',
       'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'iconeCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps', 'diagAffCorps']
+      'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'reglagesCorps', 'reglThemeCorps', 'reglAvanceCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'iconeCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps', 'diagAffCorps']
       .forEach(id => { const e = $(id); if (e) e.textContent = ''; });
     $('tb-badge').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'q'].forEach(id => { $(id).value = ''; });

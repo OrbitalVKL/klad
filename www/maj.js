@@ -23,6 +23,10 @@
   function apiUrl(owner, repo) {
     return 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo || 'klad') + '/releases/latest';
   }
+  // Notes de version (1.0) : docs/NOTES.md à l'étiquette de la version installée.
+  function notesUrl(owner, repo, version) {
+    return 'https://github.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo || 'klad') + '/blob/' + (parseVersion(version) ? 'v' + version : 'main') + '/docs/NOTES.md';
+  }
 
   // Réponse de /releases/latest → { version, url, sha256, size, notes } si plus récente que current ; sinon null.
   // Lève une erreur claire si la publication est plus récente mais inutilisable.
@@ -39,7 +43,7 @@
     return { version, url: a.browser_download_url, sha256: 'sha256:' + m[1].toLowerCase(), size: a.size || 0, notes: rel.body || '' };
   }
 
-  const pure = { parseVersion, cmpVersion, apiUrl, pickRelease };
+  const pure = { parseVersion, cmpVersion, apiUrl, notesUrl, pickRelease };
 
   // ------------------------------------------------------------ interface (appli)
   // init({ log, toast }) est appelé par verrou.js ; check(silent) après chaque déverrouillage.
@@ -64,6 +68,14 @@
     const fmtSize = n => n ? ' (' + (n / 1048576).toFixed(1).replace('.', ',') + ' Mo)' : '';
 
     $('majVer').textContent = 'Version installée : ' + (CFG.version || 'dev') + (CFG.build ? ' (' + CFG.build + ')' : '');
+    // À propos (1.0) : date de fabrication et notes de version (docs/NOTES.md du dépôt, compte déduit à la fabrication)
+    $('majDate').textContent = CFG.date ? 'Version du ' + CFG.date.split('-').reverse().join('/') + '.' : 'Version de développement.';
+    $('btnNotes').hidden = !CFG.owner;
+    $('btnNotes').addEventListener('click', () => {
+      const url = notesUrl(CFG.owner, CFG.repo, CFG.version);
+      const B = g.Capacitor && g.Capacitor.Plugins && g.Capacitor.Plugins.Browser;
+      if (B && B.open) B.open({ url }); else g.open(url, '_blank', 'noopener');
+    });
 
     async function check(silent) {
       if (!CFG.owner || !parseVersion(CFG.version)) {
