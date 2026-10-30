@@ -68,7 +68,7 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.49.1
           npx playwright install --with-deps chromium
-          node --test test/parcours.test.mjs test/ux.test.mjs test/champs.test.mjs test/demo.test.mjs test/parite.test.mjs
+          node --test test/parcours.test.mjs test/ux.test.mjs test/champs.test.mjs test/debord.test.mjs test/demo.test.mjs test/parite.test.mjs
 
       - name: Préparation Capacitor
         run: |

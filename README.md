@@ -2,7 +2,7 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 0.10.10 — nouvelle organisation de l'interface (série UX : Accueil, Opérations, Budget, Commun, Plus ; palettes Klad et Grafit) ; icônes des catégories (toutes dessinées, banque Lucide embarquée), base du reste à vivre au choix ; parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) ; mode démo sans rien de réel à l'écran (captures autorisées).** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 0.10.11 — nouvelle organisation de l'interface (série UX : Accueil, Opérations, Budget, Commun, Plus ; palettes Klad et Grafit) ; icônes des catégories (toutes dessinées, banque Lucide embarquée), base du reste à vivre au choix ; parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) ; mode démo sans rien de réel à l'écran (captures autorisées).** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
