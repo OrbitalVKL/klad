@@ -13,9 +13,9 @@
 -->
 <style>
 :root{
-  --bg:#f3f5f2; --surface:#fff; --surface-2:#eef1ed; --ink:#14201c; --ink-2:#3f4a45; --muted:#5b6661; --line:#dde2dd;
+  --bg:#f3f5f2; --surface:#fff; --surface-2:#eef1ed; --ink:#14201c; --ink-2:#3f4a45; --muted:#56615c; --line:#dde2dd;
   --accent:#23456e; --accent-ink:#fff; --accent-soft:#e3eaf3; --brand:#9E4A4A; --tab-on:#23456e;
-  --good:#1a7347; --good-soft:#e2f2e8; --warn:#8a560c; --warn-soft:#fbf0dc; --bad:#a8321f; --bad-soft:#fbe6e1;
+  --good:#17683f; --good-soft:#e2f2e8; --warn:#83510a; --warn-soft:#fbf0dc; --bad:#a8321f; --bad-soft:#fbe6e1;
   --hero:#23456e; --hero-ink:#fff; --hero-2:#d7e2f0;
   --bar:#2a78d6; --bar-2:#eb6834;
   --mono:ui-monospace,"JetBrains Mono","SFMono-Regular",Menlo,Consolas,monospace;
@@ -24,27 +24,27 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#111513; --surface:#191e1c; --surface-2:#202624; --ink:#edf1ee; --ink-2:#c3ccc7; --muted:#9aa49f; --line:#2d3532;
+    --bg:#111513; --surface:#191e1c; --surface-2:#202624; --ink:#edf1ee; --ink-2:#c3ccc7; --muted:#a3ada8; --line:#2d3532;
     --accent:#9dbbe4; --accent-ink:#0f1a28; --accent-soft:#1f2c3b; --brand:#c46a6a; --tab-on:#9dbbe4;
-    --good:#5cc08c; --good-soft:#1b2d23; --warn:#e2a846; --warn-soft:#2f2616; --bad:#f08a76; --bad-soft:#35201b;
+    --good:#62c690; --good-soft:#1b2d23; --warn:#e2a846; --warn-soft:#2f2616; --bad:#f4907c; --bad-soft:#35201b;
     --hero:#1e3a5c; --hero-ink:#eef3fa; --hero-2:#c8d6ea; --bar:#3987e5; --bar-2:#d95926;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#111513; --surface:#191e1c; --surface-2:#202624; --ink:#edf1ee; --ink-2:#c3ccc7; --muted:#9aa49f; --line:#2d3532;
+  --bg:#111513; --surface:#191e1c; --surface-2:#202624; --ink:#edf1ee; --ink-2:#c3ccc7; --muted:#a3ada8; --line:#2d3532;
   --accent:#9dbbe4; --accent-ink:#0f1a28; --accent-soft:#1f2c3b; --brand:#c46a6a; --tab-on:#9dbbe4;
-  --good:#5cc08c; --good-soft:#1b2d23; --warn:#e2a846; --warn-soft:#2f2616; --bad:#f08a76; --bad-soft:#35201b;
+  --good:#62c690; --good-soft:#1b2d23; --warn:#e2a846; --warn-soft:#2f2616; --bad:#f4907c; --bad-soft:#35201b;
   --hero:#1e3a5c; --hero-ink:#eef3fa; --hero-2:#c8d6ea; --bar:#3987e5; --bar-2:#d95926;
 }
-/* Palette « Grafit » : chrome noir, rouge réservé à la marque (logo, onglet actif) */
-:root[data-palette="grafit"]{ --bg:#f4f3f1; --surface:#fff; --surface-2:#efedea; --ink:#0A0C0E; --ink-2:#3d4247; --muted:#5f6368; --line:#e2dfdb;
+/* Palette « Grafit » : chrome noir, rouge réservé à la marque (logo, onglet actif). Valeurs alignées sur l'appli (0.10, AA vérifié en test). */
+:root[data-palette="grafit"]{ --bg:#f4f3f1; --surface:#fff; --surface-2:#efedea; --ink:#0A0C0E; --ink-2:#3d4247; --muted:#5a5f64; --line:#e2dfdb;
   --accent:#0A0C0E; --accent-ink:#fff; --accent-soft:#ecebe8; --tab-on:#9E4A4A; --hero:#0A0C0E; --hero-ink:#f4f3f1; --hero-2:#d9d5d0; }
 @media (prefers-color-scheme: dark){
-  :root[data-palette="grafit"]:not([data-theme="light"]){ --bg:#0A0C0E; --surface:#14171a; --surface-2:#1c2024; --ink:#eeeae6; --ink-2:#c9c4be; --muted:#a09a94; --line:#2a2e33;
-    --accent:#eeeae6; --accent-ink:#0A0C0E; --accent-soft:#23272c; --tab-on:#d27c7c; --hero:#1a1d21; --hero-ink:#f4f1ed; --hero-2:#c9c4be; }
+  :root[data-palette="grafit"]:not([data-theme="light"]){ --bg:#0A0C0E; --surface:#14171a; --surface-2:#1c2024; --ink:#eeeae6; --ink-2:#c9c4be; --muted:#a8a29c; --line:#2a2e33;
+    --accent:#eeeae6; --accent-ink:#0A0C0E; --accent-soft:#23272c; --tab-on:#d88686; --hero:#1a1d21; --hero-ink:#f4f1ed; --hero-2:#c9c4be; }
 }
-:root[data-palette="grafit"][data-theme="dark"]{ --bg:#0A0C0E; --surface:#14171a; --surface-2:#1c2024; --ink:#eeeae6; --ink-2:#c9c4be; --muted:#a09a94; --line:#2a2e33;
-  --accent:#eeeae6; --accent-ink:#0A0C0E; --accent-soft:#23272c; --tab-on:#d27c7c; --hero:#1a1d21; --hero-ink:#f4f1ed; --hero-2:#c9c4be; }
+:root[data-palette="grafit"][data-theme="dark"]{ --bg:#0A0C0E; --surface:#14171a; --surface-2:#1c2024; --ink:#eeeae6; --ink-2:#c9c4be; --muted:#a8a29c; --line:#2a2e33;
+  --accent:#eeeae6; --accent-ink:#0A0C0E; --accent-soft:#23272c; --tab-on:#d88686; --hero:#1a1d21; --hero-ink:#f4f1ed; --hero-2:#c9c4be; }
 
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--sans);-webkit-tap-highlight-color:transparent}
@@ -469,7 +469,7 @@ main>*,.card>*{min-width:0}
     ['Données', [['sauvegarde', '⤓', 'Sauvegarde', 'dernière il y a 34 jours · exporter, restaurer', 'warn'], ['importer', '📥', 'Importer', 'relevé d\'un compte, reprise, complément'], ['controle', '🧮', 'Contrôle', 'relevé de contrôle et état de l\'import']]],
     ['Modules', [['impots', '🏛️', 'Impôts', 'impôt du foyer, taxe foncière, partage'], ['epargne', '🐷', 'Épargne', 'livret, plan d\'épargne']].concat(st.variante === 'B' ? [['equilibre', '⚖️', 'Équilibre de l\'appartement', 'qui doit combien à qui']] : []).concat([['grafit', '🧩', 'Lien Grafit', 'désactivé']])],
     ['Extras', [['extras', '✨', 'Mail et Claude', 'désactivés']]],
-    ['Réglages', [['affichage', '🎨', 'Affichage', 'thème, mode démo'], ['verrou', '🔒', 'Verrou', 'code, empreinte, tout effacer'], ['classement', '🗂️', 'Classement', 'catégories et règles'], ['reglagesbudget', '📐', 'Budget', 'cycle de salaire, base de calcul']]],
+    ['Réglages', [['affichage', '🎨', 'Apparence', 'thème, palette Klad ou Grafit, mode démo'], ['verrou', '🔒', 'Verrou', 'code, empreinte, tout effacer'], ['classement', '🗂️', 'Classement', 'catégories et règles'], ['reglagesbudget', '📐', 'Budget', 'cycle de salaire, base de calcul']]],
     ['Aide et à propos', [['maj', 'ℹ️', 'Version et mise à jour', 'version 0.10.0 · à jour'], ['journal', '📜', 'Journal', 'anonyme, à copier pour un diagnostic']]]
   ];
   function plus() {
@@ -489,7 +489,7 @@ main>*,.card>*{min-width:0}
     equilibre: ['Équilibre de l\'appartement', ['Personne A doit encore apporter 6 200 € pour être à égalité', 'Simulation, détails, mouvements'], []],
     grafit: ['Lien Grafit', ['Partager un résumé avec Grafit (désactivé)', 'Ce qui est partagé, ce qui ne l\'est jamais'], [['Activer', '']]],
     extras: ['Mail et Claude', ['Appels de fonds par mail : désactivé', 'Claude : désactivé', 'Désactivé, un extra n\'affiche aucun bouton'], []],
-    affichage: ['Affichage', ['Thème : automatique, clair ou sombre', 'Mode démo : montants et noms masqués pour montrer l\'appli'], [['Passer en mode démo', '']]],
+    affichage: ['Apparence', ['Thème : automatique, clair ou sombre', 'Palette : « Klad » (couleurs habituelles) ou « Grafit » (noir et rouge, comme l\'icône), indépendante du thème ; gardée et appliquée dès le démarrage (boutons « Klad / Grafit » de la barre de la maquette)', 'Mode démo : montants et noms masqués pour montrer l\'appli'], [['Passer en mode démo', '']]],
     verrou: ['Verrou', ['Empreinte', 'Changer le code à 6 chiffres', 'Zone sensible : tout effacer (confirmation par le code)'], [['Changer le code', ''], ['Tout effacer', 'dang']]],
     classement: ['Classement', ['Catégories : renommer, nature, icône', 'Vos règles : mot du libellé → catégorie', 'Repris de l\'ancienne version (une seule fois)'], [['Ajouter une catégorie', '']]],
     reglagesbudget: ['Réglages du budget', ['Cycle de salaire : compte, motif, montant minimum', 'Base de calcul du réel habituel', 'Personnes du compte commun'], []],

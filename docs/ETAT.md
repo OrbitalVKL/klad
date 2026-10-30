@@ -5,15 +5,14 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.2** — série UX, lot UX-3 « Opérations » : sélecteur Perso · Commun · Tout toujours visible (dernier choix gardé,
-`klad.opsPerimetre`) ; depuis l'Accueil, la liste s'ouvre sur « Tout » (les compteurs de l'Accueil portent sur tous les
-comptes visibles) ; badge de l'onglet = toutes les opérations à voir ; recherche toujours visible, sur le libellé puis la
-catégorie ; « Trier une à une » (file : à voir puis non classées des 3 derniers mois ; non classée → « Classer », 2 appuis ;
-à voir déjà classée → « C'est bon, vue » ; « Passer » ; chaque action annulable ; fermer le volet arrête le tri) depuis les
-filtres Non vues / Non classées et l'action rapide de l'Accueil ; détail d'une opération en page avec Retour (en-tête et
-retour d'Android), « Opérations semblables ».
-(0.10.1 — UX-2 : onglet Accueil ; 0.10.0 — UX-1 : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées ;
-0.9.4 et avant : voir l'historique des lots.)
+**0.10.3** — série UX, lot UX-4 « Plus » : Plus devient une page (onglet) : « Verrouiller maintenant » en tête, puis
+6 groupes : Comptes et banques (Banques et accès, Comptes, Relevés des comptes), Données (Sauvegarde, Importer : relevé
+d'un compte, reprise de l'ancienne version, complément ; Contrôle), Modules (Impôts, Épargne, Équilibre jusqu'à UX-5,
+Lien Grafit), Extras (Mail et Claude), Réglages (Apparence : thème Auto / Clair / Sombre et palette Klad / Grafit, mode
+démo ; Verrou ; Classement), Aide et à propos (Version et mise à jour, Journal). « Relevés et sauvegarde » coupé en deux
+écrans. Synchroniser, Thème et Observations quittent Plus (pastille et Accueil). L'icône de thème quitte l'en-tête.
+Écran ouvert depuis Plus : bouton Retour (en-tête, retour d'Android) vers l'écran d'où l'on vient.
+(0.10.2 — UX-3 : opérations ; 0.10.1 — UX-2 : Accueil ; 0.10.0 — UX-1 : socle lisible ; 0.9.4 et avant : lots 9 à 1.)
 
 ## Feuille de route
 
@@ -35,7 +34,8 @@ retour d'Android), « Opérations semblables ».
 | UX-1 | Socle lisible : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées | 0.10.0 | fait |
 | UX-2 | Accueil (onglet en tête, 5 onglets) | 0.10.1 | fait |
 | UX-3 | Opérations : périmètre visible, tri une à une, détail en page | 0.10.2 | fait |
-| UX-4 → UX-7 | Plus, Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.3 → 0.10.6 | en cours |
+| UX-4 | Plus en page (6 groupes), Apparence (thème et palette) | 0.10.3 | fait |
+| UX-5 → UX-7 | Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.4 → 0.10.6 | en cours |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.x, en cours)
@@ -58,6 +58,8 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   police 10 px ; tous écrans 578 / 373 / 648 / 41 ; déverrouillage → reste à vivre 390 à 510 ms ; défilement : 23 à 27
   tâches longues, 206 à 259 ms au plus, 3 080 à 3 570 ms au total.
 - Le banc ouvre les opérations sur le périmètre perso (comme en 0.9.4) pour comparer les mêmes listes.
+- 0.10.3 : écrans principaux (Plus en page compris) 283 contrôles, 0 sous 48 dp, 0 sous AA ; tous écrans 523 / 0 / 0 ;
+  déverrouillage 335 à 390 ms ; défilement 25 tâches, 263 ms au plus, 3 540 ms au total.
 - 0.10.2 : écrans principaux 285 contrôles, 0 sous 48 dp, 0 sous AA ; déverrouillage 390 à 440 ms ; défilement 23 tâches,
   253 ms au plus, 3 210 ms au total (même ordre que 0.9.4).
 - 0.10.1 : écrans principaux (Accueil compris) 275 contrôles, 0 sous 48 dp, 0 sous AA ; déverrouillage → soldes et reste

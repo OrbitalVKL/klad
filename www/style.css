@@ -1784,3 +1784,9 @@ html:not(.ops-mode) #ops-scope{display:none}
 .ops-un{border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .ops-un table{width:100%}
 .sh-passer{width:100%;min-height:48px;margin-top:6px}
+
+/* ============================================================ 0.10.3 : Plus en page (UX-4) */
+#plusCorps{display:grid;gap:14px}
+.pl-lock{width:100%;min-height:52px!important;border-radius:14px!important;font-size:15px!important;display:flex;align-items:center;justify-content:center;gap:8px}
+.pl-grp{background:var(--surface);border-radius:20px;padding:6px 14px 4px}
+.pl-grp h2.sh-lab{margin:8px 2px 2px;font-size:12.5px}
