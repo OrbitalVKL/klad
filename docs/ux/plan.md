@@ -1,6 +1,6 @@
 # Plan de mise en œuvre de la nouvelle organisation
 
-**Validé par le propriétaire (variante A).** Avancement : UX-1 (0.10.0) à UX-6 (0.10.5) faits. Changement décidé : la palette se choisit
+**Validé par le propriétaire (variante A).** **Série faite : UX-1 (0.10.0) à UX-7 (0.10.6).** Reste : 9c (1.0.0) après la recette du propriétaire. Changement décidé : la palette se choisit
 dans Réglages › Apparence (Klad ou Grafit), indépendante du thème ; jetons des deux palettes posés en UX-1, sélecteur
 livré dès UX-1 dans Plus › Affichage, dans Plus › Réglages › Apparence depuis UX-4.
 
@@ -44,7 +44,7 @@ Effort : S (une session), M (deux sessions), L (trois sessions). Risque : faible
 | UX-4 · Plus ✅ | 0.10.3 | Plus en page entière, 6 groupes, Verrouiller en tête ; « Relevés et sauvegarde » coupé en deux ; Importer regroupé ; Synchroniser, Thème et Observations retirés de Plus ; retour d'Android vers Plus depuis un écran ouvert par Plus ; lexique. | faible | M |
 | UX-5 · Budget et Commun ✅ | 0.10.4 | Budget : sous-vues Suivi · Tendance · Contrats, dépassés d'abord ; Commun : Ce mois · Trésorerie · Équilibre (variante B : sélecteur Perso · Commun dans Budget, Équilibre dans Plus › Modules) ; sélecteur Perso / Commun retiré de Budget (A) ; Catégories et Règles retirées du bas des deux onglets (restent dans Plus › Réglages › Classement). Migration de `klad.replis` (sections découpées). | moyen | L |
 | UX-6 · Modules ✅ | 0.10.5 | Impôts : Résumé · Prélèvements · Taxe foncière · Paramètres ; Épargne : Livret · Plan d'épargne · Paramètres ; paramètres et hypothèses sortis des résultats ; Réglages › Budget (cycle de salaire, base de calcul). | moyen | M |
-| UX-7 · Rapidité et couleurs | 0.10.6 | Accueil dessiné d'abord après le déverrouillage, autres onglets calculés ensuite ; liste d'opérations allégée (jours hors écran non dessinés) pour 3 ans d'historique ; palette « Grafit » si le propriétaire la choisit (sinon couleurs actuelles). | faible | M |
+| UX-7 · Rapidité et couleurs ✅ | 0.10.6 | Accueil dessiné d'abord après le déverrouillage, autres onglets calculés ensuite ; liste d'opérations allégée (jours hors écran non dessinés) pour 3 ans d'historique ; palette « Grafit » si le propriétaire la choisit (sinon couleurs actuelles). | faible | M |
 
 Ordre : UX-1 d'abord (sans risque, utile partout, et il prépare les composants : bouton de 48 dp, ligne nommée) ; puis
 UX-2, le plus fort gain ; UX-3 et UX-4 sont indépendants ; UX-5 dépend d'UX-2 (le haut de Budget est déjà parti) ;
@@ -111,3 +111,19 @@ fait deux fois.
 
 - Pas de nouvelle fonction de calcul, pas de nouvelle donnée dans le coffre, pas de changement du résumé Grafit.
 - Pas d'Accueil personnalisable (ordre des blocs) : à voir après usage, si le propriétaire le demande.
+
+## Bilan de la série (0.10.6)
+
+- Fait : les 7 lots, une version par lot, aucune modification de calcul (relevé de contrôle identique sur les données du
+  dépôt privé, hors le titre « Balance déficitaire ») ; palettes Klad et Grafit livrées dès UX-1 (sélecteur dans Plus ›
+  Affichage, puis Plus › Réglages › Apparence en UX-4).
+- Décisions prises par défaut pendant la série (à valider) : la catégorie d'une ligne d'opération n'est plus un bouton
+  (zone trop petite qui captait les appuis sur le libellé) : la ligne ouvre le détail, « Classer » y est le premier
+  bouton, le glissement à gauche reste ; depuis l'Accueil, la liste s'ouvre sur « Tout » ; le badge compte toutes les
+  opérations à voir ; la recherche porte aussi sur la catégorie ; Équilibre gardé dans Plus › Modules jusqu'à UX-5 ;
+  contrats et tendance du commun rangés dans Commun › Trésorerie ; Réglages › Budget en lecture (modifiable au 9c) ;
+  sous-vue ouverte gardée pour la session seulement (pas de nouvelle préférence).
+- Écarts au plan : la palette n'attendait pas UX-7 (livrée en UX-1) ; « Accueil d'abord » a peu d'effet mesurable
+  (les autres écrans n'étaient déjà calculés qu'à l'ouverture) ; le gain vient surtout du second calcul évité et de la
+  liste sans tableau.
+- Mesures avant / après : `docs/ETAT.md` (Série UX) ; outil `tools/mesures/`.

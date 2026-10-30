@@ -5,13 +5,16 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.5** — série UX, lot UX-6 « Modules » : Impôts en sous-vues Résumé (synthèse, observations, taux et partage) ·
-Prélèvements (prélèvement à la source, calcul détaillé) · Taxe foncière · Paramètres (hypothèses, avis et barèmes) ;
-Épargne en Livret · Plan d'épargne (synthèse, recommandations, fonds, versements) · Paramètres (règles du plan) ;
-nouvelle entrée Plus › Réglages › Budget (cycle de salaire, base de calcul, personnes du commun, en lecture ; la base se
-change dans Budget, mode « Budget » ; le reste deviendra modifiable avec la 1.0).
-(0.10.4 — UX-5 : Budget et Commun en sous-vues ; 0.10.3 — UX-4 : Plus en page ; 0.10.2 — UX-3 : opérations ; 0.10.1 —
-UX-2 : Accueil ; 0.10.0 — UX-1 : socle lisible ; 0.9.4 et avant : lots 9 à 1.)
+**0.10.6** — fin de la série UX (UX-1 → UX-7, `docs/ux/plan.md`, variante A). UX-7 « rapidité » : l'Accueil est dessiné
+d'abord après le déverrouillage (autres écrans, résumé Grafit, reprise et synchro ensuite) ; plus de second calcul
+complet juste après l'ouverture quand rien n'a changé ; journal mis en page seulement quand il est affiché ; liste des
+opérations sans tableau (une rangée en grille par opération, un bloc par jour, jours hors écran non dessinés par
+`content-visibility`), suite chargée par petites tranches, une par image.
+Série complète : 0.10.0 socle lisible (couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées) ; 0.10.1
+Accueil ; 0.10.2 Opérations (Perso · Commun · Tout, trier une à une, détail en page) ; 0.10.3 Plus en page (6 groupes,
+Apparence) ; 0.10.4 Budget et Commun en sous-vues ; 0.10.5 Impôts et Épargne en sous-vues, Réglages › Budget ; 0.10.6
+rapidité. Aucun calcul modifié (relevé de contrôle identique, hors le titre « Balance déficitaire »).
+(0.9.4 — mode clair, opérations internes visibles, période des opérations ; 0.9.3 → 0.6 : correctifs et lots 9 à 6.)
 
 ## Feuille de route
 
@@ -36,10 +39,10 @@ UX-2 : Accueil ; 0.10.0 — UX-1 : socle lisible ; 0.9.4 et avant : lots 9 à 1.
 | UX-4 | Plus en page (6 groupes), Apparence (thème et palette) | 0.10.3 | fait |
 | UX-5 | Budget et Commun en sous-vues, migration des sections repliées | 0.10.4 | fait |
 | UX-6 | Impôts et Épargne en sous-vues, Réglages › Budget | 0.10.5 | fait |
-| UX-7 | Rapidité (`docs/ux/plan.md`) | 0.10.6 | en cours |
-| 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
+| UX-7 | Rapidité : Accueil d'abord, liste allégée | 0.10.6 | fait |
+| 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après la recette de la 0.10.6 |
 
-## Série UX (0.10.x, en cours)
+## Série UX (0.10.0 → 0.10.6, faite)
 
 Décisions du propriétaire sur l'étude : variante A (Accueil, Opérations, Budget, Commun, Plus) ; Accueil complet ;
 Équilibre dans Commun ; Plus en page entière en 6 groupes ; thème retiré de l'en-tête (Réglages) ; **palette au choix**
@@ -59,6 +62,18 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   police 10 px ; tous écrans 578 / 373 / 648 / 41 ; déverrouillage → reste à vivre 390 à 510 ms ; défilement : 23 à 27
   tâches longues, 206 à 259 ms au plus, 3 080 à 3 570 ms au total.
 - Le banc ouvre les opérations sur le périmètre perso (comme en 0.9.4) pour comparer les mêmes listes.
+- **Bilan 0.9.4 → 0.10.6** (même protocole, même session pour la rapidité) :
+
+  | Mesure | 0.9.4 | 0.10.6 |
+  |---|---|---|
+  | Écrans principaux : contrôles sous 48 dp | 187 sur 331 | 0 sur 396 (sous-vues comprises) |
+  | Écrans principaux : textes sous AA, clair / sombre | 406 / 35 | 0 / 0 (palettes Klad et Grafit) |
+  | Tous écrans : sous 48 dp ; sous AA clair / sombre | 373 ; 648 / 41 | 0 ; 0 / 0 (708 contrôles) |
+  | Plus petite police | 10 px | 12 px |
+  | Texte à 130 % : débordement horizontal | aucun | aucun (Accueil, Opérations, Budget, Commun, Plus) |
+  | Déverrouillage → soldes et reste à vivre (CPU × 4) | 359 à 426 ms | 231 à 302 ms |
+  | Changement d'onglet (CPU × 4) | 51 à 227 ms | 86 à 204 ms (Plus est une page, plus un volet) |
+  | 40 défilements rapides : tâches longues, max, total | 22, 214 ms, 2 935 ms | 1, 50 ms, 50 ms |
 - 0.10.5 : écrans principaux 396 contrôles, 0 / 0 ; tous écrans (sous-vues d'Impôts et d'Épargne comprises) 708 / 0 / 0 ;
   déverrouillage 335 à 390 ms ; défilement 26 tâches, 256 ms au plus, 3 320 ms au total.
 - 0.10.4 : écrans principaux (sous-vues comprises) 395 contrôles, 0 sous 48 dp, 0 sous AA ; tous écrans 611 / 0 / 0 ;
@@ -222,6 +237,12 @@ Restent :
   « en ligne ».
 
 ## Points d'appui pour le Lot 9c (1.0.0, à publier seulement après « recette OK »)
+
+- Place prévue dans l'interface (série UX) : Plus › Réglages › Budget (`secReglBudget`, aujourd'hui en lecture : cycle de
+  salaire, base de calcul, personnes du commun) pour les réglages du complément ; Plus › Données › Importer (`secImporter`)
+  pour le complément et la reprise ; Plus › Données › Sauvegarde (écran `sauvegarde`) pour la sauvegarde vérifiée.
+- Navigation : écrans « page » avec Retour par la table `RETOUR` de `www/app.js` ; sous-vues par `data-sousvue`
+  (`KladEcranBudget.barre`, `SV` d'`ecranfisc.js`) ; préférences d'affichage par la liste fermée `KladUI.PREFS`.
 
 - Complément et carnet en réglages ordinaires : aujourd'hui lus dans `S.carnet` (racine `KladBudget.racine`), sous-objets
   `klad.*` du complément (`klad.mail`, `appels.titre`, `appels.syndic`, pastilles…) ; réglages saisis dans Klad dans
