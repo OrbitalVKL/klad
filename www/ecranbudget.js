@@ -73,7 +73,8 @@
   }
   document.addEventListener('click', ev => {
     const b = ev.target.closest('[data-sousvue]');
-    if (b && A.etat()) sousVue(b.dataset.sousvue);
+    const v = A.vue();
+    if (b && A.etat() && (v === 'budget' || v === 'commun' || v === 'appartement')) sousVue(b.dataset.sousvue);
   });
   A.rendus.push(o => { if (!o || !o.theme) render(); });
   window.addEventListener('resize', () => { clearTimeout(render.t); render.t = setTimeout(() => { if (A.etat()) render(); }, 250); });

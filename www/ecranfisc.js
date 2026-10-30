@@ -40,6 +40,23 @@
     A.toastAnnuler(quoi, () => { fn(avant); A.changed('budget'); });
   }
 
+  // ------------------------------------------------------------ sous-vues (0.10.5) : résultats d'abord, paramètres à part
+  const SV = {
+    impots: [['resume', 'Résumé'], ['prelevements', 'Prélèvements'], ['foncier', 'Taxe foncière'], ['parametres', 'Paramètres']],
+    epargne: [['livret', 'Livret'], ['plan', 'Plan d\'épargne'], ['parametres', 'Paramètres']]
+  };
+  const svUi = { impots: 'resume', epargne: 'livret' };
+  const barreSV = v => '<div class="seg sousvues sv-' + SV[v].length + '" role="group" aria-label="' + (v === 'impots' ? 'Impôts' : 'Épargne') + ' : sous-vues">' +
+    SV[v].map(([k, l]) => '<button type="button" data-sousvue="' + k + '" aria-pressed="' + (svUi[v] === k) + '">' + l + '</button>').join('') + '</div>';
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-sousvue]');
+    const v = A.vue();
+    if (!b || !A.etat() || !SV[v] || !SV[v].some(x => x[0] === b.dataset.sousvue)) return;
+    svUi[v] = b.dataset.sousvue;
+    render();
+    window.scrollTo(0, 0);
+  });
+
   // ------------------------------------------------------------ rendu des écrans
   function render() {
     const v = A.vue(), B = A.budget();
@@ -51,8 +68,8 @@
         $('sv-eq').innerHTML = EB && EB.barre ? EB.barre('commun', 'equilibre') : '';
         poser('appart-corps', VC.equilibre(B, ui.eq));
       }
-      else if (v === 'impots') poser('view-impots', VF.impots(B, { annee: ui.annee, lecture: !!(X && X.actif(s, 'claude')), analyse: !!(X && X.actif(s, 'claude')), texteAnalyse: X && X.analyse && X.analyse('impots') }));
-      else if (v === 'epargne') poser('view-epargne', VF.epargne(B));
+      else if (v === 'impots') { $('view-impots').dataset.sv = svUi.impots; poser('view-impots', barreSV('impots') + VF.impots(B, { annee: ui.annee, lecture: !!(X && X.actif(s, 'claude')), analyse: !!(X && X.actif(s, 'claude')), texteAnalyse: X && X.analyse && X.analyse('impots') })); }
+      else if (v === 'epargne') { $('view-epargne').dataset.sv = svUi.epargne; poser('view-epargne', barreSV('epargne') + VF.epargne(B)); }
       else if (v === 'donnees') { $('imp-panel').innerHTML = Vu.releves(s, B, Date.now(), { synchro: false }); U.appliquerPli($('imp-panel')); U.appliquerPli($('save-panel')); }
     } catch (e) { A.log('err', 'Écran ' + v + ' : ' + (e.message || e)); }
   }
