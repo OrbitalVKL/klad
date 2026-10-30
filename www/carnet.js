@@ -137,7 +137,8 @@
     for (const n of Object.keys(icones)) {
       if (partiel && categories[n]) continue;
       const sp = String(icones[n] || '');
-      const ic = sp.indexOf('svg:') === 0 ? ICONES_SVG[sp.slice(4)] : sp.slice(0, 8);
+      // 0.10.9 : émojis et icônes reprises → icône dessinée (banque Lucide) ; sans la banque (anciens tests), équivalent émoji.
+      const ic = g.KladIcones && g.KladIcones.liste().length ? g.KladIcones.versDessin(sp.slice(0, 8), n) : sp.indexOf('svg:') === 0 ? ICONES_SVG[sp.slice(4)] : sp.slice(0, 8);
       if (ic) categories[n] = Object.assign({ nature: K().natureDe(C, n) }, categories[n], { icone: ic });
     }
     function ajouter(cat, type) {

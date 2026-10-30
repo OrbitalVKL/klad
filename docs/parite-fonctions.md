@@ -1,6 +1,6 @@
 # Parité des fonctions : ancienne version (Carnet v65) → Klad
 
-État à la version **0.10.8**. Chaque fonction visible de l'ancienne version (interface téléphone **et** ordinateur), écran
+État à la version **0.10.9**. Chaque fonction visible de l'ancienne version (interface téléphone **et** ordinateur), écran
 par écran et bouton par bouton, avec son équivalent dans Klad. Aucune donnée personnelle : personnes désignées
 « personne A / B » ou « l'autre personne », comptes désignés par leur rôle (compte courant principal, compte secondaire,
 compte commun, carte à débit différé, portefeuille en ligne, livret). Les exemples chiffrés sont fictifs.
@@ -11,6 +11,7 @@ Statuts :
 - **Manquant (9c)** : dépend d'un réglage personnel (complément), à faire avec les réglages modifiables de la 1.0.0.
 - **Abandonné** : décision déjà prise (citée de `docs/ETAT.md` ou `docs/ux/architecture.md`).
 - **Abandon à décider** : proposé au propriétaire, avec la raison ; reste ouvert tant qu'il n'a pas répondu.
+- **Abandonné, décision du propriétaire** : abandon proposé puis validé par le propriétaire (0.10.9).
 
 Emplacements Klad : écran pour le propriétaire, puis `fichier:fonction` (dossier `www/`).
 Emplacements v65 : fonction JS ou libellé (le JS est dans une seule fonction englobante).
@@ -19,13 +20,13 @@ Emplacements v65 : fonction JS ou libellé (le JS est dans une seule fonction en
 
 326 lignes de fonctions (téléphone et ordinateur) :
 
-| Statut | Avant (0.10.6) | Après (0.10.8) |
-|---|---|---|
-| Présent identique | 225 | 226 |
-| Présent adapté | 78 | 85 |
-| Manquant | 9 lignes (8 fonctions) | 1 (9c) |
-| Abandonné (décision déjà prise) | 12 | 12 |
-| Abandon à décider | 2 | 2 |
+| Statut | Avant (0.10.6) | Après (0.10.8) | 0.10.9 |
+|---|---|---|---|
+| Présent identique | 225 | 226 | 226 |
+| Présent adapté | 78 | 85 | 85 |
+| Manquant | 9 lignes (8 fonctions) | 1 (9c) | 1 (9c) |
+| Abandonné (décision déjà prise) | 12 | 12 | 14 |
+| Abandon à décider | 2 | 2 | 0 |
 
 Livré en 0.10.8 (sans clé ni réglage personnel, petit effort) : renommer et supprimer une catégorie, ajouter une règle à
 la main (trois pertes de la 0.10.4), aperçu des opérations concernées par une règle, pastille « équilibre » et un seul
@@ -33,7 +34,8 @@ ajout par opération, tri des opérations, total de tous les comptes dont éparg
 Reste pour la 9c (1.0.0) : la pastille « charge récurrente sur le compte secondaire » dans le détail d'un poste (le
 compte secondaire est désigné par le complément) ; plus largement, les réglages du complément modifiables dans Klad
 (Réglages › Budget : cycle de salaire, personnes du commun ; compte secondaire ; motifs de l'extra Mail).
-Abandons à décider : « Liste d'origine » des contrats ; liste des bulletins de paie non lus (voir la fin du document).
+Abandons tranchés en 0.10.9 (« abandonné, décision du propriétaire ») : « Liste d'origine » des contrats ; liste des
+bulletins de paie non lus (voir la fin du document). Plus aucun abandon à décider.
 
 ---
 
@@ -238,7 +240,7 @@ Abandons à décider : « Liste d'origine » des contrats ; liste des bulletins 
 | Édition d'un contrat : libellé, source, montant (calcul), périodicité, mot du libellé bancaire, poste du budget (dont « nouveau poste ») | `drawContracts` (`.ce`) | Présent adapté | formulaire en volet — `vbudget.js:formContrat` | — | |
 | Poste deviné d'après le libellé du contrat | `guessKey` | Présent identique | `vbudget.js:formContrat` / `budget.js` | — | À vérifier à l'usage. |
 | « + Ajouter un contrat », « Supprimer » | `#c-add`, `.cdel` | Présent identique | `vbudget.js:contrats` | — | |
-| « Liste d'origine » (remettre la liste préremplie) | `#c-reset`, liste codée en dur | Abandon à décider (question au propriétaire) | — | — | La liste d'origine était écrite dans le code avec des données personnelles ; équivalent : Plus › Données › Importer › reprise de l'ancienne version. |
+| « Liste d'origine » (remettre la liste préremplie) | `#c-reset`, liste codée en dur | Abandonné, décision du propriétaire (0.10.9) | — | — | La liste d'origine était écrite dans le code avec des données personnelles ; équivalent : Plus › Données › Importer › reprise de l'ancienne version. |
 | Échéances à venir (contrats, prélèvements récurrents, carte) | `communCash` (`due`) | Présent adapté | Budget › Contrats (échéances) — `budget.js:echeances` | — | Plus complet que la v65. |
 | Ordres permanents vers le commun (qui, depuis, montant, jour, usage, libellé) en édition | `drawContracts` (`#p-virements`, `.ve`) | Présent identique | volet « Ordres permanents » — `vcommun.js:ordres` | complément | Noms des personnes. |
 | « + Ajouter un virement », « Supprimer » | `#v-add`, `.vdel` | Présent identique | `[data-vajout]`, `[data-vsuppr]` | — | |
@@ -394,7 +396,7 @@ Abandons à décider : « Liste d'origine » des contrats ; liste des bulletins 
 | « Analyse de Claude » (impôts) | `runTaxAI` | Présent adapté | extra Claude — `[data-analyseimpots]` | 9b fait | Désactivé par défaut. |
 | Tableau « Prélèvement à la source » (paiement, employeur, net imposable, taux et type, prélevé, cumul ; projection jusqu'à décembre ; acomptes) | `drawImpots` (`#tx-pas`) | Présent identique | Impôts › Prélèvements — `vfisc.js:impots` | — | |
 | « Lire les bulletins » (Drive, automatique toutes les 6 h) et nombre de bulletins lus | `syncBulletins`, `#tx-bs-btn` | Présent adapté | « Lire un bulletin » (sélecteur de PDF + Claude) — `[data-lirebs]` | 9b fait | Drive hors périmètre ; lecture une par une, vérifiée avant enregistrement. |
-| Liste des bulletins non lus / ignorés (année couverte par l'avis) | `drawImpots` (`#tx-bs-skip`) | Abandon à décider (question au propriétaire) | — | — | Liée à la lecture automatique de Drive ; inutile avec la lecture une par une. |
+| Liste des bulletins non lus / ignorés (année couverte par l'avis) | `drawImpots` (`#tx-bs-skip`) | Abandonné, décision du propriétaire (0.10.9) | — | — | Liée à la lecture automatique de Drive ; inutile avec la lecture une par une. |
 | « Calcul détaillé » (salaires, abattement ou frais réels, revenus fonciers, revenu imposable, quotient, tranches, décote, capitaux, impôt net, prélèvements sociaux) | `drawImpots` (`#tx-calc`) | Présent identique | `vfisc.js:impots` | — | |
 | Comparaison avec l'avis (✓ identique / ≠ montant) | `drawImpots` (`ck`) | Présent identique | `vfisc.js:impots` | — | |
 | « Taux et partage » : taux du foyer, taux qui couvrirait l'impôt, taux individualisés (simulation) | `drawImpots` (`#tx-taux`), `tauxIndiv` | Présent identique | `vfisc.js:impots` | — | |
@@ -514,12 +516,12 @@ Abandons à décider : « Liste d'origine » des contrats ; liste des bulletins 
 | Total de tous les comptes, dont épargne | petit | fait (Accueil › Soldes) |
 | Pastille « charge récurrente sur le compte secondaire » | petit | 9c (réglage personnel) |
 
-## Abandons à décider (question au propriétaire)
+## Abandons tranchés (décision du propriétaire, 0.10.9)
 
 - « Liste d'origine » des contrats : liste écrite dans le code avec des données personnelles ; la reprise de l'ancienne
-  version la remplace. Recommandation : abandonner.
+  version la remplace. **Abandonné, décision du propriétaire.**
 - Liste des bulletins de paie non lus / ignorés : liée à la lecture automatique de Drive, sans objet avec la lecture une
-  par une (extra Claude). Recommandation : abandonner.
+  par une (extra Claude). **Abandonné, décision du propriétaire.**
 
 ## Points à vérifier sur le téléphone (statut « adapté » à confirmer)
 
