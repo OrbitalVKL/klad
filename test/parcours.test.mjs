@@ -636,14 +636,24 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.equal(await page.evaluate(() => document.documentElement.classList.contains('demo')), false);
 
     // Lot 8 : impôts, épargne (écrans de Plus), observations (volet) ; observations à faire en tête du Budget
-    for (const [v, id, motif] of [['impots', 'view-impots', /À régulariser entre vous[\s\S]*Taxe foncière/i], ['epargne', 'view-epargne', /Plan d'épargne entreprise[\s\S]*Livret[\s\S]*Solde estimé/i]]) {
+    // 0.10.5 : Impôts (Résumé · Prélèvements · Taxe foncière · Paramètres) et Épargne (Livret · Plan d'épargne · Paramètres)
+    for (const [v, id, vues] of [['impots', 'view-impots', [['resume', /Impôt sur le revenu du foyer[\s\S]*À régulariser entre vous/i], ['prelevements', /Prélèvement à la source/i],
+      ['foncier', /Taxe foncière/i], ['parametres', /Hypothèses[\s\S]*Avis et barèmes/i]]],
+      ['epargne', 'view-epargne', [['livret', /Livret[\s\S]*Solde estimé/i], ['plan', /Plan d'épargne entreprise[\s\S]*Versements/i], ['parametres', /Règles du plan/i]]]]) {
       await page.locator('#app-tb [data-tab="plus"]').click();
       await page.locator('#plusCorps [data-vue="' + v + '"]').click();
-      const t = await page.locator('#' + id).innerText();
-      assert.match(t, motif);
-      assert.doesNotMatch(t, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
+      for (const [k, motif] of vues) {
+        await page.locator('#' + id + ' [data-sousvue="' + k + '"]').click();
+        const t = await page.locator('#' + id).innerText();
+        assert.match(t, motif, v + ' › ' + k);
+        assert.doesNotMatch(t, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
+      }
       await capture(page, '18-' + v);
     }
+    // Réglages › Budget : cycle de salaire, base de calcul, personnes du commun
+    await plusVers('secReglBudget');
+    assert.match(await page.locator('#reglBudgetCorps').innerText(), /Cycle de salaire[\s\S]*Cycle en cours[\s\S]*Base de calcul[\s\S]*Personne A et Personne B/);
+    await page.locator('#volet [data-fermer]').last().click();
     // 0.10.3 : les observations s'ouvrent depuis l'Accueil (« À vérifier »), plus depuis Plus
     await page.locator('#app-tb [data-tab="accueil"]').click();
     await page.locator('#view-accueil [data-av="observations"]').click();
@@ -651,6 +661,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#volet [data-fermer]').last().click();
     await page.locator('#app-tb [data-tab="plus"]').click();
     await page.locator('#plusCorps [data-vue="impots"]').click();
+    await page.locator('#view-impots [data-sousvue="parametres"]').click();
     await deplier('tx-hyp-panel');
     await page.locator('#view-impots [data-hyp="communG"]').fill('60');
     await page.locator('#view-impots [data-hyp="communG"]').press('Tab');
@@ -690,6 +701,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#volet [data-fermer]').last().click();
     await page.locator('#app-tb [data-tab="plus"]').click();
     await page.locator('#plusCorps [data-vue="impots"]').click();
+    await page.locator('#view-impots [data-sousvue="prelevements"]').click();
     const nbBs = await page.evaluate(() => Object.keys(window.KladApp.etat().budget.fisc.bs).length);
     const [fb] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#view-impots [data-lirebs]').first().click()]);
     await fb.setFiles({ name: 'bulletin.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 bulletin fictif') });

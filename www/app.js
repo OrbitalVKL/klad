@@ -347,11 +347,41 @@
       grp('Réglages',
         it('🎨', 'Apparence', 'Thème ' + ({ auto: 'automatique', clair: 'clair', sombre: 'sombre' }[t]) + ' · palette ' + (p === 'grafit' ? 'Grafit' : 'Klad') + ' · mode démo', 'data-volet="secAffichage"') +
         it('🔒', 'Verrou', 'Code, empreinte, effacement', 'data-volet="secVerrou"') +
-        it('🗂️', 'Classement', 'Catégories, règles, complément', 'data-volet="secClassement"')) +
+        it('🗂️', 'Classement', 'Catégories, règles, complément', 'data-volet="secClassement"') +
+        it('📐', 'Budget', 'Cycle de salaire, base de calcul, personnes du commun', 'data-volet="secReglBudget"')) +
       grp('Aide et à propos',
         it('ℹ️', 'Version et mise à jour', 'Version ' + (CFG.version || 'dev'), 'data-volet="secMaj"') +
         it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog"'));
   }
+  // Réglages › Budget (0.10.5) : réglages du budget rassemblés (lecture ; la base de calcul se change dans Budget, mode
+  // « Budget » ; le cycle de salaire et les personnes viennent du complément, modifiables ici au Lot 9c).
+  preparer.secReglBudget = () => {
+    const KB = window.KladBudget;
+    let R = null, per = null, ref = null;
+    try { R = KB.reglages(S); const B = budget(); per = B ? KB.periode(B, 'perso', null) : null; ref = S.budget && S.budget.ref; } catch (e) { R = null; }
+    const sal = R && R.salaire, cm = R && R.commun;
+    const c = sal && sal.compte ? M.compte(S, sal.compte) : null;
+    const l = (t, v) => '<li><div class="grow">' + esc(t) + '<small>' + esc(v) + '</small></div></li>';
+    $('reglBudgetCorps').innerHTML = '<h3>Cycle de salaire</h3><ul class="list">' +
+      l('Cycle en cours', per && per.cyc ? 'du ' + U.jjmm(per.cyc.start) + ' au ' + U.jjmm(per.cyc.end) : 'mois civil (salaire non reconnu)') +
+      l('Compte du salaire', c ? c.libelle : 'tous les comptes perso') +
+      l('Libellé reconnu', sal && sal.motifs.length ? sal.motifs.join(', ') : 'non réglé') +
+      l('Montant minimum', sal && sal.min ? KB.eur(sal.min) : 'aucun') + '</ul>' +
+      '<h3>Base de calcul du réel habituel</h3><ul class="list">' + l('Depuis', ref ? U.mLong(ref) : 'automatique') + '</ul>' +
+      '<div class="row"><button type="button" class="btn" data-a="base">Modifier dans Budget</button></div>' +
+      '<h3>Compte commun</h3><ul class="list">' + l('Personnes', cm && (cm.moi || cm.autre) ? [cm.moi, cm.autre].filter(Boolean).join(' et ') : 'non réglées') + '</ul>' +
+      '<p class="note">Le cycle de salaire et les personnes viennent des réglages de l\'ancienne version ; ils deviendront modifiables ici avec la version 1.0.</p>';
+  };
+  $('reglBudgetCorps').addEventListener('click', ev => {
+    if (!ev.target.closest('[data-a="base"]')) return;
+    const EB = window.KladEcranBudget;
+    if (EB) { EB.ui.sv.perso = 'suivi'; EB.ui.mode = 'plan'; }
+    fermerVolet(true);
+    montrer('budget', { force: true, haut: true });
+    const b = $('bref');
+    if (b) requestAnimationFrame(() => { b.scrollIntoView(); window.scrollBy(0, -90); });
+  });
+
   // Données › Importer : les trois imports au même endroit.
   preparer.secImporter = () => {
     const r = S.modele.reprise;
@@ -1267,7 +1297,7 @@
     toastAction = null; $('toast').className = '';
     ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'sv-bar', 'sv-eq', 'appart-corps', 'cm-tres', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
       'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
-      'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps']
+      'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps']
       .forEach(id => { const e = $(id); if (e) e.textContent = ''; });
     $('tb-badge').hidden = true;
     ['appId', 'pemText', 'redirectUrl', 'pemFile', 'bankSearch', 'q'].forEach(id => { $(id).value = ''; });

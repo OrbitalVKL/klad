@@ -1810,3 +1810,14 @@ html.ops-mode #view-budget[data-sv] #an-zone{display:block!important}
 .dep-r{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--bad) 20%,transparent)}
 .dep-l .sh-lab + .dep-r{border-top:0}
 .dep-r .bad-t{grid-column:1 / -1;font-size:13px;font-weight:700}
+
+/* ============================================================ 0.10.5 : Impôts et Épargne en sous-vues (UX-6) */
+.sousvues.sv-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sousvues.sv-4 button{font-size:13.5px!important}
+#view-impots[data-sv="resume"] :is(#tx-pas-panel,#tx-calc-panel,#tf-panel,#tx-hyp-panel,#tx-src-panel),
+#view-impots[data-sv="prelevements"] :is(#tx-hero,#tx-obs,#tx-part-panel,#tf-panel,#tx-hyp-panel,#tx-src-panel),
+#view-impots[data-sv="foncier"] :is(#tx-hero,#tx-obs,#tx-part-panel,#tx-pas-panel,#tx-calc-panel,#tx-hyp-panel,#tx-src-panel),
+#view-impots[data-sv="parametres"] :is(#tx-hero,#tx-obs,#tx-part-panel,#tx-pas-panel,#tx-calc-panel,#tf-panel),
+#view-epargne[data-sv="livret"] :is(#pee-hero,#pee-obs,#pee-plan-panel,#pee-fonds-panel,#pee-vers-panel),
+#view-epargne[data-sv="plan"] :is(#lv-panel,#pee-plan-panel),
+#view-epargne[data-sv="parametres"] :is(#lv-panel,#pee-hero,#pee-obs,#pee-fonds-panel,#pee-vers-panel){display:none!important}

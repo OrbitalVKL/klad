@@ -5,15 +5,13 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.4** — série UX, lot UX-5 « Budget et Commun » : sous-vues en haut de l'écran. Budget : Suivi (reste à vivre,
-observations, budget mensuel, postes **dépassés d'abord**) · Tendance · Contrats ; Commun : Ce mois (solde, fin de mois,
-à voir, observations, marge réelle, virements à mettre en place, budget du commun) · Trésorerie (appels de fonds,
-trésorerie 12 mois, d'où vient le solde, ouverts ; tendance et contrats du commun) · Équilibre (écran Équilibre, quitte
-Plus). Sélecteur Perso / Commun retiré de Budget ; Catégories et Règles retirées du bas des deux onglets (Plus ›
-Réglages › Classement). Sections repliées : nouvelle clé `klad.replis.v2`, créée une fois depuis `klad.replis` (gardée)
-par une table de correspondance (`KladUI.MIGRATION_PLIS`).
-(0.10.3 — UX-4 : Plus en page, Apparence ; 0.10.2 — UX-3 : opérations ; 0.10.1 — UX-2 : Accueil ; 0.10.0 — UX-1 : socle
-lisible ; 0.9.4 et avant : lots 9 à 1.)
+**0.10.5** — série UX, lot UX-6 « Modules » : Impôts en sous-vues Résumé (synthèse, observations, taux et partage) ·
+Prélèvements (prélèvement à la source, calcul détaillé) · Taxe foncière · Paramètres (hypothèses, avis et barèmes) ;
+Épargne en Livret · Plan d'épargne (synthèse, recommandations, fonds, versements) · Paramètres (règles du plan) ;
+nouvelle entrée Plus › Réglages › Budget (cycle de salaire, base de calcul, personnes du commun, en lecture ; la base se
+change dans Budget, mode « Budget » ; le reste deviendra modifiable avec la 1.0).
+(0.10.4 — UX-5 : Budget et Commun en sous-vues ; 0.10.3 — UX-4 : Plus en page ; 0.10.2 — UX-3 : opérations ; 0.10.1 —
+UX-2 : Accueil ; 0.10.0 — UX-1 : socle lisible ; 0.9.4 et avant : lots 9 à 1.)
 
 ## Feuille de route
 
@@ -37,7 +35,8 @@ lisible ; 0.9.4 et avant : lots 9 à 1.)
 | UX-3 | Opérations : périmètre visible, tri une à une, détail en page | 0.10.2 | fait |
 | UX-4 | Plus en page (6 groupes), Apparence (thème et palette) | 0.10.3 | fait |
 | UX-5 | Budget et Commun en sous-vues, migration des sections repliées | 0.10.4 | fait |
-| UX-6 → UX-7 | Modules, rapidité (`docs/ux/plan.md`) | 0.10.5 → 0.10.6 | en cours |
+| UX-6 | Impôts et Épargne en sous-vues, Réglages › Budget | 0.10.5 | fait |
+| UX-7 | Rapidité (`docs/ux/plan.md`) | 0.10.6 | en cours |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.x, en cours)
@@ -60,6 +59,8 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   police 10 px ; tous écrans 578 / 373 / 648 / 41 ; déverrouillage → reste à vivre 390 à 510 ms ; défilement : 23 à 27
   tâches longues, 206 à 259 ms au plus, 3 080 à 3 570 ms au total.
 - Le banc ouvre les opérations sur le périmètre perso (comme en 0.9.4) pour comparer les mêmes listes.
+- 0.10.5 : écrans principaux 396 contrôles, 0 / 0 ; tous écrans (sous-vues d'Impôts et d'Épargne comprises) 708 / 0 / 0 ;
+  déverrouillage 335 à 390 ms ; défilement 26 tâches, 256 ms au plus, 3 320 ms au total.
 - 0.10.4 : écrans principaux (sous-vues comprises) 395 contrôles, 0 sous 48 dp, 0 sous AA ; tous écrans 611 / 0 / 0 ;
   déverrouillage 337 à 412 ms ; défilement 23 tâches, 274 ms au plus, 3 290 ms au total.
 - 0.10.3 : écrans principaux (Plus en page compris) 283 contrôles, 0 sous 48 dp, 0 sous AA ; tous écrans 523 / 0 / 0 ;

@@ -91,7 +91,7 @@ export async function ouvrir(o) {
   async function avecSousVues(nom, f) {
     await f(nom, await portee());
     for (const s of await sousVues()) {
-      await page.locator('[data-sousvue="' + s + '"]').first().click();
+      await page.locator('[data-sousvue="' + s + '"]:visible').first().click();
       await pause(250);
       await page.evaluate(() => window.scrollTo(0, 0));
       await f(nom + '›' + s, await portee());
