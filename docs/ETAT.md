@@ -5,15 +5,15 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.1** — série UX, lot UX-2 « Accueil » : nouvel onglet Accueil, premier des 5 (Accueil, Opérations, Budget, Commun,
-Plus) : reste à vivre en tête (par jour, cycle écoulé, budget utilisé ; appui : détail du calcul), « À vérifier » en un
-bloc (compteurs ; « Bilan du cycle précédent » les 5 premiers jours d'un cycle), soldes en liste (carte à prélever,
-livret estimé, total disponible et après les cartes), « Ce cycle-ci » (4 postes, dépassés et à surveiller d'abord),
-commun (solde, fin de mois, virements, ordres à mettre en place), échéances des 31 jours, actions rapides. Rendu
-`www/vaccueil.js` (aucun calcul propre). L'onglet Budget perd son haut (grande carte, cartes, à voir, à vérifier) ;
-retour d'Android vers l'Accueil.
-(0.10.0 — UX-1 socle lisible : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées ; 0.9.4 — mode clair,
-opérations internes visibles, période des opérations ; 0.9.3 → 0.6 : correctifs et lots 9 à 6.)
+**0.10.2** — série UX, lot UX-3 « Opérations » : sélecteur Perso · Commun · Tout toujours visible (dernier choix gardé,
+`klad.opsPerimetre`) ; depuis l'Accueil, la liste s'ouvre sur « Tout » (les compteurs de l'Accueil portent sur tous les
+comptes visibles) ; badge de l'onglet = toutes les opérations à voir ; recherche toujours visible, sur le libellé puis la
+catégorie ; « Trier une à une » (file : à voir puis non classées des 3 derniers mois ; non classée → « Classer », 2 appuis ;
+à voir déjà classée → « C'est bon, vue » ; « Passer » ; chaque action annulable ; fermer le volet arrête le tri) depuis les
+filtres Non vues / Non classées et l'action rapide de l'Accueil ; détail d'une opération en page avec Retour (en-tête et
+retour d'Android), « Opérations semblables ».
+(0.10.1 — UX-2 : onglet Accueil ; 0.10.0 — UX-1 : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées ;
+0.9.4 et avant : voir l'historique des lots.)
 
 ## Feuille de route
 
@@ -34,7 +34,8 @@ opérations internes visibles, période des opérations ; 0.9.3 → 0.6 : correc
 | UX | Étude UX : audit, nouvelle organisation (2 variantes), maquette, plan (`docs/ux/`) ; aucun code de l'appli | — | fait, validée (variante A) |
 | UX-1 | Socle lisible : couleurs AA, palettes Klad / Grafit, 48 dp, 12 px, lignes nommées | 0.10.0 | fait |
 | UX-2 | Accueil (onglet en tête, 5 onglets) | 0.10.1 | fait |
-| UX-3 → UX-7 | Opérations, Plus, Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.2 → 0.10.6 | en cours |
+| UX-3 | Opérations : périmètre visible, tri une à une, détail en page | 0.10.2 | fait |
+| UX-4 → UX-7 | Plus, Budget et Commun, Modules, rapidité (`docs/ux/plan.md`) | 0.10.3 → 0.10.6 | en cours |
 | 9c | Réglages du complément et du carnet dans Klad, sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.x, en cours)
@@ -57,6 +58,8 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   police 10 px ; tous écrans 578 / 373 / 648 / 41 ; déverrouillage → reste à vivre 390 à 510 ms ; défilement : 23 à 27
   tâches longues, 206 à 259 ms au plus, 3 080 à 3 570 ms au total.
 - Le banc ouvre les opérations sur le périmètre perso (comme en 0.9.4) pour comparer les mêmes listes.
+- 0.10.2 : écrans principaux 285 contrôles, 0 sous 48 dp, 0 sous AA ; déverrouillage 390 à 440 ms ; défilement 23 tâches,
+  253 ms au plus, 3 210 ms au total (même ordre que 0.9.4).
 - 0.10.1 : écrans principaux (Accueil compris) 275 contrôles, 0 sous 48 dp, 0 sous AA ; déverrouillage → soldes et reste
   à vivre de l'Accueil 370 à 440 ms ; défilement 22 tâches, 208 ms au plus, 2 950 ms au total.
 - 0.10.0 : écrans principaux et tous écrans : 0 sous 48 dp, 0 sous AA (clair et sombre, deux palettes), police 12 px ;
@@ -148,7 +151,8 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   vérification avant enregistrement (annulable). Analyses : agrégats seulement (`KladExtras.agregats`), personnes
   désignées « personne A / B », gardées pour la session. Sélecteur de PDF : sélecteur Android (Drive compris).
 - Préférences d'affichage gardées hors du coffre (`localStorage`) : seulement `klad.replis` (sections repliées),
-  `klad.periode`, `klad.tendance` (liste fermée, `KladUI.pref`), `klad.theme` et `klad.palette` (0.10, `klad` / `grafit`) ;
+  `klad.periode`, `klad.tendance`, `klad.opsPerimetre` (0.10.2 : `perso` / `commun` / `tout`) (liste fermée, `KladUI.pref`),
+  `klad.theme` et `klad.palette` (0.10, `klad` / `grafit`) ;
   aucune donnée.
 
 - Lot 8 (0.8) : chiffres identiques à l'ancienne version (parité `outils/parite/lot8.mjs` : impôts avis et estimation,

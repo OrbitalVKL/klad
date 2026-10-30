@@ -137,7 +137,7 @@
     try { g.localStorage.setItem(CLE_PLIS, JSON.stringify(p)); } catch (e) { /* stockage indisponible : état gardé pour la session */ }
   }
   // Préférences d'affichage gardées sur ce téléphone (hors coffre) : seulement des réglages d'interface, jamais de donnée.
-  const PREFS = ['periode', 'tendance'];
+  const PREFS = ['periode', 'tendance', 'opsPerimetre'];
   function pref(nom, val) {
     if (PREFS.indexOf(nom) < 0) throw new Error('préférence inconnue');
     const k = 'klad.' + nom;

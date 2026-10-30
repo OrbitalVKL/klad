@@ -232,7 +232,9 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.doesNotMatch(liste, SANS_SIGNE);
     assert.doesNotMatch(liste, /AVANT FRONTIERE/);
     await capture(page, '2-operations');
-    await page.locator('#ah-search').click();
+    // 0.10.2 : recherche toujours visible, périmètre Perso · Commun · Tout visible
+    assert.equal(await page.locator('#q').isVisible(), true);
+    assert.equal(await page.locator('#ops-scope [data-perimetre]').count(), 3);
     await page.fill('#q', 'epicer');
     await page.waitForTimeout(400);
     assert.equal(await page.locator('#tx tr.txr').count(), 1);
@@ -266,6 +268,9 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await capture(page, '9-classer');
     await page.locator('#clsCorps [data-a="go"]').click();
     await page.waitForSelector('#toast.show.action');
+    // 0.10.2 : le détail est une page ; il montre la nouvelle catégorie, Retour ramène à la liste
+    assert.match(await page.locator('#opDetail').innerText(), /Bars/);
+    await page.locator('#ah-back').click();
     assert.match(await ligneOp('CB CAFE').innerText(), /Bars/);
     assert.deepEqual(await page.evaluate(() => window.KladApp.etat().classement.regles.map(u => u.mot)), ['EPICERIE', 'CAFE']);
     await page.locator('#toast button').click();
@@ -298,6 +303,31 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.ok(await page.locator('#tx tr.txr').count() >= 1);
     await page.locator('#app-chips [data-f="nc"]').click();
     await capture(page, '10-operations-lot5');
+    // 0.10.2 : périmètre gardé sur ce téléphone ; badge = toutes les opérations à voir
+    await page.locator('#ops-scope [data-perimetre="tout"]').click();
+    assert.equal(await page.evaluate(() => localStorage.getItem('klad.opsPerimetre')), '"tout"');
+    assert.equal(await page.locator('#ops-scope [data-perimetre="tout"]').getAttribute('aria-pressed'), 'true');
+    // « Trier une à une » : à voir puis non classées ; non classée → Classer (catégorie, « Classer en … ») ; à voir → « C'est bon, vue »
+    await page.evaluate(() => window.KladApp.trier('nv', 'tout'));
+    const voletOuvert = () => page.evaluate(() => !document.getElementById('volet').hidden);
+    assert.ok(await voletOuvert());
+    assert.match(await page.locator('#voletTitre').innerText(), /\(1 sur \d+\)/);
+    let appuis = 0, etapes = 0;
+    while ((await voletOuvert()) && etapes++ < 12) {
+      const enClasser = await page.evaluate(() => !!document.querySelector('#voletCorps #clsCorps [data-a="go"]'));
+      const appui = sel => page.evaluate(q => document.querySelector(q).click(), sel);
+      if (enClasser) {
+        if (etapes === 2) { await appui('#clsCorps [data-a="passer"]'); continue; }       // Passer laisse l'opération telle quelle
+        await appui('#clsCorps [data-cat]:not([aria-checked="true"])');
+        await appui('#clsCorps [data-a="go"]');
+        appuis += 2;
+      } else { await appui('#triCorps [data-a="trivue"]'); appuis += 1; }
+      await page.waitForTimeout(80);
+    }
+    assert.ok(appuis >= 2, 'au moins une opération triée');
+    assert.match(await page.locator('#toast').innerText(), /Tri terminé|Annuler/);
+    assert.equal(await page.evaluate(() => window.KladClasse.attention(window.KladApp.ctx(), Date.now()).unseen), 0);
+    await page.locator('#ops-scope [data-perimetre="perso"]').click();
 
     await page.locator('#app-tb [data-tab="plus"]').click();
     await capture(page, '4-plus');
@@ -736,7 +766,6 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.ok(tot.includes(n + ' opération') && tot.includes(deb) && tot.includes(cre), tot);
     assert.doesNotMatch(tot, /[−-]\s?\d/);
     // combinée avec la recherche
-    await page.locator('#ah-search').click();
     await page.fill('#q', 'SUPERMARCHE');
     await page.locator('#q').dispatchEvent('input');
     await page.waitForTimeout(400);
@@ -745,7 +774,9 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     [n, deb, cre] = await totalAttendu();
     tot = await page.locator('#ops-tot').innerText();
     assert.ok(tot.includes(n + ' opération') && tot.includes(deb), tot);
-    await page.locator('#ah-search').click();
+    await page.fill('#q', '');
+    await page.locator('#q').dispatchEvent('input');
+    await page.waitForTimeout(400);
     // gardée en changeant d'onglet
     await page.locator('#app-tb [data-tab="budget"]').click();
     await page.locator('#app-tb [data-tab="operations"]').click();
