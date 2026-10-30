@@ -15,7 +15,7 @@ const SAUT = !PW && !process.env.KLAD_PARCOURS && 'Playwright absent';
 const LARGEURS = [320, 360, 412];
 const TEXTES = [100, 150, 200];
 const VOLETS = ['secReglBudget', 'secImporter', 'secBanques', 'secComptes', 'secReprise', 'secAffichage', 'secModules', 'secVerrou', 'secLog',
-  'secMaj', 'secSync', 'secRav', 'secClassement', 'secAjout', 'secVirements', 'secObs', 'secControle', 'secExtras', 'secDiagAff'];
+  'secMaj', 'secSync', 'secRav', 'secClassement', 'secAjout', 'secVirements', 'secObs', 'secControle', 'secExtras', 'secDiagAff', 'secReglages', 'secReglAvance'];
 
 // Relevé dans la page : champs visibles de la portée qui débordent → [« champ : raison »].
 function releve([portee, W]) {

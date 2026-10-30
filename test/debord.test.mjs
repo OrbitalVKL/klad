@@ -14,7 +14,7 @@ const SAUT = !PW && !process.env.KLAD_PARCOURS && 'Playwright absent';
 const LARGEURS = (process.env.KLAD_LARGEURS || '320,360,412').split(',').map(Number);
 const TEXTES = (process.env.KLAD_TEXTES || '100,150,200').split(',').map(Number);
 const VOLETS = ['secReglBudget', 'secImporter', 'secBanques', 'secComptes', 'secReprise', 'secAffichage', 'secModules', 'secVerrou', 'secLog',
-  'secMaj', 'secSync', 'secRav', 'secClassement', 'secAjout', 'secVirements', 'secObs', 'secControle', 'secExtras', 'secDiagAff'];
+  'secMaj', 'secSync', 'secRav', 'secClassement', 'secAjout', 'secVirements', 'secObs', 'secControle', 'secExtras', 'secDiagAff', 'secReglages', 'secReglAvance'];
 const MESSAGE = 'Message assez long pour tenir sur plusieurs lignes : synchronisation terminée, trois comptes à jour, rien à vérifier.';
 
 test('débordements : écrans, volets, verrouillage, bandeaux et messages dans l\'écran (320 à 412 px, texte de 100 à 200 %)', { skip: SAUT, timeout: 1800000 }, async () => {
@@ -42,6 +42,16 @@ test('débordements : écrans, volets, verrouillage, bandeaux et messages dans l
           if (!ok) continue;
           await B.pause(120);
           await f(id);
+          await B.fermer();
+        }
+        // Réglages du complément : chaque écran par thème (1.0)
+        for (const t of await page.evaluate(() => window.KladReglages.THEMES.map(x => x.id))) {
+          await page.evaluate(() => window.KladApp.ouvrirVolet('secReglages'));
+          const b = page.locator('#reglagesCorps [data-reglt="' + t + '"]');
+          if (!(await b.count())) continue;
+          await b.click();
+          await B.pause(120);
+          await f('réglages›' + t);
           await B.fermer();
         }
         await B.ecransPlus(f);

@@ -127,7 +127,7 @@
       }
     });
     const rac = S.carnet && KB ? KB.racine(S.carnet) : null;
-    const X = rac && isObj(rac.klad) ? rac.klad : {};
+    const X = KB && KB.complement ? KB.complement(S) : rac && isObj(rac.klad) ? rac.klad : {};
     const fisc = (S.budget && S.budget.fisc) || (rac && rac.fisc) || {};
     const emps = new Set();
     for (const b of Object.values(isObj(fisc.bs) ? fisc.bs : {})) if (b && b.emp) emps.add(String(b.emp));

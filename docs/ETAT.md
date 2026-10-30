@@ -1,9 +1,63 @@
-# Klad — état du projet
+# Klad — état du projet (maintenance)
 
 Mémoire entre sessions (générique et public : aucune donnée personnelle). Une session neuve repart de ce fichier,
-de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
+de `CLAUDE.md` et du `README.md`. Depuis la **1.0.0**, le projet est en **maintenance** : correctifs et petites
+demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES.md` (ouvertes depuis Plus › À propos).
 
-## Version
+## Statut
+
+**1.0.0** — version complète (Lot 9c) : l'ancienne version peut être arrêtée (liste de bascule remise au propriétaire).
+Toutes les fonctions de l'ancienne version sont présentes ou abandonnées par décision (`docs/parite-fonctions.md` :
+0 manquante). Aucun calcul n'a changé : relevé de contrôle de la 0.10.10 identique à la référence 0.9.4 sur les données
+réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeux fictifs (relevé et résumé Grafit).
+
+### Ce que fait Klad (état final)
+- Comptes bancaires lus par Enable Banking (synchro automatique, dédoublonnage), comptes manuels et relevés importés.
+- Données chiffrées par blocs sur le téléphone (code ou empreinte), sauvegarde chiffrée par la phrase de récupération,
+  **vérifiable** sans rien remplacer, restauration sur un téléphone neuf ; mise à jour signée depuis l'appli.
+- Classement (catégories, règles, corrections), opérations vues, carte à débit différé, paiements en ligne.
+- Budget par cycle de salaire (ou mois civil), reste à vivre, contrats, échéances, tendance ; compte commun, trésorerie,
+  appels de fonds, équilibre ; impôts, taxe foncière, épargne salariale, livret ; observations.
+- Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
+  par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
+- **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.0.0 (Lot 9c) — détails techniques
+- Complément effectif : `KladBudget.complement(S)` = complément importé (`S.carnet` › `klad`) surchargé par
+  `S.modele.reglages.complement` (`KladBudget.surcharger` : une rubrique présente remplace celle du complément, `null` la
+  retire). Sans réglage saisi, l'objet du complément tel quel : aucun calcul ne change. Lecteurs branchés : `budget.js`
+  (`reglages`), `commun.js`, `observations.js`, `fisc.js` (`complement`), `mail.js`, `ui.js` (`reglerApparence`),
+  `carnet.js` (`ext` : bars, règles, noms de comptes, à la reprise du classement), `demo.js`.
+- `www/reglages.js` : `KladReglages` (pur, testé dans node) : thèmes et champs (`THEMES`), magasins `r`
+  (`S.budget.reglages` : salaire, commun, cycle), `b` (`S.budget` : tf, livret.taux, pee.plan, carburant), `x`
+  (`S.modele.extras` : mail), `c` (`S.modele.reglages.complement`) ; `valeur` (valeur et source : réglé dans Klad, du
+  complément, valeur par défaut), `convertir` (saisie → valeur, erreurs en français), `ecrire` (champ vidé → retour au
+  complément ; compte « Aucun » = choix prioritaire, `null`), `instantane` / `restaurer` (annulation), `apercuComplement`,
+  `lireComplement`, `importerComplement`, `brutEffectif`, `validerBrut`, `enregistrerBrut`, `recurrentsSecondaire`.
+  Écrans (même fichier) : Plus › Réglages › Budget (`secReglBudget`), › Complément (`secReglages` → `secReglTheme`,
+  `secReglAvance`), Plus › Données › Importer (`secImporter`, aperçu `#complementApercu`). Enregistrement → `changed`,
+  donc écrans et résumé Grafit recalculés aussitôt ; « Annuler » sur chaque enregistrement.
+- Nouveaux réglages (sans effet tant qu'ils ne sont pas changés) : `S.budget.reglages.cycle` (`salaire` par défaut ou
+  `mois` : `cycleCourant` → null, `debuts` → [], navigation par mois) ; `S.budget.reglages.commun.part` (part de « moi »
+  par défaut d'un poste du commun, 50 par défaut, `KladBudget.partDe`).
+- Pastille « récurrent sur <compte secondaire> » (`vbudget.js:suivi`, `detRow`) : même règle que l'observation
+  (`KladObservations.recurrentsSecondaire`, montant récurrent sur au moins 2 mois ou poste fixe, récent).
+- Sauvegarde : `KladCoffre.contenuSauvegarde(S, prefs)` (tous les blocs sauf le journal, plus thème et palette),
+  `comparerSauvegarde(payload, S, prefs)` → `{ lisible, complete, differents, manquants, enTrop, cles }` ; écran
+  Sauvegarde : « Vérifier une sauvegarde » (`verrou.js:verifierSauvegarde`, rien n'est remplacé) ; bloc `sauvegarde` :
+  `verifiee: { le, date }` (aussi posé par une restauration) ; rappel (« À vérifier », `BACKUP_DUE`) : tant qu'aucune
+  sauvegarde n'est vérifiée (« SAUVEGARDE · À VÉRIFIER » si exportée, « · JAMAIS » sinon), puis 30 jours après la date du
+  fichier vérifié.
+- À propos (Plus › Aide et à propos) : version, date de fabrication (`KLAD_CONFIG.date`, `prepare-android.mjs`), notes
+  de version (`docs/NOTES.md` à l'étiquette `v<version>`, `KladMaj.notesUrl`).
+- Nettoyage : vues `categories` et `regles` de l'ancien Budget retirées (`vbudget.js`, gestionnaires d'`ecranbudget.js`,
+  sections `cats-panel` / `rules-panel`) ; l'import du complément quitte Plus › Classement pour Plus › Données › Importer.
+- Tests : `test/reglages.test.mjs` (node et Chromium : modifications visibles dans les écrans et le résumé Grafit,
+  compte secondaire, import avec aperçu, éditeur avancé, annulation), `test/sauvegarde.test.mjs` (node et Chromium :
+  export → vérification → tout effacer → restauration sur installation neuve → mêmes écrans, même relevé de contrôle,
+  même résumé Grafit), débordements étendus aux écrans de réglages.
+
+## Historique des versions avant la 1.0.0
 
 **0.10.11** — correctif avant la recette finale : le bandeau du mode démo dépassait de l'écran (texte sur une ligne).
 - Bandeau `#demoBar` : texte replié sur plusieurs lignes, largeur bornée à l'écran moins 24 px, « Quitter » jamais coupé.
@@ -116,7 +170,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Correctif : icônes toutes dessinées, champs des volets, diagnostic d'affichage, captures en mode démo | 0.10.9 | fait |
 | — | Correctif : mode démo sans rien de réel à l'écran, titres et montants à 320 px et texte à 200 % | 0.10.10 | fait |
 | — | Correctif : bandeau du mode démo dans l'écran, test de débordement de tous les écrans, volets, bandeaux et messages | 0.10.11 | fait |
-| 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
+| 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | fait, maintenance ensuite |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -313,6 +367,13 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   sur « Tout » depuis l'Accueil, recherche par catégorie, contrats et tendance du commun dans Commun › Trésorerie,
   sous-vue gardée pour la session seulement, palette dès UX-1. Réglages › Budget devient modifiable en 9c.
 
+- 1.0.0 (décisions prises par défaut, à valider) : un champ de réglage vidé revient à la valeur du complément ; un
+  compte mis sur « Aucun » est un choix de Klad (prioritaire) ; dans l'éditeur avancé, chaque rubrique différente du
+  complément importé devient un réglage de Klad, une rubrique supprimée est retirée (`null`) ; une sauvegarde est
+  « vérifiée » si elle se déchiffre et contient tous les blocs attendus, même si des données ont changé depuis (les
+  différences sont listées) ; le rappel compte 30 jours depuis la date du fichier vérifié ; une restauration vaut
+  vérification ; le thème et la palette voyagent avec la sauvegarde ; l'import du complément exige la reprise.
+
 ## Inventaire des écarts avec l'ancienne version (0.9.0)
 
 Repris en 0.9.0 : interface ; tendance complète (revenus, dépenses, balance, balance cumulée, solde reconstitué ou une
@@ -345,29 +406,39 @@ Restent :
 ## Points d'appui laissés par la 0.10.8 (parité des fonctions)
 
 - `docs/parite-fonctions.md` : inventaire des fonctions de la v65 (téléphone et ordinateur) et statut dans Klad.
-- Catégories et règles gérées dans Plus › Classement (`plus.js:renderClassement`) ; les vues `vbudget.js:categories`,
-  `regles` et leurs gestionnaires dans `ecranbudget.js` ne sont plus affichées (gardées, à retirer un jour).
+- Catégories et règles gérées dans Plus › Classement (`plus.js:renderClassement`) ; les anciennes vues `categories` et
+  `regles` du Budget ont été retirées en 1.0.0.
 - Abandons tranchés en 0.10.9 (décision du propriétaire) : « Liste d'origine » des contrats, liste des bulletins de paie
   non lus. Manquant pour la 9c : pastille « charge récurrente sur le compte secondaire » (compte secondaire réglable).
 - Mesures : `tools/mesures/banc.mjs` parcourt aussi Plus › Classement (nouvelle catégorie, catégorie dépliée) et le
   sélecteur d'icône (0.10.7 : 671 contrôles sur les écrans principaux, 0 sous 48 dp, 0 sous AA).
 
-## Points d'appui pour le Lot 9c (1.0.0, à publier seulement après « recette OK »)
+## Maintenance : comment faire
 
-- Place prévue dans l'interface (série UX) : Plus › Réglages › Budget (`secReglBudget`, aujourd'hui en lecture : cycle de
-  salaire, base de calcul, personnes du commun ; seul l'interrupteur du reste à vivre y est modifiable depuis la 0.10.7) pour les réglages du complément ; Plus › Données › Importer (`secImporter`)
-  pour le complément et la reprise ; Plus › Données › Sauvegarde (écran `sauvegarde`) pour la sauvegarde vérifiée.
-- Navigation : écrans « page » avec Retour par la table `RETOUR` de `www/app.js` ; sous-vues par `data-sousvue`
-  (`KladEcranBudget.barre`, `SV` d'`ecranfisc.js`) ; préférences d'affichage par la liste fermée `KladUI.PREFS`.
+### Rejouer le contrôle (à chaque changement de calcul)
+1. Sur le téléphone : Plus › Données › Contrôle › « Exporter le relevé de contrôle » (fichier personnel en clair,
+   `klad-controle-AAAAMMJJ-HHMM.json`, à supprimer après le contrôle).
+2. Relevé de l'ancienne version (dépôt privé de référence, jamais copié ici) puis comparaison :
+   `node tools/controle/carnet-controle.mjs …` et `node tools/controle/comparer.mjs <relevé Klad> <relevé ancienne version>`
+   (mode d'emploi : `tools/controle/README.md`). Attendu : points 2 à 7 identiques au centime ; écarts connus listés plus bas.
+3. Entre deux versions de Klad, sans donnée réelle : le banc (`tools/mesures/banc.mjs`, option `www`) ouvre une autre
+   version de `www/` sur le même jeu fictif ; comparer `KladControle.construire` et `KladResume.construire` à date fixe
+   (méthode de `test/sauvegarde.test.mjs`). Un écart sur un calcul : s'arrêter et le signaler.
 
-- Complément et carnet en réglages ordinaires : aujourd'hui lus dans `S.carnet` (racine `KladBudget.racine`), sous-objets
-  `klad.*` du complément (`klad.mail`, `appels.titre`, `appels.syndic`, pastilles…) ; réglages saisis dans Klad dans
-  `S.modele.extras` et `S.budget`. Priorité actuelle : complément < réglages de Klad.
-- Sauvegarde : tous les blocs sauf le journal (bloc `cle` compris : clé Enable Banking, clé Claude, mot de passe
-  d'application) ; à vérifier par un export puis une restauration complète sur un téléphone vierge.
-- Relevé de contrôle (`tools/controle`) : à rejouer après chaque changement de calcul.
-- Bascule : arrêt des scripts Google de l'ancienne version, archivage de l'ancienne version, retrait de l'ancienne adresse
-  de retour chez Enable Banking (liste à remettre au propriétaire, rien à faire dans le code).
+### Ajouter une donnée au mode démo
+Un écran qui affiche une donnée nouvelle (nom, libellé, motif…) : l'ajouter au dictionnaire dans `KladDemo.construire`
+(`www/demo.js`) ; ajouter la même donnée au jeu fictif « personnel » (`tools/mesures/donnees.mjs`, `reprisePersonnelle`)
+et à la liste `PERSONNEL` ; `test/demo.test.mjs` parcourt tous les écrans en mode démo et signale toute fuite. Les
+valeurs des champs sont masquées « ••• » d'office, les nombres multipliés.
+
+### Ajouter un réglage du complément
+Ajouter le champ dans `KladReglages.THEMES` (`www/reglages.js`) avec son magasin (`ou`) et son type ; le lecteur du
+calcul passe par `KladBudget.complement(S)` (jamais `S.carnet` directement) ; un test dans `test/reglages.test.mjs`.
+
+### Publier un correctif
+Branche, `npm test` (parcours Chromium compris), version dans `package.json`, demande de fusion, vérification
+« APK Android » verte sans test sauté, fusion ; la fabrication sur `main` publie l'APK signé ; note dans `docs/NOTES.md`
+et dans ce fichier ; recette manuelle remise au propriétaire.
 
 ## Points d'appui pour le Lot 9b (historique)
 

@@ -1802,7 +1802,6 @@ html.appm .controls.stick > .seg{display:none}
 .sousvues button[aria-pressed="true"]{background:var(--surface)!important;color:var(--ink)!important;box-shadow:0 1px 3px rgba(20,32,28,.14)}
 html.appm #view-budget > .sv-bar{order:1}
 html.ops-mode #view-budget > .sv-bar{display:none!important}
-html.appm #cats-panel,html.appm #rules-panel{display:none!important}
 html.appm #view-budget[data-sv="suivi"] :is(#tend-panel,#ctr-zone,#cm-tres),
 html.appm #view-budget[data-sv="tendance"] :is(#actions,#rav-m,#budget-main,#ctr-zone,#cm-plan,#cm-tres),
 html.appm #view-budget[data-sv="contrats"] :is(#actions,#rav-m,#budget-main,#tend-panel,#cm-plan,#cm-tres),
@@ -1917,7 +1916,7 @@ label.ctl{max-width:100%;min-width:0;flex-wrap:wrap}
    soit plus coupé sur les bords (défaut vu sur le téléphone : champ « tronqué des deux côtés ») */
 .sh-body{margin-inline:-6px;padding-inline:6px}
 .sheet{padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
-.diag-t{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 var(--mono);background:var(--surface-2);border-radius:12px;padding:10px 12px;margin:0;max-width:100%}
+.diag-t{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 var(--mono);background:var(--surface-2);border-radius:12px;padding:10px 12px;margin:0;max-width:100%;box-sizing:border-box}
 /* Plus › Classement : la fiche dépliée d'une catégorie passe sous son nom, sur toute la largeur (0.10.9 ; jusque-là
    coincée à droite du nom, dans la même rangée) */
 .list.cats>li{flex-wrap:wrap}
@@ -1952,3 +1951,17 @@ html.appm .an-bar:not(.custom) .an-ctl { flex-wrap: wrap; }
 .ac-hero .lbl, .ac-hero .s, .mini .lbl, .ac-poste .l3, .cm-min .subs, .ac-act { overflow-wrap: break-word; white-space: normal; }
 ul.list li { flex-wrap: wrap; }
 @media (max-width:760px){ .cmp-grid, .cm-cash { grid-template-columns: minmax(0, 1fr); } }
+/* 1.0 : réglages du complément dans Klad (reglages.js) */
+.rg-form{display:flex;flex-direction:column;gap:12px;margin:6px 0 10px}
+.rg-champ{display:flex!important;flex-direction:column;gap:6px;min-width:0}
+.rg-l{font-weight:600;font-size:14px;overflow-wrap:break-word}
+.rg-src{display:inline-block;margin-left:6px;padding:0 6px;border-radius:8px;background:var(--surface-2);color:var(--ink-2);font-weight:500;font-size:12px}
+.rg-aide{font-size:12.5px;overflow-wrap:break-word}
+.rg-champ textarea{min-height:96px;resize:vertical}
+#rgBrut{min-height:320px}
+.rg-msg{min-height:1em;margin:0;color:var(--bad);font-size:13px;overflow-wrap:anywhere}
+.rg-apercu{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-top:8px}
+.sv-verif{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-top:10px;overflow-wrap:break-word}
+.sv-verif ul{margin:4px 0;padding-left:20px}
+.sv-etapes{margin:10px 0 0;padding-left:20px;font-size:13.5px}
+.sv-etapes li{margin:4px 0}

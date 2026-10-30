@@ -78,7 +78,7 @@ test('accueil : « À vérifier » (lignes et écrans), carte à débit différ�
   const v = Vu.aVerifier(S, NOW, ext), tv = texte(v);
   assert.doesNotMatch(v, /data-av="nonvues"/);          // les opérations à voir ont leur propre ligne
   assert.match(v, /data-av="sauvegarde"/);
-  assert.match(tv, /Dernière sauvegarde il y a 45 jours/);
+  assert.match(tv, /Dernière sauvegarde vérifiée il y a 45 jours/);
   assert.match(tv, /Klad 9\.9\.9 est disponible/);
   assert.match(texte(Vu.aVoir(S, 'perso', cx)), /\d+ opérations à voir/);
   const dettes = { [k.id]: K.dette(S, k, NOW) };

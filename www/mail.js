@@ -18,8 +18,8 @@
 
   // Réglages effectifs : complément (klad.mail) < réglages saisis dans Klad (S.modele.extras.mail).
   function reglages(S) {
-    const Rc = S && S.carnet && KB() ? KB().racine(S.carnet) : null;
-    const C = Rc && isObj(Rc.klad) && isObj(Rc.klad.mail) ? Rc.klad.mail : {};
+    const K0 = S && KB() ? KB().complement(S) : {};
+    const C = isObj(K0.mail) ? K0.mail : {};
     const E = (S && S.modele && S.modele.extras && S.modele.extras.mail) || {};
     const R = Object.assign({}, DEFAUTS, C, E);
     R.expediteurs = liste(E.expediteurs != null ? E.expediteurs : C.expediteurs);

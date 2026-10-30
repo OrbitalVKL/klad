@@ -36,6 +36,12 @@
     return isObj(st.P) ? st.P : isObj(st.payload) ? st.payload : isObj(st._payload) ? st._payload : {};
   }
 
+  // Extension « klad » du carnet, surchargée par les réglages du complément saisis dans Klad (1.0, KladBudget.surcharger).
+  function ext(S, st) {
+    const X = isObj(st.klad) ? st.klad : {};
+    return g.KladBudget && g.KladBudget.surcharger ? g.KladBudget.surcharger(S, X) : X;
+  }
+
   // Le carnet contient-il de quoi classer ?
   function utilisable(carnet) {
     const st = racine(carnet);
@@ -75,7 +81,8 @@
   // Noms de comptes de l'ancienne version → comptes Klad : liste de noms du carnet (rang = référence r<rang> de la
   // reprise), sinon même libellé, sinon par rôle (« commun » dans le nom → compte commun, sinon comptes courants).
   function resolveur(S, st) {
-    const noms = arr(st.klad && st.klad.comptes) || arr(st.ACCTS) || arr(st.accts);
+    const kl = ext(S, st);
+    const noms = arr(kl.comptes) || arr(st.ACCTS) || arr(st.accts);
     const map = (S.modele.reprise && S.modele.reprise.map) || {};
     const libs = (S.modele.reprise && S.modele.reprise.libelles) || {};
     const F = K().fold;
@@ -101,7 +108,7 @@
     // partiel : seulement les règles de base et les catégories qui manquent (complément de la 0.9.3) ; règles de
     // l'utilisateur, corrections, opérations vues et catégories déjà présentes restent comme dans Klad.
     const partiel = !!opts.seulementBase;
-    const X = isObj(st.klad) ? st.klad : {};
+    const X = ext(S, st);
     const cats = isObj(st.cats) ? st.cats : {};
     const renommees = Object.assign({}, RENOMMEES, isObj(cats.renamed) ? cats.renamed : {});
     const retirees = arr(cats.removed) || [];

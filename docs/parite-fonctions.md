@@ -1,6 +1,6 @@
 # Parité des fonctions : ancienne version (Carnet v65) → Klad
 
-État à la version **0.10.9**. Chaque fonction visible de l'ancienne version (interface téléphone **et** ordinateur), écran
+État à la version **1.0.0** (dernière mise à jour : 0.10.9, puis pastille du compte secondaire en 1.0.0). Chaque fonction visible de l'ancienne version (interface téléphone **et** ordinateur), écran
 par écran et bouton par bouton, avec son équivalent dans Klad. Aucune donnée personnelle : personnes désignées
 « personne A / B » ou « l'autre personne », comptes désignés par leur rôle (compte courant principal, compte secondaire,
 compte commun, carte à débit différé, portefeuille en ligne, livret). Les exemples chiffrés sont fictifs.
@@ -20,20 +20,20 @@ Emplacements v65 : fonction JS ou libellé (le JS est dans une seule fonction en
 
 326 lignes de fonctions (téléphone et ordinateur) :
 
-| Statut | Avant (0.10.6) | Après (0.10.8) | 0.10.9 |
-|---|---|---|---|
-| Présent identique | 225 | 226 | 226 |
-| Présent adapté | 78 | 85 | 85 |
-| Manquant | 9 lignes (8 fonctions) | 1 (9c) | 1 (9c) |
-| Abandonné (décision déjà prise) | 12 | 12 | 14 |
-| Abandon à décider | 2 | 2 | 0 |
+| Statut | Avant (0.10.6) | Après (0.10.8) | 0.10.9 | 1.0.0 |
+|---|---|---|---|---|
+| Présent identique | 225 | 226 | 226 | 226 |
+| Présent adapté | 78 | 85 | 85 | 86 |
+| Manquant | 9 lignes (8 fonctions) | 1 (9c) | 1 (9c) | 0 |
+| Abandonné (décision déjà prise) | 12 | 12 | 14 | 14 |
+| Abandon à décider | 2 | 2 | 0 | 0 |
 
 Livré en 0.10.8 (sans clé ni réglage personnel, petit effort) : renommer et supprimer une catégorie, ajouter une règle à
 la main (trois pertes de la 0.10.4), aperçu des opérations concernées par une règle, pastille « équilibre » et un seul
 ajout par opération, tri des opérations, total de tous les comptes dont épargne.
-Reste pour la 9c (1.0.0) : la pastille « charge récurrente sur le compte secondaire » dans le détail d'un poste (le
-compte secondaire est désigné par le complément) ; plus largement, les réglages du complément modifiables dans Klad
-(Réglages › Budget : cycle de salaire, personnes du commun ; compte secondaire ; motifs de l'extra Mail).
+Livré en 1.0.0 : la pastille « récurrent sur <compte secondaire> » dans le détail d'un poste (compte secondaire réglable
+dans Plus › Réglages › Budget) ; tous les réglages du complément modifiables dans Klad (Réglages › Budget et
+Réglages › Complément). Plus aucune fonction manquante.
 Abandons tranchés en 0.10.9 (« abandonné, décision du propriétaire ») : « Liste d'origine » des contrats ; liste des
 bulletins de paie non lus (voir la fin du document). Plus aucun abandon à décider.
 
@@ -172,7 +172,7 @@ bulletins de paie non lus (voir la fin du document). Plus aucun abandon à déci
 | Projection fin de période d'après le rythme des 90 jours précédents | `drawTrack` (`HR`) | Présent identique | `budget.js:suivi` | — | |
 | Déplier un poste : opérations de la période et contrats du poste | `drawTrack` (`more`, `drawLine`) | Présent identique | `[data-poste]` — `vbudget.js:suivi` | — | |
 | Lien « classer ▾ » sur une opération du détail (boîte de classement sous la ligne) | `openRuleInline` | Présent adapté | `[data-classer]` ouvre la page de l'opération — `app.js:ouvrirOp` | — | |
-| Pastille « charge récurrente sur le compte secondaire » sur une opération du détail | `detRow` (fonction des charges récurrentes) | Manquant (9c) | — | 9c · complément | Le point existe dans les observations ; la pastille dans le détail du poste attend que le compte secondaire soit réglable dans Klad (9c). |
+| Pastille « charge récurrente sur le compte secondaire » sur une opération du détail | `detRow` (fonction des charges récurrentes) | Présent adapté (1.0.0) | Budget › Suivi, poste déplié : « récurrent sur <compte> » · `vbudget.js:suivi`, `reglages.js:recurrentsSecondaire` | — | Compte secondaire et principal réglés dans Plus › Réglages › Budget (sinon ceux du complément) ; même règle que les observations. |
 | Ligne « Cause » sous un poste fixe ou du commun dépassé (doublon, contrat > budget, montant changé…) | `causeOf`, `causeRow` | Présent identique | `vbudget.js:suivi`, `budget.js` (cause) | — | |
 | Bouton « aligner le budget sur … » dans la cause | `.cz-fix` | Présent identique | `[data-aligner]` — `ecranbudget.js` | — | Klad : annulable. |
 | Contribution au commun (perso) : « répartition ▾ » = ma part de chaque poste du commun | `drawLine` (clé `lk split`) | Présent identique | `vbudget.js:suivi` (« Ma part du compte commun ») | — | |
@@ -514,7 +514,7 @@ bulletins de paie non lus (voir la fin du document). Plus aucun abandon à déci
 | Pastille « équilibre » et un seul ajout par opération | petit | fait (Opérations, volet Classer) |
 | Tri des opérations | petit | fait (Opérations) |
 | Total de tous les comptes, dont épargne | petit | fait (Accueil › Soldes) |
-| Pastille « charge récurrente sur le compte secondaire » | petit | 9c (réglage personnel) |
+| Pastille « charge récurrente sur le compte secondaire » | petit | fait en 1.0.0 |
 
 ## Abandons tranchés (décision du propriétaire, 0.10.9)
 

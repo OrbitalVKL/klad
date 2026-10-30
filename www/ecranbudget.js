@@ -6,7 +6,6 @@
 
   const A = window.KladApp;
   const KB = window.KladBudget;
-  const KC = window.KladClasse;
   const KCo = window.KladCommun;
   const VB = window.KladVuesBudget;
   const VC = window.KladVuesCommun;
@@ -16,7 +15,7 @@
   const S = () => A.etat();
 
   const tend = Object.assign({ comptes: 'auto', mode: 'rd' }, U.pref('tendance') || {});
-  const ui = { sv: { perso: 'suivi', commun: 'mois' }, nav: null, mode: 'suivi', ouverts: new Set(), ouvertsPlan: new Set(), cartes: new Set(), ctrEdit: null, edit: null, ajout: null, ravOuvert: false, choixPer: false, catRen: null, sim: {} };
+  const ui = { sv: { perso: 'suivi', commun: 'mois' }, nav: null, mode: 'suivi', ouverts: new Set(), ouvertsPlan: new Set(), cartes: new Set(), ctrEdit: null, edit: null, ajout: null, ravOuvert: false, choixPer: false, sim: {} };
   let scopeRendu = null;
 
   const PANNEAUX = ['actions', 'cm-plan', 'cm-tres', 'budget-main', 'tend-panel', 'p-contrats'];
@@ -49,8 +48,6 @@
     sur('budget-main', () => VB.teteBudget(B, scope, ui) + (ui.mode === 'plan' ? VB.plan(B, scope, { ouverts: ui.ouvertsPlan }) : depasses(B, scope) + VB.suivi(B, scope, ui).html));
     sur('tend-panel', () => VB.tendance(B, scope, tend, periodeTendance(B)));
     sur('ctr-zone', () => '<section class="panel" id="p-contrats">' + VB.contrats(B, scope, ui.ctrEdit) + '</section>');
-    // Catégories et règles : Plus › Réglages › Classement (0.10.4)
-    $('cats-panel').innerHTML = ''; $('rules-panel').innerHTML = '';
     plis($('view-budget'));
     // une sous-vue ne s'ouvre jamais sur une section repliée seule
     for (const id of ['tend-panel', 'p-contrats']) { const p = $(id); if (p) { p.classList.add('force-open'); U.appliquerPli(p); } }
@@ -91,10 +88,6 @@
   function annulable(msg, snap) {
     A.changed('budget');
     A.toastAnnuler(msg, () => { KB.annuler(S(), snap); A.changed('budget'); });
-  }
-  function classementAnnulable(msg, snap) {
-    A.changed('classement');
-    A.toastAnnuler(msg, () => { KC.restaurer(S(), snap); A.changed('classement'); });
   }
 
   // ------------------------------------------------------------ sections dépliantes (tous les écrans)
@@ -213,41 +206,6 @@
     }
     const ct = t.closest('[data-ct]');
     if (ct) { contrat(ct); return; }
-    // catégories et règles
-    if (t.closest('[data-ncadd]')) {
-      try { const snap = KC.creerCategorie(S(), $('nc-name').value, $('nc-nat').value); A.log('info', 'Catégorie ajoutée.'); classementAnnulable('Catégorie créée.', snap); }
-      catch (e) { A.toast(e.message, true); }
-      return;
-    }
-    const cr = t.closest('[data-catren]');
-    if (cr) { ui.catRen = cr.dataset.catren; render(); const i = $('cat-ren'); if (i) i.focus(); return; }
-    if (t.closest('[data-catrenno]')) { ui.catRen = null; render(); return; }
-    if (t.closest('[data-catrenok]')) {
-      try { const snap = KC.renommerCategorie(S(), ui.catRen, $('cat-ren').value); ui.catRen = null; if (snap) { A.log('info', 'Catégorie renommée.'); classementAnnulable('Catégorie renommée.', snap); } else render(); }
-      catch (e) { A.toast(e.message, true); }
-      return;
-    }
-    const cs = t.closest('[data-catsup]');
-    if (cs) {
-      if (!A.confirmInline(cs, 'Supprimer ?')) return;
-      const snap = KC.supprimerCategorie(S(), cs.dataset.catsup);
-      A.log('info', 'Catégorie supprimée.');
-      classementAnnulable('Catégorie « ' + cs.dataset.catsup + ' » supprimée : ses opérations passent en « Autres ».', snap);
-      return;
-    }
-    if (t.closest('[data-nradd]')) {
-      try { const mot = $('nr-kw').value, cat = $('nr-cat').value; const snap = KC.ajouterRegle(S(), mot, cat); A.log('info', 'Règle de classement ajoutée.'); classementAnnulable('Règle « ' + mot.trim() + ' » ajoutée.', snap); }
-      catch (e) { A.toast(e.message, true); }
-      return;
-    }
-    const nr = t.closest('[data-nrsup]');
-    if (nr) {
-      if (!A.confirmInline(nr, 'Supprimer ?')) return;
-      const snap = KC.retirerRegle(S(), nr.dataset.nrsup);
-      A.log('info', 'Règle de classement supprimée.');
-      classementAnnulable('Règle supprimée.', snap);
-      return;
-    }
     // observations
     const fa = t.closest('[data-fait]');
     if (fa) {
@@ -318,15 +276,6 @@
       A.toastAnnuler('Calculateur carburant mis à jour.', () => { KB.annulerCarburant(S(), avant); A.changed('budget'); });
       return;
     }
-    if (t.dataset.catnat) {
-      const snap = KC.changerNature(S(), t.dataset.catnat, t.value);
-      classementAnnulable('Nature de « ' + t.dataset.catnat + ' » modifiée.', snap);
-    }
-  });
-  vb.addEventListener('input', ev => {
-    if (ev.target.id !== 'nr-kw') return;
-    const v = ev.target.value.trim();
-    $('nr-count').textContent = v ? KC.concernees(S(), v, {}).length + ' opération(s) concernée(s)' : '';
   });
   vb.addEventListener('toggle', ev => {
     const d = ev.target;

@@ -63,7 +63,7 @@
   const fold = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   let EXT = { couleurs: {}, pastilles: [] };           // réglages d'apparence du complément (données, jamais dans le code)
   function reglerApparence(S) {
-    const Rc = S && S.carnet && KB() ? KB().racine(S.carnet) : null, X = (Rc && Rc.klad) || {};
+    const X = S && KB() ? KB().complement(S) : {};
     const c = X.couleurs && typeof X.couleurs === 'object' ? X.couleurs : {};
     const p = X.pastilles && typeof X.pastilles === 'object' ? Object.keys(X.pastilles).map(k => [fold(k), X.pastilles[k]]) : [];
     EXT = { couleurs: c, pastilles: p.filter(x => Array.isArray(x[1]) && x[1].length >= 2) };

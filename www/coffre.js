@@ -276,10 +276,41 @@
   }
 
   // Contenu d'une sauvegarde exportée (v2) : tous les blocs sauf le journal.
-  function contenuSauvegarde(S) {
+  // 1.0 : prefs (facultatif) : préférences d'affichage du téléphone (thème, palette), rendues à la restauration.
+  function contenuSauvegarde(S, prefs) {
     const blocs = g.KladModele.versBlocs(S);
     delete blocs.journal;
-    return { app: 'klad', v: 2, blocs };
+    const o = { app: 'klad', v: 2, blocs };
+    if (prefs) o.prefs = prefs;
+    return o;
+  }
+
+  // Vérification d'une sauvegarde ouverte (1.0) : chaque bloc comparé aux données actuelles, rien n'est écrasé.
+  // → { lisible, complete, manquants: [blocs actuels absents du fichier], differents: [blocs qui diffèrent],
+  //     enTrop: [blocs du fichier absents aujourd'hui], cles: { eb, claude, mail } (présentes dans le fichier) }.
+  // complete : le fichier contient tous les blocs attendus (clés, comptes, soldes, classement, budget, reprise et
+  // complément s'ils existent, opérations de chaque compte) ; une différence de contenu (données changées depuis)
+  // n'empêche pas une sauvegarde d'être complète.
+  function comparerSauvegarde(payload, S, prefs) {
+    if (!payload || payload.app !== 'klad' || payload.v !== 2 || !payload.blocs) return { lisible: false, complete: false, manquants: [], differents: [], enTrop: [], cles: {} };
+    const F = payload.blocs, A = contenuSauvegarde(S).blocs;
+    const canon = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, c) => { o[c] = x[c]; return o; }, {}) : x);
+    const r = { lisible: true, manquants: [], differents: [], enTrop: [], cles: {} };
+    for (const n of Object.keys(A)) {
+      if (!(n in F)) r.manquants.push(n);
+      else if (canon(F[n]) !== canon(A[n])) r.differents.push(n);
+    }
+    for (const n of Object.keys(F)) if (!(n in A)) r.enTrop.push(n);
+    const k = F.cle || {};
+    r.cles = { eb: !!(k.appId && k.pem), claude: !!k.claude, mail: !!k.mailMdp };
+    // blocs structurels : tous présents ; opérations : au moins un bloc par compte qui en a aujourd'hui
+    const struct = ['cle', 'modele', 'soldes', 'classement', 'budget', 'carnet'].filter(n => n in A);
+    const comptesOps = new Set(Object.keys(A).filter(n => /^ops-/.test(n)).map(n => n.replace(/-\d{4}$/, '')));
+    const comptesF = new Set(Object.keys(F).filter(n => /^ops-/.test(n)).map(n => n.replace(/-\d{4}$/, '')));
+    r.complete = struct.every(n => n in F) && [...comptesOps].every(c => comptesF.has(c)) &&
+      (!(S.cle && S.cle.appId) || r.cles.eb) && (!(S.cle && S.cle.claude) || r.cles.claude) && (!(S.cle && S.cle.mailMdp) || r.cles.mail);
+    if (prefs && canon(payload.prefs || null) !== canon(prefs)) r.differents.push('prefs');
+    return r;
   }
 
   // Sauvegarde ouverte → état. Une sauvegarde 0.2 (v1 : { cle, comptes }) passe par la migration.
@@ -306,7 +337,7 @@
   }
 
   g.KladCoffre = {
-    toB64, fromB64, importDek, seal, open, BLOCS, nomValide, charger, contenuSauvegarde, depuisSauvegarde,
+    toB64, fromB64, importDek, seal, open, BLOCS, nomValide, charger, contenuSauvegarde, depuisSauvegarde, comparerSauvegarde,
     newPhrase, normPhrase, pickGroups, checkGroups,
     SAUV_ITER, newBackupKey, exportBackup, readBackupHeader, importBackup,
     blank, split, join, PROTO_KEY, migrate
