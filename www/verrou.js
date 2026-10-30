@@ -595,7 +595,7 @@
       finally { if (b) b.disabled = false; if (key) renderSecu(); }
     };
   }
-  document.addEventListener('click', ev => { if (ev.target.closest('#btnLock')) lock(); });
+  document.addEventListener('click', ev => { if (ev.target.closest('#btnLock, [data-act="verrou"]')) lock(); });
   $('btnBio').addEventListener('click', guard(toggleBio));
   $('btnPin').addEventListener('click', guard(changePin));
   $('btnExport').addEventListener('click', guard(exportNow));

@@ -128,12 +128,12 @@
   // ------------------------------------------------------------ écrans et onglets (comme l'ancienne version)
   // Onglets : Budget (périmètre perso), Opérations, Commun (budget du compte commun), Plus (volet) ; depuis Plus :
   // Équilibre, Impôts, Épargne, Relevés et sauvegarde.
-  const VUES = { budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data' };
-  const TITRES = { budget: 'Budget', commun: 'Commun', operations: 'Opérations', appartement: 'Équilibre', impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés' };
+  const VUES = { accueil: 'view-accueil', budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data' };
+  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', appartement: 'Équilibre', impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés' };
   const pos = {};                    // position de défilement de chaque écran
-  let vue = 'budget', scope = 'perso';
+  let vue = 'accueil', scope = 'perso';
   function montrer(v, opts) {
-    if (!VUES[v]) v = 'budget';
+    if (!VUES[v]) v = 'accueil';
     const avant = vue;
     pos[avant] = window.scrollY;
     vue = v;
@@ -154,9 +154,11 @@
   function chrome() {
     const tb = vue === 'appartement' || vue === 'impots' || vue === 'epargne' || vue === 'donnees' ? 'plus' : vue;
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    $('ah-title').textContent = TITRES[vue] || 'Budget';
+    $('ah-title').textContent = TITRES[vue] || 'Accueil';
     let e = '';
-    if (S && (vue === 'budget' || vue === 'commun')) {
+    if (S && vue === 'accueil') {
+      try { const B = budget(); e = B ? window.KladVuesAccueil.surTitre(window.KladBudget.suivi(B, 'perso', null)) : ''; } catch (x) { e = ''; }
+    } else if (S && (vue === 'budget' || vue === 'commun')) {
       try { const B = budget(); const per = B && window.KladBudget.periode(B, scope, window.KladEcranBudget ? window.KladEcranBudget.ui.nav : null);
         if (per) e = per.cyc ? 'Cycle du ' + U.jjmm(per.cyc.start) + ' au ' + U.jjmm(per.cyc.end) : U.mLabel(per.pm0);
         if (per && per.past) e += ' · terminé'; } catch (x) { e = ''; }
@@ -313,7 +315,7 @@
     AppP.addListener('backButton', () => {
       if (!$('modal').hidden) return;
       if (!$('volet').hidden) { if (pile.length > 1) retourVolet(); else fermerVolet(); return; }
-      if (S && vue !== 'budget') { montrer(vue === 'commun' || vue === 'operations' ? 'budget' : 'budget', { force: true }); return; }
+      if (S && vue !== 'accueil') { montrer('accueil', { force: true }); return; }
       if (AppP.minimizeApp) AppP.minimizeApp();
     });
   }
@@ -408,9 +410,29 @@
     $('bal-panel').innerHTML = Vu.rangee(S, scope, now, { dettes, livrets, fdm });
     const av = Vu.aVoir(S, scope, ctx());
     $('app-seen').hidden = !av; $('app-seen').innerHTML = av;
-    const ve = scope === 'perso' ? Vu.aVerifier(S, now, ex) : '';
-    $('av-zone').hidden = !ve; $('av-zone').innerHTML = ve;
+    // 0.10.1 : le haut de l'onglet Budget (grande carte, cartes des comptes, à voir, à vérifier) est passé à l'Accueil
+    const perso = scope === 'perso';
+    $('app-hero').hidden = perso; $('bal-panel').hidden = perso;
+    if (perso) $('app-seen').hidden = true;
+    $('av-zone').hidden = true; $('av-zone').innerHTML = '';
     renderBadge();
+    renderAccueilEcran(now, ex, dettes, livrets);
+  }
+  // Onglet Accueil : mêmes fonctions de calcul que les écrans d'origine (aucun calcul propre).
+  function renderAccueilEcran(now, ex, dettes, livrets) {
+    const el = $('view-accueil');
+    if (!el || !window.KladVuesAccueil) return;
+    let B = null, res = null, fdm = null, pl = null, R = {}, ech = [];
+    try { B = budget(); } catch (e) { B = null; }
+    if (B) {
+      try { res = window.KladBudget.suivi(B, 'perso', null); } catch (e) { res = null; }
+      try { fdm = window.KladCommun ? window.KladCommun.finDeMois(B) : null; } catch (e) { fdm = null; }
+      try { pl = window.KladCommun ? window.KladCommun.plan(B) : null; } catch (e) { pl = null; }
+      try { R = window.KladCommun ? window.KladCommun.reglages(B) : {}; } catch (e) { R = {}; }
+      try { ech = window.KladBudget.echeances(B, 31); } catch (e) { ech = []; }
+    }
+    try { el.innerHTML = window.KladVuesAccueil.ecran({ S, B, now, ext: ex, res, dettes, livrets, fdm, plan: pl, R, ech }); }
+    catch (e) { el.innerHTML = '<p class="muted">Affichage impossible.</p>'; log('err', 'Accueil : ' + (e.message || e)); }
   }
   function rendre() {
     if (!S) return;
@@ -426,6 +448,49 @@
   // Haut du Budget : un appui sur une carte de compte ouvre ses opérations ; « à voir » les opérations non vues ;
   // une ligne de « À vérifier » l'écran concerné.
   const AV = { comptes: 'secComptes', banques: 'secBanques', sync: 'secSync', maj: 'secMaj', observations: 'secObs' };
+  // Accueil : lignes « À vérifier », comptes, raccourcis vers les onglets, actions rapides.
+  $('view-accueil').addEventListener('click', ev => {
+    if (!S) return;
+    const av = ev.target.closest('[data-av]');
+    if (av) {
+      const k = av.dataset.av;
+      if (k === 'nonvues') versOps({ nonVues: true });
+      else if (k === 'nonclassees' || k === 'rapprocher') versOps({ cat: k === 'nonclassees' ? '__nc' : '__rap' });
+      else if (k === 'sauvegarde') montrer('donnees', { force: true, haut: true });
+      else if (k === 'bilan') { montrer('budget', { force: true, haut: true }); if (window.KladEcranBudget && window.KladEcranBudget.cyclePrecedent) window.KladEcranBudget.cyclePrecedent(); }
+      else if (AV[k]) ouvrirVolet(AV[k]);
+      return;
+    }
+    const c = ev.target.closest('[data-compte]');
+    if (c) {
+      const k = M.compte(S, c.dataset.compte);
+      if (k && k.role === 'epargne' && k.source.type === 'manuel') montrer('epargne', { force: true, haut: true });
+      else versOps({ compte: c.dataset.compte });
+      return;
+    }
+    const a = ev.target.closest('[data-aller]');
+    if (a) {
+      const k = a.dataset.aller;
+      if (k === 'rav') ouvrirVolet('secRav');
+      else if (k === 'budget' || k === 'commun') montrer(k, { force: true, haut: true });
+      else if (k === 'contrats-perso' || k === 'contrats-commun') {
+        montrer(k === 'contrats-perso' ? 'budget' : 'commun', { force: true });
+        const p = $('p-contrats');
+        if (p) { if (p.classList.contains('collapsed')) p.querySelector('.panel-h h2.fold').click(); requestAnimationFrame(() => { p.scrollIntoView(); window.scrollBy(0, -70); }); }
+      }
+      return;
+    }
+    const act = ev.target.closest('[data-act]');
+    if (!act) return;
+    if (act.dataset.act === 'sync') synchro('manuel');
+    else if (act.dataset.act === 'trier') versOps({ nonVues: true });
+    else if (act.dataset.act === 'sauvegarde') montrer('donnees', { force: true, haut: true });
+  });
+  preparer.secRav = () => {
+    let rav = null;
+    try { const B = budget(); rav = B ? window.KladBudget.suivi(B, 'perso', null).rav : null; } catch (e) { rav = null; }
+    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav) : '';
+  };
   function versOps(f) {
     Object.assign(filtre, { compte: '', cat: '', nonVues: false }, f || {});
     perOps.k = 'tout';                // depuis l'accueil : toutes les opérations (les compteurs portent sur tout)
@@ -1049,8 +1114,8 @@
     // nettoie les autorisations restées en suspens plus d'une heure
     Object.keys(S.modele.pending).forEach(k => { if (Date.now() - (S.modele.pending[k].ts || 0) > 3600e3) delete S.modele.pending[k]; });
     save();
-    vue = 'budget'; scope = 'perso';
-    montrer('budget', { rendre: false, haut: true });
+    vue = 'accueil'; scope = 'perso';
+    montrer('accueil', { rendre: false, haut: true });
     rendre();
     premierPlan();
     preparerClassement(S);
@@ -1118,7 +1183,7 @@
     filtre.cat = ''; filtre.nonVues = false; filtre.compte = '';
     fermerVolet(true);
     toastAction = null; $('toast').className = '';
-    ['app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
+    ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
       'view-appart', 'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
       'repriseApercu', 'repriseEtat', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps']
       .forEach(id => { const e = $(id); if (e) e.textContent = ''; });

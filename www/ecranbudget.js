@@ -455,5 +455,13 @@
     } catch (e) { A.toast(e.message || String(e), true); }
   });
 
-  window.KladEcranBudget = { ui, render, PANNEAUX };
+  // Accueil › « Bilan du cycle précédent » : onglet Budget sur le cycle d'avant.
+  function cyclePrecedent() {
+    const B = A.budget();
+    if (!B) return;
+    scopeRendu = A.scope();
+    const per = KB.periode(B, A.scope(), null);
+    if (per.prev) { ui.nav = per.prev; ui.ouverts.clear(); render(); A.chrome(); }
+  }
+  window.KladEcranBudget = { ui, render, PANNEAUX, cyclePrecedent };
 })();

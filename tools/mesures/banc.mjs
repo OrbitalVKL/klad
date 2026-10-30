@@ -79,6 +79,13 @@ export async function ouvrir(o) {
     await pause(350);
     await page.evaluate(() => window.scrollTo(0, 0));
   }
+  // Opérations du périmètre perso (même liste qu'en 0.9.4, où l'onglet suivait le dernier périmètre de Budget / Commun).
+  async function operationsPerso() {
+    if (onglets.indexOf('budget') >= 0) await onglet('budget');
+    await onglet('operations');
+    const p = page.locator('[data-perimetre="perso"]');
+    if (await p.count()) { await p.first().click(); await pause(250); }
+  }
   const portee = () => page.evaluate(() => document.getElementById('volet') && !document.getElementById('volet').hidden ? '#volet' : '#appli');
   const sousVues = () => page.$$eval('[data-sousvue]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.sousvue))]);
   async function avecSousVues(nom, f) {
@@ -92,8 +99,8 @@ export async function ouvrir(o) {
   }
   // Écrans principaux : onglets (et leurs sous-vues), détail d'une opération, volet « Classer ».
   async function ecransPrincipaux(f) {
-    for (const t of onglets) { await onglet(t); await avecSousVues(t, f); }
-    await onglet('operations');
+    for (const t of onglets) { if (t === 'operations') await operationsPerso(); else await onglet(t); await avecSousVues(t, f); }
+    await operationsPerso();
     if (await page.$('[data-op]')) {
       await page.evaluate(() => { const r = document.querySelector('[data-op][data-c]'); window.KladApp.ouvrirOp(r.dataset.c, r.dataset.op); });
       await pause(250);
@@ -125,5 +132,5 @@ export async function ouvrir(o) {
     await pause(100);
   }
   async function fin() { await browser.close(); srv.close(); }
-  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, onglets, ecransPrincipaux, ecransPlus, theme, fin };
+  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, ecransPrincipaux, ecransPlus, theme, fin };
 }

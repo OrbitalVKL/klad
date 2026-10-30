@@ -118,7 +118,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     }
     await page.getByRole('button', { name: 'Vérifier' }).click();
     await page.waitForSelector('#appli:not([hidden])');
-    assert.match(await page.locator('#app-hero').innerText(), /Connectez une banque/);
+    assert.match(await page.locator('#view-accueil').innerText(), /Connectez une banque/);
 
     // connexion d'une banque (faux client) : le retour bancaire recharge la page, déverrouillage, synchro automatique
     await plusVers('secBanques');
@@ -131,9 +131,9 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.waitForSelector('.pad');
     await code();
     await synchroFinie();
-    assert.equal(await page.locator('#bal-panel .bal-t').count(), 2);
-    assert.match(await page.locator('#app-hero').innerText(), /42,50\s€\s*débiteur/);
-    assert.match(await page.locator('#av-zone').innerText(), /2 comptes à vérifier ou à réassocier/);
+    assert.equal(await page.locator('#view-accueil [data-compte]').count(), 2);
+    assert.match(await page.locator('#view-accueil [data-mesure="soldes"]').innerText(), /42,50\s€\s*débiteur/);
+    assert.match(await page.locator('#view-accueil').innerText(), /2\s+comptes à vérifier ou à réassocier/);
 
     // import de la reprise : association proposée par la fin d'IBAN, livret manuel créé, frontière
     const ouvrirReprise = async () => {
@@ -216,9 +216,9 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.equal(await nbOps(), n1);
 
     // accueil : grande carte, cartes de comptes ; aucun montant signé
-    await page.locator('#app-tb [data-tab="budget"]').click();
-    assert.equal(await page.locator('#bal-panel .bal-t').count(), 4);
-    const accueil = await page.locator('#bal-panel').innerText() + '\n' + await page.locator('#app-hero').innerText();
+    await page.locator('#app-tb [data-tab="accueil"]').click();
+    assert.equal(await page.locator('#view-accueil [data-compte]').count(), 4);
+    const accueil = await page.locator('#view-accueil').innerText();
     assert.match(accueil, /LIVRET A[\s\S]*5\s000,00\s€/);
     assert.doesNotMatch(accueil, SANS_SIGNE);
     await capture(page, '1-accueil');
@@ -349,7 +349,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await code();
     await page.waitForSelector('#appli:not([hidden])');
     assert.equal(await nbOps(), n1);
-    assert.equal(await page.locator('#bal-panel .bal-t').count(), 4);
+    assert.equal(await page.locator('#view-accueil [data-compte]').count(), 4);
 
     // désactivé → résumé effacé
     await page.locator('#app-tb [data-tab="plus"]').click();
@@ -403,6 +403,19 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#volet [data-fermer]').last().click();
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
 
+    // 0.10.1 : Accueil en tête (reste à vivre, À vérifier, soldes, ce cycle-ci, commun, échéances, actions rapides) ;
+    // le reste à vivre ouvre son détail ; le haut de l'onglet Budget (grande carte, cartes) n'y est plus
+    assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
+    const acc = await page.locator('#view-accueil').innerText();
+    assert.match(acc, /Reste à vivre jusqu'au[\s\S]*par jour[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/i);
+    assert.doesNotMatch(acc, SANS_SIGNE);
+    await page.locator('#view-accueil [data-aller="rav"]').click();
+    assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
+    await page.locator('#volet [data-fermer]').last().click();
+    await capture(page, '12-accueil');
+    await page.locator('#view-accueil [data-aller="budget"]').first().click();
+    assert.equal(await page.locator('#app-tb [data-tab="budget"]').getAttribute('aria-current'), 'page');
+    assert.equal(await page.locator('#app-hero').isVisible(), false);
     // Budget : « Reste à vivre » (deux colonnes), détail en dépliant
     await page.locator('#app-tb [data-tab="budget"]').click();
     const rav = await page.locator('#rav-m').innerText();
