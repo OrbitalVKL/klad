@@ -142,7 +142,7 @@
   // Écran étroit et texte agrandi : un titre dont un mot seul dépasse, ou un montant (jamais coupé) plus large que sa
   // carte, est réduit peu à peu (zoom de 8 % en 8 %, jusqu'à 50 %) ; les barres de l'équilibre cachent un libellé qui
   // ne tient toujours pas. Rien ne bouge quand tout tient (cas ordinaire).
-  const AJUSTER = 'header.app-h h1, .panel-h h2, .ac-card h2, .seg button, .ac-act, .hv, .ac-hero .v, .mini .v, .kpi .v, .kpi .eyebrow, .num, .cr-r b, .mg-r b, .cm-min b, .wr-v b, .wr-v .chip, .eqh-bar i span, .chip';
+  const AJUSTER = 'header.app-h h1, .panel-h h2, .ac-card h2, .seg button, .ac-act, .hv, .ac-hero .v, .mini .v, .ac-li .v, .kpi .v, .kpi .eyebrow, .num, .cr-r b, .mg-r b, .cm-min b, .wr-v b, .wr-v .chip, .eqh-bar i span, .chip';
   const CADRE = '.panel, .subpanel, .dep-l, .kpi, .ac-hero, .mini, .ac-quick, .ac-card, .cmp-card, .app-hero, .sh-rule, .eqh-bar i, .seg, header.app-h, .wrap, .sh-body';
   function deborde(e) {
     const r = e.getBoundingClientRect();
@@ -171,6 +171,8 @@
     const zt = (parseFloat(g.getComputedStyle(d.body).fontSize) || 14) / 14;
     if (!ajustes && (g.innerWidth || 0) >= 360 && zt < 1.1) return;
     ajustes = true;
+    // 0.10.11 : largeur de l'écran rapportée à la taille du texte ; sous 230, chiffres clés sur une colonne (CSS)
+    d.documentElement.classList.toggle('etroit', (g.innerWidth || 0) / zt < 230);
     const L = [...(racine || d).querySelectorAll(AJUSTER)].filter(e => e.style.zoom || e.classList.contains('fit-cache') || e.getClientRects().length);
     for (const e of L) { if (e.style.zoom) e.style.zoom = ''; e.classList.remove('fit-cache'); }
     for (const e of L.filter(deborde)) {

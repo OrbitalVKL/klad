@@ -155,6 +155,8 @@ export async function ouvrir(o) {
       let st = document.getElementById('banc-texte');
       if (!st) { st = document.createElement('style'); st.id = 'banc-texte'; document.head.appendChild(st); }
       st.textContent = pc && pc !== 100 ? 'html{-webkit-text-size-adjust:' + pc + '%;text-size-adjust:' + pc + '%}' : '';
+      // sur le téléphone, la taille du texte est connue dès l'ouverture : ajustements refaits comme au démarrage
+      window.dispatchEvent(new Event('resize'));
     }, pc);
     await pause(60);
   }

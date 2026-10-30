@@ -5,7 +5,21 @@ de `CLAUDE.md` et du `README.md`. À tenir à jour à chaque lot.
 
 ## Version
 
-**0.10.10** — correctif avant la recette finale (réponse au rapport 0.10.9 ; icônes dessinées pour stationnement et
+**0.10.11** — correctif avant la recette finale : le bandeau du mode démo dépassait de l'écran (texte sur une ligne).
+- Bandeau `#demoBar` : texte replié sur plusieurs lignes, largeur bornée à l'écran moins 24 px, « Quitter » jamais coupé.
+- Autres débordements trouvés par le nouveau test et corrigés : compte et étiquette d'une opération (repliés plutôt que
+  coupés), chiffres clés de Plus › Impôts et Épargne (une colonne quand l'écran est étroit pour la taille du texte :
+  classe `html.etroit` posée par `KladUI.ajuster`, largeur / taille du texte sous 230), titres des observations
+  (`min-width: 0`), montant des lignes de l'Accueil en mode démo (réduit par `KladUI.ajuster`, `.ac-li .v`).
+- Test `test/debord.test.mjs` (parcours Chromium de la fabrication) : relevé `releveDebord` (tout élément visible dans
+  l'écran une fois rogné par ses ancêtres, zones qui défilent exclues) et `releveTextes` sur toute la page ; écrans
+  principaux et sous-vues, entrées de Plus, volets, écran de verrouillage, bandeau du mode démo sur chaque onglet,
+  messages (simple, erreur, « Annuler ») ; 320 / 360 / 412 px, texte 100 / 150 / 200 %. Contre-épreuve :
+  `KLAD_WWW=<www de la 0.10.10> node --test test/debord.test.mjs` signale le bandeau sur les 9 configurations
+  (même à 412 px et texte à 100 %), 174 défauts en tout (162 liés au bandeau) ; 0 sur la 0.10.11.
+- Banc (`tools/mesures/banc.mjs`) : changer la taille du texte relance les ajustements (comme au démarrage du téléphone).
+
+(0.10.10) — correctif avant la recette finale (réponse au rapport 0.10.9 ; icônes dessinées pour stationnement et
 courses, et texte agrandi simulé dans Chromium : validés).
 - Mode démo : rien de réel à l'écran (`www/demo.js`, `KladDemo`). Au démarrage du mode, un dictionnaire est tiré des
   données : libellé de chaque opération (complet, court, 3 premiers mots, forme des observations), contrepartie → sa
@@ -100,7 +114,8 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Retours sur la série UX : détail des postes, icônes des catégories, base du reste à vivre, gestes | 0.10.7 | fait |
 | — | Parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`) et petites fonctions manquantes | 0.10.8 | fait |
 | — | Correctif : icônes toutes dessinées, champs des volets, diagnostic d'affichage, captures en mode démo | 0.10.9 | fait |
-| — | Correctif : mode démo sans rien de réel à l'écran, titres et montants à 320 px et texte à 200 % | 0.10.10 | fait, recette finale en cours |
+| — | Correctif : mode démo sans rien de réel à l'écran, titres et montants à 320 px et texte à 200 % | 0.10.10 | fait |
+| — | Correctif : bandeau du mode démo dans l'écran, test de débordement de tous les écrans, volets, bandeaux et messages | 0.10.11 | fait |
 | 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | après « recette OK » |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
