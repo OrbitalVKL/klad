@@ -163,7 +163,7 @@
       if (m < m0 || m > lf) continue;
       if (r.type === 'revenu') rv += r.m; else if (r.type === 'depense') dp -= r.m;
     }
-    if (rv - dp < 0) add('warn', 'perso', 'Balance négative sur 3 mois', 'De ' + mLong(m0) + ' à ' + mLong(lf) + ' : ' + e0(rv / 3) + ' de revenus pour ' + e0(dp / 3) + ' de dépenses par mois.');
+    if (rv - dp < 0) add('warn', 'perso', 'Balance déficitaire sur 3 mois', 'De ' + mLong(m0) + ' à ' + mLong(lf) + ' : ' + e0(rv / 3) + ' de revenus pour ' + e0(dp / 3) + ' de dépenses par mois.');
     else add('good', 'perso', 'Balance positive sur 3 mois', e0((rv - dp) / 3) + ' de plus par mois de ' + mLong(m0) + ' à ' + mLong(lf) + '.');
     // impôts, taxe foncière, régularisations
     if (KF()) {

@@ -7,6 +7,9 @@
 
   const CLE = 'klad.theme';
   const THEMES = ['auto', 'clair', 'sombre'];
+  // Palette : « klad » (couleurs de l'ancienne version) ou « grafit » (noir et rouge, comme l'icône) ; clé klad.palette.
+  const CLE_PAL = 'klad.palette';
+  const PALETTES = ['klad', 'grafit'];
 
   // Attribut lu par la feuille de style : data-theme="light" / "dark" (absent en automatique).
   const ATTR = { clair: 'light', sombre: 'dark' };
@@ -33,6 +36,19 @@
     if (m) m.setAttribute('content', t === 'auto' ? 'light dark' : ATTR[t]);
     barres(t);
     return t;
+  }
+  function palette() { try { const p = g.localStorage && g.localStorage.getItem(CLE_PAL); return PALETTES.indexOf(p) >= 0 ? p : 'klad'; } catch (e) { return 'klad'; } }
+  function appliquerPalette(p) {
+    p = PALETTES.indexOf(p) >= 0 ? p : 'klad';
+    const r = g.document && g.document.documentElement;
+    if (r) { if (p === 'klad') r.removeAttribute('data-palette'); else r.setAttribute('data-palette', p); }
+    barres();
+    return p;
+  }
+  function choisirPalette(p) {
+    p = appliquerPalette(p);
+    try { if (p === 'klad') g.localStorage.removeItem(CLE_PAL); else g.localStorage.setItem(CLE_PAL, p); } catch (e) { /* stockage indisponible : palette pour cette session */ }
+    return p;
   }
   function choisirTheme(t) {
     t = appliquerTheme(t);
@@ -137,10 +153,11 @@
 
   if (g.document) {
     appliquerTheme(theme());
+    appliquerPalette(palette());
     // automatique : suit le téléphone quand il change de thème, appli ouverte
     try { g.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (theme() === 'auto') { barres(); if (g.KladAffichage.surTheme) g.KladAffichage.surTheme(); } }); } catch (e) { /* navigateur ancien */ }
     if (g.addEventListener) g.addEventListener('load', () => barres());
   }
 
-  g.KladAffichage = { THEMES, theme, sombre, choisirTheme, appliquerTheme, surTheme: null, masquer, aliasDe, demarrerDemo, arreterDemo, demoActif: () => demo.on, facteurDemo: () => demo.k, surArret: null };
+  g.KladAffichage = { THEMES, theme, sombre, choisirTheme, appliquerTheme, PALETTES, palette, choisirPalette, appliquerPalette, surTheme: null, masquer, aliasDe, demarrerDemo, arreterDemo, demoActif: () => demo.on, facteurDemo: () => demo.k, surArret: null };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -82,14 +82,14 @@
     const top = Math.ceil(hi / step) * step, bot = Math.floor(lo / step) * step;
     const y = v => pad.t + (top - v) / (top - bot || 1) * (H - pad.t - pad.b);
     let sv = '';
-    for (let v = bot; v <= top + 1e-6; v += step) sv += '<line x1="' + pad.l + '" x2="' + (Wd - pad.r) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)" stroke-width="1"/><text x="' + (pad.l - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end" fill="' + U().couleurGraduation(v) + '" font-family="JetBrains Mono, monospace" font-size="10">' + U().graduation(v) + '</text>';
+    for (let v = bot; v <= top + 1e-6; v += step) sv += '<line x1="' + pad.l + '" x2="' + (Wd - pad.r) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)" stroke-width="1"/><text x="' + (pad.l - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end" fill="' + U().couleurGraduation(v) + '" font-family="JetBrains Mono, monospace" font-size="12">' + U().graduation(v) + '</text>';
     sv += '<line x1="' + pad.l + '" x2="' + (Wd - pad.r) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" stroke="var(--muted)"/>';
     const n = C.months.length, bw = (Wd - pad.l - pad.r) / n;
     C.months.forEach((mo, i) => {
       const cx = pad.l + i * bw + bw / 2, bwi = Math.max(4, Math.min(26, bw * 0.5)), v = mo.end, tp = Math.min(y(v), y(0)), hh = Math.max(1, Math.abs(y(v) - y(0)));
       sv += '<rect x="' + (cx - bwi / 2).toFixed(1) + '" y="' + tp.toFixed(1) + '" width="' + bwi.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="2" fill="' + (v < 0 ? 'var(--bad)' : 'var(--good)') + '" opacity=".85"><title>' + esc(mLabel(mo.m)) + ' : fin de mois ' + s2(v) + (mo.low < v - 50 ? ' · point bas ' + s2(mo.low) : '') + '</title></rect>';
       if (mo.low < v - 50) sv += '<line x1="' + (cx - bwi / 2 - 2).toFixed(1) + '" x2="' + (cx + bwi / 2 + 2).toFixed(1) + '" y1="' + y(mo.low).toFixed(1) + '" y2="' + y(mo.low).toFixed(1) + '" stroke="' + (mo.low < 0 ? 'var(--bad)' : 'var(--ink-2)') + '" stroke-width="2"/>';
-      if (i % Math.max(1, Math.ceil(56 / bw)) === 0) sv += '<text x="' + cx.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="10">' + esc(mLabel(mo.m)) + '</text>';
+      if (i % Math.max(1, Math.ceil(56 / bw)) === 0) sv += '<text x="' + cx.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + esc(mLabel(mo.m)) + '</text>';
     });
     const parts = [];
     parts.push('Solde aujourd\'hui ' + s2(C.start) + (C.start < 0 ? (D.retourPositif ? ' ; il repasse positif ' + (D.retourPositif === cur ? 'ce mois-ci' : 'en ' + MOIS_L[+D.retourPositif.slice(5) - 1]) + ' avec les virements' : ' et ne repasse pas positif sur 12 mois') : '') + '.');
@@ -264,11 +264,11 @@
     const top = Math.ceil(hi / step) * step;
     const y = v => pad.t + (top - v) / (top || 1) * (H - pad.t - pad.b);
     let s = '';
-    for (let v = 0; v <= top + 1e-6; v += step) s += '<line x1="' + pad.l + '" x2="' + (Wd - pad.r) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)" stroke-width="1"/><text x="' + (pad.l - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="10.5">' + (v / 100 >= 1000 ? (Math.round(v / 10000) / 10).toLocaleString('fr-FR') + ' k€' : Math.round(v / 100) + ' €') + '</text>';
+    for (let v = 0; v <= top + 1e-6; v += step) s += '<line x1="' + pad.l + '" x2="' + (Wd - pad.r) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)" stroke-width="1"/><text x="' + (pad.l - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + (v / 100 >= 1000 ? (Math.round(v / 10000) / 10).toLocaleString('fr-FR') + ' k€' : Math.round(v / 100) + ' €') + '</text>';
     const idx = m => { const [a, b] = xs[0].split('-').map(Number), [c, d] = m.split('-').map(Number); return (c - a) * 12 + (d - b); };
     const span = Math.max(1, idx(xs[xs.length - 1])), x = m => pad.l + idx(m) / span * (Wd - pad.l - pad.r);
     const pts = (arr, k) => arr.map(p => x(p[0]).toFixed(1) + ',' + y(p[k]).toFixed(1)).join(' ');
-    [...new Set(xs.map(m => m.slice(0, 4)))].forEach(yy => { const m = yy + '-01'; if (m < xs[0]) return; s += '<text x="' + x(m).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="10.5">' + yy + '</text><line x1="' + x(m).toFixed(1) + '" x2="' + x(m).toFixed(1) + '" y1="' + pad.t + '" y2="' + (H - pad.b) + '" stroke="var(--line)"/>'; });
+    [...new Set(xs.map(m => m.slice(0, 4)))].forEach(yy => { const m = yy + '-01'; if (m < xs[0]) return; s += '<text x="' + x(m).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + yy + '</text><line x1="' + x(m).toFixed(1) + '" x2="' + x(m).toFixed(1) + '" y1="' + pad.t + '" y2="' + (H - pad.b) + '" stroke="var(--line)"/>'; });
     const last = series[series.length - 1];
     if (proj.length) {
       const pr = [last].concat(proj), e = proj[proj.length - 1];
@@ -278,7 +278,7 @@
     s += '<polyline fill="none" stroke="var(--rev)" stroke-width="2.2" points="' + pts(series, 1) + '"/><polyline fill="none" stroke="var(--dep)" stroke-width="2.2" points="' + pts(series, 2) + '"/>' +
       '<circle cx="' + x(last[0]).toFixed(1) + '" cy="' + y(last[1]).toFixed(1) + '" r="4" fill="var(--rev)" stroke="var(--surface)" stroke-width="2"/><circle cx="' + x(last[0]).toFixed(1) + '" cy="' + y(last[2]).toFixed(1) + '" r="4" fill="var(--dep)" stroke="var(--surface)" stroke-width="2"/>';
     const tx = x(last[0]);
-    s += '<line x1="' + tx.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y1="' + pad.t + '" y2="' + (H - pad.b) + '" stroke="var(--ink-2)" stroke-dasharray="2 3"/><text x="' + (tx + 4).toFixed(1) + '" y="' + (pad.t + 12) + '" fill="var(--ink-2)" font-size="11" font-weight="600">aujourd\'hui</text>';
+    s += '<line x1="' + tx.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y1="' + pad.t + '" y2="' + (H - pad.b) + '" stroke="var(--ink-2)" stroke-dasharray="2 3"/><text x="' + (tx + 4).toFixed(1) + '" y="' + (pad.t + 12) + '" fill="var(--ink-2)" font-size="12" font-weight="600">aujourd\'hui</text>';
     const hv = all, stp = Math.max(1, Math.round(hv.length / 60)), tips = [];
     hv.forEach((p, i) => {
       tips.push([mLabel(p[0]) + (i >= series.length ? ' (projection)' : ''), [['var(--rev)', N.moi, e0(p[1])], ['var(--dep)', N.autre, e0(p[2])], ['var(--ink-2)', 'Écart', e0(Math.abs(p[2] - p[1]))]]]);

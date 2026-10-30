@@ -91,11 +91,11 @@
     const ck = (v, a) => av && a != null ? (Math.abs(v - a) <= 1 ? ' <span class="tx-ok" title="identique à l\'avis">✓</span>' : ' <span class="tx-ko" title="avis : ' + eu(a) + '">≠ ' + eu(a) + '</span>') : '';
     const L = (t, a, b, f, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + t + '</td><td class="r num">' + (a == null ? '' : a) + '</td><td class="r num">' + (b == null ? '' : b) + '</td><td class="r num">' + (f == null ? '' : f) + '</td></tr>';
     let c = L('Salaires nets imposables', eu(R.inp.sal.g), eu(R.inp.sal.s), eu(R.inp.sal.g + R.inp.sal.s)) +
-      L(Fo.g.fr || Fo.s.fr ? 'Frais réels ou abattement de 10 %' : 'Abattement de 10 %', 'moins ' + eu(Fo.g.abat) + (Fo.g.fr ? ' <span class="subs">réels</span>' : ''), 'moins ' + eu(Fo.s.abat) + (Fo.s.fr ? ' <span class="subs">réels</span>' : ''), '') +
+      L(Fo.g.fr || Fo.s.fr ? 'Frais réels ou abattement de 10 %' : 'Abattement de 10 %', (Fo.g.fr ? 'frais réels de ' : 'abattement de ') + eu(Fo.g.abat), (Fo.s.fr ? 'frais réels de ' : 'abattement de ') + eu(Fo.s.abat), '') +
       L('Salaires nets', eu(Fo.g.net), eu(Fo.s.net), eu(Fo.g.net + Fo.s.net)) + L('Revenus fonciers nets', '', '', eu(Fo.fonc)) +
       L('<b>Revenu imposable</b>', '', '', '<b>' + eu(Fo.B.rni) + '</b>' + ck(Fo.B.rni, av && av.rni)) + L('Quotient familial (2 parts)', '', '', eu(Fo.B.q));
     for (const [r, b, t] of Fo.B.tr) c += L('<span class="subs">tranche à ' + Math.round(r * 100) + ' % sur ' + eu(b) + ' par part</span>', '', '', eu(t));
-    c += L('Impôt au barème', '', '', eu(Fo.B.brut) + ck(Fo.B.brut, av && av.irBar)) + L('Décote', '', '', (Fo.B.dec ? 'moins ' : '') + eu(Fo.B.dec) + ck(Fo.B.dec, av && av.decote)) +
+    c += L('Impôt au barème', '', '', eu(Fo.B.brut) + ck(Fo.B.brut, av && av.irBar)) + L('Décote', '', '', (Fo.B.dec ? 'décote de ' : '') + eu(Fo.B.dec) + ck(Fo.B.dec, av && av.decote)) +
       (Fo.prop ? L('Revenus de capitaux (' + eu(R.inp.rcm) + ' à 12,8 %, déjà prélevé par la banque)', '', '', eu(Fo.prop) + ' compensés') : '') +
       L('<b>Impôt sur le revenu net</b>', '', '', '<b>' + eu(Fo.irNet) + '</b>' + ck(Fo.irNet, av && av.irNet)) + L('Prélèvements sociaux sur revenus fonciers (17,2 %)', '', '', eu(Fo.ps) + ck(Fo.ps, av && av.ps)) +
       L('<b>Total</b>', '', '', '<b>' + eu(Fo.irNet + Fo.ps) + '</b>', 'total');

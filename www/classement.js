@@ -309,6 +309,14 @@
     return w.slice(0, 2).join(' ');
   }
 
+  // Mot proposé par « Classer aussi les autres » : celui de suggestKw s'il figure tel quel dans le libellé (une règle
+  // le retrouvera au moins dans cette opération), sinon son premier mot (« CAFE DU PORT » → « CAFE PORT » absent → « CAFE »).
+  function motPropose(label) {
+    const k = suggestKw(label), f = fold(label);
+    if (!k || f.indexOf(k) >= 0) return k;
+    return k.split(' ').find(w => f.indexOf(w) >= 0) || '';
+  }
+
   // Opérations dont le libellé contient le mot-clé (compte et sens facultatifs).
   function concernees(S, mot, opts) {
     const k = fold(mot);
@@ -519,7 +527,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, ICONES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    aRapprocher, marquerInterne, annulerInterne, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, concernees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, annulerInterne, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,
     creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };

@@ -473,13 +473,16 @@
     }
   });
 
-  // ------------------------------------------------------------ affichage : thème et mode démo
+  // ------------------------------------------------------------ affichage : thème, palette et mode démo
   const AF = window.KladAffichage;
   function renderAffichage() {
-    const t = AF.theme(), d = AF.demoActif();
+    const t = AF.theme(), p = AF.palette(), d = AF.demoActif();
     $('affichageCorps').innerHTML = '<h3>Thème</h3><div class="seg" role="group" aria-label="Thème">' +
       [['auto', 'Automatique'], ['clair', 'Clair'], ['sombre', 'Sombre']].map(([k, l]) => '<button data-theme-choix="' + k + '" aria-pressed="' + (k === t) + '">' + l + '</button>').join('') + '</div>' +
       '<p class="muted small">Automatique : suit le réglage du téléphone. Gardé sur ce téléphone.</p>' +
+      '<h3>Palette</h3><div class="seg" role="group" aria-label="Palette">' +
+      [['klad', 'Klad'], ['grafit', 'Grafit']].map(([k, l]) => '<button data-palette-choix="' + k + '" aria-pressed="' + (k === p) + '">' + l + '</button>').join('') + '</div>' +
+      '<p class="muted small">Klad : couleurs habituelles. Grafit : noir et rouge, comme l\'icône. Indépendante du thème, gardée sur ce téléphone.</p>' +
       '<h3>Mode démo</h3><p class="muted">Pour montrer l\'appli sans dévoiler vos chiffres : montants multipliés par un facteur pris au hasard, ' +
       'noms des personnes et des banques remplacés, champs de saisie floutés. Rien n\'est modifié dans vos données ; le mode s\'arrête en quittant ou en relançant Klad.</p>' +
       '<div class="row"><button class="btn' + (d ? ' ghost' : '') + ' small" data-demo="' + (d ? 'off' : 'on') + '">' + (d ? 'Quitter le mode démo' : 'Passer en mode démo') + '</button></div>';
@@ -488,7 +491,9 @@
   AF.surArret = () => { if ($('affichageCorps').isConnected) renderAffichage(); };
   $('affichageCorps').addEventListener('click', ev => {
     const t = ev.target.closest('[data-theme-choix]');
-    if (t) { AF.choisirTheme(t.dataset.themeChoix); renderAffichage(); return; }
+    if (t) { AF.choisirTheme(t.dataset.themeChoix); renderAffichage(); if (A.redessiner) A.redessiner(); return; }
+    const p = ev.target.closest('[data-palette-choix]');
+    if (p) { AF.choisirPalette(p.dataset.paletteChoix); renderAffichage(); if (A.redessiner) A.redessiner(); return; }
     const d = ev.target.closest('[data-demo]');
     if (!d) return;
     if (d.dataset.demo === 'on') { AF.demarrerDemo(S()); A.log('info', 'Mode démo activé.'); A.fermerVolet(); }
