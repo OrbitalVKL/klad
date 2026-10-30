@@ -128,14 +128,18 @@
   // ------------------------------------------------------------ écrans et onglets (comme l'ancienne version)
   // Onglets : Budget (périmètre perso), Opérations, Commun (budget du compte commun), Plus (volet) ; depuis Plus :
   // Équilibre, Impôts, Épargne, Relevés et sauvegarde.
-  const VUES = { accueil: 'view-accueil', budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data' };
-  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', appartement: 'Équilibre', impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés' };
+  const VUES = { accueil: 'view-accueil', budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', operation: 'view-op', appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data' };
+  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', appartement: 'Équilibre', impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés' };
+  // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient.
+  const RETOUR = { operation: 'operations' };
+  let retourDe = {};
   const pos = {};                    // position de défilement de chaque écran
   let vue = 'accueil', scope = 'perso';
   function montrer(v, opts) {
     if (!VUES[v]) v = 'accueil';
     const avant = vue;
     pos[avant] = window.scrollY;
+    if (RETOUR[v] && avant !== v) retourDe[v] = avant;
     vue = v;
     if (v === 'budget') scope = 'perso';
     else if (v === 'commun') scope = 'commun';
@@ -152,7 +156,8 @@
   }
   // En-tête : titre, ligne du dessus (période), pastille de synchro, recherche (opérations), thème.
   function chrome() {
-    const tb = vue === 'appartement' || vue === 'impots' || vue === 'epargne' || vue === 'donnees' ? 'plus' : vue;
+    const tb = vue === 'appartement' || vue === 'impots' || vue === 'epargne' || vue === 'donnees' ? 'plus' : vue === 'operation' ? 'operations' : vue;
+    $('ah-back').hidden = !RETOUR[vue];
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('ah-title').textContent = TITRES[vue] || 'Accueil';
     let e = '';
@@ -163,10 +168,12 @@
         if (per) e = per.cyc ? 'Cycle du ' + U.jjmm(per.cyc.start) + ' au ' + U.jjmm(per.cyc.end) : U.mLabel(per.pm0);
         if (per && per.past) e += ' · terminé'; } catch (x) { e = ''; }
     } else if (S && vue === 'operations') {
-      e = (perOps.k === 'tout' ? 'Toutes' : bornesOps().libelle) + ' · ' + (scope === 'commun' ? 'Commun' : 'Perso');
+      e = (perOps.k === 'tout' ? 'Toutes' : bornesOps().libelle) + ' · ' + ({ perso: 'Perso', commun: 'Commun', tout: 'Perso et commun' }[perimOps]);
+    } else if (S && vue === 'operation') {
+      const o = opCourante && trouverOp(opCourante[0], opCourante[1]);
+      e = o ? F.jour(o.date) : '';
     }
     $('ah-e').textContent = e;
-    $('ah-search').hidden = vue !== 'operations';
     const t = AF.theme();
     const sombre = AF.sombre(t);
     $('ah-theme').textContent = sombre ? '☾' : '☀';
@@ -195,11 +202,9 @@
     if (k === 'operations') { opsFin = 0; montrer('operations', { rendre: false }); renderOps(true); return; }
     montrer(k, { force: true });
   });
-  $('ah-search').addEventListener('click', () => {
-    const o = !document.documentElement.classList.contains('q-open');
-    document.documentElement.classList.toggle('q-open', o);
-    if (o) $('q').focus(); else if ($('q').value) { $('q').value = ''; opsFin = 0; renderOps(true); }
-  });
+  // Retour (écran ouvert depuis un autre) : vers l'écran d'où l'on vient.
+  function retourEcran() { montrer(retourDe[vue] || RETOUR[vue] || 'accueil', { force: vue === 'operation' }); }
+  $('ah-back').addEventListener('click', retourEcran);
 
   // ------------------------------------------------------------ période d'analyse (tendance et opérations)
   // Comme l'ancienne version : du mois de début au mois de fin (12 derniers mois complets au départ), gardée sur ce téléphone.
@@ -252,6 +257,7 @@
     if (!deja) requestAnimationFrame(() => requestAnimationFrame(() => { v.querySelector('.sheet-scrim').classList.add('on'); v.querySelector('.sheet').classList.add('on'); }));
   }
   function fermerVolet(vite) {
+    tri = null;                     // fermer le volet arrête « Trier une à une »
     const v = $('volet');
     v.querySelector('.sheet-scrim').classList.remove('on'); v.querySelector('.sheet').classList.remove('on');
     const fin = () => { while (pile.length) $('rangement').appendChild($(pile.pop())); v.hidden = true; };
@@ -315,6 +321,7 @@
     AppP.addListener('backButton', () => {
       if (!$('modal').hidden) return;
       if (!$('volet').hidden) { if (pile.length > 1) retourVolet(); else fermerVolet(); return; }
+      if (S && RETOUR[vue]) { retourEcran(); return; }
       if (S && vue !== 'accueil') { montrer('accueil', { force: true }); return; }
       if (AppP.minimizeApp) AppP.minimizeApp();
     });
@@ -381,12 +388,10 @@
 
   // ------------------------------------------------------------ rendu
   const rendus = [];            // fonctions de rendu ajoutées par les autres fichiers (écrans)
+  // Badge de l'onglet Opérations : toutes les opérations à voir (perso et commun), comme l'Accueil.
   function nonVuesScope() {
     let n = 0;
-    for (const c of Vu.comptesDe(S, scope)) {
-      if (scope === 'commun' ? c.role !== 'commun' : (c.role === 'commun' || c.role === 'epargne')) continue;
-      for (const o of S.ops[c.id] || []) if (!KC.vue(S, o)) n++;
-    }
+    for (const c of Vu.comptesDe(S, 'perso')) for (const o of S.ops[c.id] || []) if (!KC.vue(S, o)) n++;
     return n;
   }
   function renderBadge() {
@@ -439,6 +444,7 @@
     CTX = null; BCTX = null;
     renderHaut();
     if (vue === 'operations') renderOps(true);
+    if (vue === 'operation') renderDetail();
     rendus.forEach(fn => { try { fn({}); } catch (e) { log('err', 'Affichage : ' + (e.message || e)); } });
     chrome();
     if (pile.length && preparer[pile[pile.length - 1]]) preparer[pile[pile.length - 1]]({ rendu: true });
@@ -483,7 +489,7 @@
     const act = ev.target.closest('[data-act]');
     if (!act) return;
     if (act.dataset.act === 'sync') synchro('manuel');
-    else if (act.dataset.act === 'trier') versOps({ nonVues: true });
+    else if (act.dataset.act === 'trier') trier('nv', 'tout');
     else if (act.dataset.act === 'sauvegarde') montrer('donnees', { force: true, haut: true });
   });
   preparer.secRav = () => {
@@ -492,9 +498,12 @@
     $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav) : '';
   };
   function versOps(f) {
-    Object.assign(filtre, { compte: '', cat: '', nonVues: false }, f || {});
+    f = Object.assign({}, f || {});
+    perimOps = f.perimetre || 'tout';            // depuis l'Accueil : les compteurs portent sur perso et commun
+    delete f.perimetre;
+    Object.assign(filtre, { compte: '', cat: '', nonVues: false }, f);
     perOps.k = 'tout';                // depuis l'accueil : toutes les opérations (les compteurs portent sur tout)
-    $('q').value = '';
+    $('q').value = f.q || '';
     opsFin = 0;
     montrer('operations', { rendre: false, haut: true });
     renderOps(true);
@@ -519,15 +528,18 @@
 
   // ------------------------------------------------------------ opérations (liste par jour, recherche, filtres)
   const filtre = { compte: '', q: '', cat: '', nonVues: false };
+  // Périmètre de la liste (Perso · Commun · Tout), toujours visible ; le dernier choix est gardé sur ce téléphone.
+  let perimOps = ['perso', 'commun', 'tout'].indexOf(U.pref('opsPerimetre')) >= 0 ? U.pref('opsPerimetre') : 'perso';
   let opsListe = [], opsFin = 0;
   // Période des opérations : gardée tant que l'appli reste ouverte (« Toute période » au démarrage).
   const perOps = { k: 'tout', du: '', au: '' };
-  const bornesOps = () => Vu.bornesPeriode(perOps.k, M.jourLocal(Date.now()), budget(), scope, perOps.du, perOps.au);
+  const bornesOps = () => Vu.bornesPeriode(perOps.k, M.jourLocal(Date.now()), budget(), perimOps === 'commun' ? 'commun' : 'perso', perOps.du, perOps.au);
   function renderOps(reset) {
     if (!S) return;
     if (reset) {
       const cx = ctx();
-      filtre.q = $('q').value.trim(); filtre.scope = scope;
+      filtre.q = $('q').value.trim(); filtre.scope = perimOps;
+      $('ops-scope').innerHTML = Vu.perimetre(perimOps);
       if (filtre.compte && !M.compte(S, filtre.compte)) filtre.compte = '';
       if (filtre.cat && filtre.cat[0] !== '_' && !cx.C.categories[filtre.cat]) filtre.cat = '';
       const bp = bornesOps();
@@ -539,6 +551,10 @@
       const nc = Vu.filtrer(S, Object.assign({}, base, { cat: '__nc' }), cx).length;
       const int = Vu.filtrer(S, Object.assign({}, base, { cat: '__int' }), cx).length;
       $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
+      // « Trier une à une » : avec le filtre Non vues ou Non classées
+      const nTri = filtre.nonVues || filtre.cat === '__nc' ? opsListe.filter(o => filtre.nonVues ? !KC.vue(S, o) : true).length : 0;
+      $('ops-tri').hidden = !nTri;
+      $('ops-tri').innerHTML = nTri ? '<button type="button" class="btn primary" data-tri="1">' + (filtre.cat === '__nc' ? 'Classer une à une' : 'Trier une à une') + ' (' + nTri + ')</button>' : '';
       $('ops-perso').hidden = perOps.k !== 'perso';
       if (perOps.k === 'perso') { $('opsDu').value = perOps.du; $('opsAu').value = perOps.au; }
       $('ops-pastille').hidden = perOps.k === 'tout';
@@ -579,6 +595,15 @@
     ev.preventDefault();
     ouvrirOp(tr.dataset.c, tr.dataset.op);
   });
+  $('ops-scope').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-perimetre]');
+    if (!b || b.dataset.perimetre === perimOps) return;
+    perimOps = b.dataset.perimetre;
+    U.pref('opsPerimetre', perimOps);
+    if (filtre.compte) filtre.compte = '';
+    opsFin = 0; renderOps(true);
+  });
+  $('ops-tri').addEventListener('click', ev => { if (ev.target.closest('[data-tri]')) trier(filtre.cat === '__nc' ? 'nc' : 'nv'); });
   $('app-chips').addEventListener('click', ev => {
     const b = ev.target.closest('[data-f]');
     if (!b) return;
@@ -671,23 +696,31 @@
     toastAnnuler(on ? 'Opération marquée vue.' : 'Opération remise en non vue.', () => { KC.annulerVues(avant); changed('vu'); });
   }
 
-  // ------------------------------------------------------------ détail d'une opération
+  // ------------------------------------------------------------ détail d'une opération (page avec Retour, 0.10.2)
   let opCourante = null;            // [compte, id]
   function ouvrirOp(cid, id) {
     if (!trouverOp(cid, id)) return;
     opCourante = [cid, id];
-    ouvrirVolet('secOp');
+    fermerVolet(true);
+    renderDetail();
+    montrer('operation', { rendre: false, haut: true });
   }
-  preparer.secOp = () => {
+  function renderDetail() {
     const o = opCourante && trouverOp(opCourante[0], opCourante[1]);
     if (!o) { $('opDetail').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
     $('opDetail').innerHTML = Vu.detail(S, o, ctx());
-  };
+  }
+  // depuis le détail, une action qui remet l'opération dans la liste ramène à la liste
+  const versListe = () => { if (vue === 'operation') montrer(retourDe.operation || 'operations', { force: true }); };
   $('opDetail').addEventListener('click', ev => {
     const b = ev.target.closest('[data-a]');
     if (!b || !opCourante) return;
-    if (b.dataset.a === 'vue') { basculerVue(opCourante[0], opCourante[1]); preparer.secOp(); }
-    else if (b.dataset.a === 'classer') ouvrirClasser(opCourante[0], opCourante[1], true);
+    if (b.dataset.a === 'vue') { basculerVue(opCourante[0], opCourante[1]); renderDetail(); }
+    else if (b.dataset.a === 'classer') ouvrirClasser(opCourante[0], opCourante[1]);
+    else if (b.dataset.a === 'semblables') {
+      const o = trouverOp(opCourante[0], opCourante[1]);
+      if (o) versOps({ q: KC.motPropose(o.libelle) || Vu.libelleCourt(o.libelle) });
+    }
     else if (b.dataset.a === 'interne') {
       const o = trouverOp(opCourante[0], opCourante[1]);
       const w = o && KC.aRapprocher(ctx(), o);
@@ -695,6 +728,7 @@
       const snap = KC.marquerInterne(ctx(), o, w);
       log('info', 'Prélèvement de portefeuille rapproché à la main.');
       fermerVolet();
+      versListe();
       const venu = filtre.cat === '__rap';
       if (venu) filtre.cat = '__int';          // elle reste sous les yeux : filtre « Internes »
       changed('classement');
@@ -706,6 +740,7 @@
       if (!snap) return;
       log('info', 'Opération remise en dépense (marquée interne à la main auparavant).');
       fermerVolet();
+      versListe();
       changed('classement');
       toastAnnuler('Opération comptée en dépense : elle revient dans « À vérifier ».', () => { KC.annulerInterne(snap); changed('classement'); });
     }
@@ -713,7 +748,7 @@
 
   // ------------------------------------------------------------ volet « Classer »
   let cls = null;                   // { cid, id, st }
-  function ouvrirClasser(cid, id, empiler) {
+  function ouvrirClasser(cid, id, empiler, opts) {
     const o = trouverOp(cid, id);
     if (!o) return;
     const r = KC.classer(ctx(), o);
@@ -721,8 +756,8 @@
     // mot présent dans le libellé ; interrupteur coupé s'il ne retrouve aucune opération
     const mot = KC.motPropose(o.libelle);
     const trouve = !!mot && KC.concernees(S, mot, {}).length > 0;
-    cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: trouve, mot, compte: false, sens: '', toutes: false }, sub0: r.nc ? cat : r.sub };
-    ouvrirVolet('secClasser', { empiler: !!empiler });
+    cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: trouve, mot, compte: false, sens: '', toutes: false }, sub0: r.nc ? cat : r.sub, tri: !!(opts && opts.tri) };
+    ouvrirVolet('secClasser', { empiler: !!empiler, titre: opts && opts.titre });
   }
   function nbConcernees() {
     const st = cls.st;
@@ -736,7 +771,7 @@
   function renderClasser() {
     const o = cls && trouverOp(cls.cid, cls.id);
     if (!o) { $('clsCorps').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
-    $('clsCorps').innerHTML = Vu.classer(S, o, ctx(), cls.st, nbConcernees(), { equilibre: equilibrePossible(o) });
+    $('clsCorps').innerHTML = Vu.classer(S, o, ctx(), cls.st, nbConcernees(), { equilibre: equilibrePossible(o), tri: cls.tri && !!tri });
   }
   function majCompte() {
     const n = nbConcernees(), st = cls.st;
@@ -760,6 +795,7 @@
     if (ev.target.closest('[data-toutes]')) { cls.st.toutes = true; lireCls(); renderClasser(); return; }
     if (ev.target.closest('#clsAutres')) { lireCls(); cls.st.autres = !cls.st.autres; renderClasser(); return; }
     if (ev.target.closest('[data-a="go"]')) appliquerClasser();
+    if (ev.target.closest('[data-a="passer"]') && tri) { tri.i++; triSuivant(); return; }
     if (ev.target.closest('[data-a="equilibre"]')) { lireCls(); ouvrirEquilibreOp(); }
   });
   $('clsCorps').addEventListener('input', ev => {
@@ -785,12 +821,60 @@
     const snap = KC.appliquer(S, o, { cat: st.cat, sub: st.sub || st.cat, mot: st.autres ? st.mot : null, compte: st.autres && st.compte ? cls.cid : null, sens: st.autres ? st.sens : '' });
     const vuAvant = KC.vue(S, o) ? null : KC.marquer(S, [o], true);       // comme l'ancienne version : classée = vue
     log('info', st.autres ? 'Règle de classement créée (' + n + ' opération(s) concernée(s)).' : 'Opération classée à la main.');
-    fermerVolet();
+    const enTri = cls.tri && tri;
+    if (!enTri) fermerVolet();
     changed('classement');
+    if (enTri) { tri.i++; setTimeout(triSuivant, 0); }
     toastAnnuler(st.autres ? n + ' opération(s) classée(s) en « ' + st.cat + ' ».' : 'Opération classée en « ' + st.cat + ' ».', () => {
       KC.annuler(S, snap); if (vuAvant) KC.annulerVues(vuAvant); log('info', 'Classement annulé.'); changed('classement');
     });
   }
+  // ------------------------------------------------------------ « Trier une à une » (0.10.2)
+  // File : opérations à voir du périmètre, puis non classées (3 derniers mois). Non classée : volet « Classer » (catégorie
+  // puis « Classer en … » : 2 appuis) ; à voir déjà classée : « C'est bon, vue ». « Passer » laisse l'opération telle quelle ;
+  // chaque action reste annulable. Fermer le volet arrête le tri.
+  let tri = null, triOp = null;             // { file: [[compte, id]], i }
+  const aTrier = o => !!o && (!KC.vue(S, o) || KC.classer(ctx(), o).nc);
+  function trier(mode, perim) {
+    if (!S) return;
+    const cx = ctx(), base = { scope: perim || perimOps };
+    const nv = mode === 'nc' ? [] : Vu.filtrer(S, Object.assign({}, base, { nonVues: true }), cx);
+    const nc = Vu.filtrer(S, Object.assign({}, base, { cat: '__nc' }), cx);
+    const vus = new Set(), file = [];
+    for (const o of nv.concat(nc)) if (!vus.has(o.id)) { vus.add(o.id); file.push([o.compte, o.id]); }
+    if (!file.length) { toast('Rien à trier.'); return; }
+    tri = { file, i: 0 };
+    log('info', 'Tri une à une : ' + file.length + ' opération(s).');
+    triSuivant();
+  }
+  function triSuivant() {
+    while (tri && tri.i < tri.file.length && !aTrier(trouverOp(tri.file[tri.i][0], tri.file[tri.i][1]))) tri.i++;
+    if (!tri) return;
+    if (tri.i >= tri.file.length) { tri = null; fermerVolet(); toast('✓ Tri terminé.'); return; }
+    const [cid, id] = tri.file[tri.i], o = trouverOp(cid, id);
+    const n = ' (' + (tri.i + 1) + ' sur ' + tri.file.length + ')';
+    if (KC.classer(ctx(), o).nc) ouvrirClasser(cid, id, false, { tri: true, titre: 'Classer' + n });
+    else { triOp = [cid, id]; ouvrirVolet('secTri', { titre: 'À voir' + n }); }
+  }
+  preparer.secTri = () => {
+    const o = triOp && trouverOp(triOp[0], triOp[1]);
+    $('triCorps').innerHTML = o ? Vu.triVue(S, o, ctx()) : '';
+  };
+  $('triCorps').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-a]');
+    if (!b || !tri || !triOp) return;
+    const [cid, id] = triOp;
+    if (b.dataset.a === 'trivue') {
+      const o = trouverOp(cid, id);
+      const avant = o ? KC.marquer(S, [o], true) : [];
+      save(); M.signaler('vu'); renderHaut();
+      if (vue === 'operations') renderOps(true);
+      toastAnnuler('Opération marquée vue.', () => { KC.annulerVues(avant); changed('vu'); });
+      tri.i++; triSuivant();
+    } else if (b.dataset.a === 'triclasser') ouvrirClasser(cid, id, false, { tri: true, titre: 'Classer (' + (tri.i + 1) + ' sur ' + tri.file.length + ')' });
+    else if (b.dataset.a === 'passer') { tri.i++; triSuivant(); }
+  });
+
   // « Ajouter à l'équilibre » : une dépense perso payée pour le logement commun (formulaire dans le même volet).
   function ouvrirEquilibreOp() {
     const o = trouverOp(cls.cid, cls.id);
@@ -1180,7 +1264,7 @@
   // Verrouillage : l'état et tout ce qui était affiché sont effacés.
   function close() {
     S = null; hooks = {}; bankList = []; handled = {}; opsListe = []; opsFin = 0; CTX = null; BCTX = null; cls = null; opCourante = null;
-    filtre.cat = ''; filtre.nonVues = false; filtre.compte = '';
+    filtre.cat = ''; filtre.nonVues = false; filtre.compte = ''; tri = null; triOp = null; retourDe = {};
     fermerVolet(true);
     toastAction = null; $('toast').className = '';
     ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone', 'cats-panel', 'rules-panel',
@@ -1195,6 +1279,6 @@
   window.KladApp = {
     open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
     ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, rendre, redessiner, renderHaut, chrome, vue: () => vue, scope: () => scope, periode, choisirPeriode, versOps, etat: () => S, hooks: () => hooks, esc, isNative,
-    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp
+    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp, trier
   };
 })();

@@ -73,7 +73,9 @@
     const L = M().comptesTries(S).filter(c => !c.masque);
     return scope === 'commun' ? L.filter(c => c.role === 'commun') : L;
   }
-  const opsDuScope = (S, scope, c) => scope === 'commun' ? c.role === 'commun' : c.role !== 'commun' && c.role !== 'epargne';
+  // Opérations d'un périmètre : perso (sans le commun ni l'épargne), commun, ou tout (tous les comptes visibles, comme les
+  // compteurs de l'Accueil et le badge, 0.10.2).
+  const opsDuScope = (S, scope, c) => scope === 'commun' ? c.role === 'commun' : scope === 'tout' ? true : c.role !== 'commun' && c.role !== 'epargne';
 
   // ------------------------------------------------------------ grande carte (total) et cartes des comptes
   // Perso : comptes courants et compte commun (comme l'ancienne version) ; commun : solde du compte commun.
@@ -197,7 +199,11 @@
         if ((f.du || f.depuis) && o.date < (f.du || f.depuis)) continue;
         if (f.au && o.date > f.au) continue;
         if (limNc && o.date < limNc) continue;
-        if (k && M().cleLibelle(o.libelle + ' ' + (o.contrepartie || '')).indexOf(k) < 0) continue;
+        // recherche : libellé (ou contrepartie), sinon catégorie et sous-catégorie (0.10.2)
+        if (k && M().cleLibelle(o.libelle + ' ' + (o.contrepartie || '')).indexOf(k) < 0) {
+          const r = ctx ? K().classer(ctx, o) : null;
+          if (!r || M().cleLibelle(r.cat + ' ' + (r.sub || '')).indexOf(k) < 0) continue;
+        }
         if (f.nonVues && K().vue(S, o)) continue;
         if (rap) { if (!K().aRapprocher(ctx, o)) continue; }
         else if (f.cat && ctx) {
@@ -313,7 +319,13 @@
       (nb.visiblesNonVues ? '<button type="button" class="ch-link" data-f="toutVu">Tout marquer vu</button>' : '');
   }
 
-  // ------------------------------------------------------------ détail d'une opération (volet)
+  // Sélecteur du périmètre de la liste (toujours visible) : Perso · Commun · Tout.
+  function perimetre(p) {
+    return '<div class="seg ops-scope" role="group" aria-label="Périmètre des opérations">' + [['perso', 'Perso'], ['commun', 'Commun'], ['tout', 'Tout']].map(([k, l]) =>
+      '<button type="button" data-perimetre="' + k + '" aria-pressed="' + (p === k) + '">' + l + '</button>').join('') + '</div>';
+  }
+
+  // ------------------------------------------------------------ détail d'une opération (page)
   function detail(S, o, ctx) {
     const c = M().compte(S, o.compte);
     const cur = (c && c.devise) || 'EUR';
@@ -345,6 +357,7 @@
       '<button type="button" class="btn" data-a="vue">' + (vu ? 'Marquer non vue' : 'Marquer vue') + '</button>' +
       (w ? '<button type="button" class="btn" data-a="interne">Marquer interne</button>' : '') +
       (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' +
+      '<button type="button" class="ac-lien" data-a="semblables">Opérations semblables ›</button>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
   }
 
@@ -371,9 +384,17 @@
         '<select id="clsSens" aria-label="Sens"><option value="">débits et crédits</option><option value="debit"' + (st.sens === 'debit' ? ' selected' : '') + '>débits seulement</option>' +
         '<option value="credit"' + (st.sens === 'credit' ? ' selected' : '') + '>crédits seulement</option></select></div>' : '') + '</div>' +
       '<button type="button" class="sh-go" data-a="go">Classer en ' + esc(st.cat) + (st.autres && n > 1 ? ' (' + n + ')' : '') + '</button>' +
+      (opt && opt.tri ? '<button type="button" class="btn sh-passer" data-a="passer">Passer</button>' : '') +
       (opt && opt.equilibre ? '<button type="button" class="sh-alt" data-a="equilibre">🏠 Ajouter à l\'équilibre</button>' : '');
   }
 
+
+  // Mode « Trier une à une » : opération à voir, déjà classée (« C'est bon, vue », changer la catégorie, passer).
+  function triVue(S, o, ctx) {
+    return '<div class="ops-un"><table class="tx txv2"><colgroup><col style="width:44px"><col><col style="width:118px"></colgroup><tbody>' + ligne(S, o, { ctx }) + '</tbody></table></div>' +
+      '<button type="button" class="sh-go" data-a="trivue">C\'est bon, vue</button>' +
+      '<div class="row"><button type="button" class="btn" data-a="triclasser">Changer la catégorie</button><button type="button" class="btn" data-a="passer">Passer</button></div>';
+  }
 
   // ------------------------------------------------------------ écran « Relevés » : état de chaque compte (comme l'ancienne version)
   // B : contexte du budget (règlements détaillés) ; opt : { synchro: bool (en cours) }.
@@ -422,5 +443,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, filtres, detail, classer, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, filtres, detail, classer, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

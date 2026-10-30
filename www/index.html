@@ -16,10 +16,10 @@
   <div id="appli" hidden>
   <div class="wrap">
     <header class="app-h" id="app-h">
-      <div class="ah-t"><span class="ah-e" id="ah-e"></span><h1 id="ah-title">Budget</h1></div>
+      <button type="button" class="ah-ico ah-back" id="ah-back" aria-label="Retour" hidden>‹</button>
+      <div class="ah-t"><span class="ah-e" id="ah-e"></span><h1 id="ah-title">Accueil</h1></div>
       <div class="ah-a">
         <button type="button" class="ah-pill" id="ah-sync" aria-label="Synchroniser les banques"><span class="ic" aria-hidden="true">✓</span><span class="lb">—</span></button>
-        <button type="button" class="ah-ico" id="ah-search" aria-label="Rechercher un libellé" hidden><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
         <button type="button" class="ah-ico" id="ah-theme" aria-label="Changer de thème"></button>
       </div>
     </header>
@@ -46,10 +46,12 @@
       <div id="an-zone">
         <section class="panel" id="tend-panel"></section>
         <section class="panel" id="ops-panel">
+          <div id="ops-scope"></div>
           <div class="panel-h"><h2>Opérations</h2>
-            <div class="row"><input type="search" id="q" placeholder="Rechercher un libellé…" aria-label="Rechercher un libellé" autocomplete="off" spellcheck="false"></div>
+            <div class="row"><input type="search" id="q" placeholder="Rechercher un libellé, une catégorie…" aria-label="Rechercher un libellé ou une catégorie" autocomplete="off" spellcheck="false"></div>
           </div>
           <div class="app-chips" id="app-chips" role="group" aria-label="Filtres des opérations"></div>
+          <div class="ops-tri" id="ops-tri" hidden></div>
           <div class="ops-per" id="ops-perso" hidden><label>Du <input type="date" id="opsDu"></label><label>au <input type="date" id="opsAu"></label></div>
           <div class="ops-per" id="ops-pastille" hidden></div>
           <div class="scroll tablewrap">
@@ -66,6 +68,8 @@
       <section class="panel" id="rules-panel"></section>
     </div>
 
+    <!-- ================= DÉTAIL D'UNE OPÉRATION (page, 0.10.2) ================= -->
+    <div id="view-op" class="vue" hidden style="display:grid;gap:14px"><section class="panel op-page" aria-label="Détail de l'opération"><div id="opDetail"></div></section></div>
     <!-- ================= ÉQUILIBRE ================= -->
     <div id="view-appart" class="vue" hidden style="display:grid;gap:18px"></div>
     <!-- ================= IMPÔTS ================= -->
@@ -218,9 +222,8 @@
 
     <section id="secRav" data-titre="Reste à vivre"><div id="ravCorps"></div></section>
 
-    <section id="secOp" data-titre="Opération"><div id="opDetail"></div></section>
-
     <section id="secClasser" data-titre="Classer"><div id="clsCorps"></div></section>
+    <section id="secTri" data-titre="À voir"><div id="triCorps"></div></section>
 
     <section id="secClassement" data-titre="Classement"><div id="classementCorps"></div></section>
 

@@ -1768,3 +1768,19 @@ html.appm nav.app-tb{grid-template-columns:repeat(5,minmax(0,1fr));gap:0;padding
 html.appm .wrap{grid-template-columns:minmax(0,1fr)}
 html.appm .ah-a{min-width:0}
 html.appm #app-hero[hidden],html.appm #bal-panel[hidden],html.appm #app-seen[hidden]{display:none!important}
+
+/* ============================================================ 0.10.2 : Opérations (UX-3) */
+#ops-scope{padding:0 16px 8px}
+.ops-scope{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;border-radius:14px!important;padding:4px!important;background:var(--surface-2)}
+.ops-scope button{height:44px;border-radius:10px!important;padding:0!important;text-align:center;font-size:14px!important}
+.ops-scope button[aria-pressed="true"]{background:var(--surface)!important;color:var(--ink)!important;box-shadow:0 1px 3px rgba(20,32,28,.14)}
+html.ops-mode #q{display:block;height:48px}
+html:not(.ops-mode) #ops-scope{display:none}
+.ops-tri{padding:0 16px 12px;display:flex;gap:8px;flex-wrap:wrap}
+.ops-tri .btn{min-height:48px}
+.ah-back{font-size:28px;line-height:1;margin-left:-8px;flex:none;align-self:center;background:none!important}
+.op-page .sh-head{margin-bottom:6px}
+.op-page .row{margin-top:12px}
+.ops-un{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ops-un table{width:100%}
+.sh-passer{width:100%;min-height:48px;margin-top:6px}
