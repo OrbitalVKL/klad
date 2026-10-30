@@ -41,7 +41,8 @@
     if (L.length > 300) L.splice(0, L.length - 300);
     saveLog(); renderLog();
   }
-  function renderLog() { const el = $('log'); if (!S) return; el.textContent = S.journal.log.join('\n'); el.scrollTop = el.scrollHeight; }
+  // Journal affiché seulement quand son volet est ouvert (pas de mise en page à chaque ligne écrite).
+  function renderLog() { const el = $('log'); if (!S || !el.closest('#voletCorps')) return; el.textContent = S.journal.log.join('\n'); el.scrollTop = el.scrollHeight; }
 
   let toastT, toastAction = null;
   function toast(msg, err) {
@@ -591,8 +592,8 @@
       $('ops-tot').hidden = !opsListe.length;
       $('ops-tot').innerHTML = opsListe.length ? '<span>' + T.n + ' opération' + (T.n > 1 ? 's' : '') + '</span><span>Débit <b class="num">' + Vu.esc(F.montant(T.debit)) +
         '</b></span><span>Crédit <b class="num">' + Vu.esc(F.montant(T.credit)) + '</b></span>' : '';
-      $('tx').innerHTML = opsListe.length ? '' : '<tr><td colspan="3" class="muted" style="padding:14px 16px">' +
-        (filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte || perOps.k !== 'tout' ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</td></tr>';
+      $('tx').innerHTML = opsListe.length ? '' : '<div class="muted tx-vide">' +
+        (filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte || perOps.k !== 'tout' ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</div>';
       $('tx-suite').innerHTML = '';
       if (opsListe.length) plus(30);
       chrome();
@@ -610,7 +611,7 @@
   $('tx-suite').addEventListener('click', ev => { if (ev.target.closest('[data-suite]')) renderOps(false); });
   $('tx').addEventListener('click', ev => {
     if (Date.now() - finGeste < 400) return;
-    const tr = ev.target.closest('tr.txr[data-op]');
+    const tr = ev.target.closest('div.txr[data-op]');
     if (!tr) return;
     if (ev.target.closest('[data-classer]')) ouvrirClasser(tr.dataset.c, tr.dataset.op);
     else ouvrirOp(tr.dataset.c, tr.dataset.op);
@@ -618,7 +619,7 @@
   // clavier (ou contacteur) : Entrée ou Espace sur une ligne ouvre son détail
   $('tx').addEventListener('keydown', ev => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    const tr = ev.target.closest('tr.txr[data-op]');
+    const tr = ev.target.closest('div.txr[data-op]');
     if (!tr || ev.target !== tr) return;
     ev.preventDefault();
     ouvrirOp(tr.dataset.c, tr.dataset.op);
@@ -666,8 +667,19 @@
     perOps.k = 'tout'; perOps.du = ''; perOps.au = '';
     opsFin = 0; renderOps(true);
   });
+  // En défilant : la suite de la liste est ajoutée par petites tranches, une par image, tant qu'il reste moins de
+  // 2 500 px d'avance (tâches courtes, 0.10.6) ; les jours hors écran ne sont pas dessinés (content-visibility).
+  let remplissage = false;
+  const reste = () => document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+  function remplir() {
+    remplissage = false;
+    if (vue !== 'operations' || opsFin >= opsListe.length || reste() > 2500) return;
+    plus(8);
+    remplissage = true;
+    requestAnimationFrame(remplir);
+  }
   window.addEventListener('scroll', () => {
-    if (vue === 'operations' && opsFin < opsListe.length && window.scrollY + window.innerHeight > document.documentElement.scrollHeight - 800) renderOps(false);
+    if (!remplissage && vue === 'operations' && opsFin < opsListe.length && reste() < 2500) { remplissage = true; requestAnimationFrame(remplir); }
   }, { passive: true });
   let qT;
   $('q').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => { opsFin = 0; renderOps(true); }, 200); });
@@ -681,7 +693,7 @@
     let G = null;
     const SEUIL = 90;
     box.addEventListener('touchstart', ev => {
-      const tr = ev.target.closest('tr.txr[data-op]');
+      const tr = ev.target.closest('div.txr[data-op]');
       if (!tr || ev.touches.length > 1) { G = null; return; }
       G = { tr, x: ev.touches[0].clientX, y: ev.touches[0].clientY, dx: 0, lock: false };
     }, { passive: true });
@@ -718,7 +730,7 @@
     if (!o) return;
     const on = !KC.vue(S, o);
     const avant = KC.marquer(S, [o], on);
-    const tr = document.querySelector('#tx tr.txr[data-op="' + CSS.escape(id) + '"]');
+    const tr = document.querySelector('#tx div.txr[data-op="' + CSS.escape(id) + '"]');
     if (tr) tr.classList.toggle('unseen', !on);
     save(); M.signaler('vu'); renderHaut();
     toastAnnuler(on ? 'Opération marquée vue.' : 'Opération remise en non vue.', () => { KC.annulerVues(avant); changed('vu'); });
@@ -989,7 +1001,7 @@
     const ptr = $('app-ptr');
     let y0 = null, d = 0;
     addEventListener('touchstart', e => {
-      if (!S || !$('volet').hidden || window.scrollY > 0 || e.touches.length > 1 || e.target.closest('.bal-row,.app-chips,#tx tr.txr,.screen')) { y0 = null; return; }
+      if (!S || !$('volet').hidden || window.scrollY > 0 || e.touches.length > 1 || e.target.closest('.bal-row,.app-chips,#tx div.txr,.screen')) { y0 = null; return; }
       y0 = e.touches[0].clientY; d = 0;
     }, { passive: true });
     addEventListener('touchmove', e => {
@@ -1228,16 +1240,26 @@
     save();
     vue = 'accueil'; scope = 'perso';
     montrer('accueil', { rendre: false, haut: true });
-    rendre();
-    premierPlan();
-    preparerClassement(S);
-    if (KladSync.aFaire(S, Date.now())) synchro('auto');
+    // 0.10.6 : l'Accueil est dessiné d'abord ; le reste (autres écrans, résumé Grafit, reprise, synchro) après le premier affichage
+    renderHaut();
+    chrome();
+    const s0 = S;
+    const ensuite = () => {
+      if (S !== s0) return;
+      rendus.forEach(fn => { try { fn({}); } catch (e) { log('err', 'Affichage : ' + (e.message || e)); } });
+      premierPlan();
+      preparerClassement(S);
+      if (KladSync.aFaire(S, Date.now())) synchro('auto');
+    };
+    if (window.requestAnimationFrame) requestAnimationFrame(() => setTimeout(ensuite, 0)); else setTimeout(ensuite, 0);
   }
 
   // Première ouverture de la 0.5 : classement repris du carnet (déjà importé), date de départ des opérations vues.
   async function preparerClassement(s0) {
     try {
+      let modifie = false;          // 0.10.6 : nouvel affichage seulement si quelque chose a changé
       if (!s0.classement && s0.carnet != null && window.KladCarnet.utilisable(s0.carnet)) {
+        modifie = true;
         const r = await window.KladCarnet.convertir(s0, s0.carnet, { now: Date.now() });
         if (S !== s0) return;
         log('ok', 'Classement repris de l\'ancienne version : ' + r.categories + ' catégorie(s), ' + r.base + ' règle(s) de base, ' + r.regles +
@@ -1246,7 +1268,7 @@
       }
       if (S !== s0) return;
       const init = KC.initialiserVues(s0, Date.now());
-      if (!s0.classement) KC.donnees(s0);
+      if (!s0.classement) { KC.donnees(s0); modifie = true; }
       // Première ouverture de la 0.6 : budget, contrats et virements repris du carnet (le carnet reste intact).
       let bud = false;
       if (!s0.budget && s0.carnet != null && window.KladBudget) {
@@ -1285,7 +1307,7 @@
           }
         } catch (e) { log('err', 'Mise à jour des réglages : ' + (e.message || e)); }
       }
-      if (init || s0.classement || bud) changed('classement');
+      if (init || modifie || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }
   }
 

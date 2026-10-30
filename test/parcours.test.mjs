@@ -229,10 +229,10 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
 
     // opérations : liste par jour (période d'analyse), en cours marquée, recherche, filtre par compte
     await page.locator('#app-tb [data-tab="operations"]').click();
-    assert.ok(await page.locator('#tx tr.tx-day').count() >= 4);
-    assert.equal(await page.locator('#tx tr.txr.encours').count(), 1);
-    assert.equal(await page.locator('#tx tr.txr .amt.pos', { hasText: /1\s800,00/ }).count(), 1);
-    const liste = await page.locator('#tx').innerText();
+    assert.ok(await page.locator('#tx .tx-day').count() >= 4);
+    assert.equal(await page.locator('#tx .txr.encours').count(), 1);
+    assert.equal(await page.locator('#tx .txr .amt.pos', { hasText: /1\s800,00/ }).count(), 1);
+    const liste = await page.locator('#tx').textContent();
     assert.doesNotMatch(liste, SANS_SIGNE);
     assert.doesNotMatch(liste, /AVANT FRONTIERE/);
     await capture(page, '2-operations');
@@ -241,19 +241,19 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     assert.equal(await page.locator('#ops-scope [data-perimetre]').count(), 3);
     await page.fill('#q', 'epicer');
     await page.waitForTimeout(400);
-    assert.equal(await page.locator('#tx tr.txr').count(), 1);
+    assert.equal(await page.locator('#tx .txr').count(), 1);
     await page.fill('#q', '');
     await page.waitForTimeout(400);
     await page.locator('#opsCompte').selectOption({ label: 'CARTE' });
-    assert.match(await page.locator('#tx').innerText(), /Aucune opération ne correspond/);
+    assert.match(await page.locator('#tx').textContent(), /Aucune opération ne correspond/);
     assert.doesNotMatch(await page.locator('body').innerText(), /\u2212\s?\d/);
 
     // classement repris du carnet fictif : règle de base (restaurants), règle de l'utilisateur (épicerie)
     await page.locator('#opsCompte').selectOption('');
     await page.waitForTimeout(100);
-    const ligneOp = t => page.locator('#tx tr.txr', { hasText: t });
-    assert.match(await ligneOp('CB RESTAURANT').innerText(), /COURANT\s+Restaurant/);
-    assert.match(await ligneOp('CB EPICERIE FICTIVE').innerText(), /Alimentation · Courses/);
+    const ligneOp = t => page.locator('#tx .txr', { hasText: t });
+    assert.match(await ligneOp('CB RESTAURANT').textContent(), /COURANT\s+Restaurant/);
+    assert.match(await ligneOp('CB EPICERIE FICTIVE').textContent(), /Alimentation · Courses/);
     assert.match(await page.locator('#tb-badge').innerText(), /^3$/);
     // détail par un appui ; « Marquer vue » (bouton, alternative au geste)
     await ligneOp('CB CAFE').locator('.tl').click();
@@ -275,11 +275,11 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     // 0.10.2 : le détail est une page ; il montre la nouvelle catégorie, Retour ramène à la liste
     assert.match(await page.locator('#opDetail').innerText(), /Bars/);
     await page.locator('#ah-back').click();
-    assert.match(await ligneOp('CB CAFE').innerText(), /Bars/);
+    assert.match(await ligneOp('CB CAFE').textContent(), /Bars/);
     assert.deepEqual(await page.evaluate(() => window.KladApp.etat().classement.regles.map(u => u.mot)), ['EPICERIE', 'CAFE']);
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
-    assert.match(await ligneOp('CB CAFE').innerText(), /Autres/);
+    assert.match(await ligneOp('CB CAFE').textContent(), /Autres/);
     assert.deepEqual(await page.evaluate(() => window.KladApp.etat().classement.regles.map(u => u.mot)), ['EPICERIE']);
     // gestes : glisser à droite → vue ; à gauche → volet « Classer »
     const glisser = (t, dx) => ligneOp(t).evaluate((el, dx) => {
@@ -296,15 +296,15 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.locator('#volet [data-fermer]').last().click();
     // filtre « Non vues », « Tout marquer vu » puis Annuler
     await page.locator('#app-chips [data-f="nonVues"]').click();
-    assert.equal(await page.locator('#tx tr.txr').count(), 1);
+    assert.equal(await page.locator('#tx .txr').count(), 1);
     await page.locator('#app-chips [data-f="toutVu"]').click();
     await page.waitForFunction(() => document.getElementById('tb-badge').hidden);
-    assert.match(await page.locator('#tx').innerText(), /Toutes les opérations de la période ont été vues/);
+    assert.match(await page.locator('#tx').textContent(), /Toutes les opérations de la période ont été vues/);
     await page.locator('#toast button').click();
     await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '1');
     await page.locator('#app-chips [data-f="nonVues"]').click();
     await page.locator('#app-chips [data-f="nc"]').click();
-    assert.ok(await page.locator('#tx tr.txr').count() >= 1);
+    assert.ok(await page.locator('#tx .txr').count() >= 1);
     await page.locator('#app-chips [data-f="nc"]').click();
     await capture(page, '10-operations-lot5');
     // 0.10.2 : périmètre gardé sur ce téléphone ; badge = toutes les opérations à voir
@@ -772,14 +772,14 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
       S.ops[c.id].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
       window.KladApp.changed('classement');
     }, [jourAvant(10), jourAvant(8)]);
-    const ligneRap = page.locator('#tx tr.txr[data-op$=":m:rap"]');
+    const ligneRap = page.locator('#tx .txr[data-op$=":m:rap"]');
     await page.evaluate(() => window.KladApp.versOps({ cat: '__rap' }));
     await ligneRap.locator('.tl').click();
     await page.locator('#opDetail [data-a="interne"]').click();
     await page.waitForSelector('#toast.show.action');
     assert.match(await page.locator('#toast').innerText(), /reste dans la liste, filtre « Internes »/);
     assert.equal(await page.locator('#app-chips [data-f="int"]').getAttribute('aria-pressed'), 'true');
-    assert.match(await ligneRap.innerText(), /Virements internes[\s\S]*interne \(à la main\)/);
+    assert.match(await ligneRap.textContent(), /Virements internes[\s\S]*interne \(à la main\)/);
     await ligneRap.locator('.tl').click();
     assert.match(await page.locator('#opDetail').innerText(), /Interne\s*marquée interne à la main : pas comptée dans le budget/);
     await page.waitForFunction(() => !document.getElementById('toast').classList.contains('show'), null, { timeout: 15000 });
@@ -797,15 +797,15 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#app-tb [data-tab="operations"]').click();
     await page.locator('#app-chips [data-f="toutes"]').click();
     await page.locator('#app-chips [data-f="int"]').click();
-    assert.match(await page.locator('#tx').innerText(), /CARTE FICTIVE[\s\S]*interne/);
+    assert.match(await page.locator('#tx').textContent(), /CARTE FICTIVE[\s\S]*interne/);
     assert.equal(await ligneRap.count(), 1);
     await page.locator('#app-chips [data-f="int"]').click();
 
     // 0.9.4 : période des opérations (raccourcis, personnalisée), combinée avec la recherche ; pastille effaçable ;
     // totaux débit / crédit de la sélection ; gardée en changeant d'onglet
-    const dates = () => page.$$eval('#tx tr.txr', trs => trs.map(t => t.dataset.op));
+    const dates = () => page.$$eval('#tx .txr', trs => trs.map(t => t.dataset.op));
     const totalAttendu = () => page.evaluate(() => {
-      const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx tr.txr')].map(t => t.dataset.op));
+      const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx .txr')].map(t => t.dataset.op));
       let d = 0, c = 0; for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) if (ids.has(o.id)) { if (o.montant < 0) d -= o.montant; else c += o.montant; }
       return [ids.size, window.KladFormat.montant(d), window.KladFormat.montant(c)]; });
     const toutAffiche = async () => { while (await page.locator('#tx-suite [data-suite]').count()) await page.locator('#tx-suite [data-suite]').click(); };
@@ -814,7 +814,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.match(await page.locator('#ops-pastille').innerText(), /30 derniers jours/);
     assert.match(await page.locator('#ah-e').innerText(), /30 derniers jours/);
     await toutAffiche();
-    const ops30 = await page.evaluate(() => { const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx tr.txr')].map(t => t.dataset.op)), out = [];
+    const ops30 = await page.evaluate(() => { const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx .txr')].map(t => t.dataset.op)), out = [];
       for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) if (ids.has(o.id)) out.push(o.date); return out; });
     assert.ok(ops30.length > 0 && ops30.every(d => d >= jourAvant(29)), 'dates dans les 30 jours');
     let [n, deb, cre] = await totalAttendu();
@@ -825,7 +825,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.fill('#q', 'SUPERMARCHE');
     await page.locator('#q').dispatchEvent('input');
     await page.waitForTimeout(400);
-    const txt = await page.locator('#tx').innerText();
+    const txt = await page.locator('#tx').textContent();
     assert.ok(/SUPERMARCHE/.test(txt) && !/SALAIRE|LIBRAIRIE/.test(txt), txt);
     [n, deb, cre] = await totalAttendu();
     tot = await page.locator('#ops-tot').innerText();
@@ -848,7 +848,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#opsAu').dispatchEvent('change');
     assert.match(await page.locator('#ops-pastille').innerText(), /Du \d\d\/\d\d(\/\d\d)? au \d\d\/\d\d\/\d\d/);
     await toutAffiche();
-    const opsP = await page.evaluate(() => { const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx tr.txr')].map(t => t.dataset.op)), out = [];
+    const opsP = await page.evaluate(() => { const S = window.KladApp.etat(), ids = new Set([...document.querySelectorAll('#tx .txr')].map(t => t.dataset.op)), out = [];
       for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) if (ids.has(o.id)) out.push(o.date); return out; });
     assert.ok(opsP.length > 0 && opsP.every(d => d >= jourAvant(20) && d <= jourAvant(5)));
     await page.locator('#ops-pastille [data-per-effacer]').click();

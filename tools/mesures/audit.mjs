@@ -44,7 +44,7 @@ export function auditer(o) {
   }
   const opacite = el => { let a = 1; for (let e = el; e; e = e.parentElement) a *= +getComputedStyle(e).opacity; return a; };
   // ---------------------------------------------------------- contrôles et zone d'appui
-  const SEL = 'button, a[href], input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab], [role=switch], [role=link], [tabindex="0"], tr[data-op]';
+  const SEL = 'button, a[href], input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab], [role=switch], [role=link], [tabindex="0"]';
   const zone = el => {
     const r = el.getBoundingClientRect();
     let L = r.left, T = r.top, R = r.right, B = r.bottom;

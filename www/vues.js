@@ -266,13 +266,13 @@
     // ligne = bouton nommé (lecteur d'écran, clavier) : libellé, sens et montant, date, compte, catégorie, état
     const nom = libelleCourt(o.libelle) + ', ' + (o.montant < 0 ? 'débit ' : 'crédit ') + F().montant(Math.abs(o.montant), cur) + ', ' + jjmm(o.date) +
       (c ? ', ' + c.libelle : '') + ', ' + r.cat + (r.type === 'interne' ? ', interne' : '') + (o.statut === 'en_cours' ? ', en cours' : '') + (vue ? '' : ', non vue');
-    return '<tr class="' + cls + '" data-op="' + esc(o.id) + '" data-c="' + esc(o.compte) + '" role="button" tabindex="0" aria-label="' + esc(nom) + '"><td class="ic">' + U().icoOp(C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '</td>' +
-      '<td class="lab"><div class="tl">' + (vue ? '' : '<span class="sr">Non vue. </span>') + esc(libelleCourt(o.libelle)) + '</div><div class="tm">' +
+    return '<div class="' + cls + '" data-op="' + esc(o.id) + '" data-c="' + esc(o.compte) + '" role="button" tabindex="0" aria-label="' + esc(nom) + '"><div class="ic">' + U().icoOp(C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '</div>' +
+      '<div class="lab"><div class="tl">' + (vue ? '' : '<span class="sr">Non vue. </span>') + esc(libelleCourt(o.libelle)) + '</div><div class="tm">' +
       (opt && opt.date ? '<span class="num">' + jjmm(o.date) + '</span> · ' : '') +
       '<span class="acct">' + esc(c ? c.libelle : '') + '</span> <span class="tx-cat">' + cat + '</span>' +
       (r.src === 'regle' ? '<span class="tx-tag" title="Classée par une de vos règles">règle</span>' : '') + nc +
-      (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') + '</div></td>' +
-      '<td class="amt' + (o.montant > 0 ? ' pos' : '') + (!COMPTEE(r.type) ? ' nc' : '') + '"><span class="amt-v">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></td></tr>';
+      (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') + '</div></div>' +
+      '<div class="amt' + (o.montant > 0 ? ' pos' : '') + (!COMPTEE(r.type) ? ' nc' : '') + '"><span class="amt-v">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></div></div>';
   }
 
   // Tranche de la liste : à partir de l'indice debut, au moins nbJours jours complets ; un en-tête par jour (total du jour
@@ -292,9 +292,9 @@
         j++;
       }
       const dt = new Date(d + 'T12:00:00Z');
-      h += '<tr class="tx-day"><td colspan="3"><div class="td-in"><span>' + JOURS[dt.getUTCDay()] + ' ' + jjmm(d) + (annee && +d.slice(0, 4) !== annee ? '/' + d.slice(2, 4) : '') +
-        '</span><span class="td-t num">' + (Math.abs(tot) < 1 ? '' : esc((tot > 0 ? '+' : '') + F().montant(Math.abs(tot)))) + '</span></div></td></tr>' +
-        ops.slice(i, j).map(o => ligne(S, o, { ctx })).join('');
+      h += '<div class="tx-j"><div class="tx-day"><div><div class="td-in"><span>' + JOURS[dt.getUTCDay()] + ' ' + jjmm(d) + (annee && +d.slice(0, 4) !== annee ? '/' + d.slice(2, 4) : '') +
+        '</span><span class="td-t num">' + (Math.abs(tot) < 1 ? '' : esc((tot > 0 ? '+' : '') + F().montant(Math.abs(tot)))) + '</span></div></div></div>' +
+        ops.slice(i, j).map(o => ligne(S, o, { ctx })).join('') + '</div>';
       i = j; jours++;
     }
     return { html: h, fin: i };
@@ -391,7 +391,7 @@
 
   // Mode « Trier une à une » : opération à voir, déjà classée (« C'est bon, vue », changer la catégorie, passer).
   function triVue(S, o, ctx) {
-    return '<div class="ops-un"><table class="tx txv2"><colgroup><col style="width:44px"><col><col style="width:118px"></colgroup><tbody>' + ligne(S, o, { ctx }) + '</tbody></table></div>' +
+    return '<div class="ops-un"><div class="tx txv2">' + ligne(S, o, { ctx }) + '</div></div>' +
       '<button type="button" class="sh-go" data-a="trivue">C\'est bon, vue</button>' +
       '<div class="row"><button type="button" class="btn" data-a="triclasser">Changer la catégorie</button><button type="button" class="btn" data-a="passer">Passer</button></div>';
   }

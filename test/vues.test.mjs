@@ -41,12 +41,12 @@ test('opérations : par jour, total du jour, débit sans signe, crédit « + »,
   assert.deepEqual(json(ops.map(o => o.id)), ['o1', 'o2', 'o3', 'o4']);
   const r = Vu.tranche(S, ops, 0, 10, { annee: 2026 });
   assert.equal(r.fin, 4);
-  assert.equal((r.html.match(/<tr class="tx-day">/g) || []).length, 3);
+  assert.equal((r.html.match(/<div class="tx-day">/g) || []).length, 3);
   assert.match(texte(r.html), /mar\. 27\/10\s+9,99 €/);
   assert.match(texte(r.html), /mer\. 31\/12\/25/);
-  assert.match(r.html, /<tr class="txr unseen encours" data-op="o1"/);
-  assert.match(r.html, /<td class="amt"><span class="amt-v">9,99\s€<\/span>/);
-  assert.match(r.html, /<td class="amt pos"><span class="amt-v">\+1\s800,00\s€<\/span>/);
+  assert.match(r.html, /<div class="txr unseen encours" data-op="o1"/);
+  assert.match(r.html, /<div class="amt"><span class="amt-v">9,99\s€<\/span>/);
+  assert.match(r.html, /<div class="amt pos"><span class="amt-v">\+1\s800,00\s€<\/span>/);
   assert.match(r.html, /LOYER &amp; CHARGES/);
   assert.doesNotMatch(texte(r.html), SIGNE);
   // tranches : au moins n jours complets
