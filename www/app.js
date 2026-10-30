@@ -128,10 +128,13 @@
   // ------------------------------------------------------------ écrans et onglets (comme l'ancienne version)
   // Onglets : Budget (périmètre perso), Opérations, Commun (budget du compte commun), Plus (volet) ; depuis Plus :
   // Équilibre, Impôts, Épargne, Relevés et sauvegarde.
-  const VUES = { accueil: 'view-accueil', budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', operation: 'view-op', appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data' };
-  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', appartement: 'Équilibre', impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés' };
-  // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient.
-  const RETOUR = { operation: 'operations' };
+  const VUES = { accueil: 'view-accueil', budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', operation: 'view-op', plus: 'view-plus',
+    appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data', sauvegarde: 'view-save' };
+  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', plus: 'Plus', appartement: 'Équilibre',
+    impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés des comptes', sauvegarde: 'Sauvegarde' };
+  // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient
+  // (par défaut : la liste des opérations, Plus).
+  const RETOUR = { operation: 'operations', appartement: 'plus', impots: 'plus', epargne: 'plus', donnees: 'plus', sauvegarde: 'plus' };
   let retourDe = {};
   const pos = {};                    // position de défilement de chaque écran
   let vue = 'accueil', scope = 'perso';
@@ -156,7 +159,7 @@
   }
   // En-tête : titre, ligne du dessus (période), pastille de synchro, recherche (opérations), thème.
   function chrome() {
-    const tb = vue === 'appartement' || vue === 'impots' || vue === 'epargne' || vue === 'donnees' ? 'plus' : vue === 'operation' ? 'operations' : vue;
+    const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue;
     $('ah-back').hidden = !RETOUR[vue];
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('ah-title').textContent = TITRES[vue] || 'Accueil';
@@ -174,30 +177,18 @@
       e = o ? F.jour(o.date) : '';
     }
     $('ah-e').textContent = e;
-    const t = AF.theme();
-    const sombre = AF.sombre(t);
-    $('ah-theme').textContent = sombre ? '☾' : '☀';
-    $('ah-theme').title = 'Thème : ' + (t === 'sombre' ? 'sombre' : t === 'clair' ? 'clair' : 'automatique (réglage du téléphone)') + ' — toucher pour changer';
     renderPastille();
   }
   const AF = window.KladAffichage;
   const U = window.KladUI;
-  function changerTheme() {
-    const t = AF.theme(), n = t === 'auto' ? 'clair' : t === 'clair' ? 'sombre' : 'auto';
-    AF.choisirTheme(n);
-    chrome();
-    rendus.forEach(fn => { try { fn({ theme: true }); } catch (e) { /* rendu suivant */ } });
-    return n;
-  }
   // automatique : le téléphone a changé de thème, appli ouverte ; ou palette changée (graphiques et icône du thème redessinés)
   function redessiner() { if (!S) return; chrome(); rendus.forEach(fn => { try { fn({ theme: true }); } catch (e) { /* rendu suivant */ } }); }
   AF.surTheme = redessiner;
-  $('ah-theme').addEventListener('click', () => { const n = changerTheme(); toast('Thème : ' + (n === 'auto' ? 'automatique' : n) + '.'); });
   $('app-tb').addEventListener('click', ev => {
     const b = ev.target.closest('[data-tab]');
     if (!b || !S) return;
     const k = b.dataset.tab;
-    if (k === 'plus') { ouvrirVolet('secPlus'); return; }
+    if (k === 'plus') { montrer('plus', { force: true, haut: true }); return; }
     if (k === vue) { window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
     if (k === 'operations') { opsFin = 0; montrer('operations', { rendre: false }); renderOps(true); return; }
     montrer(k, { force: true });
@@ -327,43 +318,48 @@
     });
   }
 
-  // ------------------------------------------------------------ volet « Plus » (comme l'ancienne version, puis réglages de Klad)
+  // ------------------------------------------------------------ Plus (page, 0.10.3) : Verrouiller en tête, puis 6 groupes
+  // Comptes et banques · Données · Modules · Extras · Réglages · Aide et à propos. Synchroniser (pastille, Accueil),
+  // le thème (Réglages › Apparence) et les observations (Accueil, Budget) n'y sont plus.
   function renderPlus() {
     const it = (ic, t, s2, attr) => '<button type="button" class="sh-li" ' + attr + '><span class="ic" aria-hidden="true">' + ic + '</span><span>' + esc(t) + (s2 ? '<small>' + esc(s2) + '</small>' : '') + '</span><span class="r" aria-hidden="true">›</span></button>';
-    const t = AF.theme();
-    const sombre = AF.sombre(t);
-    const d = S.modele.sync.derniere;
-    const n = Object.keys(S.modele.connexions).length, c = S.modele.comptes.length, r = S.modele.reprise;
-    const nObs = (() => { try { const B = budget(); return B && window.KladObservations ? window.KladObservations.observations(B, 'perso').faire.length : 0; } catch (e) { return 0; } })();
-    $('plusCorps').innerHTML = '<div class="sh-list">' +
-      it('🏠', 'Équilibre de l\'appartement', 'Qui doit combien à qui', 'data-vue="appartement"') +
-      it('🏛️', 'Impôts', 'Avis, prélèvements, partage', 'data-vue="impots"') +
-      it('🐷', 'Épargne', 'Livrets et PEE', 'data-vue="epargne"') +
-      it('🧾', 'Relevés et sauvegarde', 'État de chaque compte, imports, sauvegarde', 'data-vue="donnees"') +
-      it('↻', 'Synchroniser maintenant', syncP ? 'synchronisation en cours…' : d ? 'relevés lus à ' + F.heure(d) : '', 'data-act="sync"') +
-      it(sombre ? '☾' : '☀', 'Thème', t === 'auto' ? 'automatique (' + (sombre ? 'sombre' : 'clair') + ', comme le téléphone)' : sombre ? 'thème sombre' : 'thème clair', 'data-act="theme"') +
-      '</div><div class="sh-lab">Réglages de Klad</div><div class="sh-list">' +
-      it('🏦', 'Banques et accès', n ? n + ' banque' + (n > 1 ? 's' : '') + ' connectée' + (n > 1 ? 's' : '') : 'Aucune banque connectée', 'data-volet="secBanques" data-empiler="1"') +
-      it('💳', 'Comptes', c ? c + ' compte' + (c > 1 ? 's' : '') : 'Aucun compte', 'data-volet="secComptes" data-empiler="1"') +
-      it('🗂️', 'Classement', 'Catégories, règles, complément', 'data-volet="secClassement" data-empiler="1"') +
-      it('🔎', 'Observations', nObs ? nObs + ' point(s) à faire' : 'Rien à faire', 'data-volet="secObs" data-empiler="1"') +
-      it('📥', 'Import de reprise', r ? 'Importée le ' + F.date(r.importee.slice(0, 10)) + ', ' + r.nb + ' opération(s)' : 'Aucun import', 'data-volet="secReprise" data-empiler="1"') +
-      it('🎨', 'Affichage', 'Thème, palette, mode démo', 'data-volet="secAffichage" data-empiler="1"') +
-      it('🧮', 'Contrôle', 'Relevé pour comparer avec l\'ancienne version', 'data-volet="secControle" data-empiler="1"') +
-      it('✨', 'Extras', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : 'Mail, Claude', 'data-volet="secExtras" data-empiler="1"') +
-      it('🧩', 'Modules', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : 'Lien Grafit', 'data-volet="secModules" data-empiler="1"') +
-      it('🔒', 'Verrou', 'Code, empreinte, effacement', 'data-volet="secVerrou" data-empiler="1"') +
-      it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog" data-empiler="1"') +
-      it('ℹ️', 'À propos et mise à jour', 'Version ' + (CFG.version || 'dev'), 'data-volet="secMaj" data-empiler="1"') +
-      '</div><div class="row center"><button type="button" id="btnLock" class="btn">Verrouiller</button></div>';
+    const grp = (t, corps) => '<section class="pl-grp" aria-label="' + esc(t) + '"><h2 class="sh-lab">' + esc(t) + '</h2><div class="sh-list">' + corps + '</div></section>';
+    const n = Object.keys(S.modele.connexions).length, c = S.modele.comptes.length;
+    const t = AF.theme(), p = AF.palette ? AF.palette() : 'klad';
+    $('plusCorps').innerHTML =
+      '<button type="button" id="btnLock" class="btn pl-lock"><span aria-hidden="true">🔒</span> Verrouiller maintenant</button>' +
+      grp('Comptes et banques',
+        it('🏦', 'Banques et accès', n ? n + ' banque' + (n > 1 ? 's' : '') + ' connectée' + (n > 1 ? 's' : '') : 'Aucune banque connectée', 'data-volet="secBanques"') +
+        it('💳', 'Comptes', c ? c + ' compte' + (c > 1 ? 's' : '') : 'Aucun compte', 'data-volet="secComptes"') +
+        it('🧾', 'Relevés des comptes', 'État de chaque compte, relevé manuel', 'data-vue="donnees"')) +
+      grp('Données',
+        it('💾', 'Sauvegarde', 'Export chiffré, restauration', 'data-vue="sauvegarde"') +
+        it('📥', 'Importer', 'Relevé d\'un compte, reprise de l\'ancienne version, complément', 'data-volet="secImporter"') +
+        it('🧮', 'Contrôle', 'Relevé pour comparer avec l\'ancienne version', 'data-volet="secControle"')) +
+      grp('Modules',
+        it('🏛️', 'Impôts', 'Avis, prélèvements, partage, taxe foncière', 'data-vue="impots"') +
+        it('🐷', 'Épargne', 'Livret, plan d\'épargne', 'data-vue="epargne"') +
+        it('🏠', 'Équilibre de l\'appartement', 'Qui doit combien à qui', 'data-vue="appartement"') +
+        it('🧩', 'Lien Grafit', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : 'Résumé pour Grafit', 'data-volet="secModules"')) +
+      grp('Extras',
+        it('✨', 'Mail et Claude', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : 'Mail, Claude', 'data-volet="secExtras"')) +
+      grp('Réglages',
+        it('🎨', 'Apparence', 'Thème ' + ({ auto: 'automatique', clair: 'clair', sombre: 'sombre' }[t]) + ' · palette ' + (p === 'grafit' ? 'Grafit' : 'Klad') + ' · mode démo', 'data-volet="secAffichage"') +
+        it('🔒', 'Verrou', 'Code, empreinte, effacement', 'data-volet="secVerrou"') +
+        it('🗂️', 'Classement', 'Catégories, règles, complément', 'data-volet="secClassement"')) +
+      grp('Aide et à propos',
+        it('ℹ️', 'Version et mise à jour', 'Version ' + (CFG.version || 'dev'), 'data-volet="secMaj"') +
+        it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog"'));
   }
-  preparer.secPlus = () => renderPlus();
-  $('plusCorps').addEventListener('click', ev => {
-    const b = ev.target.closest('[data-act]');
-    if (!b) return;
-    if (b.dataset.act === 'sync') { fermerVolet(); synchro('manuel'); }
-    else if (b.dataset.act === 'theme') { changerTheme(); renderPlus(); }
-  });
+  // Données › Importer : les trois imports au même endroit.
+  preparer.secImporter = () => {
+    const r = S.modele.reprise;
+    const it = (ic, t, s2, attr) => '<button type="button" class="sh-li" ' + attr + '><span class="ic" aria-hidden="true">' + ic + '</span><span>' + esc(t) + (s2 ? '<small>' + esc(s2) + '</small>' : '') + '</span><span class="r" aria-hidden="true">›</span></button>';
+    $('importerCorps').innerHTML = '<div class="sh-list">' +
+      it('🧾', 'Relevé d\'un compte', 'CSV, JSON ou Excel, depuis Relevés des comptes', 'data-vue="donnees"') +
+      it('📦', 'Reprise de l\'ancienne version', r ? 'Importée le ' + F.date(r.importee.slice(0, 10)) + ', ' + r.nb + ' opération(s)' : 'Aucun import', 'data-volet="secReprise" data-empiler="1"') +
+      it('🗂️', 'Complément de classement', 'Dans Classement : « Importer un complément »', 'data-volet="secClassement" data-empiler="1"') + '</div>';
+  };
 
   // Tableaux trop larges sur téléphone : chaque ligne devient une carte, l'intitulé de colonne est recopié dans chaque
   // case (comme l'ancienne version).
@@ -445,6 +441,7 @@
     renderHaut();
     if (vue === 'operations') renderOps(true);
     if (vue === 'operation') renderDetail();
+    if (vue === 'plus') renderPlus();
     rendus.forEach(fn => { try { fn({}); } catch (e) { log('err', 'Affichage : ' + (e.message || e)); } });
     chrome();
     if (pile.length && preparer[pile[pile.length - 1]]) preparer[pile[pile.length - 1]]({ rendu: true });
@@ -462,7 +459,7 @@
       const k = av.dataset.av;
       if (k === 'nonvues') versOps({ nonVues: true });
       else if (k === 'nonclassees' || k === 'rapprocher') versOps({ cat: k === 'nonclassees' ? '__nc' : '__rap' });
-      else if (k === 'sauvegarde') montrer('donnees', { force: true, haut: true });
+      else if (k === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
       else if (k === 'bilan') { montrer('budget', { force: true, haut: true }); if (window.KladEcranBudget && window.KladEcranBudget.cyclePrecedent) window.KladEcranBudget.cyclePrecedent(); }
       else if (AV[k]) ouvrirVolet(AV[k]);
       return;
@@ -490,7 +487,7 @@
     if (!act) return;
     if (act.dataset.act === 'sync') synchro('manuel');
     else if (act.dataset.act === 'trier') trier('nv', 'tout');
-    else if (act.dataset.act === 'sauvegarde') montrer('donnees', { force: true, haut: true });
+    else if (act.dataset.act === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
   });
   preparer.secRav = () => {
     let rav = null;
@@ -514,7 +511,7 @@
     if (av) {
       const k = av.dataset.av;
       if (k === 'nonclassees' || k === 'rapprocher') versOps({ cat: k === 'nonclassees' ? '__nc' : '__rap' });
-      else if (k === 'sauvegarde') montrer('donnees', { force: true, haut: true });
+      else if (k === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
       else if (AV[k]) ouvrirVolet(AV[k]);
       return;
     }

@@ -1,8 +1,8 @@
 # Plan de mise en œuvre de la nouvelle organisation
 
-**Validé par le propriétaire (variante A).** Avancement : UX-1 (0.10.0), UX-2 (0.10.1) et UX-3 (0.10.2) faits. Changement décidé : la palette se choisit
+**Validé par le propriétaire (variante A).** Avancement : UX-1 (0.10.0), UX-2 (0.10.1), UX-3 (0.10.2) et UX-4 (0.10.3) faits. Changement décidé : la palette se choisit
 dans Réglages › Apparence (Klad ou Grafit), indépendante du thème ; jetons des deux palettes posés en UX-1, sélecteur
-livré dès UX-1 dans Plus › Affichage (déplacé dans Réglages › Apparence en UX-4).
+livré dès UX-1 dans Plus › Affichage, dans Plus › Réglages › Apparence depuis UX-4.
 
 Suite de [`audit.md`](audit.md) et [`architecture.md`](architecture.md). **À lancer seulement après validation du
 propriétaire** (variante, contenu de l'Accueil, groupes de Plus, couleurs). Écrit pour la variante A ; les écarts de la
@@ -41,7 +41,7 @@ Effort : S (une session), M (deux sessions), L (trois sessions). Risque : faible
 | UX-1 · Socle lisible ✅ | 0.10.0 | Couleurs AA (texte secondaire, légendes, liens, crédits, badge), polices de 12 px au moins, zones d'appui de 48 dp partout (en-tête, Fermer, puces, ◀ ▶, liens « voir les N », « Comment c'est calculé », « c'est fait », ↑ ↓) ; lignes d'opérations en boutons nommés (« débit 14,50 € ») ; 3 sections du commun nommées ; libellés sur 2 lignes à 130 % ; mot proposé par « Classer aussi les autres » présent dans le libellé, interrupteur coupé s'il ne trouve rien ; « abattement de … », « balance déficitaire ». **Aucun déplacement.** | faible | M |
 | UX-2 · Accueil ✅ | 0.10.1 | Nouvel onglet Accueil (§ 2 de l'architecture) : reste à vivre en tête, « À vérifier » regroupé (à voir perso et commun, non classées, accès, sauvegarde, mise à jour, observations, bilan du cycle précédent), soldes en liste, « Ce cycle-ci », commun en un coup d'œil, échéances, actions rapides. L'onglet Budget perd son haut (grande carte, cartes, à voir, à vérifier). Retour d'Android : vers l'Accueil. | moyen | L |
 | UX-3 · Opérations ✅ | 0.10.2 | Sélecteur Perso · Commun · Tout toujours visible (par défaut : celui choisi la dernière fois, gardé) ; badge = total à voir ; recherche visible ; « Trier une à une » (à voir puis non classées, 2 appuis par opération, Passer, Annuler) ; détail en page avec Retour ; « Opérations semblables ». | moyen | M |
-| UX-4 · Plus | 0.10.3 | Plus en page entière, 6 groupes, Verrouiller en tête ; « Relevés et sauvegarde » coupé en deux ; Importer regroupé ; Synchroniser, Thème et Observations retirés de Plus ; retour d'Android vers Plus depuis un écran ouvert par Plus ; lexique. | faible | M |
+| UX-4 · Plus ✅ | 0.10.3 | Plus en page entière, 6 groupes, Verrouiller en tête ; « Relevés et sauvegarde » coupé en deux ; Importer regroupé ; Synchroniser, Thème et Observations retirés de Plus ; retour d'Android vers Plus depuis un écran ouvert par Plus ; lexique. | faible | M |
 | UX-5 · Budget et Commun | 0.10.4 | Budget : sous-vues Suivi · Tendance · Contrats, dépassés d'abord ; Commun : Ce mois · Trésorerie · Équilibre (variante B : sélecteur Perso · Commun dans Budget, Équilibre dans Plus › Modules) ; sélecteur Perso / Commun retiré de Budget (A) ; Catégories et Règles retirées du bas des deux onglets (restent dans Plus › Réglages › Classement). Migration de `klad.replis` (sections découpées). | moyen | L |
 | UX-6 · Modules | 0.10.5 | Impôts : Résumé · Prélèvements · Taxe foncière · Paramètres ; Épargne : Livret · Plan d'épargne · Paramètres ; paramètres et hypothèses sortis des résultats ; Réglages › Budget (cycle de salaire, base de calcul). | moyen | M |
 | UX-7 · Rapidité et couleurs | 0.10.6 | Accueil dessiné d'abord après le déverrouillage, autres onglets calculés ensuite ; liste d'opérations allégée (jours hors écran non dessinés) pour 3 ans d'historique ; palette « Grafit » si le propriétaire la choisit (sinon couleurs actuelles). | faible | M |

@@ -103,7 +103,11 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.addInitScript(fauxEB);
     await page.goto(base);
     const code = async () => { for (const k of '123456') await page.keyboard.press(k); };
-    const plusVers = async sec => { await page.locator('#app-tb [data-tab="plus"]').click(); await page.locator('#plusCorps [data-volet="' + sec + '"]').click(); };
+    const plusVers = async sec => {      // 0.10.3 : reprise de l'ancienne version dans Plus › Données › Importer
+      await page.locator('#app-tb [data-tab="plus"]').click();
+      if (sec === 'secReprise') { await page.locator('#plusCorps [data-volet="secImporter"]').click(); await page.locator('#importerCorps [data-volet="secReprise"]').click(); }
+      else await page.locator('#plusCorps [data-volet="' + sec + '"]').click();
+    };
     const synchroFinie = () => page.waitForFunction(() => { const S = window.KladApp && window.KladApp.etat(); return S && S.modele.sync.derniere && !document.getElementById('ah-sync').classList.contains('busy'); });
 
     // premier lancement : code (deux fois), phrase de récupération vérifiée
@@ -330,6 +334,11 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.locator('#ops-scope [data-perimetre="perso"]').click();
 
     await page.locator('#app-tb [data-tab="plus"]').click();
+    // 0.10.3 : Plus en page entière, Verrouiller en tête, 6 groupes ; Synchroniser, Thème et Observations n'y sont plus
+    const plus = await page.locator('#plusCorps').innerText();
+    assert.match(plus, /Verrouiller maintenant[\s\S]*Comptes et banques[\s\S]*Données[\s\S]*Modules[\s\S]*Extras[\s\S]*Réglages[\s\S]*Aide et à propos/i);
+    assert.doesNotMatch(plus, /Synchroniser maintenant|Observations|Relevés et sauvegarde|Import de reprise/);
+    assert.equal(await page.locator('#volet').evaluate(e => e.hidden), true);
     await capture(page, '4-plus');
     await page.locator('#plusCorps [data-volet="secClassement"]').click();
     assert.match(await page.locator('#classementCorps').innerText(), /Repris de l'ancienne version[\s\S]*Vos règles[\s\S]*EPICERIE/);
@@ -421,7 +430,11 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.getByRole('button', { name: 'Vérifier' }).click();
     await page.waitForSelector('#appli:not([hidden])');
     // reprise fictive avec un carnet (budget, contrats, virements, réglages du salaire)
-    const plusVers = async sec => { await page.locator('#app-tb [data-tab="plus"]').click(); await page.locator('#plusCorps [data-volet="' + sec + '"]').click(); };
+    const plusVers = async sec => {      // 0.10.3 : reprise de l'ancienne version dans Plus › Données › Importer
+      await page.locator('#app-tb [data-tab="plus"]').click();
+      if (sec === 'secReprise') { await page.locator('#plusCorps [data-volet="secImporter"]').click(); await page.locator('#importerCorps [data-volet="secReprise"]').click(); }
+      else await page.locator('#plusCorps [data-volet="' + sec + '"]').click();
+    };
     const deplier = async id => { if (await page.locator('#' + id).evaluate(e => e.classList.contains('collapsed'))) await page.locator('#' + id + ' .panel-h h2.fold').click(); };
     const auj = await page.evaluate(() => window.KladModele.jourLocal(Date.now()));
     await plusVers('secReprise');
@@ -435,6 +448,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
 
     // 0.10.1 : Accueil en tête (reste à vivre, À vérifier, soldes, ce cycle-ci, commun, échéances, actions rapides) ;
     // le reste à vivre ouvre son détail ; le haut de l'onglet Budget (grande carte, cartes) n'y est plus
+    await page.locator('#app-tb [data-tab="accueil"]').click();
     assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
     const acc = await page.locator('#view-accueil').innerText();
     assert.match(acc, /Reste à vivre jusqu'au[\s\S]*par jour[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/i);
@@ -503,6 +517,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     // Équilibre (Plus) : reste à combler, simulation
     await page.locator('#app-tb [data-tab="plus"]').click();
     await page.locator('#plusCorps [data-vue="appartement"]').click();
+    assert.equal(await page.locator('#ah-back').isVisible(), true);          // écran ouvert par Plus : Retour vers Plus
     assert.match(await page.locator('#view-appart').innerText(), /Reste à combler[\s\S]*Personne A doit encore investir/i);
     await page.fill('#eqSimY', '100000');
     await page.waitForFunction(() => /Équilibre atteint tout de suite/.test(document.getElementById('eqSimOut').textContent));
@@ -563,10 +578,28 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
       }
       await page.locator('#volet [data-fermer]').last().click();
     }
-    await page.locator('#ah-theme').click();
+    // 0.10.3 : plus d'icône de thème dans l'en-tête ; thème et palette dans Plus › Réglages › Apparence
+    assert.equal(await page.locator('#ah-theme').count(), 0);
+    await plusVers('secAffichage');
+    await page.locator('#affichageCorps [data-theme-choix="clair"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
-    await page.locator('#ah-theme').click();
+    await page.locator('#affichageCorps [data-theme-choix="sombre"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    // palette Grafit (noir et rouge), indépendante du thème, gardée et appliquée dès le démarrage
+    await page.locator('#affichageCorps [data-palette-choix="grafit"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'grafit');
+    assert.equal(await fond(), 'rgb(10, 12, 14)');
+    assert.equal(await page.evaluate(() => localStorage.getItem('klad.palette')), 'grafit');
+    const p3 = await browser.newPage({ colorScheme: 'light' });
+    await p3.addInitScript(() => { try { localStorage.setItem('klad.palette', 'grafit'); } catch (e) { /* page vide */ } });
+    await p3.goto(base + 'index.html', { waitUntil: 'domcontentloaded' });
+    assert.equal(await p3.evaluate(() => document.documentElement.dataset.palette), 'grafit');
+    assert.equal(await p3.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(244, 243, 241)');
+    await p3.close();
+    await page.locator('#affichageCorps [data-palette-choix="klad"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.palette || 'klad'), 'klad');
+    assert.equal(await fond(), SOMBRE);
+    await page.locator('#volet [data-fermer]').last().click();
     await capture(page, '20-theme-sombre');
     // choix gardé et appliqué dès le démarrage, avant la feuille de style (pas de flash) : téléphone clair, thème sombre
     assert.equal(await page.evaluate(() => localStorage.getItem('klad.theme')), 'sombre');
@@ -602,7 +635,9 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
       assert.doesNotMatch(t, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
       await capture(page, '18-' + v);
     }
-    await plusVers('secObs');
+    // 0.10.3 : les observations s'ouvrent depuis l'Accueil (« À vérifier »), plus depuis Plus
+    await page.locator('#app-tb [data-tab="accueil"]').click();
+    await page.locator('#view-accueil [data-av="observations"]').click();
     assert.match(await page.locator('#obsCorps').innerText(), /À faire/i);
     await page.locator('#volet [data-fermer]').last().click();
     await page.locator('#app-tb [data-tab="plus"]').click();
