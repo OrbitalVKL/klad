@@ -74,7 +74,18 @@
     if (b && A.etat() && (v === 'budget' || v === 'commun' || v === 'appartement')) sousVue(b.dataset.sousvue);
   });
   A.rendus.push(o => { if (!o || !o.theme) render(); });
-  window.addEventListener('resize', () => { clearTimeout(render.t); render.t = setTimeout(() => { if (A.etat()) render(); }, 250); });
+  // Largeur changée seulement (rotation, fenêtre) : l'ouverture du clavier ne change que la hauteur, et un rendu
+  // pendant une saisie ferait disparaître le champ et le clavier (1.1).
+  let largeurRendue = window.innerWidth;
+  const saisieEnCours = () => { const e = document.activeElement; return !!(e && e.matches && e.matches('input, textarea, select') && e.closest('#appli')); };
+  window.addEventListener('resize', () => {
+    clearTimeout(render.t);
+    render.t = setTimeout(() => {
+      if (!A.etat() || window.innerWidth === largeurRendue || saisieEnCours()) return;
+      largeurRendue = window.innerWidth;
+      render();
+    }, 250);
+  });
 
   // Période d'analyse de la tendance (et des opérations) : mois proposés, préréglage.
   function periodeTendance(B) {
@@ -169,7 +180,7 @@
     }
     const pd = t.closest('[data-pdet]'), pm = t.closest('[data-pmois]');
     if (pd || pm) { const k = pd ? 'd|' + pd.dataset.pdet : 'mo|' + pm.dataset.pmois; if (ui.ouvertsPlan.has(k)) ui.ouvertsPlan.delete(k); else ui.ouvertsPlan.add(k); render(); return; }
-    if (t.closest('[data-fuel]')) { if (ui.ouvertsPlan.has('fuel')) ui.ouvertsPlan.delete('fuel'); else ui.ouvertsPlan.add('fuel'); render(); return; }
+    if (t.closest('[data-fuel]')) { A.ouvrirVolet('secCarburant'); return; }
     const fo = t.closest('[data-fuelok]');
     if (fo) {
       const snap = KB.modifier(S(), 'perso', 'c|Carburant', { on: true, per: 1, amt: +fo.dataset.fuelok });
@@ -209,7 +220,7 @@
     // observations
     const fa = t.closest('[data-fait]');
     if (fa) {
-      const avant = window.KladObservations.fait(S(), fa.dataset.fait, Date.now());
+      const avant = window.KladObservations.fait(S(), fa.dataset.fait, Date.now(), A.budget());
       A.changed('budget');
       A.toastAnnuler('Point marqué comme fait : il reviendra seulement si la situation se reproduit.', () => { window.KladObservations.annulerFait(S(), avant); A.changed('budget'); });
       return;
@@ -270,12 +281,25 @@
       }
       annulable('Poste « ' + key.slice(2) + ' » ajouté au budget.', KB.ajouter(S(), sc, key)); return;
     }
-    if (t.dataset.fu) {
-      const avant = KB.reglerCarburant(S(), { [t.dataset.fu]: parseFloat(String(t.value).replace(',', '.')) || 0 });
-      A.changed('budget');
-      A.toastAnnuler('Calculateur carburant mis à jour.', () => { KB.annulerCarburant(S(), avant); A.changed('budget'); });
-      return;
-    }
+  });
+  // ------------------------------------------------------------ calculateur carburant (fenêtre dédiée, 1.1)
+  A.preparer.secCarburant = () => { const B = A.budget(); $('carburantCorps').innerHTML = B ? VB.carburantVolet(B) : ''; };
+  const rafraichirCarburant = () => { if ($('carburantCorps').closest('#volet')) A.preparer.secCarburant(); };
+  $('carburantCorps').addEventListener('change', ev => {
+    const t = ev.target;
+    if (!t.dataset.fu) return;
+    const avant = KB.reglerCarburant(S(), { [t.dataset.fu]: parseFloat(String(t.value).replace(/\s/g, '').replace(',', '.')) || 0 });
+    A.changed('budget');
+    rafraichirCarburant();
+    A.toastAnnuler('Calculateur carburant mis à jour.', () => { KB.annulerCarburant(S(), avant); A.changed('budget'); rafraichirCarburant(); });
+  });
+  $('carburantCorps').addEventListener('click', ev => {
+    const fo = ev.target.closest('[data-fuelok]');
+    if (!fo) return;
+    const snap = KB.modifier(S(), 'perso', 'c|Carburant', { on: true, per: 1, amt: +fo.dataset.fuelok });
+    A.changed('budget');
+    rafraichirCarburant();
+    A.toastAnnuler('Prévu Carburant : ' + KB.eur(+fo.dataset.fuelok) + '.', () => { KB.annuler(S(), snap); A.changed('budget'); rafraichirCarburant(); });
   });
   vb.addEventListener('toggle', ev => {
     const d = ev.target;

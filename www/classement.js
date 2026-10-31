@@ -223,7 +223,7 @@
   // détail) : il reste une dépense, mais il est signalé « à rapprocher » et peut être marqué interne à la main.
   // → le compte portefeuille concerné, ou null.
   function aRapprocher(ctx, o) {
-    if (o.montant >= 0 || (o.categorie && o.categorie.cat) || !ctx.portefeuilles.length) return null;
+    if (o.montant >= 0 || (o.categorie && o.categorie.cat) || o.rapprochement === 'depense' || !ctx.portefeuilles.length) return null;
     const c = ctx.comptes.get(o.compte);
     if (!estCourant(c)) return null;
     const F = fold(o.libelle);
@@ -256,6 +256,64 @@
     o.categorie = null;
     return snap;
   }
+
+  // ------------------------------------------------------------ rapprochement à la main (1.1)
+  // Côté banque, un prélèvement de portefeuille « à rapprocher » peut être rapproché d'un achat choisi dans le détail
+  // du portefeuille (le prélèvement devient interne, l'achat est la dépense), ou gardé en dépense. Côté portefeuille,
+  // un achat sans prélèvement à la banque peut être marqué « payé autrement » (solde du portefeuille, autre moyen).
+  // o.rapprochement : 'depense' (prélèvement gardé en dépense), 'autrement' (achat payé autrement) ou { avec: id }.
+  const FENETRE_MANUELLE = 30;
+  const proche = (o, x) => Math.abs(ecart(o.date, x.date)) <= FENETRE_MANUELLE;
+  const triProches = (o, L) => L.sort((a, b) => (Math.abs(Math.abs(a.montant) - Math.abs(o.montant)) - Math.abs(Math.abs(b.montant) - Math.abs(o.montant))) ||
+    (Math.abs(ecart(o.date, a.date)) - Math.abs(ecart(o.date, b.date))));
+  const portefeuilleDe = (ctx, o) => { const c = ctx.comptes.get(o.compte); return c && c.role === 'paiement_en_ligne' ? c : null; };
+  // Prélèvement de la banque qui règle un achat du portefeuille : rapproché à la main, sinon même montant et dates
+  // proches (règle automatique). → opération, ou null.
+  function prelevementDe(ctx, wop) {
+    const w = ctx.portefeuilles.find(x => x.c.id === wop.compte);
+    if (!w) return null;
+    for (const c of ctx.comptes.values()) {
+      if (!estCourant(c)) continue;
+      for (const o of ctx.S.ops[c.id] || []) {
+        if (o.montant >= 0 || !contient(fold(o.libelle), w.mots)) continue;
+        if (o.categorie && o.categorie.lie === wop.id) return o;
+        const e = ecart(o.date, wop.date);
+        if (Math.abs(o.montant) === Math.abs(wop.montant) && e >= -PORTEFEUILLE_AVANT && e <= PORTEFEUILLE_APRES) return o;
+      }
+    }
+    return null;
+  }
+  // Achats du portefeuille w à proposer pour le prélèvement o (± 30 jours, sans prélèvement déjà), du plus proche.
+  function candidatsPortefeuille(ctx, o, w) {
+    const L = (ctx.S.ops[w.id] || []).filter(x => x.montant < 0 && proche(o, x) && x.rapprochement !== 'autrement' && !prelevementDe(ctx, x));
+    return triProches(o, L).slice(0, 12);
+  }
+  // Prélèvements « à rapprocher » à proposer pour l'achat wop (± 30 jours), du plus proche.
+  function candidatsBanque(ctx, wop) {
+    const L = [];
+    for (const c of ctx.comptes.values()) if (estCourant(c)) for (const o of ctx.S.ops[c.id] || []) { const w = aRapprocher(ctx, o); if (w && w.id === wop.compte && proche(wop, o)) L.push(o); }
+    return triProches(wop, L).slice(0, 12);
+  }
+  const snapOps = L => L.map(o => ({ op: o, categorie: o.categorie, vue: o.vue, rapprochement: o.rapprochement }));
+  function annulerRapprochement(snap) {
+    for (const x of snap) {
+      x.op.categorie = x.categorie;
+      if (x.vue === undefined) delete x.op.vue; else x.op.vue = x.vue;
+      if (x.rapprochement === undefined) delete x.op.rapprochement; else x.op.rapprochement = x.rapprochement;
+    }
+  }
+  // Prélèvement o (banque) rapproché de l'achat wop du portefeuille w → instantané pour annuler.
+  function rapprocherAvec(ctx, o, w, wop) {
+    const snap = snapOps([o, wop]);
+    o.categorie = { cat: ctx.D.interne.cat, sub: 'Règlement ' + (w.libelle || 'portefeuille') + ' (rapproché à la main)', main: true, lie: wop.id };
+    if (!vue(ctx.S, o)) o.vue = true;
+    wop.rapprochement = { avec: o.id };
+    return snap;
+  }
+  // Prélèvement gardé en dépense (plus « à rapprocher ») → instantané.
+  function garderDepense(o) { const snap = snapOps([o]); o.rapprochement = 'depense'; return snap; }
+  // Achat du portefeuille payé autrement (aucun prélèvement à attendre) → instantané.
+  function payeAutrement(wop) { const snap = snapOps([wop]); wop.rapprochement = 'autrement'; return snap; }
 
   // ------------------------------------------------------------ opérations vues
   // Une opération est vue si elle a été cochée, ou si elle est datée du jour de départ ou avant (et pas décochée).
@@ -532,7 +590,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    aRapprocher, marquerInterne, annulerInterne, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,
     creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };

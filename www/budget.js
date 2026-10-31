@@ -23,6 +23,8 @@
   const CONTRIBUTION = 'Contribution compte commun';   // poste perso lié à ma part du budget commun (par défaut)
   const PERSO = ['courant', 'carte_differee', 'paiement_en_ligne'];
   const EURO = 100, DEMI = 50;
+  const SURVEILLER = 0.9;
+  const TOL_MIN = 200, TOL_PART = 0.02;  // 1.1 : tolérance des charges (2 € ou 2 % du budget, le plus grand)            // 1.1 : part du budget utilisée à partir de laquelle un poste est « à surveiller »
 
   const isObj = o => o != null && typeof o === 'object' && !Array.isArray(o);
   const plusJours = (d, n) => M().plusJours(d, n);
@@ -166,7 +168,9 @@
         contribution: typeof c.contribution === 'string' && c.contribution.trim() ? c.contribution.trim() : CONTRIBUTION,
         part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50
       },
-      cycle: isObj(B.reglages) && B.reglages.cycle === 'mois' ? 'mois' : 'salaire'
+      cycle: isObj(B.reglages) && B.reglages.cycle === 'mois' ? 'mois' : 'salaire',
+      // 1.1 : suivi du commun au mois (par défaut) ou sur le cycle de salaire du budget perso
+      cycleCommun: c.cycle === 'salaire' ? 'salaire' : 'mois'
     };
   }
 
@@ -270,17 +274,18 @@
     if (B.memo[k]) return B.memo[k];
     const curM = B.auj.slice(0, 7);
     const isD = !!nav && nav.length > 7, past = !!nav && (isD || nav < curM);
-    const cyc = scope === 'perso' ? (past ? cyclePasse(B, nav) : cycleCourant(B)) : null;
+    const parSalaire = scope === 'perso' || (scope === 'commun' && B.R.cycleCommun === 'salaire');
+    const cyc = parSalaire ? (past ? cyclePasse(B, nav) : cycleCourant(B)) : null;
     const pm0 = !past ? curM : isD ? (cyc ? moisMilieu(cyc) : nav.slice(0, 7)) : nav;
     const start = cyc ? cyc.start : pm0 + '-01', end = cyc ? cyc.end : finMois(pm0), upto = past ? end : B.auj;
-    const parCycle = scope === 'perso' && B.R.cycle !== 'mois' && (cyc || !past);
+    const parCycle = parSalaire && B.R.cycle !== 'mois' && (cyc || !past);
     let prev, next;
     if (parCycle) {
       const st = debuts(B);
       prev = past ? (cyc ? cyc.prev : null) : (st.length >= 2 ? st[st.length - 2].date : null);
       next = past && cyc ? cyc.next : null;
     } else {
-      const curStart = scope === 'perso' && cycleCourant(B) ? cycleCourant(B).start.slice(0, 7) : curM;
+      const curStart = parSalaire && cycleCourant(B) ? cycleCourant(B).start.slice(0, 7) : curM;
       prev = past ? shift(pm0, -1) : shift(curStart, -1);
       next = past ? shift(pm0, 1) : null;
       if (next && next >= curStart) next = 'courant';
@@ -539,6 +544,10 @@
     }
     const RT = { p: revList.reduce((t, x) => t + x.pm, 0), c: revList.reduce((t, x) => t + x.got, 0) };
 
+    // 1.1 : tolérance des charges (fixes, et tous les postes du commun) : un écart d'arrondi ou de quelques euros ne
+    // passe pas le poste en dépassement ; au-delà du plus grand de 2 € et 2 % du budget, il est dépassé.
+    const tolere = (a, nk) => nk === 'fixe' || scope === 'commun';
+    const tolerance = a => Math.max(TOL_MIN, Math.round(a.pm * TOL_PART));
     // état d'un poste ; exc : à signaler même section repliée
     const etatDe = (a, nk) => {
       let st, cls = '', exc = false;
@@ -552,8 +561,10 @@
         if (a.per > 1 && a.pm === 0) st = { niveau: 'muted', texte: 'pas d\'échéance ce mois' };
         else if (a.cur > 0 && a.cur >= a.pm - Math.max(DEMI, Math.min(500, a.pm * 0.02))) {
           const lt = a.pm - a.cur;
-          st = a.cur > a.pm + EURO ? { niveau: 'bad', texte: 'prélevé · ' + eur(a.cur - a.pm) + ' de plus' } : { niveau: 'good', texte: 'prélevé' + (lt > DEMI ? ' · ' + eur(lt) + ' de moins' : '') };
-          cls = a.cur > a.pm + EURO ? 'over' : 'ok';
+          const dep = a.cur > a.pm + tolerance(a);
+          st = dep ? { niveau: 'bad', texte: 'prélevé · ' + eur(a.cur - a.pm) + ' de plus' }
+            : { niveau: 'good', texte: 'prélevé' + (lt > DEMI ? ' · ' + eur(lt) + ' de moins' : lt < -DEMI ? ' · ' + eur(-lt) + ' de plus' : '') };
+          cls = dep ? 'over' : 'ok';
         } else if (a.cur > DEMI) { st = { niveau: 'warn', texte: 'en partie' }; cls = 'warn'; }
         else if (past) st = { niveau: 'warn', texte: 'non prélevé' };
         else {
@@ -561,9 +572,11 @@
           if (ed) { const D = dueDate(ed), late = dDiff(D.iso, B.auj) > 2; st = { niveau: late ? 'warn' : 'info', texte: (late ? 'attendu le ' : 'à venir · le ') + jjmm(D), date: D.iso }; }
           else st = { niveau: 'info', texte: 'à venir' };
         }
-      } else if (a.cur > a.pm + DEMI) { st = { niveau: 'bad', texte: 'dépassé' }; cls = 'over'; }
+      } else if (a.cur > a.pm + (tolere(a, nk) ? tolerance(a) : DEMI)) { st = { niveau: 'bad', texte: 'dépassé' }; cls = 'over'; }
+      else if (a.cur > a.pm + DEMI) { st = { niveau: 'good', texte: 'conforme · ' + eur(a.cur - a.pm) + ' de plus' }; cls = 'ok'; }
       else if (a.pm > DEMI && a.cur >= a.pm - DEMI) { st = { niveau: 'good', texte: 'conforme' }; cls = 'ok'; }
-      else if (a.proj > a.pm * 1.05 + 500) { st = { niveau: 'warn', texte: 'à surveiller' }; cls = 'warn'; }
+      // 1.1 : « à surveiller » seulement à partir de 90 % du budget utilisé (la projection seule ne suffit plus)
+      else if (a.cur >= a.pm * SURVEILLER) { st = { niveau: 'warn', texte: 'à surveiller' }; cls = 'warn'; }
       else { st = { niveau: 'good', texte: 'conforme' }; cls = 'ok'; }
       if (nk === 'fixe' && (st.niveau === 'bad' || st.niveau === 'warn')) exc = true;
       return { etat: st, cls, exc };
@@ -577,6 +590,8 @@
       if (!a.on || a.pm <= DEMI) { if (a.cur <= DEMI) return null; return { texte: 'poste sans budget : ' + opsT, sorte: 'hb' }; }
       const over = a.cur - a.pm;
       if (over <= DEMI) return null;
+      // dans la tolérance (1.1) : signalé sans alerte, avec la correction en un appui
+      if (a.cls !== 'over') return { texte: eur(over) + ' de plus que le budget (écart toléré)', sorte: 'tol', aligner: Math.round(a.cur) };
       if (o.length > 1 && a.per === 1 && !(cm && Math.abs(a.cur - cm) < DEMI)) return { texte: o.length + ' prélèvements sur la période : ' + opsT + (cm ? ' (contrat ' + eur(cm) + ')' : ''), sorte: 'dbl' };
       if (cm && cm > a.pm + DEMI) return { texte: 'le contrat (' + eur(cm) + ') dépasse le budget (' + eur(a.pm) + ')', sorte: 'ctr', aligner: cm };
       if (cm && o.length === 1 && Math.abs(-o[0].m - cm) > DEMI) return { texte: 'prélevé ' + eur(-o[0].m) + ' au lieu de ' + eur(cm) + ' (contrat) : montant changé ?', sorte: 'chg', aligner: -o[0].m };
@@ -631,7 +646,7 @@
       }
     }
     const res = { per, scope, revenus: { lignes: revList, p: RT.p, c: RT.c }, sections, horsBudget: { lignes: HB, c: HB.reduce((x, a) => x + a.cur, 0), proj: HB.reduce((x, a) => x + Math.max(a.proj, a.cur), 0) },
-      total: { P, C, IN, OUT }, T, solde, causes: CAUSES.sort((x, y) => y.v - x.v), depasses: OVER.sort((x, y) => (y.cur - y.pm) - (x.cur - x.pm)),
+      total: { P, C, IN, OUT }, T, solde, causes: CAUSES.filter(x => x.hb || x.a.cls === 'over').sort((x, y) => y.v - x.v), depasses: OVER.filter(a => a.cls === 'over').sort((x, y) => (y.cur - y.pm) - (x.cur - x.pm)),
       jour: day, nbJours: dim, frac };
     if (scope === 'perso' && !past) res.rav = resteAVivre(B, res, inPer);
     return (B.memo[k] = res);

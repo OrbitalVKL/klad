@@ -100,7 +100,18 @@ export async function ouvrir(o) {
   }
   // Écrans principaux : onglets (et leurs sous-vues), détail d'une opération, volet « Classer ».
   async function ecransPrincipaux(f) {
-    for (const t of onglets) { if (t === 'operations') await operationsPerso(); else await onglet(t); await avecSousVues(t, f); }
+    for (const t of onglets) {
+      if (t === 'operations') await operationsPerso(); else await onglet(t);
+      // 1.1 : onglet Patrimoine en parties (Impôts, Foncier, Épargne, Crypto), chacune avec ses sous-vues
+      const parties = await page.$$eval('.vue:not([hidden]) [data-patri]', bs => bs.map(b => b.dataset.patri));
+      if (!parties.length) { await avecSousVues(t, f); continue; }
+      for (const p of parties) {
+        await page.locator('.vue:not([hidden]) [data-patri="' + p + '"]').click();
+        await pause(250);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await avecSousVues(t + '›' + p, f);
+      }
+    }
     await operationsPerso();
     if (await page.$('[data-op]')) {
       await page.evaluate(() => { const r = document.querySelector('[data-op][data-c]'); window.KladApp.ouvrirOp(r.dataset.c, r.dataset.op); });

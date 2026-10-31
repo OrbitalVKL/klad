@@ -177,6 +177,8 @@
       ajouter(c.src, 'justificatif'); ajouter(c.note, 'note');
     });
     (D.virements || []).forEach((v, i) => { if (isObj(v)) { ajouter(v.label, 'Virement ' + (i + 1)); ajouter(v.depuis, 'Compte ' + (i + 1)); } });
+    // crypto (1.1) : nom de chaque position
+    ((isObj(D.crypto) && Array.isArray(D.crypto.positions)) ? D.crypto.positions : []).forEach((p, i) => { if (isObj(p)) ajouter(p.nom, 'Position ' + (i + 1)); });
     // motifs des réglages (salaire, commun, livret, observations, cartes) : morceaux de libellés
     const mot = (txt, r) => { for (const p of String(txt || '').split('|')) ajouter(p, r); };
     const RG = Object.assign({}, X, isObj(D.reglages) ? D.reglages : {});

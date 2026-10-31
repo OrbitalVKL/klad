@@ -53,7 +53,7 @@
     return '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Budget mensuel</h2><div class="row">' +
       (plan ? '<label class="ctl plan-only" for="bref">Base de calcul depuis <select id="bref">' + L.map(m => '<option value="' + m + '"' + (m === W.start ? ' selected' : '') + '>' + esc(mLabel(m)) + '</option>').join('') + '</select></label>' +
         '<button class="btn plan-only" type="button" data-alignertout="' + esc(scope) + '">Tout aligner sur le réel habituel</button>' : '') +
-      '<button class="btn sm" type="button" data-nav="prev"' + (KB().periode(B, scope, ui.nav).prev ? '' : ' disabled') + '>◀ ' + (scope === 'perso' ? 'Cycle précédent' : 'Mois précédent') + '</button>' +
+      '<button class="btn sm" type="button" data-nav="prev"' + (KB().periode(B, scope, ui.nav).prev ? '' : ' disabled') + '>◀ ' + (KB().periode(B, scope, ui.nav).salaire || (scope === 'perso' && B.R.cycle !== 'mois') ? 'Cycle précédent' : 'Mois précédent') + '</button>' +
       '<div class="seg" role="group" aria-label="Affichage du budget"><button type="button" data-bmode="suivi" aria-pressed="' + !plan + '">Suivi</button><button type="button" data-bmode="plan" aria-pressed="' + plan + '">Budget</button></div>' +
       '</div></div>';
   }
@@ -142,10 +142,11 @@
         for (const c of cs) h += '<tr class="det ctr-det' + c2 + '"><td class="subs" style="padding-left:34px">📄 <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + esc(PERLAB[c.per || 1]) + (c.src ? ' · ' + esc(c.src) : '') + '</td><td></td><td class="r num subs">' + e2(c.montant) + '</td><td class="hide-s"></td><td></td></tr>';
         for (const r of a.ops || []) h += detRow(esc(jjmm(r.od) + ' · ' + g.KladVues.libelleCourt(r.label)), esc(e2(-r.m)), r, c2.trim());
         if (!nOps && !cs.length) h += detRow('<span class="muted">Aucune opération sur cette période.</span>', '', null, 'vide' + c2);
-        if (!past && !a.lie) h += '<tr class="det' + c2 + '"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-editer="' + esc(a.key) + '">Modifier le budget</button></td></tr>';
+        if (!past && !a.lie) h += '<tr class="det' + c2 + '"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-editer="' + esc(a.key) + '">Modifier le budget</button>' +
+          (a.key === 'c|Carburant' && scope === 'perso' ? ' <button class="linkbtn" type="button" data-fuel="1">Calculateur carburant</button>' : '') + '</td></tr>';
       }
-      if (a.cause) h += '<tr class="det cause' + c2 + '"><td colspan="5" class="subs"><span class="cz">⚠ Cause</span> ' + esc(a.cause.texte) +
-        (a.cause.aligner && !past && !a.lie ? ' <button class="linkbtn cz-fix" type="button" data-aligner="' + esc(a.key) + '" data-v="' + Math.round(a.cause.aligner) + '">aligner le budget sur ' + e2(a.cause.aligner) + '</button>' : '') + '</td></tr>';
+      if (a.cause) h += '<tr class="det cause' + (a.cause.sorte === 'tol' ? ' tol' : '') + c2 + '"><td colspan="5" class="subs"><span class="cz">' + (a.cause.sorte === 'tol' ? 'Écart' : '⚠ Cause') + '</span> ' + esc(a.cause.texte) +
+        (a.cause.aligner && !past && !a.lie ? ' <button class="linkbtn cz-fix" type="button" data-aligner="' + esc(a.key) + '" data-v="' + Math.round(a.cause.aligner) + '">aligner le budget sur le prélevé (' + e2(a.cause.aligner) + ')</button>' : '') + '</td></tr>';
       return h;
     };
     for (const nk of KB().NATS) {
@@ -254,7 +255,7 @@
   }
 
   // ------------------------------------------------------------ mode Budget (prévu, parts du commun, carburant)
-  // ui : { ouverts: Set ('d|<clé>' détail, 'mo|<clé>' mois par mois, 'fuel') }.
+  // ui : { ouverts: Set ('d|<clé>' détail, 'mo|<clé>' mois par mois) }.
   function plan(B, scope, ui) {
     const C = B.cx.C, SH = scope === 'commun', COLS = SH ? 8 : 5;
     const P = KB().postes(B, scope), W = P.W, n = P.n;
@@ -308,7 +309,7 @@
         const part = SH ? KB().partDe(B, a.key) : null, amt = a.on ? Math.max(0, a.amt) : 0, gp = SH ? amt * part.pg / 100 : 0;
         tb += '<tr class="cat' + (a.on ? '' : ' off') + ' rmable"><td><label class="chk" for="' + id + '"><input type="checkbox" id="' + id + '" data-pon="' + esc(a.key) + '"' + (a.on ? ' checked' : '') + '> ' + U().icoPoste(C, a) + ' ' + esc(a.label) + '</label>' +
           (nd ? ' <button class="linkbtn more" type="button" data-pdet="' + esc(a.key) + '" aria-expanded="' + !!det + '">' + (det ? 'masquer' : 'détail') + '</button>' : '') +
-          (isFuel ? ' <button class="linkbtn fuelbtn" type="button" data-fuel="1" aria-expanded="' + ouv.has('fuel') + '">' + (ouv.has('fuel') ? 'masquer le calculateur' : 'calculateur carburant') + '</button>' : '') + '</td>' +
+          (isFuel ? ' <button class="linkbtn fuelbtn" type="button" data-fuel="1">calculateur carburant</button>' : '') + '</td>' +
           '<td class="r num"><button class="refbtn" type="button" data-pmois="' + esc(a.key) + '" aria-expanded="' + ouv.has('mo|' + a.key) + '" title="' + esc(how(a)) + ' — toucher pour le détail mois par mois">' + fmt(a.avg) + '</button><div class="subs">' + esc(hs(a)) + '</div></td>' +
           '<td class="r num hide-s' + (a.on && a.amt && a.per === 1 && a.cur > a.amt + DEMI ? ' neg' : '') + '">' + (a.cur ? fmt(a.cur) : '—') + '</td>' +
           (a.lie ? '<td class="r"><span class="num"><b>' + fmt(a.amt) + '</b></span><div class="subs"><button type="button" class="linkbtn golink" data-scope="commun">= ma part du compte commun</button></div></td>'
@@ -324,7 +325,6 @@
             '<p class="subs" style="margin:6px 0 0">Réel habituel = <b>' + esc(how(a)) + '</b> = ' + fmt(a.avg) + ' / mois. ' + (a.per > 1 ? 'Utilisé car ce poste est payé ' + ({ 3: 'tous les trimestres', 4: 'tous les 4 mois', 12: 'une fois par an' })[a.per] + '.' : 'Les mois viennent de « Base de calcul depuis » en haut du tableau.') +
             (a.nat !== 'fixe' && !a.manuel && a.per === 1 ? ' La médiane (le mois du milieu) évite qu\'un mois exceptionnel fausse le chiffre.' : '') + '</p></td></tr>';
         }
-        if (isFuel && ouv.has('fuel')) tb += carburant(B, COLS);
         if (det) {
           const vide = SH ? '<td></td><td></td><td></td><td></td>' : '<td></td>';
           for (const c of cs) tb += '<tr class="det ctr-det"><td class="subs" style="padding-left:30px">📄 <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + PERLAB[c.per || 1] + (c.src ? ' · ' + esc(c.src) : '') + '</td><td class="r num subs">' + e2(c.montant / (c.per || 1)) + '</td><td class="hide-s"></td><td></td>' + vide + '</tr>';
@@ -357,17 +357,18 @@
     return h;
   }
 
-  // Calculateur carburant (sous le poste Carburant, mode Budget).
-  function carburant(B, cols) {
+  // Calculateur carburant (1.1) : fenêtre dédiée, ouverte depuis le poste Carburant du Budget (suivi et budget).
+  function carburantVolet(B) {
     const R = KB().carburant(B.S), X = KB().calculCarburant(B, R);
-    const f = (k, lab, w, unit) => '<label class="ctl">' + lab + ' <input type="number" class="fu" data-fu="' + k + '" min="0" step="any" value="' + esc(R[k]) + '" style="width:' + w + 'px"> ' + unit + '</label>';
-    return '<tr class="fuel"><td colspan="' + cols + '"><div class="fuelbox"><div class="row" style="gap:10px 14px">' +
-      f('ar', 'Trajet A/R travail', 64, 'km') + f('jours', '×', 52, 'jours / mois') + f('autres', '+ autres', 70, 'km / mois') + f('conso', 'Conso.', 60, 'L/100 km') + f('prix', 'Prix', 64, '€/L') + '</div>' +
-      '<div class="fuelres"><span>' + Math.round(X.km).toLocaleString('fr-FR') + ' km/mois → <b class="num">' + e0(X.prevu) + '</b> de carburant prévu / mois</span>' +
-      '<span class="muted">réel des pleins : ' + e0(X.reel.mediane) + ' (médiane) · ' + e0(X.reel.moyenne) + ' (moyenne) · ' + X.reel.pleins + ' plein(s) sur la base de calcul</span>' +
-      '<button class="btn" type="button" data-fuelok="' + X.prevu + '">Reporter au prévu Carburant (' + e0(X.prevu) + ')</button></div></div></td></tr>';
+    const f = (k, lab) => '<label class="sh-l"><span class="sh-lab">' + lab + '</span><input type="text" inputmode="decimal" class="sh-in" data-fu="' + k + '" value="' + esc(String(R[k]).replace('.', ',')) + '" autocomplete="off"></label>';
+    const pl = ((B.D.plan && B.D.plan.perso) || {})['c|Carburant'];
+    return '<p class="muted small">Le prévu du poste Carburant d\'après vos trajets. Chaque valeur est enregistrée dès que vous quittez le champ (annulable).</p>' +
+      '<div class="fuel-f">' + f('ar', 'Trajet aller-retour travail (km)') + f('jours', 'Jours de trajet par mois') + f('autres', 'Autres kilomètres par mois') + f('conso', 'Consommation (l / 100 km)') + f('prix', 'Prix du litre (€)') + '</div>' +
+      '<div class="fuelres" aria-live="polite"><p><b>' + Math.round(X.km).toLocaleString('fr-FR') + ' km par mois → <span class="num">' + e0(X.prevu) + '</span> de carburant par mois</b></p>' +
+      '<p class="muted small">Réel des pleins sur la base de calcul : ' + e0(X.reel.mediane) + ' (médiane) · ' + e0(X.reel.moyenne) + ' (moyenne) · ' + pluriel(X.reel.pleins, 'plein') + '.' +
+      (pl && pl.on ? ' Prévu actuel : ' + e0(pl.amt) + ' par mois.' : '') + '</p></div>' +
+      '<div class="row"><button class="btn primary" type="button" data-fuelok="' + X.prevu + '">Reporter au prévu Carburant (' + e0(X.prevu) + ')</button></div>';
   }
-
   // ------------------------------------------------------------ reste à vivre (perso) et marge réelle (commun)
   function ravM(B, scope, ui) {
     const S0 = B.S;
@@ -573,7 +574,8 @@
     return h;
   }
   // base (0.10.7) : colonne choisie (« salaire » ou « comptes »), mise en avant ; les deux colonnes restent affichées.
-  function detailRav(rav, base) {
+  // restants (1.1) : jours restants du cycle, jour même compris → ligne « Par jour ».
+  function detailRav(rav, base, restants) {
     if (!rav) return '<p class="muted">Le reste à vivre se calcule sur le cycle en cours du périmètre perso.</p>';
     const b = rav.budget, c = rav.comptes, x = KB().ravChoisi(rav, base);
     const on = k => x.choix === k ? ' class="rav-on"' : '';
@@ -583,7 +585,10 @@
       '<div class="tablewrap"><table class="rav-t rav-' + x.choix + '"><thead><tr><th></th><th' + on('salaire') + '>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th' + on('comptes') + '>Comptes courants</th></tr></thead><tbody>' +
       L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') + L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
       L('= Marge', '', b.marge, c && c.marge, 'mg') + L('− Variable', 'dépensé / reste du budget', b.variable, c && c.variable, 'b') +
-      L('= Reste à vivre', '', b.reste, c && c.reste, 'rv') + '</tbody></table></div>' +
+      L('= Reste à vivre', '', b.reste, c && c.reste, 'rv') +
+      (restants ? '<tr class="pj"><th>Par jour<span class="subs"> ' + esc(restants + ' jour' + (restants > 1 ? 's' : '') + ' restant' + (restants > 1 ? 's' : '')) + '</span></th>' +
+        [b, c].map(x => !x ? '<td class="muted">—</td>' : '<td class="num">' + (x.reste > 0 ? esc(e0(Math.floor(x.reste / restants))) : '<span class="bad">dépassé</span>') + '</td>').join('') + '</tr>' : '') +
+      '</tbody></table></div>' +
       '<p class="muted small">Jusqu\'au ' + esc(jjmmaa(rav.fin)) + '. Colonne « dernier salaire » : le salaire du cycle moins ce qui est déjà dépensé. ' +
       'Colonne « comptes courants » : les soldes des comptes courants moins les charges fixes pas encore prélevées et le reste du budget variable.</p>';
   }
@@ -610,11 +615,12 @@
     h += '<div id="obs-todo">' + (O.faire.length ? '<h3 class="obs-h3">À faire</h3><ul class="alerts obs-todo">' + O.faire.map(a => item(a, true)).join('') + '</ul>' : '<p class="muted" style="margin:0 0 8px">Aucune action en attente, sur vos comptes comme sur le compte commun.</p>') +
       (O.masques.length ? '<p class="subs obs-hid">' + pluriel(O.masques.length, 'point') + ' marqué' + (O.masques.length > 1 ? 's' : '') + ' « fait » : ' + O.masques.map(a => esc(a.titre)).join(' · ') + ' <button class="linkbtn obs-undo" type="button" data-reafficher="1">réafficher</button></p>' : '') + '</div>';
     h += '<div class="obs-list"><h3 class="obs-h3">Observations</h3><ul class="alerts" id="alerts">' + (O.infos.length ? O.infos.map(a => item(a, false)).join('') : '<li><p class="muted">Aucune observation.</p></li>') + '</ul></div>';
+    if (g.KladVuesFisc && g.KladVuesFisc.historiqueObs) h += g.KladVuesFisc.historiqueObs(B);
     h += '<div class="row obs-act"><button class="btn" type="button" data-audit="1">Relancer l\'audit</button>' + (opt && opt.analyse ? '<button class="btn" type="button" data-analyse="1">Analyse de Claude</button>' : '') +
       '<span class="eyebrow" id="audit-at">audit du ' + esc(U().dfr(B.auj)) + ' · mes comptes et compte commun</span></div>' +
       (opt && opt.texteAnalyse ? '<div class="ai-out" id="ai-out" aria-live="polite">' + esc(opt.texteAnalyse) + '</div>' : '');
     return h;
   }
 
-  g.KladVuesBudget = { observations, libellePeriode, cycNav, teteBudget, suivi, plan, carburant, totBar, repartition, ravM, tendance, contrats, formContrat, edition, detailRav, carteRav, PERLAB, NAT_LABEL };
+  g.KladVuesBudget = { observations, libellePeriode, cycNav, teteBudget, suivi, plan, carburantVolet, totBar, repartition, ravM, tendance, contrats, formContrat, edition, detailRav, carteRav, PERLAB, NAT_LABEL };
 })(typeof window !== 'undefined' ? window : globalThis);

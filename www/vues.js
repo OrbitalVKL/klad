@@ -359,6 +359,11 @@
     const w = K().aRapprocher(ctx, o);
     const man = r.type === 'interne' && K().interneManuel(o);
     const cd = r.detail && M().compte(S, r.detail), nomDetail = cd ? cd.libelle : 'le compte détaillé';
+    // 1.1 : rapprochement à la main (prélèvement de portefeuille côté banque, achat côté portefeuille)
+    const wc = K().portefeuilleDe(ctx, o), achat = wc && o.montant < 0;
+    const regle = achat ? K().prelevementDe(ctx, o) : null;
+    const garde = !w && o.rapprochement === 'depense';
+    const cBanque = achat && !regle && o.rapprochement !== 'autrement' ? K().candidatsBanque(ctx, o) : [];
     const lignes = [
       ['Libellé', o.libelle],
       ['Date', F().jour(o.date) + (o.statut === 'en_cours' ? ' (en cours)' : '')],
@@ -370,19 +375,40 @@
       ['Catégorie', r.cat + (r.sub && r.sub !== r.cat ? ' › ' + r.sub : '') + ' (' + (SOURCES[r.src] || '') + ')'],
       r.type === 'interne' ? ['Interne', (man ? 'marquée interne à la main' : r.src === 'reglement' ? 'règlement détaillé sur ' + nomDetail + ', compté automatiquement interne' : 'virement entre vos comptes') +
         ' : pas comptée dans le budget'] : null,
+      achat ? ['Réglé par', regle ? 'prélèvement du ' + F().date(regle.date) + ' sur ' + ((M().compte(S, regle.compte) || {}).libelle || 'un compte') + (regle.categorie && regle.categorie.lie === o.id ? ' (rapproché à la main)' : '')
+        : o.rapprochement === 'autrement' ? 'payé autrement (solde de ' + wc.libelle + ' ou autre moyen)' : 'aucun prélèvement retrouvé à la banque'] : null,
+      garde ? ['Rapprochement', 'gardé en dépense : aucun achat de ' + 'portefeuille ne lui correspond'] : null,
       ['Vue', vu ? 'oui' : 'non']
     ].filter(Boolean);
     return '<div class="sh-head op-h">' + U().icoOp(ctx.C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '<div class="t"><b>' + esc(libelleCourt(o.libelle)) + '</b><span>' +
       esc(jjmm(o.date) + ' · ' + (c ? c.libelle : '') + ' · ') + '<span class="num">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></span></div></div>' +
       '<dl class="op-det">' + lignes.map(x => '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>').join('') + '</dl>' +
       (w ? '<p class="note">Prélèvement de ' + esc(w.libelle) + ' sans opération de même montant dans son détail : il est compté comme une dépense. ' +
-        'S\'il est déjà détaillé dans ' + esc(w.libelle) + ', marquez-le interne.</p>' : '') +
+        'Rapprochez-le de l\'achat correspondant, marquez-le interne s\'il est déjà détaillé, ou gardez-le en dépense.</p>' : '') +
+      (achat && !regle && o.rapprochement !== 'autrement' ? '<p class="note">Aucun prélèvement de ' + esc(wc.libelle) + ' ne correspond à cet achat. ' +
+        (cBanque.length ? 'Rapprochez-le d\'un prélèvement, ou ' : '') + 'marquez-le « payé autrement » s\'il a été réglé avec le solde de ' + esc(wc.libelle) + ' ou un autre moyen.</p>' : '') +
       '<div class="row"><button type="button" class="btn primary" data-a="classer">Classer</button>' +
       '<button type="button" class="btn" data-a="vue">' + (vu ? 'Marquer non vue' : 'Marquer vue') + '</button>' +
-      (w ? '<button type="button" class="btn" data-a="interne">Marquer interne</button>' : '') +
+      (w ? '<button type="button" class="btn" data-a="rapprocher">Rapprocher avec un achat…</button><button type="button" class="btn" data-a="interne">Marquer interne</button>' +
+        '<button type="button" class="btn" data-a="garder">Garder en dépense</button>' : '') +
+      (garde ? '<button type="button" class="btn" data-a="arapprocher">Annuler : remettre à rapprocher</button>' : '') +
+      (cBanque.length ? '<button type="button" class="btn" data-a="rapprocherb">Rapprocher avec un prélèvement…</button>' : '') +
+      (achat && !regle && o.rapprochement !== 'autrement' ? '<button type="button" class="btn" data-a="autrement">Payé autrement</button>' : '') +
+      (achat && o.rapprochement === 'autrement' ? '<button type="button" class="btn" data-a="pasautrement">Annuler : payé autrement</button>' : '') +
       (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' +
       '<button type="button" class="ac-lien" data-a="semblables">Opérations semblables ›</button>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
+  }
+
+  // 1.1 : choix de l'opération à rapprocher (achats du portefeuille, ou prélèvements de la banque), les plus proches
+  // en montant puis en date d'abord.
+  function choixRapprochement(S, o, L, achats) {
+    const cur = op => (M().compte(S, op.compte) || {}).libelle || '';
+    return '<p class="muted small">' + (achats ? 'Achat qui correspond au prélèvement du ' : 'Prélèvement qui règle l\'achat du ') + esc(F().jour(o.date)) + ' (' + esc(F().montant(Math.abs(o.montant))) + ') : ' +
+      'à 30 jours au plus, du plus proche au plus lointain.</p>' +
+      (L.length ? '<div class="sh-list">' + L.map(x => '<button type="button" class="sh-li" data-rapid="' + esc(x.compte + '|' + x.id) + '"><span>' + esc(libelleCourt(x.libelle)) +
+        '<small>' + esc(F().jour(x.date) + ' · ' + cur(x)) + '</small></span><span class="num">' + esc(F().montant(Math.abs(x.montant))) + '</span></button>').join('') + '</div>'
+        : '<p class="muted">Aucune opération à proposer.</p>');
   }
 
   // ------------------------------------------------------------ volet « Classer » (comme l'ancienne version)
@@ -478,5 +504,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, classer, apercuRegle, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, classer, apercuRegle, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

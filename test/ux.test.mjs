@@ -34,8 +34,14 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
     });
     // Accueil
     await B.onglet('accueil');
+    // 1.1 : l'encart montre la base choisie (dernier salaire par défaut) ; les deux colonnes sont dans le détail
     const rav = await texte('[data-mesure="rav"]');
-    for (const v of attendu.rav) assert.ok(rav.includes(norm(v)), 'reste à vivre ' + v + ' dans « ' + rav + ' »');
+    assert.ok(rav.includes(norm(attendu.rav[0])), 'reste à vivre ' + attendu.rav[0] + ' dans « ' + rav + ' »');
+    await page.locator('[data-mesure="rav"] [data-aller="rav"]').click();
+    await B.pause(200);
+    const det = await texte('#ravCorps');
+    for (const v of attendu.rav) assert.ok(det.includes(norm(v)), 'reste à vivre ' + v + ' dans le détail « ' + det + ' »');
+    await B.fermer();
     const sold = await texte('[data-mesure="soldes"]');
     for (const [lib, v] of attendu.soldes) { assert.ok(sold.includes(lib), lib); assert.ok(sold.includes(norm(v)), 'solde ' + lib + ' ' + v); }
     const cyc = await texte('#ac-cy + *, section[aria-labelledby="ac-cy"]');

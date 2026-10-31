@@ -2,6 +2,24 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.1.0
+
+Retours d'usage de la 1.0.1 (sauvegarde et lecture confirmées sur le téléphone).
+- **Budget** : le montant d'un poste se modifie de nouveau (le clavier ne se referme plus tout seul).
+- **Reste à vivre** (Accueil) : encart simplifié (montant, échéance, montant par jour, avancement du cycle) ; le détail
+  montre aussi le montant par jour.
+- **« À surveiller »** : seulement à partir de 90 % du budget utilisé.
+- **Charges** (fixes et compte commun) : un écart sous 2 € ou 2 % du budget (le plus grand) ne met plus le poste en
+  dépassement ; il est signalé avec « aligner le budget sur le prélevé ».
+- **Commun** : suivi au mois civil ou sur le cycle de salaire (Réglages › Budget › Compte commun).
+- **Observations** : historique des points marqués « c'est fait », gardé même quand le point revient.
+- **Carburant** : calculateur dans une fenêtre dédiée, ouverte depuis le poste Carburant du Budget.
+- **Nouvel onglet Patrimoine** : Impôts, Foncier, Épargne et Crypto (positions saisies à la main, résultat, rappel de
+  mise à jour après 30 jours) ; ces écrans quittent « Plus ».
+- **Portefeuille de paiement en ligne** : rapprocher à la main un prélèvement d'un achat (montant ou date différents),
+  garder un prélèvement en dépense, marquer un achat « payé autrement » ; tout est annulable.
+- Aucun montant calculé modifié (relevé de contrôle et résumé Grafit identiques).
+
 ## 1.0.1
 
 Correctif de la recette 1.0.0.
