@@ -190,12 +190,22 @@
     d.documentElement.classList.add('demo');
     let b = d.getElementById('demoBar');
     if (!b) {
+      // 1.0.1 : bandeau replié en pastille « DÉMO » d'un appui, d'un glissement ou seul après 6 s ; la pastille le
+      // rouvre ; « Quitter » arrête le mode. Masqué pendant un message (un seul élément flottant à la fois).
       b = d.createElement('div'); b.id = 'demoBar'; b.className = 'demobar';
-      b.innerHTML = '<span>MODE DÉMO · chiffres et libellés fictifs · captures d\'écran autorisées</span><button type="button">Quitter</button>';
+      b.innerHTML = '<span class="db-t">MODE DÉMO · chiffres et libellés fictifs · captures d\'écran autorisées</span><span class="db-p" aria-hidden="true">DÉMO</span><button type="button" data-demo-quitter>Quitter</button>';
       d.body.appendChild(b);
-      b.querySelector('button').addEventListener('click', () => arreterDemo());
+      let x0 = null, glisse = false;
+      b.addEventListener('click', ev => {
+        if (glisse) { glisse = false; return; }
+        if (ev.target.closest('[data-demo-quitter]')) { arreterDemo(); return; }
+        replierDemo(!b.classList.contains('reduit'));
+      });
+      b.addEventListener('pointerdown', ev => { x0 = ev.clientX; glisse = false; });
+      b.addEventListener('pointerup', ev => { if (x0 != null && Math.abs(ev.clientX - x0) > 50) { glisse = true; replierDemo(true); } x0 = null; });
     }
     b.hidden = false;
+    replierDemo(false);
     if (!demo.obs) { demo.obs = new g.MutationObserver(planifier); demo.obs.observe(d.body, { subtree: true, childList: true, characterData: true }); }
     // pastilles de banque (initiales) : redessinées avec la lettre de l'alias
     if (g.KladApp && g.KladApp.rendre) { try { g.KladApp.rendre(); } catch (e) { /* écran fermé */ } }
@@ -213,6 +223,15 @@
     }
     demo.origines = new Map();
   }
+  let replT = null;
+  function replierDemo(oui) {
+    const b = g.document.getElementById('demoBar');
+    if (!b) return;
+    clearTimeout(replT);
+    b.classList.toggle('reduit', !!oui);
+    if (oui) b.setAttribute('aria-label', 'Mode démo actif : toucher pour le détail'); else b.removeAttribute('aria-label');
+    if (!oui) replT = setTimeout(() => replierDemo(true), 6000);
+  }
   // o.sansRendu : au verrouillage (rien à réafficher).
   function arreterDemo(o) {
     const d = g.document;
@@ -224,6 +243,7 @@
     demo.faits = new WeakMap();
     d.documentElement.classList.remove('demo');
     const b = d.getElementById('demoBar'); if (b) b.hidden = true;
+    clearTimeout(replT);
     if (g.KladApp && g.KladApp.demoFin) g.KladApp.demoFin();
     if (o && o.sansRendu) return;
     if (g.KladApp && g.KladApp.rendre) g.KladApp.rendre();
@@ -250,5 +270,5 @@
     if (g.addEventListener) g.addEventListener('load', () => barres());
   }
 
-  g.KladAffichage = { THEMES, theme, sombre, choisirTheme, appliquerTheme, PALETTES, palette, choisirPalette, appliquerPalette, surTheme: null, masquer, aliasDe, demarrerDemo, arreterDemo, demoActif: () => demo.on, facteurDemo: () => demo.k, texteDemo, surVersion, surArret: null };
+  g.KladAffichage = { THEMES, theme, sombre, choisirTheme, appliquerTheme, PALETTES, palette, choisirPalette, appliquerPalette, surTheme: null, masquer, aliasDe, demarrerDemo, arreterDemo, replierDemo, demoActif: () => demo.on, facteurDemo: () => demo.k, texteDemo, surVersion, surArret: null };
 })(typeof window !== 'undefined' ? window : globalThis);

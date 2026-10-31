@@ -101,3 +101,21 @@ export function reprisePersonnelle(fin) {
   r.accounts[0].iban_last4 = PERSONNEL.finCarte;
   return r;
 }
+
+// Variante « grande » (1.0.1, test de la sauvegarde) : plus grosse que les données réelles du propriétaire —
+// au moins 5 000 opérations sur 3 ans, et des pièces jointes fictives (« PDF » de 1 Mo) gardées dans le carnet.
+export function repriseGrande(fin) {
+  const r = repriseMesures(fin);
+  const hasard = graine(20261030);
+  const debut = jour(fin, -36 * 30.4 | 0);
+  const jours = Math.round((Date.parse(fin) - Date.parse(debut)) / 864e5);
+  for (let i = 0; r.transactions.length < 5200; i++) {
+    const d = jour(debut, Math.floor(hasard() * jours));
+    r.transactions.push({ account: hasard() < 0.8 ? 'r0' : 'r1', date: d, amount: -Math.round(200 + hasard() * 5000),
+      label: 'CARTE ' + d.slice(8) + '/' + d.slice(5, 7) + ' SUPERMARCHE FICTIF', status: 'comptabilisee' });
+  }
+  r.transactions.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const pdf = 'JVBERi0xLjQK' + 'UERGIGZpY3RpZiBkZSB0ZXN0IA'.repeat(40000);
+  r.carnet.pieces = [0, 1, 2].map(i => ({ nom: 'appel-fictif-' + i + '.pdf', data: pdf }));
+  return r;
+}

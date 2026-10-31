@@ -46,29 +46,73 @@
   // Journal affiché seulement quand son volet est ouvert (pas de mise en page à chaque ligne écrite).
   function renderLog() { const el = $('log'); if (!S || !el.closest('#voletCorps')) return; el.textContent = S.journal.log.join('\n'); el.scrollTop = el.scrollHeight; }
 
-  let toastT, toastAction = null;
+  // Messages en bas d'écran (1.0.1) : un seul à la fois (le suivant remplace le précédent), au-dessus de la barre
+  // d'onglets (en haut de l'écran quand un volet est ouvert, pour ne pas couvrir ses boutons) ; un appui le ferme (sur
+  // « Annuler » : l'action, puis la fermeture), un glissement l'écarte ; il disparaît seul après 5 s (erreur : 6 s,
+  // avec « Annuler » : 8 s). Rien d'autre ne capte les appuis autour.
+  const TOAST_MS = 5000, TOAST_ERR_MS = 6000, TOAST_ANNULER_MS = 8000;
+  let toastT, toastAction = null, toastGlisse = false;
+  function cacherToast() {
+    const el = $('toast');
+    clearTimeout(toastT); toastAction = null;
+    el.className = ''; el.style.transform = ''; el.style.opacity = '';
+    document.documentElement.classList.remove('toast-on');
+  }
+  function montrerToast(cls, ms) {
+    const el = $('toast');
+    el.style.transform = ''; el.style.opacity = '';
+    el.className = 'show' + cls;
+    document.documentElement.classList.add('toast-on');
+    clearTimeout(toastT); toastT = setTimeout(cacherToast, ms);
+  }
   function toast(msg, err) {
     const el = $('toast');
-    if (toastAction && !err) return;          // un « Annuler » en cours n'est pas remplacé par un simple message
     toastAction = null;
-    el.textContent = msg; el.className = 'show' + (err ? ' err' : '');
-    clearTimeout(toastT); toastT = setTimeout(() => { el.className = ''; }, err ? 6000 : 3000);
+    el.textContent = msg;
+    montrerToast(err ? ' err' : '', err ? TOAST_ERR_MS : TOAST_MS);
   }
-  // Message avec « Annuler » (10 s).
   function toastAnnuler(msg, fn) {
     const el = $('toast');
     el.innerHTML = '<span></span><button type="button" class="lien">Annuler</button>';
     el.firstChild.textContent = msg;
-    el.className = 'show action';
+    montrerToast(' action', TOAST_ANNULER_MS);
     toastAction = fn;
-    clearTimeout(toastT); toastT = setTimeout(() => { el.className = ''; toastAction = null; }, 10000);
   }
   $('toast').addEventListener('click', ev => {
-    if (!ev.target.closest('button') || !toastAction) return;
-    const fn = toastAction; toastAction = null;
-    $('toast').className = '';
-    fn();
+    if (toastGlisse) { toastGlisse = false; return; }
+    const fn = ev.target.closest('button') ? toastAction : null;
+    cacherToast();
+    if (fn) fn();
   });
+  // Glisser pour écarter (à gauche, à droite ou vers le bas).
+  (function () {
+    const el = $('toast');
+    let x0 = null, y0 = 0, dx = 0, dy = 0;
+    el.addEventListener('pointerdown', ev => { x0 = ev.clientX; y0 = ev.clientY; dx = dy = 0; toastGlisse = false; });
+    el.addEventListener('pointermove', ev => {
+      if (x0 == null) return;
+      dx = ev.clientX - x0; dy = Math.max(0, ev.clientY - y0);
+      if (Math.abs(dx) > 8 || dy > 8) {
+        el.style.transform = 'translateX(calc(-50% + ' + dx + 'px)) translateY(' + dy + 'px)';
+        el.style.opacity = String(Math.max(0.2, 1 - Math.max(Math.abs(dx), dy) / 160));
+      }
+    });
+    const fin = () => {
+      if (x0 == null) return;
+      x0 = null;
+      if (Math.abs(dx) > 50 || dy > 30) { toastGlisse = true; cacherToast(); setTimeout(() => { toastGlisse = false; }, 400); }
+      else { el.style.transform = ''; el.style.opacity = ''; }
+    };
+    el.addEventListener('pointerup', fin);
+    el.addEventListener('pointercancel', fin);
+  })();
+  // Hauteur de la barre d'onglets (texte agrandi compris) : messages et bandeau posés juste au-dessus.
+  function poserBarre() {
+    const tb = $('app-tb');
+    if (tb && tb.offsetHeight) document.documentElement.style.setProperty('--tbh', tb.offsetHeight + 'px');
+  }
+  window.addEventListener('resize', poserBarre);
+  if (window.ResizeObserver) new ResizeObserver(poserBarre).observe($('app-tb'));
 
   // ------------------------------------------------------------ client Enable Banking
   // Dans un navigateur ordinaire, un faux client (données fictives) peut être fourni pour essayer l'interface.
@@ -249,6 +293,7 @@
     const v = $('volet');
     const deja = !v.hidden;
     v.hidden = false;
+    document.documentElement.classList.add('volet-ouvert');
     document.querySelector('#volet .sh-body').scrollTop = 0;
     if (!deja) requestAnimationFrame(() => requestAnimationFrame(() => { v.querySelector('.sheet-scrim').classList.add('on'); v.querySelector('.sheet').classList.add('on'); }));
   }
@@ -256,7 +301,7 @@
     tri = null;                     // fermer le volet arrête « Trier une à une »
     const v = $('volet');
     v.querySelector('.sheet-scrim').classList.remove('on'); v.querySelector('.sheet').classList.remove('on');
-    const fin = () => { while (pile.length) $('rangement').appendChild($(pile.pop())); v.hidden = true; };
+    const fin = () => { while (pile.length) $('rangement').appendChild($(pile.pop())); v.hidden = true; document.documentElement.classList.remove('volet-ouvert'); };
     clearTimeout(voletT);
     if (vite || v.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) fin(); else voletT = setTimeout(fin, 240);
   }
@@ -1006,14 +1051,16 @@
     }
     const s0 = S;
     log('info', 'Synchronisation (' + raison + '), ' + comptes.length + ' compte(s)');
+    if (window.KladArret) window.KladArret.action('synchronisation');
     syncP = KladSync.synchroniser(S, { client, dispo: dispoPSU, log, now: () => Date.now() }, () => S === s0)
       .then(r => {
         if (!r || S !== s0) return r;
-        if (raison !== 'auto' || r.erreurs) toast(r.erreurs ? r.erreurs + ' compte(s) en erreur : appuyez sur la pastille.' : 'Synchronisation terminée.', !!r.erreurs);
+        // 1.0.1 : banque momentanément indisponible : message neutre, sans erreur (voir KladSync.passager)
+        if (raison !== 'auto' || r.erreurs) toast(r.erreurs ? r.erreurs + ' compte(s) en erreur : appuyez sur la pastille.' : r.passagers ? KladSync.MSG_PASSAGER : 'Synchronisation terminée.', !!r.erreurs);
         return r;
       })
       .catch(e => { toast(e.message || String(e), true); log('err', e.message || String(e)); return null; })
-      .finally(() => { syncP = null; if (S === s0) changed('synchro'); else renderPastille(); });
+      .finally(() => { syncP = null; if (window.KladArret) window.KladArret.action(''); if (S === s0) changed('synchro'); else renderPastille(); });
     renderPastille();
     return syncP;
   }
@@ -1025,7 +1072,7 @@
     const now = Date.now();
     const rows = S.modele.comptes.filter(c => c.source.type === 'eb').map(c =>
       '<li><div class="grow">' + esc(c.libelle) + '<small>' + (c.sync && c.sync.erreur ? '<span class="bad">' + esc(c.sync.erreur) + '</span>'
-        : 'Lu ' + esc(F.ilYa(c.sync && c.sync.lu, now))) + '</small></div></li>').join('');
+        : 'Lu ' + esc(F.ilYa(c.sync && c.sync.lu, now)) + (KladSync.passagerDe(c) ? ' · ' + esc(KladSync.passagerDe(c)) : '')) + '</small></div></li>').join('');
     $('syncDetail').innerHTML = '<p class="muted">Dernière synchronisation : ' + (S.modele.sync.derniere ? esc(F.ilYa(S.modele.sync.derniere, now)) : 'jamais') + '.</p>' +
       '<ul class="list">' + (rows || '<li class="muted">Aucun compte bancaire.</li>') + '</ul>' +
       '<div class="row"><button type="button" class="btn primary" data-a="sync">Synchroniser maintenant</button></div>';
@@ -1389,7 +1436,7 @@
     S = null; hooks = {}; bankList = []; handled = {}; opsListe = []; opsFin = 0; CTX = null; BCTX = null; cls = null; opCourante = null;
     filtre.cat = ''; filtre.nonVues = false; filtre.compte = ''; tri = null; triOp = null; retourDe = {};
     fermerVolet(true);
-    toastAction = null; $('toast').className = '';
+    cacherToast();
     ['view-accueil', 'ravCorps', 'app-hero', 'bal-panel', 'app-seen', 'av-zone', 'tx', 'tx-suite', 'app-chips', 'cyc-nav', 'sv-bar', 'sv-eq', 'appart-corps', 'cm-tres', 'actions', 'rav-m', 'cm-plan', 'budget-main', 'tend-panel', 'ctr-zone',
       'view-impots', 'view-epargne', 'imp-panel', 'sauvState', 'plusCorps', 'connexions', 'banks', 'appInfo', 'keyState', 'log', 'listeComptes', 'formCompte',
       'repriseApercu', 'repriseEtat', 'reglBudgetCorps', 'importerCorps', 'reglagesCorps', 'reglThemeCorps', 'reglAvanceCorps', 'syncDetail', 'opDetail', 'clsCorps', 'classementCorps', 'iconeCorps', 'posteCorps', 'ajoutCorps', 'virementsCorps', 'obsCorps', 'controleCorps', 'extrasCorps', 'claudeCorps', 'diagAffCorps']

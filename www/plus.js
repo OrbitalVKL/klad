@@ -372,6 +372,48 @@
     } catch (e) { A.log('err', 'Classement : ' + (e.message || e)); return null; }
   }
 
+  // ------------------------------------------------------------ reprise à refaire après un changement de bars ou de
+  // règles (1.0.1) : encart « Reprendre le classement » avec l'aperçu du nombre d'opérations touchées ; « Plus tard »
+  // le masque pour la session ; la reprise est annulable.
+  let plusTard = null, apercuEnCours = null;      // plusTard : signature des bars et règles écartés pour la session
+  const encartHtml = () => '<div class="encart-reprise" data-encart-reprise hidden></div>';
+  async function remplirEncarts() {
+    const els = [...document.querySelectorAll('[data-encart-reprise]')];
+    const s = S();
+    if (!els.length || !s) return;
+    const montrer = CN.aReprendre(s) && plusTard !== CN.signatureActuelle(s);
+    for (const e of els) { e.hidden = !montrer; if (!montrer) e.innerHTML = ''; }
+    if (!montrer) return;
+    const corps = t => '<p><b>Bars ou règles modifiés.</b> ' + t + '</p><div class="row"><button type="button" class="btn small primary" data-reprise="go">Reprendre le classement</button>' +
+      '<button type="button" class="btn small" data-reprise="tard">Plus tard</button></div>';
+    for (const e of els) e.innerHTML = corps('Calcul des opérations touchées…');
+    const p = apercuEnCours || (apercuEnCours = CN.apercuReprise(s, Date.now()).finally(() => { apercuEnCours = null; }));
+    let r = null;
+    try { r = await p; } catch (e) { r = null; }
+    if (A.etat() !== s) return;
+    const t = r ? (r.touchees ? r.touchees + ' opération' + (r.touchees > 1 ? 's changeront' : ' changera') + ' de catégorie (sur ' + r.total + ').' : 'Aucune opération ne change de catégorie.')
+      : 'Pris en compte à la reprise du classement.';
+    for (const e of document.querySelectorAll('[data-encart-reprise]')) if (!e.hidden) e.innerHTML = corps(t);
+  }
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-reprise]');
+    if (!b || !S()) return;
+    if (b.dataset.reprise === 'tard') { plusTard = CN.signatureActuelle(S()); remplirEncarts(); return; }
+    const s = S();
+    A.busy(b, async () => {
+      const avant = CN.instantane(s);
+      const ap = await CN.apercuReprise(s, Date.now()).catch(() => null);
+      const r = await reprendreClassement(s);
+      if (!r) throw new Error('Reprise du classement impossible (voir le journal).');
+      A.toastAnnuler('Classement repris' + (ap ? ' : ' + ap.touchees + ' opération(s) ont changé de catégorie' : '') + '.', () => {
+        CN.restaurer(S(), avant); A.log('info', 'Reprise du classement annulée.'); A.changed('classement'); remplirEncarts();
+      });
+      remplirEncarts();
+      if ($('classementCorps').closest('#volet')) renderClassement();
+    });
+  });
+  A.encartsReprise = remplirEncarts;
+
   let catEditee = null, ajoutCat = false, catRen = null, ajoutRegle = null;
   // Compteur et aperçu des opérations dont le libellé contient le mot (règle à la main).
   function apercuRegle(s, mot) {
@@ -392,7 +434,7 @@
     const cats = KC.listeCategories(C);
     const natOpts = v => KC.NATURES.map(n => '<option value="' + n + '"' + (n === v ? ' selected' : '') + '>' + esc(KC.NOMS_NATURES[n]) + '</option>').join('');
     const pl = (n, m) => n + ' ' + m + (n > 1 ? 's' : '');
-    let h = '<p class="muted">' + (r ? 'Repris de l\'ancienne version le ' + esc(F.date(imp.le.slice(0, 10))) + ' : ' + pl(r.categories, 'catégorie') + ', ' +
+    let h = encartHtml() + '<p class="muted">' + (r ? 'Repris de l\'ancienne version le ' + esc(F.date(imp.le.slice(0, 10))) + ' : ' + pl(r.categories, 'catégorie') + ', ' +
       pl(r.base, 'règle') + ' de base, ' + pl(r.regles, 'règle') + ' personnelle' + (r.regles > 1 ? 's' : '') + ', ' + r.correctionsRetrouvees + ' correction(s) retrouvée(s) sur ' + r.corrections +
       (r.depuis ? ', opérations vues jusqu\'au ' + esc(F.date(r.depuis)) : '') + '.' : 'Aucun classement repris de l\'ancienne version.') + '</p>';
     h += '<div class="row">' + (s.carnet != null && CN.utilisable(s.carnet) ? '<button class="btn small" data-a="reprendre">Reprendre depuis l\'ancienne version</button>' : '') +
@@ -430,6 +472,7 @@
     }).join('') + '</ul>' : '<p class="muted">Aucune règle. Classez une opération avec « Classer aussi les autres » pour en créer une.</p>');
     h += '<p class="muted small">' + (C.base || []).length + ' règle(s) de base, reprises de l\'ancienne version.</p>';
     $('classementCorps').innerHTML = h;
+    remplirEncarts();
   }
   A.preparer.secClassement = () => renderClassement();
   A.rendus.push(() => {

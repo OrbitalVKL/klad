@@ -448,7 +448,8 @@
         const a = M().alerteCompte(S, c, now);
         const n = lu ? jours(lu) : null;
         st = !a ? '<span class="chip good">à jour</span>' : c.sync && c.sync.erreur ? '<span class="chip bad">en erreur</span>' : n != null && n <= 7 ? '<span class="chip warn">' + n + ' j</span>' : '<span class="chip bad">' + (n == null ? 'jamais lu' : n + ' j de retard') + '</span>';
-        todo = !a ? '<span class="muted">synchronisé automatiquement</span>' : '<span class="subs">' + esc(c.sync && c.sync.erreur ? c.sync.erreur : a) + '</span>';
+        const pas = g.KladSync && g.KladSync.passagerDe(c);       // 1.0.1 : panne passagère de la banque, sans alerte
+        todo = !a ? '<span class="muted">' + (pas ? esc(pas) : 'synchronisé automatiquement') + '</span>' : '<span class="subs">' + esc(c.sync && c.sync.erreur ? c.sync.erreur : a) + '</span>';
         if (a) late++;
       } else {
         const ref = [max, c.solde && c.solde.date].filter(Boolean).sort().pop();

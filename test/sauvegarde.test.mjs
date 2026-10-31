@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { charge, json } from './charge.mjs';
 import { ouvrir, playwright, AUJ } from '../tools/mesures/banc.mjs';
+import { repriseGrande } from '../tools/mesures/donnees.mjs';
 
 const PW = playwright();
 const SAUT = !PW && !process.env.KLAD_PARCOURS && 'Playwright absent';
@@ -129,6 +130,101 @@ test('sauvegarde : exportée, vérifiée, tout effacé, restaurée sur une insta
     const S2 = await page.evaluate(() => { const S = window.KladApp.etat(); return { claude: S.cle.claude, mail: S.cle.mailMdp, reg: S.modele.reglages, palette: window.KladAffichage.palette() }; });
     assert.deepEqual(S2, { claude: 'sk-ant-cle-fictive-pour-le-test-000000', mail: 'mot-de-passe-fictif', reg: { complement: { appels: { titre: 'Résidence fictive B' } } }, palette: 'grafit' });
     assert.deepEqual(await alertes(), [], 'sauvegarde restaurée : vérifiée');
+    assert.deepEqual(B.erreurs, []);
+  } finally { await B.fin(); }
+});
+
+// 1.0.1 : la 1.0.0 se fermait à l'export avec des données réelles (sauvegarde entière en un seul message vers
+// Android). Jeu plus gros que les données réelles ; pendant le sélecteur, Klad passe en arrière-plan et se verrouille
+// (5 min) : le fichier est écrit quand même, « Sauvegarde enregistrée » s'affiche au déverrouillage ; aucun message
+// vers Android ne dépasse 512 Ko ; puis vérification et restauration ; échec et annulation propres.
+test('sauvegarde de taille réelle : export pendant un verrouillage, vérification, restauration, échec propre', { skip: SAUT, timeout: 900000 }, async () => {
+  const B = await ouvrir({ reprise: repriseGrande });
+  try {
+    const { page } = B;
+    const NOW = Date.parse(AUJ + 'T10:00:00');
+    const nb = await page.evaluate(() => { const S = window.KladApp.etat(); return { ops: Object.values(S.ops).reduce((t, l) => t + l.length, 0), pieces: (S.carnet.pieces || []).length }; });
+    assert.ok(nb.ops >= 5000, nb.ops + ' opérations');
+    assert.equal(nb.pieces, 3);
+    const calc = () => page.evaluate(now => {
+      const A = window.KladApp, S = A.etat(), Bu = A.budget(), cx = A.ctx(), e = A.extras(now);
+      const ext = { attention: e.attention, sauvegarde: { jours: 3, rappel: false }, maj: null, budget: Bu };
+      return { rel: window.KladControle.construire(S, Bu, cx, now, { version: 'test', resume: null, grafitActif: false, extResume: ext }), resume: window.KladResume.construire(S, now, ext) };
+    }, NOW);
+    const journal = () => page.evaluate(() => window.KladApp.etat().journal.log.join('\n'));
+    const visibilite = v => page.evaluate(v => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, v);
+    await B.onglet('plus');
+    await page.locator('#plusCorps [data-vue="sauvegarde"]').click();
+
+    // sélecteur ouvert : arrière-plan, verrouillage au bout de 5 min, retour, puis fichier choisi
+    await page.evaluate(() => { window.KladDemoCoffre.messages.max = 0; window.KladDemoCoffre.avantSelecteur = () => new Promise(r => { window.__choisir = r; }); });
+    const dl = page.waitForEvent('download');
+    await page.locator('#btnExport').click();
+    await page.waitForFunction(() => !!window.__choisir, null, { timeout: 120000 });
+    await visibilite('hidden');
+    await page.clock.runFor(5 * 60e3 + 2000);
+    await page.waitForSelector('#verrou:not([hidden]) .pad');
+    assert.equal(await page.evaluate(() => window.KladApp.etat()), null, 'verrouillé : état effacé de la mémoire');
+    await visibilite('visible');
+    await page.evaluate(() => window.__choisir(null));
+    const fichier = fs.readFileSync(await (await dl).path());
+    assert.ok(fichier.length > 3e6, 'fichier écrit malgré le verrouillage : ' + fichier.length + ' octets');
+    assert.doesNotMatch(fichier.toString('latin1'), /SUPERMARCHE|JVBERi|appel-fictif/, 'fichier chiffré');
+    const max = await page.evaluate(() => window.KladDemoCoffre.messages.max);
+    assert.ok(max < 512 * 1024, 'plus gros message vers Android : ' + max + ' caractères');
+    await B.code();
+    await page.waitForSelector('#appli:not([hidden])');
+    await page.waitForFunction(() => /Sauvegarde enregistrée/.test(document.getElementById('toast').textContent));
+    assert.match(await journal(), /Sauvegarde enregistrée \(\d+,\d Mo, fichier relu et identique\)/);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('klad.demo.resultat')), null, 'résultat pris en compte une fois');
+    await page.evaluate(() => { window.KladDemoCoffre.avantSelecteur = null; window.__choisir = null; });
+
+    // vérification du fichier
+    await B.onglet('plus');
+    await page.locator('#plusCorps [data-vue="sauvegarde"]').click();
+    assert.match(await page.locator('#sauvState').innerText(), /Dernier export le/);
+    const choisir = async bouton => {
+      const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.locator(bouton).click()]);
+      await fc.setFiles({ name: 'sauvegarde.klad', mimeType: 'application/octet-stream', buffer: fichier });
+      await page.locator('#modal .phrase-in').fill(B.phrase);
+      await page.locator('#modal [data-a="go"]').click();
+    };
+    await choisir('#btnVerifier');
+    await page.waitForFunction(() => !document.getElementById('sauvVerif').hidden, null, { timeout: 120000 });
+    assert.match(await page.locator('#sauvVerif').innerText(), /Sauvegarde complète et lisible/);
+    const avant = await calc();
+
+    // restauration dans l'appli (données remplacées par celles du fichier) : mêmes calculs
+    await page.evaluate(() => { const S = window.KladApp.etat(); S.ops[Object.keys(S.ops)[0]].splice(0, 50); window.KladApp.changed('test'); });
+    await B.pause(600);
+    assert.notDeepEqual((await calc()).rel, avant.rel);
+    await choisir('#btnRestore');
+    await page.locator('#modal [data-a="y"]').click({ timeout: 120000 });
+    await page.waitForFunction(() => /Sauvegarde restaurée/.test(document.getElementById('toast').textContent), null, { timeout: 120000 });
+    await B.pause(800);
+    const apres = await calc();
+    assert.deepEqual(apres.rel, avant.rel, 'même relevé de contrôle');
+    assert.deepEqual(apres.resume, avant.resume, 'même résumé Grafit');
+
+    // échec de la copie : message clair, journal renseigné, aucune date d'export ; annulation : rien
+    const dernier = await page.evaluate(() => document.getElementById('sauvState').textContent);
+    await B.onglet('plus');
+    await page.locator('#plusCorps [data-vue="sauvegarde"]').click();
+    await page.evaluate(() => { window.KladDemoCoffre.avantSelecteur = async () => ({ erreur: 'IOException : espace insuffisant' }); });
+    await page.locator('#btnExport').click();
+    await page.waitForFunction(() => /non enregistrée/.test(document.getElementById('toast').textContent), null, { timeout: 120000 });
+    assert.match(await page.locator('#toast').innerText(), /Rien n'a été écrit/);
+    assert.match(await journal(), /Sauvegarde : enregistrement impossible \(IOException : espace insuffisant\)\. Rien n'est resté dans le fichier choisi\./);
+    assert.equal(await page.evaluate(() => document.getElementById('sauvState').textContent), dernier);
+    const lignes = (await journal()).split('\n').length;
+    await page.evaluate(() => { window.KladDemoCoffre.avantSelecteur = async () => ({ annule: true }); });
+    await page.locator('#btnExport').click();
+    await page.waitForFunction(() => !document.getElementById('btnExport').disabled);
+    await B.pause(300);
+    assert.equal((await journal()).split('\n').length, lignes, 'annulé : rien au journal');
     assert.deepEqual(B.erreurs, []);
   } finally { await B.fin(); }
 });

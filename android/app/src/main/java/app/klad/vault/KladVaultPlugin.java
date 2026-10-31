@@ -1,8 +1,10 @@
 package app.klad.vault;
 
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.net.Uri;
+import android.provider.DocumentsContract;
 import androidx.activity.result.ActivityResult;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
@@ -13,12 +15,14 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.crypto.Cipher;
 
@@ -33,13 +37,15 @@ import javax.crypto.Cipher;
 @CapacitorPlugin(name = "KladVault")
 public class KladVaultPlugin extends Plugin {
 
-    private static final int MAX_IMPORT = 50 * 1024 * 1024;
-
     private Vault vault;
+    private Transfert transfert;
+    private final ExecutorService fil = Executors.newSingleThreadExecutor();
 
     @Override
     public void load() {
         vault = new Vault(getContext());
+        transfert = new Transfert(new File(getContext().getNoBackupFilesDir(), "klad/echanges"));
+        fil.execute(() -> transfert.nettoyer(System.currentTimeMillis()));
     }
 
     // ------------------------------------------------------------ outils
@@ -347,67 +353,203 @@ public class KladVaultPlugin extends Plugin {
         }
     }
 
-    // ------------------------------------------------------------ sauvegarde : sélecteur de fichiers Android
+    // ------------------------------------------------------------ fichiers par morceaux (1.0.1, voir Transfert)
+    // Le sélecteur ne reçoit qu'un jeton : la demande gardée par Capacitor pendant le sélecteur reste minuscule.
 
-    @PluginMethod
-    public void exportFile(PluginCall call) {
-        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        // Type facultatif : « application/json » pour le relevé de contrôle, sinon fichier binaire (sauvegarde).
-        i.setType("application/json".equals(call.getString("type", "")) ? "application/json" : "application/octet-stream");
-        i.putExtra(Intent.EXTRA_TITLE, call.getString("name", "klad-sauvegarde.klad"));
-        startActivityForResult(call, i, "exportDone");
+    private static String jeton(PluginCall call) {
+        String j = call.getString("jeton");
+        if (!Transfert.jetonValide(j)) {
+            call.reject("Jeton invalide", "BAD_ARG");
+            return null;
+        }
+        return j;
     }
 
-    @ActivityCallback
-    private void exportDone(PluginCall call, ActivityResult res) {
-        if (call == null) return;
-        Uri uri = res.getResultCode() == Activity.RESULT_OK && res.getData() != null ? res.getData().getData() : null;
-        if (uri == null) {
-            call.resolve(fail("annule", null));
-            return;
-        }
-        try (OutputStream out = getContext().getContentResolver().openOutputStream(uri, "wt")) {
-            if (out == null) throw new IOException("Fichier inaccessible");
-            out.write(Base64.getDecoder().decode(call.getString("data", "")));
-            call.resolve(ok());
+    @PluginMethod
+    public void tmpOuvrir(PluginCall call) {
+        try {
+            JSObject r = ok();
+            r.put("jeton", transfert.ouvrir());
+            call.resolve(r);
         } catch (Exception e) {
             call.resolve(fail("erreur", describe(e)));
         }
     }
 
     @PluginMethod
-    public void importFile(PluginCall call) {
+    public void tmpAjouter(PluginCall call) {
+        String j = jeton(call);
+        if (j == null) return;
+        try {
+            JSObject r = ok();
+            r.put("taille", transfert.ajouter(j, Base64.getDecoder().decode(call.getString("data", ""))));
+            call.resolve(r);
+        } catch (Exception e) {
+            transfert.abandonner(j);
+            call.resolve(fail("erreur", describe(e)));
+        }
+    }
+
+    @PluginMethod
+    public void tmpLire(PluginCall call) {
+        String j = jeton(call);
+        if (j == null) return;
+        try {
+            // optLong : un petit nombre arrive en Integer, que PluginCall.getLong ignorerait (valeur par défaut)
+            long debut = call.getData().optLong("debut", 0L);
+            int longueur = call.getInt("longueur", Transfert.MAX_MORCEAU);
+            byte[] b = transfert.lire(j, debut, longueur);
+            JSObject r = ok();
+            r.put("data", b64(b));
+            r.put("fin", debut + b.length >= transfert.taille(j));
+            call.resolve(r);
+        } catch (Exception e) {
+            call.resolve(fail("erreur", describe(e)));
+        }
+    }
+
+    @PluginMethod
+    public void tmpAbandon(PluginCall call) {
+        String j = jeton(call);
+        if (j == null) return;
+        transfert.abandonner(j);
+        call.resolve(ok());
+    }
+
+    /** Fichier choisi par le sélecteur, ouvert par le ContentResolver. */
+    private Transfert.Destination destination(final Uri uri) {
+        final ContentResolver cr = getContext().getContentResolver();
+        return new Transfert.Destination() {
+            @Override
+            public OutputStream ouvrir() throws IOException {
+                // « wt » (écriture, contenu tronqué) ; repli sur « w » pour un fournisseur qui refuse ce mode
+                try {
+                    return cr.openOutputStream(uri, "wt");
+                } catch (IllegalArgumentException | UnsupportedOperationException | java.io.FileNotFoundException e) {
+                    return cr.openOutputStream(uri, "w");
+                }
+            }
+
+            @Override
+            public InputStream relire() throws IOException {
+                return cr.openInputStream(uri);
+            }
+
+            @Override
+            public boolean supprimer() {
+                try {
+                    return DocumentsContract.deleteDocument(cr, uri);
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+        };
+    }
+
+    /**
+     * Enregistre le fichier temporaire « jeton » à l'endroit choisi (sélecteur Android, Drive compris).
+     * { jeton, name, type ("application/json" ou binaire), nature ("sauvegarde", "controle"…) } → { ok, taille } ou
+     * { ok: false, reason: "annule" | "erreur", message }. Le résultat est aussi gardé (resultatEnregistrement).
+     */
+    @PluginMethod
+    public void enregistrerFichier(PluginCall call) {
+        String j = jeton(call);
+        if (j == null) return;
+        if (!transfert.fichier(j).isFile()) {
+            call.resolve(fail("erreur", "Fichier préparé introuvable"));
+            return;
+        }
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/json".equals(call.getString("type", "")) ? "application/json" : "application/octet-stream");
+        i.putExtra(Intent.EXTRA_TITLE, call.getString("name", "klad-sauvegarde.klad"));
+        startActivityForResult(call, i, "enregistre");
+    }
+
+    // Appelé aussi après une recréation de l'activité (demande « orpheline » rendue par Capacitor) : le fichier
+    // temporaire est sur disque, la copie se fait et le résultat est gardé pour l'appli.
+    @ActivityCallback
+    private void enregistre(PluginCall call, ActivityResult res) {
+        if (call == null) return;
+        final String j = call.getString("jeton");
+        final String nature = call.getString("nature", "");
+        final Uri uri = res.getResultCode() == Activity.RESULT_OK && res.getData() != null ? res.getData().getData() : null;
+        if (uri == null || !Transfert.jetonValide(j)) {
+            Transfert.Resultat r = Transfert.Resultat.echec("annule", null);
+            if (Transfert.jetonValide(j)) {
+                transfert.abandonner(j);
+                transfert.noter(j, nature, r, System.currentTimeMillis());
+            }
+            call.resolve(fail("annule", null));
+            return;
+        }
+        // copie hors du fil principal : un gros fichier vers Drive ne doit pas figer l'appli
+        fil.execute(() -> {
+            Transfert.Resultat r = transfert.enregistrer(j, destination(uri));
+            transfert.noter(j, nature, r, System.currentTimeMillis());
+            if (r.ok) {
+                JSObject o = ok();
+                o.put("taille", r.taille);
+                call.resolve(o);
+            } else call.resolve(fail(r.raison, r.message));
+        });
+    }
+
+    /** Dernier résultat d'enregistrement gardé → { resultat: { jeton, nature, ok, reason, message, taille, le } | null }. */
+    @PluginMethod
+    public void resultatEnregistrement(PluginCall call) {
+        java.util.Properties p = transfert.dernier();
+        JSObject r = ok();
+        if (p != null) {
+            JSObject o = new JSObject();
+            o.put("jeton", p.getProperty("jeton", ""));
+            o.put("nature", p.getProperty("nature", ""));
+            o.put("ok", "1".equals(p.getProperty("ok")));
+            o.put("reason", p.getProperty("raison", ""));
+            o.put("message", p.getProperty("message", ""));
+            o.put("taille", Long.parseLong(p.getProperty("taille", "0")));
+            o.put("le", Long.parseLong(p.getProperty("le", "0")));
+            r.put("resultat", o);
+        }
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void oublierEnregistrement(PluginCall call) {
+        transfert.oublier(call.getString("jeton"));
+        call.resolve(ok());
+    }
+
+    /** Sélecteur Android → fichier copié dans un fichier temporaire, lu ensuite par morceaux (tmpLire) → { jeton, taille }. */
+    @PluginMethod
+    public void choisirFichier(PluginCall call) {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         // Type facultatif (« application/pdf » pour un bulletin ou un avis) ; le sélecteur Android propose aussi Drive.
         String type = call.getString("type", "*/*");
         i.setType("application/pdf".equals(type) ? type : "*/*");
-        startActivityForResult(call, i, "importDone");
+        startActivityForResult(call, i, "choisi");
     }
 
     @ActivityCallback
-    private void importDone(PluginCall call, ActivityResult res) {
+    private void choisi(PluginCall call, ActivityResult res) {
         if (call == null) return;
-        Uri uri = res.getResultCode() == Activity.RESULT_OK && res.getData() != null ? res.getData().getData() : null;
+        final Uri uri = res.getResultCode() == Activity.RESULT_OK && res.getData() != null ? res.getData().getData() : null;
         if (uri == null) {
             call.resolve(fail("annule", null));
             return;
         }
-        try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
-            if (in == null) throw new IOException("Fichier inaccessible");
-            ByteArrayOutputStream buf = new ByteArrayOutputStream();
-            byte[] chunk = new byte[64 * 1024];
-            int n;
-            while ((n = in.read(chunk)) > 0) {
-                buf.write(chunk, 0, n);
-                if (buf.size() > MAX_IMPORT) throw new IOException("Fichier trop gros");
+        fil.execute(() -> {
+            try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
+                if (in == null) throw new IOException("Fichier inaccessible");
+                String j = transfert.recevoir(in);
+                JSObject r = ok();
+                r.put("jeton", j);
+                r.put("taille", transfert.taille(j));
+                call.resolve(r);
+            } catch (Exception e) {
+                call.resolve(fail("erreur", describe(e)));
             }
-            JSObject r = ok();
-            r.put("data", b64(buf.toByteArray()));
-            call.resolve(r);
-        } catch (Exception e) {
-            call.resolve(fail("erreur", describe(e)));
-        }
+        });
     }
 }
