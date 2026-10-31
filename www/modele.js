@@ -319,6 +319,9 @@
       if (p.apparue < best.apparue) best.apparue = p.apparue;
       if (best.categorie == null && p.categorie != null) best.categorie = p.categorie;
       if (p.vue) best.vue = true;
+      // rapprochement à la main (1.1) et écart vérifié (1.1.1) suivent l'opération comptabilisée
+      if (best.rapprochement == null && p.rapprochement != null) best.rapprochement = p.rapprochement;
+      if (p.ecartVu) best.ecartVu = true;
       retirer.add(p.id);
       n++;
     }

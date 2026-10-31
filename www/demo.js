@@ -132,8 +132,10 @@
     const emps = new Set();
     for (const b of Object.values(isObj(fisc.bs) ? fisc.bs : {})) if (b && b.emp) emps.add(String(b.emp));
     const pee = Object.assign({}, rac && isObj(rac.pee) ? rac.pee : {}, isObj(X.pee) ? X.pee : {}, S.budget && isObj(S.budget.pee) ? S.budget.pee : {});
-    const plans = [pee.plan].concat(Array.isArray(pee.anciens) ? pee.anciens : [], Array.isArray(pee.clos) ? pee.clos : []).filter(isObj);
-    for (const p of plans) { if (p.emp) emps.add(String(p.emp)); if (p.teneur) ajouter(p.teneur, 'Teneur du plan', true); }
+    const plans = [pee.plan].concat(Array.isArray(pee.anciens) ? pee.anciens : [], Array.isArray(pee.clos) ? pee.clos : [], Array.isArray(pee.closed) ? pee.closed : []).filter(isObj);
+    for (const p of plans) { if (p.emp) emps.add(String(p.emp)); if (p.teneur) ajouter(p.teneur, 'Teneur du plan', true); if (p.note) ajouter(p.note, 'note', true); }
+    // 1.1.1 : fonds du plan d'épargne → « Fonds N »
+    (Array.isArray(pee.fonds) ? pee.fonds : []).forEach((f, i) => { if (isObj(f)) ajouter(f.nom, 'Fonds ' + (i + 1), true); });
     [...emps].forEach((e, i) => ajouter(e, emps.size > 1 ? 'Employeur ' + (i + 1) : 'Employeur', true));
     // copropriétés et syndics (appels de fonds)
     const ap = Object.assign({}, rac && isObj(rac.appels) ? rac.appels : {}, S.budget && isObj(S.budget.appels) ? S.budget.appels : {});

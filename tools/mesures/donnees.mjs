@@ -68,7 +68,18 @@ export const PERSONNEL = {
   references: ['7788123', '2024-55871', 'CTR-990077', '2025-118'],
   adresses: ['aurore.ombelin@example.org', 'imap.mirabelle-mail.example', 'ombelin-aurore.github.io'],
   appId: '8f14e45f-ceea-467a-9b2c-1f0e2d3c4b5a',
-  textes: ['Résidence Les Mimosas', 'SYNDIC MIMOSAS GESTION', 'Cuisine Ombelin', 'Offre de prêt', 'Prêt Banque Mirabelle', 'Contrat Assurance Phénix', 'Forfait Galaxie Mobile', 'MIMOSAS', 'PHENIX', 'GALAXIE']
+  textes: ['Résidence Les Mimosas', 'SYNDIC MIMOSAS GESTION', 'Cuisine Ombelin', 'Offre de prêt', 'Prêt Banque Mirabelle', 'Contrat Assurance Phénix', 'Forfait Galaxie Mobile', 'MIMOSAS', 'PHENIX', 'GALAXIE'],
+  // 1.1.1 : Patrimoine saisi à la main (crypto, livret, plan d'épargne) et portefeuille rapproché à la main.
+  // Montants en centimes (crypto) ou en euros (livret, plan) ; « montants » : leur forme affichée, jamais visible en démo.
+  patrimoine: {
+    // noms sans mot déjà masqué par ailleurs (personnes, banque…) : chacun doit l'être pour lui-même
+    crypto: [['Vortexia Réserve', 777777, 1234567], ['Jeton Calypsium', 250050, 198765]],
+    livret: 8642.19, teneur: 'Gestion Calliope Épargne', fonds: 'Fonds Hespéride Horizon', valeurPart: 13.57, versement: 4321.98, ancienPlan: 'Plan Asphodèle Avenir',
+    portefeuille: 'Portemonnaie Nébuleuse', motifPortefeuille: 'NEBULAPAY', achat: 'LIBRAIRIE DES ASPHODELES',
+    // montants distinctifs seulement (en démo, les montants sont multipliés au hasard : un petit montant peut retomber
+    // sur une valeur courante par coïncidence)
+    montants: ['7 777,77', '12 345,67', '2 500,50', '1 987,65', '8 642,19', '4 321,98']
+  }
 };
 const REMPLACER = [
   ['SOCIETE FICTIVE', 'ZEPHYRINE INDUSTRIES'], ['Société fictive', 'Zéphyrine Industries'],

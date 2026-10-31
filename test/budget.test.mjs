@@ -301,7 +301,7 @@ test('à surveiller à partir de 90 % ; tolérance de 2 € ou 2 % sur les charg
   S.budget.plan.perso['c|Alimentation'].amt = 500000;
   ({ a } = ligne(S, 'perso', 'c|Alimentation'));
   assert.notEqual(a.cls, 'warn');
-  // commun : prêt de 1 200 €, prélevé 1 201 € → dans la tolérance (24 €)
+  // commun : prêt de 1 200 €, prélevé 1 201 € → dans la tolérance (2 % = 24 €, plafonnée à 10 € depuis la 1.1.1)
   const ech = S.ops[c.id].find(o => o.date === '2026-10-05');
   ech.montant = -120100;
   let r;
@@ -310,12 +310,33 @@ test('à surveiller à partir de 90 % ; tolérance de 2 € ou 2 % sur les charg
   assert.match(a.etat.texte, /^prélevé · 1\s€ de plus$/);
   assert.deepEqual([a.cause.sorte, a.cause.aligner], ['tol', 120100], 'correction proposée en un appui');
   assert.ok(!r.depasses.some(x => x.key === 'f|Prêt') && !r.causes.some(x => x.a.key === 'f|Prêt'), 'ni « plus gros écarts » ni causes de dépassement');
-  ech.montant = -122300;          // 23 € de plus : toujours toléré
+  ech.montant = -121000;          // 10 € de plus : toléré (plafond)
   assert.equal(ligne(S, 'commun', 'f|Prêt').a.cls, 'ok');
-  ech.montant = -122500;          // 25 € de plus : au-delà de 2 %
+  ech.montant = -121500;          // 15 € de plus : sous 2 %, mais au-delà du plafond de 10 € (1.1.1)
   ({ a } = ligne(S, 'commun', 'f|Prêt'));
   assert.deepEqual([a.cls, a.etat.niveau], ['over', 'bad']);
   assert.notEqual(a.cause.sorte, 'tol');
+  // seuils réglables (Plus › Réglages › Budget) : plafond relevé à 30 € → 15 € de plus redevient toléré
+  S.budget.reglages.tolerance = { max: 30 };
+  assert.equal(ligne(S, 'commun', 'f|Prêt').a.cls, 'ok');
+  ech.montant = -122500;          // 25 € de plus : au-delà de 2 % (24 €)
+  assert.equal(ligne(S, 'commun', 'f|Prêt').a.cls, 'over');
+  S.budget.reglages.tolerance = { min: 30, part: 0, max: 30 };
+  assert.equal(ligne(S, 'commun', 'f|Prêt').a.cls, 'ok', 'minimum seul');
+  delete S.budget.reglages.tolerance;
+});
+
+// 1.1.1 : tolérance = plus grand de 2 € et 2 % du budget, plafonné à 10 € ; seuils réglables, valeurs invalides ignorées.
+test('tolérance plafonnée : 2 € / 2 % / 10 €, réglable', () => {
+  const J = o => JSON.parse(JSON.stringify(o));
+  const T0 = J(KB.tolReglee(undefined));
+  assert.deepEqual(T0, { min: 200, part: 0.02, max: 1000 });
+  assert.equal(KB.toleranceDe(T0, 5000), 200, 'charge de 50 € : 2 €');
+  assert.equal(KB.toleranceDe(T0, 30000), 600, 'charge de 300 € : 2 % = 6 €');
+  assert.equal(KB.toleranceDe(T0, 100000), 1000, 'charge de 1 000 € : 2 % = 20 €, plafonné à 10 €');
+  assert.deepEqual(J(KB.tolReglee({ tolerance: { min: '3', part: 5, max: 50 } })), { min: 300, part: 0.05, max: 5000 });
+  assert.deepEqual(J(KB.tolReglee({ tolerance: { min: 'x', part: -1, max: '' } })), T0, 'saisie invalide → défaut');
+  assert.equal(KB.toleranceDe(KB.tolReglee({ tolerance: { min: 20, max: 10 } }), 5000), 1000, 'le plafond l\'emporte sur le minimum');
 });
 
 // 1.1 : suivi du commun au mois (par défaut) ou sur le cycle de salaire du budget perso (réglage commun.cycle).

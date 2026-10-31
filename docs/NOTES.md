@@ -2,6 +2,20 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.1.1
+
+Correctif de la 1.1.0 (décisions de l'architecte).
+- **Tolérance des charges plafonnée** : un écart reste toléré jusqu'au plus grand de 2 € et 2 % du budget, mais jamais
+  plus de 10 € ; au-delà, le poste est en dépassement. Les trois seuils se règlent dans Plus › Réglages › Budget ›
+  Tolérance des charges.
+- **Écart de rapprochement** : rapprocher à la main un prélèvement de portefeuille d'un achat d'un autre montant demande
+  confirmation (prélèvement, achat, écart, catégorie). L'écart reste compté, une seule fois, dans la catégorie de
+  l'achat (en moins si le prélèvement est plus petit) ; il est affiché « écart de rapprochement » sur les deux
+  opérations et signalé dans « À vérifier » au-delà de 2 €, jusqu'à « Écart vérifié ». « Annuler » rend l'état d'avant.
+- **Mode démo** : noms des fonds et des anciens plans d'épargne masqués ; crypto, livret, plan d'épargne, historique des
+  observations et rapprochement vérifiés.
+- Aucun autre montant calculé modifié (relevé de contrôle identique quand les montants rapprochés sont égaux).
+
 ## 1.1.0
 
 Retours d'usage de la 1.0.1 (sauvegarde et lecture confirmées sur le téléphone).

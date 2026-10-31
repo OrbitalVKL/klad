@@ -165,9 +165,9 @@ test('opérations vues : date de départ, cochées, décochées ; marquer et ann
   assert.equal(o1.vue, false);
   a.aVerifier = true;
   const at = json(K.attention(K.contexte(S, NOW), NOW));
-  assert.deepEqual(at, { unseen: 1, unclassified: 3, accountsToCheck: 1, toMatch: 0 });
+  assert.deepEqual(at, { unseen: 1, unclassified: 3, accountsToCheck: 1, toMatch: 0, gaps: 0 });
   b.masque = true;
-  assert.deepEqual(json(K.attention(K.contexte(S, NOW), NOW)), { unseen: 1, unclassified: 2, accountsToCheck: 1, toMatch: 0 });
+  assert.deepEqual(json(K.attention(K.contexte(S, NOW), NOW)), { unseen: 1, unclassified: 2, accountsToCheck: 1, toMatch: 0, gaps: 0 });
   // non classées : 90 derniers jours seulement
   S.ops[a.id].push(op(a, '2026-06-01', -100, 'VIEUX'));
   assert.equal(K.attention(K.contexte(S, NOW), NOW).unclassified, 2);

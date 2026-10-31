@@ -513,7 +513,7 @@
     if (av) {
       const k = av.dataset.av;
       if (k === 'nonvues') versOps({ nonVues: true });
-      else if (k === 'nonclassees' || k === 'rapprocher') versOps({ cat: k === 'nonclassees' ? '__nc' : '__rap' });
+      else if (k === 'nonclassees' || k === 'rapprocher' || k === 'ecarts') versOps({ cat: k === 'nonclassees' ? '__nc' : k === 'ecarts' ? '__ecart' : '__rap' });
       else if (k === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
       else if (k === 'bilan') { if (window.KladEcranBudget) window.KladEcranBudget.ui.sv.perso = 'suivi'; montrer('budget', { force: true, haut: true }); if (window.KladEcranBudget && window.KladEcranBudget.cyclePrecedent) window.KladEcranBudget.cyclePrecedent(); }
       else if (AV[k]) ouvrirVolet(AV[k]);
@@ -582,7 +582,7 @@
     const av = ev.target.closest('[data-av]');
     if (av) {
       const k = av.dataset.av;
-      if (k === 'nonclassees' || k === 'rapprocher') versOps({ cat: k === 'nonclassees' ? '__nc' : '__rap' });
+      if (k === 'nonclassees' || k === 'rapprocher' || k === 'ecarts') versOps({ cat: k === 'nonclassees' ? '__nc' : k === 'ecarts' ? '__ecart' : '__rap' });
       else if (k === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
       else if (AV[k]) ouvrirVolet(AV[k]);
       return;
@@ -844,6 +844,17 @@
         () => { KC.annulerInterne(snap); if (venu && filtre.cat === '__int') filtre.cat = '__rap'; changed('classement'); });
     } else if (['rapprocher', 'rapprocherb', 'garder', 'arapprocher', 'autrement', 'pasautrement'].indexOf(b.dataset.a) >= 0) {
       rapprochement(b.dataset.a);
+    } else if (b.dataset.a === 'ecartvu' || b.dataset.a === 'ecartnonvu') {
+      const o = trouverOp(opCourante[0], opCourante[1]);
+      const e = o && KC.ecartDe(ctx(), o);
+      if (!e) return;
+      const on = b.dataset.a === 'ecartvu';
+      const snap = KC.marquerEcartVu(e.banque, on);
+      log('info', on ? 'Écart de rapprochement vérifié.' : 'Écart de rapprochement remis à vérifier.');
+      changed('classement');
+      renderDetail();
+      toastAnnuler(on ? 'Écart vérifié : il n\'est plus signalé dans « À vérifier ».' : 'Écart de nouveau signalé dans « À vérifier ».',
+        () => { KC.annulerEcartVu(snap); changed('classement'); if (vue === 'operation') renderDetail(); });
     } else if (b.dataset.a === 'depense') {
       const o = trouverOp(opCourante[0], opCourante[1]);
       const snap = o && KC.compterEnDepense(o);
@@ -890,23 +901,36 @@
     const L = rapEnCours.achats ? (w ? KC.candidatsPortefeuille(cx, o, w) : []) : KC.candidatsBanque(cx, o);
     $('rapCorps').innerHTML = Vu.choixRapprochement(S, o, L, rapEnCours.achats);
   };
+  // 1.1.1 : montants différents → confirmation (prélèvement, achat, écart, catégorie) avant de rapprocher.
   $('rapCorps').addEventListener('click', ev => {
-    const b = ev.target.closest('[data-rapid]');
-    if (!b || !rapEnCours) return;
-    const [cid, id] = [b.dataset.rapid.slice(0, b.dataset.rapid.indexOf('|')), b.dataset.rapid.slice(b.dataset.rapid.indexOf('|') + 1)];
+    if (!rapEnCours) return;
+    if (ev.target.closest('[data-rapnon]')) { delete rapEnCours.choix; preparer.secRapprocher(); return; }
+    const ok = ev.target.closest('[data-rapok]');
+    const b = ok ? null : ev.target.closest('[data-rapid]');
+    if (!ok && !b) return;
+    const ref = ok ? rapEnCours.choix : b.dataset.rapid;
+    if (!ref) return;
+    const [cid, id] = [ref.slice(0, ref.indexOf('|')), ref.slice(ref.indexOf('|') + 1)];
     const o = trouverOp(rapEnCours.cid, rapEnCours.id), x = trouverOp(cid, id);
     if (!o || !x) return;
     const cx = ctx();
     const banque = rapEnCours.achats ? o : x, achat = rapEnCours.achats ? x : o;
     const w = M.compte(S, achat.compte);
     if (!KC.aRapprocher(cx, banque) || !w) return;
+    const ecart = KC.ecartPrevu(banque, achat);
+    if (ecart && !ok) {
+      rapEnCours.choix = ref;
+      $('rapCorps').innerHTML = Vu.confirmationEcart(S, cx, banque, achat);
+      return;
+    }
     const snap = KC.rapprocherAvec(cx, banque, w, achat);
-    log('info', 'Prélèvement de portefeuille rapproché à la main d\'un achat.');
+    log('info', 'Prélèvement de portefeuille rapproché à la main d\'un achat' + (ecart ? ', avec un écart de rapprochement.' : '.'));
     rapEnCours = null;
     fermerVolet();
     changed('classement');
     if (vue === 'operation') renderDetail();
-    toastAnnuler('Rapproché : le prélèvement est interne, l\'achat compte comme dépense.', () => { KC.annulerRapprochement(snap); changed('classement'); if (vue === 'operation') renderDetail(); });
+    toastAnnuler(ecart ? 'Rapproché : l\'achat compte comme dépense, l\'écart de ' + U.e2(Math.abs(ecart)) + (ecart > 0 ? ' aussi.' : ' vient en moins.')
+      : 'Rapproché : le prélèvement est interne, l\'achat compte comme dépense.', () => { KC.annulerRapprochement(snap); changed('classement'); if (vue === 'operation') renderDetail(); });
   });
 
   // ------------------------------------------------------------ volet « Classer »

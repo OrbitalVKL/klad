@@ -6,6 +6,10 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.1.1** — correctif de la 1.1.0 (réponse de l'architecte au rapport 1.1.0) : tolérance des charges plafonnée à 10 €
+et réglable, écart de rapprochement à la main gardé en dépense (confirmation, affichage, « À vérifier »), mode démo
+vérifié sur les nouveautés de la 1.1.0.
+
 **1.1.0** — retours d'usage de la 1.0.1 (sauvegarde et lecture confirmées sur le téléphone : la bascule peut
 reprendre). Saisie du Budget, reste à vivre simplifié, « à surveiller » à 90 %, tolérance des charges, commun sur le
 cycle de salaire, historique des observations, carburant en fenêtre, onglet Patrimoine (dont crypto), rapprochement
@@ -30,6 +34,35 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.1.1 — détails techniques
+- Tolérance (`budget.js`) : `toleranceDe(T, pm) = min(T.max, max(T.min, pm × T.part))`, `tolReglee(S.budget.reglages)`
+  → `B.R.tolerance` (centimes ; défauts `TOL_MIN = 200`, `TOL_PART = 0.02`, `TOL_MAX = 1000`). Réglage : thème
+  `tolerance` de `KladReglages.THEMES` (magasin `r`, `S.budget.reglages.tolerance { min, part, max }` en € et %, bornes
+  `borne` vérifiées par `convertir`), affiché dans Plus › Réglages › Budget (« Tolérance des charges »).
+- Écart de rapprochement (`classement.js`) : `ecartDe(ctx, o)` → `{ banque, achat, ecart }` (prélèvement rapproché à la
+  main `categorie.lie`, ou achat `rapprochement.avec` ; `ecart` = |prélevé| − |achat|, null si égal), `ecarts(ctx)`,
+  `ecartAVerifier` (|écart| > `ECART_SIGNAL` = 200 et pas `o.ecartVu`), `marquerEcartVu` / `annulerEcartVu`,
+  `ecartPrevu`. `attention()` → `gaps` (écarts à vérifier, comptes visibles). `liens(ctx)` mémorisé dans le contexte.
+- Budget (`KladBudget.contexte`) : une ligne `{ ecart: true, id: id du prélèvement, m: −écart, type/cat/sub de l'achat,
+  date du prélèvement, label « Écart de rapprochement » }` par écart ; comptée par tous les calculs de dépense
+  (postes, suivi, tendance, répartition, reste à vivre) ; écartée des calculs de trésorerie et de soldes (variation du
+  commun, courbe de solde, `opsCommun`) et des recherches par libellé (contrats, récurrents, salaire, impôts, livret,
+  observations du portefeuille et du compte secondaire). Exclusion du budget par l'id du prélèvement.
+- Écrans : confirmation dans le volet `secRapprocher` (`KladVues.confirmationEcart`, `data-rapok` / `data-rapnon`) ;
+  détail des deux opérations (« Écart de rapprochement », boutons `ecartvu` / `ecartnonvu`) ; « À vérifier » : ligne
+  `ecarts` → liste filtrée `__ecart` ; détail d'un poste : ligne « écart de rapprochement » sans bouton « classer » ni
+  montant négatif. `modele.rapprocher` (en cours → comptabilisée) garde `rapprochement` et `ecartVu`.
+- Relevé de contrôle : `aVerifier.ecartsAVerifier` et `ecartsRapprochement` seulement s'il y en a (relevé identique
+  sinon) ; `ecartsAVerifier` non comparé à l'ancienne version (`tools/controle/comparer.mjs`).
+- Mode démo (`demo.js`) : noms des fonds du plan d'épargne → « Fonds N » ; plans soldés (`closed`) : employeur et note.
+  Jeu « personnel » (`PERSONNEL.patrimoine`, `test/demo-outils.mjs:completer`) : positions crypto, livret, plan
+  d'épargne (fonds, versement, plan soldé), historique des observations, portefeuille et prélèvement à rapprocher ;
+  noms et montants saisis dans les interdits ; `test/demo.test.mjs` ouvre aussi le formulaire crypto, l'historique,
+  le choix et la confirmation du rapprochement et le détail des deux opérations.
+- Tests : `test/lot111.test.mjs` (écart compté une fois, soldes inchangés, annulation, « À vérifier », relevé identique
+  à montants égaux, tolérance 1 € / 15 €), `budget.test.mjs` (plafond, réglage), `lot11.test.mjs` (confirmation à
+  l'écran, « Écart vérifié »).
 
 ### 1.1.0 — détails techniques
 - Clavier du Budget : `ecranbudget.js` ne redessine plus sur `resize` si la largeur n'a pas changé ou si un champ de
@@ -275,6 +308,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | fait, maintenance ensuite |
 | — | Correctif : export de la sauvegarde (plantage), journal des plantages, reprise du classement, messages flottants, panne passagère de la banque | 1.0.1 | fait |
 | — | Retours d'usage : saisie du Budget, reste à vivre, alertes, tolérance, commun en cycle, historique, carburant, onglet Patrimoine, crypto, rapprochement | 1.1.0 | fait |
+| — | Correctif : tolérance plafonnée et réglable, écart de rapprochement, mode démo des nouveautés | 1.1.1 | fait |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -478,7 +512,12 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   différences sont listées) ; le rappel compte 30 jours depuis la date du fichier vérifié ; une restauration vaut
   vérification ; le thème et la palette voyagent avec la sauvegarde ; l'import du complément exige la reprise.
 
-- 1.1.0 (décisions prises par défaut, à valider) : « à surveiller » dès 90 % consommés, sans autre condition ;
+- 1.1.1 (décisions de l'architecte) : tolérance = plus grand de 2 € et 2 % du budget, plafonnée à 10 €, réglable ;
+  écart de rapprochement compté dans la catégorie de l'achat, signalé au-delà de 2 €, confirmation avant de rapprocher.
+  Choix du propriétaire : un prélèvement plus petit que l'achat compte en moins (dépense comptée = montant prélevé) ;
+  le signalement dure jusqu'à « Écart vérifié » (annulable). Par défaut, à valider : un rapprochement à montants égaux
+  ne demande pas de confirmation ; l'écart est daté du prélèvement.
+- 1.1.0 (décisions validées par l'architecte, sauf la tolérance, plafonnée en 1.1.1) : « à surveiller » dès 90 % consommés, sans autre condition ;
   tolérance aussi sur les postes courants du commun ; commun sur le cycle de salaire = celui du budget perso ; partie
   Foncier = taxe foncière seule ; crypto : rappel et observation à 30 jours ; rapprochement à la main jusqu'à 30 jours
   d'écart, montant libre ; libellé d'onglet « Patrimoine ».

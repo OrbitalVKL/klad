@@ -40,6 +40,14 @@
       { k: 'commun.contribution', ou: 'r', t: 'texte', l: 'Poste perso de votre contribution au commun', defaut: 'Contribution compte commun' },
       { k: 'commun.motifAutre', ou: 'r', t: 'motif', l: 'Motif des virements de l\'autre personne', aide: 'Expression reconnue dans le libellé des virements reçus sur le compte commun.' }
     ] },
+    // 1.1.1 : tolérance des charges (charges fixes et postes du commun) : le plus grand du minimum et de la part du
+    // budget, sans dépasser le plafond ; au-delà, le poste est dépassé.
+    { id: 'tolerance', titre: 'Tolérance des charges', sous: 'Écart toléré avant un dépassement', champs: [
+      { k: 'tolerance.min', ou: 'r', t: 'nombre', l: 'Écart toléré minimum (€)', defaut: 2, borne: [0, 1000] },
+      { k: 'tolerance.part', ou: 'r', t: 'nombre', l: 'Part du budget tolérée (%)', defaut: 2, borne: [0, 100] },
+      { k: 'tolerance.max', ou: 'r', t: 'nombre', l: 'Écart toléré au plus (€)', defaut: 10, borne: [0, 1000],
+        aide: 'Charges fixes et postes du commun : un écart jusqu\'au plus grand du minimum et de la part du budget reste « prélevé » ou « conforme », sans dépasser ce plafond. Au-delà, le poste est dépassé.' }
+    ] },
     { id: 'secondaire', titre: 'Compte secondaire', sous: 'Charges récurrentes à basculer sur le compte principal', champs: [
       { k: 'observations.secondaire', ou: 'c', t: 'compte', l: 'Compte secondaire', vide: 'Aucun', aide: 'Les charges récurrentes prélevées sur ce compte sont signalées (observations et pastille « récurrent » dans le détail des postes).' },
       { k: 'observations.principal', ou: 'c', t: 'compte', l: 'Compte courant principal', vide: 'Non précisé' },
@@ -145,7 +153,12 @@
     const s = String(texte == null ? '' : texte).trim();
     if (!s) return { ok: true, v: c.t === 'compte' ? null : undefined };       // compte : « Aucun » choisi, prioritaire
     switch (c.t) {
-      case 'nombre': { const n = nombreFr(s); return isFinite(n) ? { ok: true, v: n } : { ok: false, erreur: 'Nombre attendu.' }; }
+      case 'nombre': {
+        const n = nombreFr(s);
+        if (!isFinite(n)) return { ok: false, erreur: 'Nombre attendu.' };
+        if (c.borne && (n < c.borne[0] || n > c.borne[1])) return { ok: false, erreur: 'Nombre entre ' + c.borne[0] + ' et ' + c.borne[1] + ' attendu.' };
+        return { ok: true, v: n };
+      }
       case 'motifs': return { ok: true, v: s.split(/\n+/).map(x => x.trim()).filter(Boolean).join('|') };
       case 'liste': return { ok: true, v: s.split(/\n+/).map(x => x.trim()).filter(Boolean) };
       case 'motif': try { new RegExp(s, 'i'); return { ok: true, v: s }; } catch (e) { return { ok: false, erreur: 'Expression non reconnue : ' + e.message }; }
@@ -361,6 +374,7 @@
       '<h3>Base de calcul du réel habituel</h3><ul class="list"><li><div class="grow">Depuis<small>' + esc(ref ? U.mLong(ref) : 'automatique') + '</small></div></li></ul>' +
       '<div class="row"><button type="button" class="btn" data-a="base">Modifier dans Budget</button></div>' +
       '<h3>Compte commun</h3>' + formHtml(R.theme('commun')) +
+      '<h3>Tolérance des charges</h3>' + formHtml(R.theme('tolerance')) +
       '<h3>Compte secondaire</h3>' + formHtml(R.theme('secondaire'));
   };
   $('reglBudgetCorps').addEventListener('click', ev => {

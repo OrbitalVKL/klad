@@ -60,8 +60,9 @@ ni journal, ni identifiant bancaire. Une valeur que l'une des versions ne calcul
 | `contrats` | 6. `liste` (`perimetre`, `libelle`, `poste`, `montant`, `periodicite`, `prochaine`), `echeances31` (`date`, `libelle`, `montant`, `sorte`) |
 | `impots` | 7. `annee`, `annees` (par année : `sorte` avis / estimation, `total`, `paye`, `aVenir`, `solde`, `revenuImposable`, `impotNet`, `prelevementsSociaux`, `pas` et `reste` par personne), `regularisations`, `taxeFonciere` (par année : `total`, `base`), `livret` (`solde`, `date`, `interets`), `pee` (`encours`, `verse`, `abondement`, `plusValue`) |
 | `observations` | 8. `code` (titre sans chiffres ni accents), `niveau`, `perimetre`, `titre`, `chiffres` (montants cités) |
-| `aVerifier` | 9. `nonVues`, `nonClassees` (90 derniers jours), `aRapprocher` (prélèvements de portefeuille), `comptesAVerifier` |
+| `aVerifier` | 9. `nonVues`, `nonClassees` (90 derniers jours), `aRapprocher` (prélèvements de portefeuille), `comptesAVerifier` ; `ecartsAVerifier` (1.1.1, présent seulement s'il y en a : écarts de rapprochement de plus de 2 € non vérifiés) |
 | `grafit` | 10. `actif`, `enregistre` (résumé tel qu'enregistré pour Grafit), `calcule` (tel que calculé à l'export) |
+| `ecartsRapprochement` | 1.1.1, présent seulement s'il y en a (relevé inchangé sinon) ; non comparé à l'ancienne version. Par écart : `date` et `compte` du prélèvement, `prelevement` et `achat` (identifiants), `montantPreleve`, `montantAchat` (positifs), `ecart` (prélevé − achat ; positif : compté en plus, négatif : compté en moins), `categorie` et `poste` de l'achat (où l'écart est compté), `aVerifier` |
 | `empreinte` | 11. `cycles.courant` / `cycles.precedent` (`debut`, `fin`, `comptes` : `ref`, `nb`, `debits`, `credits`, `ops`) et `commun` (12 mois : `mois`, `nb`, `debits`, `credits`, `ops`) ; `ops` = `[id, date, montant, libellé]` |
 
 Identifiants d'opérations : ceux de la reprise de l'ancienne version (`'k' + sha256(date|montant|compte|libellé[0..30])`,
