@@ -32,7 +32,7 @@
   function recurrentsSecondaire(B, c) {
     const from4 = M().plusJours(B.auj, -122), recent = M().plusJours(B.auj, -45), parK = {}, out = [];
     for (const r of B.rows) {
-      if (r.cid !== c.id || r.type !== 'depense' || r.date < from4 || /^VIR\b/i.test(r.label)) continue;
+      if (r.cid !== c.id || r.type !== 'depense' || r.ecart || r.date < from4 || /^VIR\b/i.test(r.label)) continue;
       const k = String(-r.m);
       const x = parK[k] || (parK[k] = { ms: new Set(), rows: [], fixe: false });
       x.ms.add(r.od.slice(0, 7)); x.rows.push(r);
@@ -58,7 +58,7 @@
     const late = B.comptes.filter(c => c.source && c.source.type === 'eb').filter(c => { const ref = [B.cover[c.id] ? B.cover[c.id].max : '', c.sync && c.sync.lu ? M().jourLocal(Date.parse(c.sync.lu)) : ''].sort().pop(); return !ref || jours(B, ref) > 3; });
     if (late.length) add('warn', 'all', 'Relevés en retard', late.map(c => c.libelle).join(', ') + ' : pas de synchronisation récente. Tirez l\'accueil vers le bas ; si rien ne change, l\'accès bancaire est peut-être à renouveler (Plus › Banques et accès).');
     // compte commun : virements du mois et échéance du prêt
-    const ops = B.rows.filter(r => r.role === 'commun');
+    const ops = B.rows.filter(r => r.role === 'commun' && !r.ecart);
     const V = B.D.virements || [];
     const prets = RO.pret ? ops.filter(r => r.m < 0 && RO.pret.test(r.label)) : [];
     if (prets.length && KC()) {
@@ -104,7 +104,7 @@
     for (const w of B.comptes.filter(c => c.role === 'paiement_en_ligne')) {
       const mots = K().motifs(w.prelevement && w.prelevement.motif);
       if (!mots.length) continue;
-      const prel = B.rows.filter(r => (r.role === 'courant' || r.role === 'commun') && r.m < 0 && mots.some(m => K().fold(r.label).indexOf(m) >= 0));
+      const prel = B.rows.filter(r => !r.ecart && (r.role === 'courant' || r.role === 'commun') && r.m < 0 && mots.some(m => K().fold(r.label).indexOf(m) >= 0));
       const reste = prel.filter(r => r.type !== 'interne'), cv = B.cover[w.id];
       if (!cv) add('warn', 'perso', w.libelle + ' pas encore détaillé', reste.length + ' prélèvements ' + w.libelle + ' (' + e0(-reste.reduce((t, r) => t + r.m, 0)) + ') sans le nom du commerçant.');
       else {

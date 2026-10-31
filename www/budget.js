@@ -24,7 +24,9 @@
   const PERSO = ['courant', 'carte_differee', 'paiement_en_ligne'];
   const EURO = 100, DEMI = 50;
   const SURVEILLER = 0.9;
-  const TOL_MIN = 200, TOL_PART = 0.02;  // 1.1 : tolérance des charges (2 € ou 2 % du budget, le plus grand)            // 1.1 : part du budget utilisée à partir de laquelle un poste est « à surveiller »
+  // 1.1 : tolérance des charges (le plus grand de 2 € et 2 % du budget) ; 1.1.1 : plafonnée à 10 €, réglable
+  // (Plus › Réglages › Budget › Tolérance des charges : S.budget.reglages.tolerance { min, part, max } en € et %).
+  const TOL_MIN = 200, TOL_PART = 0.02, TOL_MAX = 1000;
 
   const isObj = o => o != null && typeof o === 'object' && !Array.isArray(o);
   const plusJours = (d, n) => M().plusJours(d, n);
@@ -145,6 +147,15 @@
     return surcharger(S, st && isObj(st.klad) ? st.klad : null);
   }
 
+  // 1.1.1 : seuils de la tolérance des charges (centimes ; part en fraction). Valeur vide ou invalide → défaut.
+  function tolReglee(R) {
+    const t = isObj(R) && isObj(R.tolerance) ? R.tolerance : {};
+    const n = (v, d, k) => v != null && v !== '' && isFinite(+v) && +v >= 0 ? Math.round(+v * k) : d;
+    return { min: n(t.min, TOL_MIN, 100), part: n(t.part, TOL_PART * 10000, 100) / 10000, max: n(t.max, TOL_MAX, 100) };
+  }
+  // Écart toléré pour un budget pm (centimes) : le plus grand du minimum et de la part, plafonné.
+  const toleranceDe = (T, pm) => Math.min(T.max, Math.max(T.min, Math.round(pm * T.part)));
+
   // Réglages : ceux de Klad, sinon ceux du complément / carnet (extension « klad »).
   // 1.0 : cycle « salaire » (défaut) ou « mois » civil ; part de « moi » par défaut des postes du commun (50 %).
   function reglages(S) {
@@ -168,6 +179,7 @@
         contribution: typeof c.contribution === 'string' && c.contribution.trim() ? c.contribution.trim() : CONTRIBUTION,
         part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50
       },
+      tolerance: tolReglee(B.reglages),
       cycle: isObj(B.reglages) && B.reglages.cycle === 'mois' ? 'mois' : 'salaire',
       // 1.1 : suivi du commun au mois (par défaut) ou sur le cycle de salaire du budget perso
       cycleCommun: c.cycle === 'salaire' ? 'salaire' : 'mois'
@@ -194,6 +206,16 @@
         if (o.date > cv.max) cv.max = o.date;
       }
     }
+    // 1.1.1 : écart de rapprochement à la main (prélèvement ≠ achat) : ligne « écart » comptée une seule fois dans la
+    // catégorie de l'achat, à la date du prélèvement ; même id que le prélèvement (exclusion, ouverture du détail).
+    // ecart: true → ni trésorerie, ni soldes, ni recherche par libellé (contrats, récurrents, salaire, impôts).
+    if (K().ecarts) {
+      for (const e of K().ecarts(cx)) {
+        if (!role[e.banque.compte]) continue;
+        const r = K().classer(cx, e.achat), o = e.banque;
+        rows.push({ o, id: o.id, cid: o.compte, role: role[o.compte], date: o.date, od: o.date, m: -e.ecart, label: 'Écart de rapprochement', type: r.type, cat: r.cat, sub: r.sub, ecart: true });
+      }
+    }
     rows.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     const D = S.budget || nouveau();
     const B = { S, cx, now: now == null ? Date.now() : now, auj, comptes, role, rows, cover, D, R: reglages(S), memo: {} };
@@ -212,14 +234,14 @@
   // ------------------------------------------------------------ cycle de salaire
   function estSalaireRef(B, r) {
     const R = B.R.salaire;
-    if (!R.motifs.length || r.m <= 0) return false;
+    if (!R.motifs.length || r.m <= 0 || r.ecart) return false;
     if (R.compte ? r.cid !== R.compte : !estPerso(B, r)) return false;
     const F = fold(r.label);
     if (!R.motifs.some(m => F.indexOf(m) >= 0)) return false;
     if (!R.paie.length && !R.min) return true;
     return (R.paie.length && R.paie.some(m => F.indexOf(m) >= 0)) || (R.min > 0 && r.m >= R.min);
   }
-  const estSalaire = (B, r) => r.type === 'revenu' && r.cat === 'Salaire' && estPerso(B, r);
+  const estSalaire = (B, r) => r.type === 'revenu' && r.cat === 'Salaire' && !r.ecart && estPerso(B, r);
 
   // Cycle en cours : du dernier salaire reçu à la veille du même jour le mois suivant (prolongé jusqu'à aujourd'hui).
   function cycleCourant(B) {
@@ -409,7 +431,7 @@
     if (!mots.length) return null;
     for (let i = B.rows.length - 1; i >= 0; i--) {
       const r = B.rows[i];
-      if (r.m < 0 && dansScope(B, c.sc, r) && mots.some(m => fold(r.label).indexOf(m) >= 0)) return r;
+      if (r.m < 0 && !r.ecart && dansScope(B, c.sc, r) && mots.some(m => fold(r.label).indexOf(m) >= 0)) return r;
     }
     return null;
   }
@@ -427,13 +449,13 @@
     for (let i = B.rows.length - 1; i >= 0; i--) {
       const r = B.rows[i];
       if (r.date < lim) break;
-      if (r.type !== 'depense' || !dansScope(B, sc, r) || r.date.slice(0, 7) >= cur) continue;
+      if (r.type !== 'depense' || r.ecart || !dansScope(B, sc, r) || r.date.slice(0, 7) >= cur) continue;
       if (cleDe(B, r) === key && (!best || -r.m > -best.m)) best = r;
     }
     if (best) return +best.date.slice(8, 10);
     for (let i = B.rows.length - 1; i >= 0; i--) {
       const r = B.rows[i];
-      if (r.type !== 'depense' || !dansScope(B, sc, r) || r.date.slice(0, 7) >= cur) continue;
+      if (r.type !== 'depense' || r.ecart || !dansScope(B, sc, r) || r.date.slice(0, 7) >= cur) continue;
       if (cleDe(B, r) === key) return +r.date.slice(8, 10);
     }
     const c = contratsDe(B, key, sc)[0];
@@ -443,7 +465,7 @@
 
   // Commun : dernière échéance d'un poste non mensuel, mois de la prochaine (trimestres civils pour per = 3).
   function dernierDebitPoste(B, key) {
-    for (let i = B.rows.length - 1; i >= 0; i--) { const r = B.rows[i]; if (estCommun(B, r) && r.type === 'depense' && cleDe(B, r) === key && r.date <= B.auj) return r; }
+    for (let i = B.rows.length - 1; i >= 0; i--) { const r = B.rows[i]; if (estCommun(B, r) && r.type === 'depense' && !r.ecart && cleDe(B, r) === key && r.date <= B.auj) return r; }
     return null;
   }
   function moisProchaineEcheance(B, key, per, ech) {
@@ -545,9 +567,10 @@
     const RT = { p: revList.reduce((t, x) => t + x.pm, 0), c: revList.reduce((t, x) => t + x.got, 0) };
 
     // 1.1 : tolérance des charges (fixes, et tous les postes du commun) : un écart d'arrondi ou de quelques euros ne
-    // passe pas le poste en dépassement ; au-delà du plus grand de 2 € et 2 % du budget, il est dépassé.
+    // passe pas le poste en dépassement ; au-delà du plus grand de 2 € et 2 % du budget (plafonné à 10 €, 1.1.1), il est
+    // dépassé.
     const tolere = (a, nk) => nk === 'fixe' || scope === 'commun';
-    const tolerance = a => Math.max(TOL_MIN, Math.round(a.pm * TOL_PART));
+    const tolerance = a => toleranceDe(B.R.tolerance, a.pm);
     // état d'un poste ; exc : à signaler même section repliée
     const etatDe = (a, nk) => {
       let st, cls = '', exc = false;
@@ -641,7 +664,7 @@
       const bc = soldes(B, ['commun']);
       if (bc) {
         solde.compte = bc.v;
-        solde.variation = B.rows.filter(r => estCommun(B, r) && inPer(r.date)).reduce((t, r) => t + r.m, 0);
+        solde.variation = B.rows.filter(r => estCommun(B, r) && !r.ecart && inPer(r.date)).reduce((t, r) => t + r.m, 0);
         solde.provisions = sections.fixe.lignes.concat(HB).filter(a => a.debit !== undefined).reduce((t, a) => t + (+a.amt || 0), 0);
       }
     }
@@ -718,7 +741,7 @@
     // récurrents : même compte, mêmes premiers mots, au moins 2 des 3 derniers mois, montants proches
     const debut = shift(B.auj.slice(0, 7), -3) + '-01', grp = {};
     for (const r of B.rows) {
-      if (r.date < debut || r.m >= 0 || r.type !== 'depense' || !(r.role === 'courant' || r.role === 'commun')) continue;
+      if (r.date < debut || r.m >= 0 || r.type !== 'depense' || r.ecart || !(r.role === 'courant' || r.role === 'commun')) continue;
       const kw = K().suggestKw(r.label);
       if (!kw) continue;
       const k = r.cid + '|' + kw;
@@ -1005,7 +1028,7 @@
       else {
         const ids = new Set(L.map(c => c.id));
         const debut = L.map(c => (B.cover[c.id] || {}).min).filter(Boolean).sort().pop() || '0000';
-        const apres = B.rows.filter(r => ids.has(r.cid));
+        const apres = B.rows.filter(r => ids.has(r.cid) && !r.ecart);
         out.solde = v;
         out.ligne = mois.map(m => { const fin = finMois(m); if (fin < debut) return null; return v - apres.filter(r => r.date > fin).reduce((t, r) => t + r.m, 0); });
       }
@@ -1077,7 +1100,7 @@
   }
 
   g.KladBudget = {
-    V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, BASES_RAV, baseRav, choisirBaseRav, ravChoisi, nouveau, donnees, importer, reglages, contexte,
+    V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, BASES_RAV, baseRav, choisirBaseRav, ravChoisi, nouveau, donnees, importer, reglages, contexte, tolReglee, toleranceDe,
     complement, surcharger, cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
     devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement,

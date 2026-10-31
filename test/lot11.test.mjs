@@ -149,11 +149,23 @@ test('lot 1.1 : clavier du Budget, reste à vivre, Patrimoine et crypto, carbura
     await page.waitForSelector('#rapCorps [data-rapid]');
     assert.match(await page.locator('#rapCorps').innerText(), /MARCHAND DE VETEMENTS/);
     await page.locator('#rapCorps [data-rapid="' + ids.w + '|' + ids.w + ':m:1"]').click();
-    await toast(/Rapproché/);
+    // 1.1.1 : montants différents (59,90 € prélevés pour un achat de 54,90 €) → confirmation avec l'écart
+    await page.waitForSelector('#rapCorps [data-rapok]');
+    assert.match(await page.locator('#rapCorps').innerText(), /Écart de rapprochement\s*5,00\s€[\s\S]*reste compté en dépense[\s\S]*signalé dans « À vérifier »/);
+    await page.locator('#rapCorps [data-rapnon]').click();
+    await page.waitForSelector('#rapCorps [data-rapid]');
+    await page.locator('#rapCorps [data-rapid="' + ids.w + '|' + ids.w + ':m:1"]').click();
+    await page.locator('#rapCorps [data-rapok]').click();
+    await toast(/Rapproché : l'achat compte comme dépense, l'écart de 5,00\s€ aussi/);
     assert.match(await page.locator('#opDetail').innerText(), /Interne[\s\S]*marquée interne à la main/);
+    assert.match(await page.locator('#opDetail').innerText(), /Écart de rapprochement\s*5,00\s€ · prélèvement de 59,90\s€, achat de 54,90\s€ : écart compté en dépense[\s\S]*à vérifier/);
+    await page.locator('#opDetail [data-a="ecartvu"]').click();
+    await toast(/Écart vérifié/);
+    assert.match(await page.locator('#opDetail').innerText(), /· vérifié/);
     await page.evaluate(i => window.KladApp.ouvrirOp(i.w, i.w + ':m:1'), ids);
     await B.pause(200);
     assert.match(await page.locator('#opDetail').innerText(), /Réglé par\s*prélèvement du 18\/10\/2026[\s\S]*rapproché à la main/);
+    assert.match(await page.locator('#opDetail').innerText(), /Écart de rapprochement\s*5,00\s€/, 'écart affiché aussi sur l\'achat');
     await page.evaluate(i => window.KladApp.ouvrirOp(i.cour, i.cour + ':m:4'), ids);
     await B.pause(200);
     await page.locator('#opDetail [data-a="garder"]').click();

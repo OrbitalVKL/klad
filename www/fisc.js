@@ -107,7 +107,7 @@
     if (B.memo.fisc) return B.memo.fisc;
     const S = B.S, FI = fiscDe(S);
     const noms = { g: B.R.commun.moi || 'Moi', s: B.R.commun.autre || 'L\'autre personne' };
-    const dgfip = B.rows.filter(r => r.role === 'commun' && r.m < 0 && IMPOTS_RX.test(r.label));
+    const dgfip = B.rows.filter(r => !r.ecart && r.role === 'commun' && r.m < 0 && IMPOTS_RX.test(r.label));
     return (B.memo.fisc = { B, FI, noms, dgfip, Y: +B.auj.slice(0, 4), auj: B.auj, memo: {} });
   }
   function bsList(X, p, year) {
@@ -292,7 +292,7 @@
   }
   function tfPayee(X, y) {
     const TF = tfDe(X), av = TF && TF.avis[y];
-    return X.B.rows.filter(r => r.role === 'commun' && r.m < 0 && r.date.slice(0, 4) === String(y) && (/FONCI/i.test(r.label) || (av && /DGFIP|FINANCES PUBLIQUES|DIRECTION GENERALE|IMPOT/i.test(r.label) && Math.abs(-r.m / 100 - av.total) <= 2)));
+    return X.B.rows.filter(r => !r.ecart && r.role === 'commun' && r.m < 0 && r.date.slice(0, 4) === String(y) && (/FONCI/i.test(r.label) || (av && /DGFIP|FINANCES PUBLIQUES|DIRECTION GENERALE|IMPOT/i.test(r.label) && Math.abs(-r.m / 100 - av.total) <= 2)));
   }
   const tfPart = (X, v) => { const pg = +(tfDe(X).pg || 0); return { g: v * pg / 100, s: v * (100 - pg) / 100 }; };
   function tfProchaine(X) {
@@ -404,7 +404,7 @@
     try { rx = new RegExp(C.motif || 'LIVRE|LIVRET', 'i'); } catch (e) { rx = /LIVRE|LIVRET/i; }
     let v = Math.round(+D.base * 100), n = 0, d = D.date;
     for (const r of B.rows) {
-      if ((cpt ? r.cid !== cpt : r.role !== 'courant') || r.date <= D.date || !rx.test(r.label)) continue;
+      if (r.ecart || (cpt ? r.cid !== cpt : r.role !== 'courant') || r.date <= D.date || !rx.test(r.label)) continue;
       v -= r.m; n++;
       if (r.date > d) d = r.date;
     }
@@ -425,7 +425,7 @@
     const cpt = C.compte ? (map[C.compte] || C.compte) : null;
     let rx = null;
     try { rx = new RegExp(C.motif || 'LIVRE|LIVRET', 'i'); } catch (e) { rx = /LIVRE|LIVRET/i; }
-    const mv = B.rows.filter(r => (cpt ? r.cid === cpt : r.role === 'courant') && rx.test(r.label)).map(r => [r.date, -r.m]);
+    const mv = B.rows.filter(r => !r.ecart && (cpt ? r.cid === cpt : r.role === 'courant') && rx.test(r.label)).map(r => [r.date, -r.m]);
     // solde du livret à une date : solde saisi, plus les mouvements entre les deux dates
     const solde = d => d >= L.date ? L.base + mv.filter(x => x[0] > L.date && x[0] <= d).reduce((t, x) => t + x[1], 0)
       : L.base - mv.filter(x => x[0] > d && x[0] <= L.date).reduce((t, x) => t + x[1], 0);

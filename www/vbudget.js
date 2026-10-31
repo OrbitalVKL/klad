@@ -101,7 +101,7 @@
     const recSec = r => RS && r.m < 0 && r.cid === RS.compte.id && RS.montants.has(-r.m)
       ? ' <span class="chip warn" title="' + esc('Charge récurrente sur le ' + RS.compte.libelle + ' : à basculer sur ' + (RS.principal ? RS.principal.libelle : 'le compte courant principal')) + '">récurrent sur ' + esc(RS.compte.libelle) + '</span>' : '';
     const detRow = (labHtml, amt, r, cls) => '<tr class="det' + (cls ? ' ' + cls : '') + '"><td class="subs" style="padding-left:34px">' + (r ? U().bico(S0, cpt(r.cid), true) + ' ' : '') + labHtml + (r ? recSec(r) : '') +
-      (r ? ' <button class="linkbtn cls-op" type="button" data-op="' + esc(r.id) + '" data-c="' + esc(r.cid) + '" data-classer="1">classer ▾</button>' : '') + '</td><td></td><td class="r num subs cs-det">' + amt + '</td><td class="hide-s"></td><td></td></tr>';
+      (r && !r.ecart ? ' <button class="linkbtn cls-op" type="button" data-op="' + esc(r.id) + '" data-c="' + esc(r.cid) + '" data-classer="1">classer ▾</button>' : '') + '</td><td></td><td class="r num subs cs-det">' + amt + '</td><td class="hide-s"></td><td></td></tr>';
 
     // revenus
     const R = s.revenus;
@@ -140,7 +140,9 @@
       }
       if (op) {
         for (const c of cs) h += '<tr class="det ctr-det' + c2 + '"><td class="subs" style="padding-left:34px">📄 <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + esc(PERLAB[c.per || 1]) + (c.src ? ' · ' + esc(c.src) : '') + '</td><td></td><td class="r num subs">' + e2(c.montant) + '</td><td class="hide-s"></td><td></td></tr>';
-        for (const r of a.ops || []) h += detRow(esc(jjmm(r.od) + ' · ' + g.KladVues.libelleCourt(r.label)), esc(e2(-r.m)), r, c2.trim());
+        // 1.1.1 : écart de rapprochement (prélèvement ≠ achat), sans montant négatif affiché
+        for (const r of a.ops || []) h += r.ecart ? detRow(esc(jjmm(r.od) + ' · écart de rapprochement' + (r.m > 0 ? ' (prélèvement plus petit, compté en moins)' : '')), esc(e2(Math.abs(r.m))), r, c2.trim())
+          : detRow(esc(jjmm(r.od) + ' · ' + g.KladVues.libelleCourt(r.label)), esc(e2(-r.m)), r, c2.trim());
         if (!nOps && !cs.length) h += detRow('<span class="muted">Aucune opération sur cette période.</span>', '', null, 'vide' + c2);
         if (!past && !a.lie) h += '<tr class="det' + c2 + '"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-editer="' + esc(a.key) + '">Modifier le budget</button>' +
           (a.key === 'c|Carburant' && scope === 'perso' ? ' <button class="linkbtn" type="button" data-fuel="1">Calculateur carburant</button>' : '') + '</td></tr>';

@@ -15,6 +15,22 @@ export async function completer(page) {
     S.modele.extras = Object.assign({}, S.modele.extras, { mail: { hote: P.adresses[1], port: 993, adresse: P.adresses[0], expediteurs: 'syndic-mimosas.example', motsCles: 'appel de fonds MIMOSAS', jours: 400 } });
     S.cle = Object.assign({}, S.cle, { appId: P.appId, redirectUrl: 'https://' + P.adresses[2] + '/klad/retour.html' });
     S.classement.regles.push({ mot: 'QUENARD', cat: 'Apports compte commun', sub: 'Basile Quenard', le: new Date().toISOString() });
+    // 1.1.1 : Patrimoine saisi (crypto, livret, plan d'épargne), historique des observations, rapprochement à la main
+    const X = P.patrimoine, auj = new Date().toISOString().slice(0, 10);
+    S.budget.crypto = { positions: X.crypto.map((c, i) => ({ id: 'cr' + i, nom: c[0], investi: c[1], valeur: c[2], le: auj })) };
+    S.budget.livret = Object.assign({}, S.budget.livret, { base: X.livret, date: auj.slice(0, 4) + '-01-15', taux: 2.4 });
+    S.budget.pee = { plan: { emp: P.employeur, teneur: X.teneur, entree: '2024-01-01', abTaux: 100, abPlaf: 1500, dispo: 5 },
+      fonds: [{ id: 'f1', nom: X.fonds, cat: 'div', sri: 4, vl: X.valeurPart, vlDate: auj }],
+      vers: [{ id: 'v1', d: auj.slice(0, 4) + '-03-15', orig: 'vol', fid: 'f1', mt: X.versement, parts: 318.5 }],
+      closed: [{ emp: P.employeur, note: X.ancienPlan, inv: 1000, out: 1100, dOut: '2023-05-01' }] };
+    S.budget.histObs = [{ titre: 'Échéance ' + P.textes[4], le: new Date().toISOString(), niveau: 'warn', scope: 'commun', texte: P.personnes[1] + ' : ' + P.textes[4] + ' n° ' + P.references[0] + ' prélevé.' }];
+    const M = window.KladModele, cour = S.modele.comptes.find(c => c.role === 'courant');
+    const w = M.nouveauCompte(S, { libelle: X.portefeuille, role: 'paiement_en_ligne', prelevement: { motif: X.motifPortefeuille } });
+    const o = (c, id, date, montant, libelle) => ({ id: c.id + ':m:demo' + id, compte: c.id, date, montant, libelle, statut: 'comptabilisee', source: 'manuel', categorie: null, vue: true });
+    const j = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+    S.ops[w.id] = [o(w, 1, j(12), -5490, X.achat)];
+    S.ops[cour.id].push(o(cour, 2, j(8), -5990, 'PRLV ' + X.motifPortefeuille + ' ' + P.references[1]));
+    window.__demoRap = { w: w.id, cour: cour.id, achat: w.id + ':m:demo1', prel: cour.id + ':m:demo2' };
     window.KladApp.changed('test');
   }, PERSONNEL);
 }
@@ -28,6 +44,10 @@ export async function interdits(page) {
     const mot = s => { if (s && String(s).trim().length >= 4) L.add(D.fold(s)); };
     P.personnes.forEach(n => { mot(n); n.split(' ').forEach(mot); });
     [P.employeur, 'Zéphyrine', P.banque, 'Mirabelle', P.intitule, P.iban, P.iban.replace(/\s/g, ''), P.appId, ...P.categories, ...P.postes, ...P.references, ...P.adresses, ...P.textes].forEach(mot);
+    // 1.1.1 : noms et montants saisis du Patrimoine, portefeuille et achat rapproché
+    const X = P.patrimoine;
+    [...X.crypto.map(c => c[0]), X.teneur, X.fonds, X.ancienPlan, X.portefeuille, X.motifPortefeuille, X.achat].forEach(mot);
+    for (const v of X.montants) L.add(v);
     L.add('…' + P.finCarte); L.add(P.finCarte);
     for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) {
       const c = V.libelleCourt(o.libelle);

@@ -52,6 +52,7 @@
     if (a.unseen) L.push({ cle: 'nonvues', texte: pluriel(a.unseen, 'opération') + ' à voir', niveau: 'info' });
     if (a.unclassified) L.push({ cle: 'nonclassees', texte: pluriel(a.unclassified, 'opération non classée', 'opérations non classées') + ' (3 derniers mois)', niveau: 'info' });
     if (a.toMatch) L.push({ cle: 'rapprocher', texte: pluriel(a.toMatch, 'prélèvement') + ' de portefeuille à rapprocher', niveau: 'info' });
+    if (a.gaps) L.push({ cle: 'ecarts', texte: pluriel(a.gaps, 'écart') + ' de rapprochement à vérifier', niveau: 'info' });
     if (e.observations) L.push({ cle: 'observations', texte: pluriel(e.observations, 'observation') + ' à faire', niveau: 'caut' });
     if (a.accountsToCheck) L.push({ cle: 'comptes', texte: pluriel(a.accountsToCheck, 'compte') + ' à vérifier ou à réassocier', niveau: 'caut' });
     for (const sid of Object.keys(S.modele.connexions)) {
@@ -185,14 +186,15 @@
   }
 
   // ------------------------------------------------------------ opérations
-  // f : { scope, compte, q, cat ('' | '__nc' | '__rap' | '__int' | nom), nonVues, du, au (AAAA-MM-JJ, bornes incluses) }.
+  // f : { scope, compte, q, cat ('' | '__nc' | '__rap' | '__ecart' | '__int' | nom), nonVues, du, au (AAAA-MM-JJ, bornes incluses) }.
+  // « Écarts » (1.1.1) : prélèvements rapprochés à la main dont l'écart de plus de 2 € reste à vérifier.
   // « Non classées » : celles des 3 derniers mois (comme « À vérifier »). « Internes » : virements entre comptes et
   // règlements détaillés ailleurs, automatiques ou marqués à la main. Tri : date décroissante.
   function filtrer(S, f, ctx) {
     const ids = f.compte ? [f.compte] : comptesDe(S, f.scope || 'perso').filter(c => f.scope ? opsDuScope(S, f.scope, c) : true).map(c => c.id);
     const k = f.q ? M().cleLibelle(f.q) : '';
     const limNc = f.cat === '__nc' && ctx ? M().plusJours(M().jourLocal(ctx.now), -K().NC_JOURS) : '';
-    const rap = f.cat === '__rap' && ctx;
+    const rap = f.cat === '__rap' && ctx, gap = f.cat === '__ecart' && ctx;
     const out = [];
     for (const id of ids) {
       for (const o of S.ops[id] || []) {
@@ -206,6 +208,7 @@
         }
         if (f.nonVues && K().vue(S, o)) continue;
         if (rap) { if (!K().aRapprocher(ctx, o)) continue; }
+        else if (gap) { const e = K().ecartDe(ctx, o); if (!e || e.banque !== o || !K().ecartAVerifier(e)) continue; }
         else if (f.cat && ctx) {
           const r = K().classer(ctx, o);
           if (f.cat === '__nc' ? !r.nc : f.cat === '__int' ? r.type !== 'interne' : r.cat !== f.cat) continue;
@@ -331,6 +334,7 @@
       '<button type="button" data-f="nonVues" class="ch-u" aria-pressed="' + !!f.nonVues + '">Non vues <b>' + nb.unseen + '</b></button>' +
       '<button type="button" data-f="nc" aria-pressed="' + (f.cat === '__nc') + '">Non classées <b>' + nb.nc + '</b></button>' +
       (f.cat === '__rap' ? '<button type="button" data-f="rap" aria-pressed="true">À rapprocher</button>' : '') +
+      (f.cat === '__ecart' ? '<button type="button" data-f="rap" aria-pressed="true">Écarts à vérifier</button>' : '') +
       '<button type="button" data-f="int" aria-pressed="' + (f.cat === '__int') + '">Internes <b>' + (nb.int || 0) + '</b></button>' +
       '<select id="opsPer" aria-label="Filtrer par période" class="' + (f.per && f.per !== 'tout' ? 'on' : '') + '">' +
       PERIODES.map(([k, l]) => '<option value="' + k + '"' + (k === (f.per || 'tout') ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
@@ -364,6 +368,9 @@
     const regle = achat ? K().prelevementDe(ctx, o) : null;
     const garde = !w && o.rapprochement === 'depense';
     const cBanque = achat && !regle && o.rapprochement !== 'autrement' ? K().candidatsBanque(ctx, o) : [];
+    // 1.1.1 : écart de rapprochement (prélèvement rapproché à la main d'un achat de montant différent)
+    const ec = K().ecartDe ? K().ecartDe(ctx, o) : null, ecV = ec && Math.abs(ec.ecart) > K().ECART_SIGNAL;
+    const ecCat = ec ? K().classer(ctx, ec.achat) : null;
     const lignes = [
       ['Libellé', o.libelle],
       ['Date', F().jour(o.date) + (o.statut === 'en_cours' ? ' (en cours)' : '')],
@@ -378,6 +385,9 @@
       achat ? ['Réglé par', regle ? 'prélèvement du ' + F().date(regle.date) + ' sur ' + ((M().compte(S, regle.compte) || {}).libelle || 'un compte') + (regle.categorie && regle.categorie.lie === o.id ? ' (rapproché à la main)' : '')
         : o.rapprochement === 'autrement' ? 'payé autrement (solde de ' + wc.libelle + ' ou autre moyen)' : 'aucun prélèvement retrouvé à la banque'] : null,
       garde ? ['Rapprochement', 'gardé en dépense : aucun achat de ' + 'portefeuille ne lui correspond'] : null,
+      ec ? ['Écart de rapprochement', F().montant(Math.abs(ec.ecart)) + ' · prélèvement de ' + F().montant(Math.abs(ec.banque.montant)) + ', achat de ' + F().montant(Math.abs(ec.achat.montant)) +
+        (ec.ecart > 0 ? ' : écart compté en dépense' : ' : écart compté en moins') + ' (' + ecCat.cat + (ecCat.sub && ecCat.sub !== ecCat.cat ? ' › ' + ecCat.sub : '') + ')' +
+        (ecV ? (ec.banque.ecartVu ? ' · vérifié' : ' · à vérifier') : '')] : null,
       ['Vue', vu ? 'oui' : 'non']
     ].filter(Boolean);
     return '<div class="sh-head op-h">' + U().icoOp(ctx.C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '<div class="t"><b>' + esc(libelleCourt(o.libelle)) + '</b><span>' +
@@ -395,6 +405,8 @@
       (cBanque.length ? '<button type="button" class="btn" data-a="rapprocherb">Rapprocher avec un prélèvement…</button>' : '') +
       (achat && !regle && o.rapprochement !== 'autrement' ? '<button type="button" class="btn" data-a="autrement">Payé autrement</button>' : '') +
       (achat && o.rapprochement === 'autrement' ? '<button type="button" class="btn" data-a="pasautrement">Annuler : payé autrement</button>' : '') +
+      (ecV && !ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartvu">Écart vérifié</button>' : '') +
+      (ecV && ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartnonvu">Annuler : écart à vérifier</button>' : '') +
       (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' +
       '<button type="button" class="ac-lien" data-a="semblables">Opérations semblables ›</button>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
@@ -402,6 +414,17 @@
 
   // 1.1 : choix de l'opération à rapprocher (achats du portefeuille, ou prélèvements de la banque), les plus proches
   // en montant puis en date d'abord.
+  // 1.1.1 : confirmation d'un rapprochement à montants différents : prélèvement, achat, écart et catégorie où il compte.
+  function confirmationEcart(S, ctx, banque, achat) {
+    const e = K().ecartPrevu(banque, achat), r = K().classer(ctx, achat);
+    const cat = r.cat + (r.sub && r.sub !== r.cat ? ' › ' + r.sub : '');
+    return '<dl class="op-det"><dt>Prélèvement</dt><dd>' + esc(F().jour(banque.date) + ' · ' + F().montant(Math.abs(banque.montant))) + '</dd>' +
+      '<dt>Achat</dt><dd>' + esc(F().jour(achat.date) + ' · ' + libelleCourt(achat.libelle) + ' · ' + F().montant(Math.abs(achat.montant))) + '</dd>' +
+      '<dt>Écart de rapprochement</dt><dd>' + esc(F().montant(Math.abs(e))) + '</dd></dl>' +
+      '<p class="note">Les montants diffèrent. L\'écart de ' + esc(F().montant(Math.abs(e))) + (e > 0 ? ' reste compté en dépense' : ' est compté en moins') + ' dans « ' + esc(cat) + ' », comme l\'achat' +
+      (Math.abs(e) > K().ECART_SIGNAL ? ', et il sera signalé dans « À vérifier »' : '') + '.</p>' +
+      '<div class="row"><button type="button" class="btn primary" data-rapok="1">Rapprocher</button><button type="button" class="btn" data-rapnon="1">Choisir une autre opération</button></div>';
+  }
   function choixRapprochement(S, o, L, achats) {
     const cur = op => (M().compte(S, op.compte) || {}).libelle || '';
     return '<p class="muted small">' + (achats ? 'Achat qui correspond au prélèvement du ' : 'Prélèvement qui règle l\'achat du ') + esc(F().jour(o.date)) + ' (' + esc(F().montant(Math.abs(o.montant))) + ') : ' +
@@ -504,5 +527,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, classer, apercuRegle, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

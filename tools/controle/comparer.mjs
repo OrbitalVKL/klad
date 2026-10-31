@@ -22,7 +22,7 @@ export const POINTS = [
 ];
 // Données que l'ancienne version ne calcule pas (null de son côté) : non comparables, pas des écarts.
 const NON_DISPO = [/^comptes\.[^.]+\.(role|libelle|prelevement)$/, /^equilibre\.date$/, /^contrats\.echeances31$/, /^impots\.livret\.interets$/,
-  /^aVerifier\.(aRapprocher|comptesAVerifier)$/, /^grafit$/, /^observations\.[^.]+\.titre$/];
+  /^aVerifier\.(aRapprocher|comptesAVerifier|ecartsAVerifier)$/, /^grafit$/, /^observations\.[^.]+\.titre$/];
 // Champs purement descriptifs : affichés, jamais comptés comme écarts.
 const DESCRIPTIFS = [/^comptes\.[^.]+\.(libelle|role)$/, /^observations\.[^.]+\.(titre|perimetre)$/, /^contrats\.liste\.[^.]+\.perimetre$/];
 // Clés des listes (appariement des éléments) ; à défaut, l'ordre.

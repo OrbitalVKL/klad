@@ -48,7 +48,7 @@
   }
   const R7 = B => B.memo.R7 || (B.memo.R7 = reglages(B));
   const lignesCommun = B => KB().postes(B, 'commun').lignes;
-  const opsCommun = B => B.memo.opsC || (B.memo.opsC = B.rows.filter(r => r.role === 'commun'));
+  const opsCommun = B => B.memo.opsC || (B.memo.opsC = B.rows.filter(r => r.role === 'commun' && !r.ecart));
   const virements = B => (B.D.virements || []).filter(v => +v.montant > 0 || v.montant === 0);
 
   // ------------------------------------------------------------ virements permanents
@@ -281,7 +281,7 @@
       stmt.forEach((x, ix) => { if (!used.has(ix)) list.push({ d: x.d, k: x.k, a: x.a, src: 'releve', pdf: !!pdfDe(cp, x.d, x.k) }); });
       const items = list.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : 0).map(x => Object.assign(x, { paid: 0, pay: [] }));
       const from = items.length ? plusJours(items[0].d, -75) : '2000-01-01';
-      const pays = B.rows.filter(r => paieDe(r) === cp && r.date >= from).sort((x, y) => x.date < y.date ? -1 : 1).map(r => ({ d: r.date, a: -r.m }));
+      const pays = B.rows.filter(r => !r.ecart && paieDe(r) === cp && r.date >= from).sort((x, y) => x.date < y.date ? -1 : 1).map(r => ({ d: r.date, a: -r.m }));
       const pq = pays.map(p => Object.assign({}, p, { r: p.a }));
       for (const it of items) {
         for (const p of pq) {

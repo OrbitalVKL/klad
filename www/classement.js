@@ -294,12 +294,13 @@
     for (const c of ctx.comptes.values()) if (estCourant(c)) for (const o of ctx.S.ops[c.id] || []) { const w = aRapprocher(ctx, o); if (w && w.id === wop.compte && proche(wop, o)) L.push(o); }
     return triProches(wop, L).slice(0, 12);
   }
-  const snapOps = L => L.map(o => ({ op: o, categorie: o.categorie, vue: o.vue, rapprochement: o.rapprochement }));
+  const snapOps = L => L.map(o => ({ op: o, categorie: o.categorie, vue: o.vue, rapprochement: o.rapprochement, ecartVu: o.ecartVu }));
   function annulerRapprochement(snap) {
     for (const x of snap) {
       x.op.categorie = x.categorie;
       if (x.vue === undefined) delete x.op.vue; else x.op.vue = x.vue;
       if (x.rapprochement === undefined) delete x.op.rapprochement; else x.op.rapprochement = x.rapprochement;
+      if (x.ecartVu === undefined) delete x.op.ecartVu; else x.op.ecartVu = x.ecartVu;
     }
   }
   // Prélèvement o (banque) rapproché de l'achat wop du portefeuille w → instantané pour annuler.
@@ -307,9 +308,61 @@
     const snap = snapOps([o, wop]);
     o.categorie = { cat: ctx.D.interne.cat, sub: 'Règlement ' + (w.libelle || 'portefeuille') + ' (rapproché à la main)', main: true, lie: wop.id };
     if (!vue(ctx.S, o)) o.vue = true;
+    delete o.ecartVu;
     wop.rapprochement = { avec: o.id };
+    ctx.liens = null;
     return snap;
   }
+  // 1.1.1 : écart de rapprochement. Un prélèvement rapproché à la main d'un achat de montant différent : l'écart
+  // (montant prélevé − montant de l'achat, centimes ; positif : prélèvement plus grand) reste compté, une seule fois,
+  // dans la catégorie de l'achat (ligne « écart » du budget, KladBudget.contexte) ; négatif : compté en moins (la
+  // dépense comptée vaut le montant prélevé). Signalé dans « À vérifier » au-delà de ECART_SIGNAL, jusqu'à « Écart
+  // vérifié » (o.ecartVu sur le prélèvement).
+  const ECART_SIGNAL = 200;
+  // → Map(id de l'achat → prélèvement), une fois par contexte.
+  function liens(ctx) {
+    if (ctx.liens) return ctx.liens;
+    const L = new Map();
+    for (const c of ctx.comptes.values()) {
+      if (!estCourant(c)) continue;
+      for (const o of ctx.S.ops[c.id] || []) if (o.categorie && o.categorie.main && o.categorie.lie) L.set(o.categorie.lie, o);
+    }
+    ctx.liens = L;
+    return L;
+  }
+  // Achat (portefeuille) d'id donné, ou null.
+  function achatDe(ctx, id) {
+    for (const w of ctx.portefeuilles) for (const x of ctx.S.ops[w.c.id] || []) if (x.id === id) return x;
+    return null;
+  }
+  // Écart d'une opération (prélèvement rapproché à la main, ou achat qu'il règle) → { banque, achat, ecart }, ou null
+  // (pas de rapprochement à la main, ou montants égaux).
+  function ecartDe(ctx, o) {
+    let banque = null, achat = null;
+    if (o.categorie && o.categorie.main && o.categorie.lie) { banque = o; achat = achatDe(ctx, o.categorie.lie); }
+    else if (o.rapprochement && o.rapprochement.avec) { banque = liens(ctx).get(o.id) || null; achat = banque ? o : null; }
+    if (!banque || !achat) return null;
+    const ecart = Math.abs(banque.montant) - Math.abs(achat.montant);
+    return ecart ? { banque, achat, ecart } : null;
+  }
+  // Tous les écarts (comptes visibles ou non : le budget filtre).
+  function ecarts(ctx) {
+    const out = [];
+    for (const banque of liens(ctx).values()) { const e = ecartDe(ctx, banque); if (e) out.push(e); }
+    return out;
+  }
+  // Écart à vérifier : au-delà de 2 €, tant que « Écart vérifié » n'a pas été appuyé.
+  const ecartAVerifier = e => !!e && Math.abs(e.ecart) > ECART_SIGNAL && !e.banque.ecartVu;
+  // « Écart vérifié » (ou l'inverse) → instantané pour annuler (annulerEcartVu).
+  function marquerEcartVu(o, on) {
+    const snap = { op: o, ecartVu: o.ecartVu };
+    if (on) o.ecartVu = true; else delete o.ecartVu;
+    return snap;
+  }
+  function annulerEcartVu(snap) { if (snap.ecartVu === undefined) delete snap.op.ecartVu; else snap.op.ecartVu = snap.ecartVu; }
+  // Écart qu'un rapprochement créerait (avant de confirmer) : centimes, 0 si montants égaux.
+  const ecartPrevu = (banque, achat) => Math.abs(banque.montant) - Math.abs(achat.montant);
+
   // Prélèvement gardé en dépense (plus « à rapprocher ») → instantané.
   function garderDepense(o) { const snap = snapOps([o]); o.rapprochement = 'depense'; return snap; }
   // Achat du portefeuille payé autrement (aucun prélèvement à attendre) → instantané.
@@ -361,7 +414,10 @@
       if (aRapprocher(ctx, o)) toMatch++;
     }
     const accountsToCheck = S.modele.comptes.filter(c => c.aVerifier || c.aReassocier).length;
-    return { unseen, unclassified, accountsToCheck, toMatch };
+    // 1.1.1 : écarts de rapprochement de plus de 2 € pas encore vérifiés (prélèvement sur un compte visible)
+    const vis = new Set(visibles(S).map(c => c.id));
+    const gaps = ecarts(ctx).filter(e => ecartAVerifier(e) && vis.has(e.banque.compte)).length;
+    return { unseen, unclassified, accountsToCheck, toMatch, gaps };
   }
 
   // ------------------------------------------------------------ volet « Classer »
@@ -590,7 +646,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    aRapprocher, marquerInterne, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, ECART_SIGNAL, ecartDe, ecarts, ecartAVerifier, marquerEcartVu, annulerEcartVu, ecartPrevu, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,
     creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };

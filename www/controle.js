@@ -134,7 +134,19 @@
   // ------------------------------------------------------------ 9. « À vérifier »
   function aVerifier(S, cx, now) {
     const a = K().attention(cx, now);
-    return { nonVues: a.unseen, nonClassees: a.unclassified, aRapprocher: a.toMatch, comptesAVerifier: a.accountsToCheck };
+    const out = { nonVues: a.unseen, nonClassees: a.unclassified, aRapprocher: a.toMatch, comptesAVerifier: a.accountsToCheck };
+    if (a.gaps) out.ecartsAVerifier = a.gaps;           // 1.1.1 : seulement s'il y en a (relevé inchangé sinon)
+    return out;
+  }
+  // 1.1.1 : écarts de rapprochement à la main (montant prélevé ≠ montant de l'achat), comptés dans la catégorie de
+  // l'achat. Absent du relevé quand il n'y en a pas.
+  function ecarts(S, cx, ref) {
+    const vis = new Set(M().comptesTries(S).filter(c => !c.masque).map(c => c.id));
+    return K().ecarts(cx).filter(e => vis.has(e.banque.compte)).map(e => {
+      const r = K().classer(cx, e.achat);
+      return { date: e.banque.date, compte: ref(e.banque.compte), prelevement: idOp(e.banque), achat: idOp(e.achat), montantPreleve: -e.banque.montant,
+        montantAchat: -e.achat.montant, ecart: e.ecart, categorie: r.cat, poste: r.sub, aVerifier: K().ecartAVerifier(e) };
+    }).sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : x.prelevement < y.prelevement ? -1 : 1));
   }
 
   // ------------------------------------------------------------ 11. empreinte des données d'entrée
@@ -167,7 +179,8 @@
       synchro: M().comptesTries(S).filter(c => !c.masque).map(c => ({ ref: ref(c.id), libelle: c.libelle, lu: c.source.type === 'eb' ? (c.sync && c.sync.lu) || null : null, source: c.source.type })),
       complement: !!(S.carnet && KB().racine(S.carnet) && KB().racine(S.carnet).klad), derniereSynchro: S.modele.sync.derniere || null,
       import: g.KladMigrations ? essai(() => g.KladMigrations.etatImport(S)) : null };
-    return {
+    const ec = point(() => ecarts(S, cx, ref));
+    const out = {
       format: FORMAT, v: V, source: 'klad', meta,
       comptes: point(() => comptes(S, B, now, ref)),
       resteAVivre: point(() => resteAVivre(B)),
@@ -182,6 +195,8 @@
       grafit: { actif: !!x.grafitActif, enregistre: x.resume == null ? null : x.resume, calcule: point(() => R().construire(S, now, x.extResume || { budget: B })) },
       empreinte: point(() => empreinte(S, B, ref))
     };
+    if (ec && ec.length) out.ecartsRapprochement = ec;
+    return out;
   }
   // Nom du fichier : klad-controle-AAAAMMJJ-HHMM.json (heure locale).
   function nomFichier(now) {
