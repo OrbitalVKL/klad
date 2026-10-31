@@ -190,6 +190,9 @@ test('mode démo : rien de réel à l\'écran (jeu « personnel »), champs en l
     assert.match(await page.locator('#toast').innerText(), /Synchronisation suspendue pendant le mode démo/);
     await B.pause(1200);
     assert.equal(await blocs(), avant, 'aucun bloc écrit pendant le mode démo');
+    // 1.0.1 : un appui ferme le message ; le bandeau, replié en pastille « DÉMO », se rouvre d'un appui
+    if (await page.evaluate(() => document.getElementById('toast').classList.contains('show'))) await page.locator('#toast').click();
+    if (await page.evaluate(() => document.getElementById('demoBar').classList.contains('reduit'))) await page.locator('#demoBar').click();
     await page.locator('#demoBar button').click();
     await B.pause(300);
     assert.equal(await page.evaluate(() => window.KladAffichage.demoActif()), false);

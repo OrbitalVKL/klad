@@ -18,6 +18,21 @@
 
   const refusPSU = e => e && (e.status === 422 || e.status === 400) && /PSU_HEADER/i.test((e.code || '') + ' ' + (e.message || ''));
 
+  // 1.0.1 : « 400 Error interacting with ASPSP » = panne passagère côté banque. Pas d'erreur affichée (ni rouge, ni
+  // « compte à vérifier ») tant qu'elle ne se répète pas 3 fois de suite ou plus de 24 h.
+  const PASSAGER_FOIS = 3;
+  const PASSAGER_MS = 24 * 3600e3;
+  const MSG_PASSAGER = 'Banque momentanément indisponible, nouvel essai à la prochaine synchro.';
+  const passager = e => !!e && e.status === 400 && /ASPSP/i.test((e.code || '') + ' ' + (e.message || ''));
+  // → nouvel état sync du compte après une panne passagère (erreur posée seulement au-delà des seuils).
+  function etatPassager(sync, now) {
+    const p0 = (sync && sync.passager) || null;
+    const p = { n: (p0 ? p0.n : 0) + 1, depuis: p0 ? p0.depuis : new Date(now).toISOString() };
+    const grave = p.n >= PASSAGER_FOIS || now - Date.parse(p.depuis) > PASSAGER_MS;
+    return Object.assign({}, sync, { passager: p, le: new Date(now).toISOString(),
+      erreur: grave ? 'Banque indisponible depuis ' + (p.n >= PASSAGER_FOIS ? p.n + ' synchros' : 'plus de 24 h') + ' (erreur de la banque) : vérifiez l\'accès.' : null });
+  }
+
   const aFaire = (S, now) => !S.modele.sync.derniere || now - S.modele.sync.derniere > AUTO_MS;
 
   // deps : { client() → KladEB.Client, dispo() → Promise<en-têtes disponibles>, log(kind, msg), now() → ms }
@@ -27,7 +42,7 @@
     const ok = garde || (() => true);
     // Comptes sans connexion (banque déconnectée) ou non retrouvés au renouvellement : signalés sur l'accueil, pas lus.
     const comptes = M().comptesTries(S).filter(c => c.source.type === 'eb' && !c.aReassocier && S.modele.connexions[c.source.connexion]);
-    const res = { comptes: comptes.length, erreurs: 0, nouvelles: 0, fusionnees: 0, retirees: 0 };
+    const res = { comptes: comptes.length, erreurs: 0, passagers: 0, nouvelles: 0, fusionnees: 0, retirees: 0 };
     if (!comptes.length) { S.modele.sync.derniere = now; return res; }
     const cl = deps.client();
     let dispo = {};
@@ -67,8 +82,14 @@
           st.ignorees + ' ignorée(s)' + (st.reprises ? ' dont ' + st.reprises + ' déjà dans la reprise' : '') + (Object.keys(h).length ? '' : ', sans en-têtes utilisateur'));
       } catch (e) {
         if (!ok()) return null;
+        if (passager(e)) {
+          c.sync = etatPassager(c.sync, now);
+          if (c.sync.erreur) { res.erreurs++; deps.log('err', nom + ' : ' + c.sync.erreur); }
+          else { res.passagers++; deps.log('info', nom + ' : banque momentanément indisponible (' + c.sync.passager.n + '/' + PASSAGER_FOIS + '), nouvel essai à la prochaine synchro.'); }
+          continue;
+        }
         res.erreurs++;
-        c.sync = Object.assign({}, c.sync, { erreur: String(e.message || e).slice(0, 200), le: new Date(now).toISOString() });
+        c.sync = Object.assign({}, c.sync, { erreur: String(e.message || e).slice(0, 200), le: new Date(now).toISOString(), passager: null });
         deps.log('err', nom + ' : ' + (e.message || e));
       }
     }
@@ -84,5 +105,8 @@
     return g.KladAnon.accountLabel(S.modele.alias, cx.banque, i < 0 ? 0 : i);
   }
 
-  g.KladSync = { AUTO_MS, entetesPSU, refusPSU, aFaire, synchroniser, nomJournal };
+  // Texte d'un compte en panne passagère (sans erreur), ou null.
+  const passagerDe = c => c && c.sync && !c.sync.erreur && c.sync.passager ? MSG_PASSAGER : null;
+
+  g.KladSync = { AUTO_MS, entetesPSU, refusPSU, aFaire, synchroniser, nomJournal, passager, etatPassager, passagerDe, MSG_PASSAGER, PASSAGER_FOIS, PASSAGER_MS };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -35,10 +35,11 @@ test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
     'update/KladUpdatePlugin.java', 'update/Maj.java', 'reseau/KladReseauPlugin.java', 'reseau/Adresse.java',
     'grafit/GrafitConfig.java', 'grafit/Appelant.java', 'grafit/Resume.java', 'grafit/Stockage.java', 'grafit/CleKeystore.java',
     'grafit/GrafitProvider.java', 'grafit/KladGrafitPlugin.java', 'mail/KladMailPlugin.java', 'mail/Reglages.java',
-    'mail/Criteres.java', 'mail/Lecture.java', 'mail/Erreurs.java', 'affichage/KladAffichagePlugin.java'];
+    'mail/Criteres.java', 'mail/Lecture.java', 'mail/Erreurs.java', 'affichage/KladAffichagePlugin.java', 'vault/Transfert.java',
+    'arret/Arret.java', 'arret/KladArretPlugin.java'];
   for (const f of files) {
     const x = read(JAVA + f);
-    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau|\.grafit|\.mail|\.affichage)?;/m, f);
+    assert.match(x, /^package app\.klad(\.vault|\.update|\.reseau|\.grafit|\.mail|\.affichage|\.arret)?;/m, f);
     assert.doesNotMatch(x, /io\.github\./, f);
   }
   const main = read(JAVA + 'MainActivity.java');
@@ -49,6 +50,7 @@ test('code Java dans le package fixe app.klad, sans compte GitHub', () => {
   assert.match(main, /registerPlugin\(KladGrafitPlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladMailPlugin\.class\)/);
   assert.match(main, /registerPlugin\(KladAffichagePlugin\.class\)/);
+  assert.match(main, /registerPlugin\(KladArretPlugin\.class\)/);
   // thème : la WebView n'assombrit jamais la page d'elle-même ; barres Android accordées au thème de l'appli
   assert.match(main, /setAlgorithmicDarkeningAllowed\(s, false\)/);
   assert.match(main, /FORCE_DARK_OFF/);
@@ -165,4 +167,36 @@ test('lien Grafit : contrôle de l\'appelant par UID et signature, configuration
   assert.match(plug, /stockage\.ecrire\(json[\s\S]*?notifier\(\)/);
   assert.match(plug, /stockage\.effacer\(\)[\s\S]*?notifier\(\)/);
   assert.match(plug, /notifyChange\(GrafitProvider\.uri\(getContext\(\)\), null\)/);
+});
+
+// 1.0.1 : la 1.0.0 se fermait à l'export de la sauvegarde. Capacitor garde la demande en attente pendant le sélecteur
+// et la recopie dans l'état sauvegardé de l'activité (limite ≈ 1 Mo) : aucune donnée dans ces demandes, seulement un
+// jeton ; les octets passent par morceaux (Transfert), la copie se fait hors du fil principal.
+test('sélecteur de fichiers : aucune donnée dans la demande gardée pendant le sélecteur', () => {
+  const p = read(JAVA + 'vault/KladVaultPlugin.java');
+  assert.doesNotMatch(p, /exportFile|importFile|MAX_IMPORT/, 'anciennes méthodes retirées');
+  for (const m of ['enregistrerFichier', 'enregistre', 'choisirFichier', 'choisi']) {
+    const i = p.search(new RegExp('void ' + m + '\\('));
+    assert.ok(i > 0, m);
+    const corps = p.slice(i, p.indexOf('\n    }\n', i));
+    assert.doesNotMatch(corps, /getString\("data"/, m + ' : aucune donnée dans la demande');
+  }
+  assert.match(p, /fil\.execute\(\(\) -> \{\s*Transfert\.Resultat r = transfert\.enregistrer/);
+  assert.doesNotMatch(p, /call\.getLong\(/, 'PluginCall.getLong ignore un petit nombre (Integer) : optLong');
+  assert.match(p, /transfert\.noter\(j, nature, r/);
+  const t = read(JAVA + 'vault/Transfert.java');
+  assert.match(t, /MAX_MORCEAU = 512 \* 1024/);
+  assert.match(t, /MessageDigest\.isEqual\(attendu, relu\)/);
+  const v = read('www/verrou.js');
+  assert.doesNotMatch(v, /V\.exportFile|V\.importFile/);
+  assert.match(v, /V\.enregistrerFichier\(\{ jeton, name, type: type \|\| '', nature \}\)/);
+});
+
+test('journal des plantages : gestionnaire installé, moteur d\'affichage surveillé, aucun message d\'erreur gardé', () => {
+  const main = read(JAVA + 'MainActivity.java');
+  assert.match(main, /Arret\.installer\(KladArretPlugin\.dossier\(this\)\)/);
+  assert.match(main, /onRenderProcessGone/);
+  const a = read(JAVA + 'arret/Arret.java');
+  assert.doesNotMatch(a, /getMessage|getLocalizedMessage|[et]\.toString\(\)|printStackTrace/);
+  assert.match(read('www/verrou.js'), /ArretP\.lire\(\)[\s\S]*A\(\)\.log\('err', r\.ligne\)/);
 });

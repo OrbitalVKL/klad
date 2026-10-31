@@ -114,7 +114,6 @@ label.ctl{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:va
 .acct{font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .note{font-size:12px;color:var(--muted);margin:8px 0 0}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:10}
 @media (max-width:900px){.grid2{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.wrap{padding-inline:16px}.chartbox{height:240px}.cats .hide-s{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -417,8 +416,6 @@ tr:hover .linkbtn.rm-line{opacity:1}
 .linkbtn.rm-line, .linkbtn.sh-del{margin-left:10px}
 td.has-rm{white-space:nowrap}
 .linkbtn.rm-line.armed, .linkbtn.sh-del.armed{opacity:1;color:var(--bad);border:1px solid var(--bad);background:var(--bad-soft)}
-.toast.undo{display:flex;align-items:center;gap:14px;z-index:60;padding:10px 12px 10px 16px;max-width:calc(100vw - 32px)}
-.toast.undo button{all:unset;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:2px 4px}
 @media (max-width:620px){
   table.cats.budget tr.rmable{position:relative;padding-right:40px}
   table.cats.budget tr.rmable td.has-rm .rm-line, table.cats.budget tr.rmable td.has-rm .sh-del{position:absolute;top:8px;right:4px;margin:0}
@@ -1233,9 +1230,7 @@ html.appm nav.app-tb{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
 .app-tb [aria-current="page"]{color:var(--accent);font-weight:750}
 .app-tb a:focus-visible,.app-tb button:focus-visible{outline:2px solid var(--accent);border-radius:10px}
 .app-tb svg{display:block}
-.tb-badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;box-sizing:border-box;padding:0 5px;border-radius:9px;background:var(--rev);color:#fff;font:700 12px/18px var(--display);text-align:center}
-/* messages au-dessus de la barre */
-html.appm .toast{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+.tb-badge{position:absolute;top:0;left:calc(50% + 13px);min-width:16px;height:16px;box-sizing:border-box;padding:0 4px;border-radius:8px;background:var(--rev);color:#fff;font:700 12px/16px var(--display);text-align:center;pointer-events:none}
 /* tirer pour synchroniser */
 .app-ptr{position:fixed;left:50%;top:0;z-index:60;width:40px;height:40px;margin-left:-20px;border-radius:50%;background:var(--surface);box-shadow:0 2px 10px rgba(0,0,0,.18);display:grid;place-items:center;color:var(--accent);font-size:20px;transform:translateY(-60px);opacity:0;pointer-events:none}
 .app-ptr.go{color:var(--good)} .app-ptr.spin span{animation:spin 1s linear infinite}
@@ -1508,8 +1503,11 @@ pre#log{font:12px/1.45 var(--mono);background:var(--surface-2);border-radius:12p
 .sh-back{all:unset;cursor:pointer;flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--surface-2);color:var(--ink-2);font-size:20px}
 
 /* Messages : comme l'ancienne version, au-dessus de la barre d'onglets ; « Annuler » pendant 10 s */
-#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(86px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;z-index:100;max-width:calc(100vw - 32px);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(var(--tbh,76px) + 10px);touch-action:none;cursor:pointer;user-select:none;-webkit-user-select:none;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;z-index:100;max-width:calc(100vw - 32px);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+/* 1.0.1 : volet ouvert → message en haut de l'écran, sans couvrir les boutons du volet */
+html.volet-ouvert #toast{top:calc(10px + env(safe-area-inset-top,0px));bottom:auto;transform:translateX(-50%) translateY(-20px)}
+html.volet-ouvert #toast.show{transform:translateX(-50%) translateY(0)}
 #toast.err{background:var(--bad);color:#fff}
 #toast.action{display:flex;align-items:center;gap:14px}
 #toast.action button{all:unset;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:2px 4px}
@@ -1571,13 +1569,23 @@ ol.ecarts { padding-left: 20px; font-size: 13px; }
 ol.ecarts li { margin: 4px 0; }
 /* 0.10.11 : le bandeau tient dans l'écran (texte replié sur plusieurs lignes, « Quitter » jamais coupé) */
 .demobar {
-  position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 90;
+  position: fixed; left: 50%; bottom: calc(var(--tbh, 66px) + 10px); transform: translateX(-50%); z-index: 90; cursor: pointer;
   width: max-content; max-width: calc(100vw - 24px); box-sizing: border-box; text-align: center; overflow-wrap: break-word;
   background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 12.5px; padding: 6px 14px; border-radius: 18px;
   display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,.25);
 }
 .demobar > span { min-width: 0; }
 .demobar[hidden] { display: none; }
+/* 1.0.1 : bandeau replié en pastille « DÉMO » (appui, glissement, ou seul après 6 s) ; masqué pendant un message */
+.demobar .db-p { display: none; }
+.demobar.reduit { left: 10px; transform: none; width: auto; padding: 4px 12px; }
+.demobar.reduit .db-t, .demobar.reduit button { display: none; }
+.demobar.reduit .db-p { display: inline; }
+html.toast-on .demobar { visibility: hidden; }
+/* 1.0.1 : reprise du classement à refaire (bars ou règles modifiés) */
+.encart-reprise { background: var(--surface-2); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; }
+.encart-reprise p { margin: 0 0 8px; }
+.encart-reprise[hidden] { display: none; }
 .demobar button { all: unset; flex: none; cursor: pointer; text-decoration: underline; font-weight: 600; }
 /* 0.10.10 : plus de flou, les valeurs des champs sont masquées (KladAffichage) */
 

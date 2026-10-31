@@ -2,6 +2,27 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.0.1
+
+Correctif de la recette 1.0.0.
+- **Sauvegarde** : Klad ne se ferme plus à l'export avec des données réelles. La sauvegarde est préparée et chiffrée
+  morceau par morceau avant d'ouvrir le sélecteur de fichiers, puis recopiée vers Drive (ou ailleurs), relue et
+  comparée : « Sauvegarde enregistrée » seulement si le fichier est identique. Si Klad se verrouille pendant le
+  sélecteur, l'enregistrement se termine quand même et le message s'affiche au déverrouillage. En cas d'échec : message
+  clair, ligne au journal, rien de partiel dans le fichier choisi. Nouveau format de fichier, par morceaux ; les
+  sauvegardes de la 1.0.0 restent lisibles. Même correction pour le relevé de contrôle et les fichiers importés.
+- **Journal des plantages** : si Klad s'arrête (erreur Java ou moteur d'affichage perdu), une ligne anonyme est écrite
+  au journal au déverrouillage suivant : « Klad s'est arrêté pendant <action> : <type d'erreur>, <endroit du code> ».
+- **Reprendre le classement** : après un changement des bars ou des règles, un encart indique combien d'opérations
+  changeraient de catégorie, avec « Reprendre le classement » (annulable) et « Plus tard ».
+- **Messages en bas d'écran** : un appui les ferme, un glissement les écarte ; ils disparaissent seuls (5 s, 6 s pour
+  une erreur, 8 s avec « Annuler ») ; un seul à la fois ; au-dessus de la barre d'onglets (en haut quand un volet est
+  ouvert) ; plus rien de bloquant autour. Bandeau du mode démo replié en pastille « DÉMO » (appui, glissement, ou seul
+  après 6 s). Compteur « à voir » de l'onglet Opérations plus petit, à côté de l'icône.
+- **Banque momentanément indisponible** (« 400 Error interacting with ASPSP ») : message neutre, nouvel essai à la
+  prochaine synchro ; erreur seulement après 3 échecs de suite ou plus de 24 h.
+- Aucun calcul modifié.
+
 ## 1.0.0
 
 Première version complète : l'ancienne version peut être arrêtée.

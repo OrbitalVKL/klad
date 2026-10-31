@@ -282,8 +282,68 @@
       if (c.role === 'carte_differee') rapport.cartes++;
       if (c.role === 'paiement_en_ligne') rapport.portefeuilles++;
     }
-    C.import = { le: new Date(opts.now == null ? Date.now() : opts.now).toISOString(), rapport, payload: true };
+    C.import = { le: new Date(opts.now == null ? Date.now() : opts.now).toISOString(), rapport, payload: true, ext: signature(X) };
     return rapport;
+  }
+
+  // ------------------------------------------------------------ reprise à refaire (1.0.1)
+  // Bars et règles du complément sont pris en compte à la reprise du classement : après un changement, Klad propose de
+  // la refaire (aperçu du nombre d'opérations touchées, annulable).
+  function signature(X) {
+    const t = JSON.stringify({ bars: (X && X.bars) || null, regles: (X && X.regles) || null });
+    let h = 0x811c9dc5;
+    for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  }
+  // Vrai si les bars ou les règles en vigueur ne sont plus ceux de la dernière reprise. Reprise faite avant la 1.0.1
+  // (sans signature) : vrai seulement si bars ou règles ont été réglés dans Klad.
+  function aReprendre(S) {
+    if (S.carnet == null || !utilisable(S.carnet)) return false;
+    const imp = S.classement && S.classement.import;
+    if (!imp) return false;
+    const st = racine(S.carnet);
+    if (imp.ext) return imp.ext !== signature(ext(S, st));
+    const O = (S.modele.reglages && S.modele.reglages.complement) || {};
+    return 'bars' in O || 'regles' in O;
+  }
+  const signatureActuelle = S => S.carnet == null || !racine(S.carnet) ? null : signature(ext(S, racine(S.carnet)));
+  // Ce que la reprise change (classement, opérations classées et vues, motifs des cartes) : pour « Annuler ».
+  function instantane(S) {
+    const ops = {};
+    for (const cid of Object.keys(S.ops)) for (const o of S.ops[cid]) ops[o.id] = [o.categorie === undefined ? null : o.categorie, o.vue === undefined ? null : o.vue];
+    return JSON.stringify({ C: S.classement === undefined ? null : S.classement, vues: S.modele.vues === undefined ? null : S.modele.vues,
+      prel: S.modele.comptes.map(c => [c.id, c.prelevement === undefined ? null : c.prelevement]), ops });
+  }
+  function restaurer(S, avant) {
+    const o = JSON.parse(avant);
+    S.classement = o.C;
+    if (o.vues == null) delete S.modele.vues; else S.modele.vues = o.vues;
+    for (const [id, p] of o.prel) { const c = S.modele.comptes.find(x => x.id === id); if (c) { if (p == null) delete c.prelevement; else c.prelevement = p; } }
+    for (const cid of Object.keys(S.ops)) for (const op of S.ops[cid]) {
+      const v = o.ops[op.id];
+      if (!v) continue;
+      if (v[0] == null) delete op.categorie; else op.categorie = v[0];
+      if (v[1] == null) delete op.vue; else op.vue = v[1];
+    }
+  }
+  // Aperçu sans rien changer : reprise faite sur une copie → { touchees, total } (opérations visibles dont la
+  // catégorie, la sous-catégorie ou la nature changerait).
+  async function apercuReprise(S, now) {
+    const K0 = K();
+    const t = now == null ? Date.now() : now;
+    const copie = JSON.parse(JSON.stringify(S));
+    await convertir(copie, copie.carnet, { now: t });
+    const a = K0.contexte(S, t), b = K0.contexte(copie, t);
+    const idx = {};
+    for (const o of K0.opsVisibles(copie)) idx[o.id] = o;
+    let touchees = 0, total = 0;
+    for (const o of K0.opsVisibles(S)) {
+      total++;
+      const x = K0.classer(a, o), o2 = idx[o.id];
+      const y = o2 ? K0.classer(b, o2) : null;
+      if (!y || x.cat !== y.cat || x.sub !== y.sub || x.type !== y.type) touchees++;
+    }
+    return { touchees, total };
   }
 
   // Motif de règlement manquant : déduit des règles de base « à détailler » (règlements de carte ou de portefeuille).
@@ -339,5 +399,5 @@
     return c => { let x = c; for (let i = 0; ren[x] && ren[x] !== x && i < 5; i++) x = ren[x]; return x; };
   }
 
-  g.KladCarnet = { utilisable, convertir, cleCarnet, sha256hex, BARS, renommeur, racine, payload };
+  g.KladCarnet = { utilisable, convertir, cleCarnet, sha256hex, BARS, renommeur, racine, payload, signature, signatureActuelle, aReprendre, instantane, restaurer, apercuReprise };
 })(typeof window !== 'undefined' ? window : globalThis);

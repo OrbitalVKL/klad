@@ -61,9 +61,9 @@
       { k: 'mail.cp', ou: 'c', t: 'json', l: 'Copropriétés (nom → motif)', aide: 'Objet JSON, par exemple { "Résidence A": "RESIDENCE A" }.' }
     ] },
     { id: 'motscles', titre: 'Listes de mots-clés', sous: 'Bars, livret, règles du complément', champs: [
-      { k: 'bars', ou: 'c', t: 'motif', l: 'Bars (partage de « Restaurants & bars »)', aide: 'Pris en compte à la prochaine reprise du classement (Plus › Réglages › Classement).' },
+      { k: 'bars', ou: 'c', t: 'motif', l: 'Bars (partage de « Restaurants & bars »)', aide: 'Pris en compte à la reprise du classement, proposée après l\'enregistrement (« Reprendre le classement »).' },
       { k: 'livret.motif', ou: 'c', t: 'motif', l: 'Virements vers le livret', defaut: 'LIVRE|LIVRET' },
-      { k: 'regles', ou: 'c', t: 'json', l: 'Règles du complément', aide: 'Liste JSON. Prises en compte à la prochaine reprise du classement.' }
+      { k: 'regles', ou: 'c', t: 'json', l: 'Règles du complément', aide: 'Liste JSON. Prises en compte à la reprise du classement, proposée après l\'enregistrement.' }
     ] },
     { id: 'tf', titre: 'Taxe foncière', sous: 'Logement, bases, taux', champs: [
       { k: 'tf.ach', ou: 'b', t: 'date', l: 'Achèvement du logement' },
@@ -428,7 +428,9 @@
     if (o && o.rendu && sale) return;
     const t = R.theme(themeCourant);
     if (!t) { $('reglThemeCorps').innerHTML = ''; return; }
-    $('reglThemeCorps').innerHTML = '<p class="muted small">' + esc(t.sous) + '. Un champ vidé revient à la valeur du complément.</p>' + (t.special ? special(t) : formHtml(t));
+    $('reglThemeCorps').innerHTML = (t.id === 'motscles' ? '<div class="encart-reprise" data-encart-reprise hidden></div>' : '') +
+      '<p class="muted small">' + esc(t.sous) + '. Un champ vidé revient à la valeur du complément.</p>' + (t.special ? special(t) : formHtml(t));
+    if (t.id === 'motscles' && A.encartsReprise) A.encartsReprise();
   };
   function actionTheme(ev) {
     const b = ev.target.closest('button');
@@ -487,13 +489,14 @@
     neuf();
     if (o && o.rendu && sale) return;
     const s = S();
-    $('reglAvanceCorps').innerHTML = '<p class="muted small">Complément complet tel que Klad l\'utilise (complément importé et réglages faits dans Klad). ' +
+    $('reglAvanceCorps').innerHTML = '<div class="encart-reprise" data-encart-reprise hidden></div><p class="muted small">Complément complet tel que Klad l\'utilise (complément importé et réglages faits dans Klad). ' +
       'Vérifié avant l\'enregistrement ; chaque rubrique modifiée devient un réglage de Klad. Annulable.</p>' +
       '<label class="rg-champ" for="rgBrut"><span class="rg-l">Complément (JSON)</span><textarea id="rgBrut" rows="14" spellcheck="false" autocomplete="off">' + esc(R.brutEffectif(s)) + '</textarea></label>' +
       '<p class="rg-msg" id="rgBrutMsg" aria-live="polite"></p>' +
       '<div class="row"><button type="button" class="btn" data-rg="verifier">Vérifier</button><button type="button" class="btn" data-rg="brut">Enregistrer</button></div>' +
       '<div class="row">' + (avantAvance ? '<button type="button" class="btn" data-rg="annulerbrut">Annuler la dernière modification</button>' : '') +
       ((s.modele.reglages && s.modele.reglages.complement && Object.keys(s.modele.reglages.complement).length) ? '<button type="button" class="btn" data-rg="revenir">Revenir au complément importé</button>' : '') + '</div>';
+    if (A.encartsReprise) A.encartsReprise();
   };
   $('reglAvanceCorps').addEventListener('input', () => { sale = true; });
   $('reglAvanceCorps').addEventListener('click', ev => {

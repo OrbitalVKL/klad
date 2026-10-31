@@ -6,6 +6,10 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.0.1** — correctif de la recette 1.0.0 (plantage à l'export de la sauvegarde, journal des plantages, reprise du
+classement proposée, messages flottants, banque momentanément indisponible). La bascule (arrêt de l'ancienne version)
+reste suspendue tant qu'aucune sauvegarde vérifiée n'existe sur le téléphone.
+
 **1.0.0** — version complète (Lot 9c) : l'ancienne version peut être arrêtée (liste de bascule remise au propriétaire).
 Toutes les fonctions de l'ancienne version sont présentes ou abandonnées par décision (`docs/parite-fonctions.md` :
 0 manquante). Aucun calcul n'a changé : relevé de contrôle de la 0.10.10 identique à la référence 0.9.4 sur les données
@@ -21,6 +25,64 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.0.1 — détails techniques
+- **Cause du plantage à l'export (1.0.0)** : `exportFile` recevait toute la sauvegarde (base64 d'un JSON contenant un
+  base64) dans la demande Capacitor ; pendant le sélecteur, Capacitor recopie la demande en attente dans l'état
+  sauvegardé de l'activité (`Bridge.saveInstanceState`, deux fois : options et bundle du plugin) ; au passage en
+  arrière-plan, Android l'envoie au système (limite ≈ 1 Mo) : `TransactionTooLargeException` levée dans `onStop`,
+  appli fermée sans trace JS. S'y ajoutaient 6 à 8 copies complètes en mémoire (JSON, octets, chiffré, base64, JSON,
+  octets, base64, puis côté Java String, JSObject, décodage) et l'écriture sur le fil principal.
+- **Fichiers par morceaux** (`android/.../vault/Transfert.java`, pur, JUnit `TransfertTest`) : fichiers temporaires
+  dans `noBackupFilesDir/klad/echanges` (jeton de 16 hexadécimaux), morceaux ≤ 512 Ko (`MAX_MORCEAU`), fichier ≤ 512 Mo ;
+  `enregistrer(jeton, destination)` : copie par blocs de 64 Ko, relecture et comparaison (taille, SHA-256), en cas
+  d'échec destination supprimée (`DocumentsContract.deleteDocument`) sinon vidée, temporaire supprimé ;
+  `noter` / `dernier` / `oublier` : résultat gardé sur disque (`resultat.properties`) ; `nettoyer` : temporaires de plus
+  de 24 h. Plugin `KladVault` : `tmpOuvrir`, `tmpAjouter`, `tmpLire`, `tmpAbandon`, `enregistrerFichier({ jeton, name,
+  type, nature })` (copie sur un fil à part ; demande « orpheline » après recréation de l'activité traitée aussi),
+  `resultatEnregistrement`, `oublierEnregistrement`, `choisirFichier({ type })` (copie du fichier choisi en temporaire,
+  lu ensuite par `tmpLire`). `exportFile` et `importFile` retirés.
+- **Format de sauvegarde v2** (`KladCoffre.ecrireSauvegarde`, `enteteSauvegarde`, `ouvrirSauvegarde`, `MORCEAU` = 256 Ko) :
+  ligne d'en-tête JSON (format, v 2, kdf, date, morceau) puis enregistrements « longueur | IV | AES-GCM », donnée associée
+  = en-tête + rang ; clair = `{ n: bloc, i, f }` + octets, dernier enregistrement `{ fin, app, v, blocs, prefs, n }`
+  (fichier tronqué, altéré ou réordonné refusé). Un seul bloc en clair à la fois. Lecture des v1 (1.0.0) gardée.
+  Test node `test/morceaux.test.mjs` (5 000 opérations, 3 ans, 3 Mo de PDF fictifs).
+- `verrou.js` : `enregistrer(nom, type, nature, produire)`, `choisirSource`, `resultatsEnAttente()` (appelé après chaque
+  enregistrement et à chaque déverrouillage : « Sauvegarde enregistrée (x Mo, fichier relu et identique) », ou l'échec ;
+  `B.dernier` posé à ce moment) ; `exportNow` prépare le fichier avant le sélecteur (état et clé de sauvegarde pris au
+  départ : un verrouillage pendant le sélecteur n'y change rien). Coffre de démonstration : mêmes méthodes, compteur
+  `KladDemoCoffre.messages` (taille du plus gros message), crochet `avantSelecteur` (arrière-plan, verrouillage,
+  échec, annulation simulés) ; données trop grosses pour sessionStorage gardées en mémoire.
+- **Journal des plantages** (`android/.../arret/Arret.java`, `KladArretPlugin`, JUnit `ArretTest`) : gestionnaire des
+  exceptions non attrapées installé dans `MainActivity` (puis gestionnaire d'Android), `onRenderProcessGone` (Capacitor
+  `WebViewListener`, comportement inchangé ensuite) ; ligne « Klad s'est arrêté pendant <action> : <Type ← Cause>,
+  <Classe:ligne> (le JJ/MM à HH:MM) » dans `noBackupFilesDir/klad/arret.txt` ; jamais de message d'erreur ; action
+  posée par l'appli (`window.KladArret.action` : export, vérification, restauration, relevé, synchronisation), mots
+  filtrés (lettres seulement). Recopiée au journal au déverrouillage (`verrou.js:arretPrecedent`), puis effacée.
+- **Reprise du classement** : `KladCarnet.signature` (bars et règles du complément effectif) gardée dans
+  `C.import.ext` ; `aReprendre(S)` (sans signature, reprise d'avant 1.0.1 : vrai si bars ou règles réglés dans Klad) ;
+  `apercuReprise(S)` (reprise sur une copie → opérations dont catégorie, sous-catégorie ou nature changerait) ;
+  `instantane` / `restaurer` (classement, catégories et « vues » des opérations, `modele.vues`, motifs des cartes).
+  Encart `[data-encart-reprise]` (`plus.js:remplirEncarts`, `KladApp.encartsReprise`) dans Plus › Classement,
+  Réglages › Listes de mots-clés et l'éditeur avancé ; « Plus tard » écarte ce changement pour la session.
+- **Éléments flottants** (inventaire) : messages `#toast` (simple, erreur, « Annuler ») ; bandeau du mode démo
+  `#demoBar` ; indicateur « tirer pour synchroniser » `.app-ptr` (transitoire, `pointer-events: none`, inchangé) ;
+  compteur `#tb-badge`. Anciennes règles `.toast` (inutilisées) retirées. Messages (`app.js`) : `cacherToast`,
+  `montrerToast`, 5 / 6 / 8 s, appui = fermeture (« Annuler » : action puis fermeture), glissement (`pointer*`), le
+  suivant remplace le précédent, `html.toast-on` ; position `bottom: var(--tbh) + 10px` (`--tbh` = hauteur réelle de la
+  barre d'onglets, `poserBarre`), en haut quand un volet est ouvert (`html.volet-ouvert`). Bandeau démo : replié en
+  pastille « DÉMO » (`KladAffichage.replierDemo`, appui, glissement, 6 s), masqué pendant un message. Compteur :
+  16 px, à droite de l'icône, sans chevauchement.
+- **Banque momentanément indisponible** (`KladSync.passager`, `etatPassager`, `passagerDe`) : 400 + « ASPSP » →
+  `c.sync.passager { n, depuis }`, `erreur` reste nul (pas de pastille rouge, de « compte à vérifier », de
+  `SYNC_FAILED`) ; erreur à partir de 3 fois de suite ou après 24 h ; succès : tout effacé. Message neutre dans le
+  détail de la synchro, Plus › Banques et après une synchro lancée à la main.
+- Tests : `test/morceaux.test.mjs` (node) ; `test/sauvegarde.test.mjs` (Chromium : jeu `repriseGrande` de
+  `tools/mesures/donnees.mjs`, 5 200 opérations et 3 « PDF » de 1 Mo ; export pendant arrière-plan + verrouillage
+  de 5 min, plus gros message < 512 Ko, vérification, restauration, échec et annulation) ; `test/reglages.test.mjs`
+  (encart, aperçu, Plus tard, reprise, Annuler) ; `test/debord.test.mjs` étendu aux éléments flottants (contre-épreuve
+  1.0.0 : 9 défauts) ; `test/sync.test.mjs` (panne passagère) ; `test/android.test.mjs` (aucune donnée dans les demandes
+  du sélecteur, journal des plantages) ; JUnit `TransfertTest`, `ArretTest`.
 
 ### 1.0.0 (Lot 9c) — détails techniques
 - Complément effectif : `KladBudget.complement(S)` = complément importé (`S.carnet` › `klad`) surchargé par
@@ -171,6 +233,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Correctif : mode démo sans rien de réel à l'écran, titres et montants à 320 px et texte à 200 % | 0.10.10 | fait |
 | — | Correctif : bandeau du mode démo dans l'écran, test de débordement de tous les écrans, volets, bandeaux et messages | 0.10.11 | fait |
 | 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | fait, maintenance ensuite |
+| — | Correctif : export de la sauvegarde (plantage), journal des plantages, reprise du classement, messages flottants, panne passagère de la banque | 1.0.1 | fait |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -367,12 +430,18 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   sur « Tout » depuis l'Accueil, recherche par catégorie, contrats et tendance du commun dans Commun › Trésorerie,
   sous-vue gardée pour la session seulement, palette dès UX-1. Réglages › Budget devient modifiable en 9c.
 
-- 1.0.0 (décisions prises par défaut, à valider) : un champ de réglage vidé revient à la valeur du complément ; un
+- 1.0.0 (décisions validées par le propriétaire en 1.0.1) : un champ de réglage vidé revient à la valeur du complément ; un
   compte mis sur « Aucun » est un choix de Klad (prioritaire) ; dans l'éditeur avancé, chaque rubrique différente du
   complément importé devient un réglage de Klad, une rubrique supprimée est retirée (`null`) ; une sauvegarde est
   « vérifiée » si elle se déchiffre et contient tous les blocs attendus, même si des données ont changé depuis (les
   différences sont listées) ; le rappel compte 30 jours depuis la date du fichier vérifié ; une restauration vaut
   vérification ; le thème et la palette voyagent avec la sauvegarde ; l'import du complément exige la reprise.
+
+- 1.0.1 (décisions prises par défaut, à valider) : nouveau format de sauvegarde par morceaux (v2), les fichiers v1
+  restant lisibles ; messages 5 s, erreurs 6 s, « Annuler » 8 s ; un message plus récent remplace un « Annuler » en
+  cours ; message en haut de l'écran quand un volet est ouvert ; bandeau du mode démo replié en pastille après 6 s ;
+  l'encart « Reprendre le classement » reste jusqu'au choix (« Plus tard » : écarté pour la session) ; panne passagère
+  limitée à la réponse 400 contenant « ASPSP ».
 
 ## Inventaire des écarts avec l'ancienne version (0.9.0)
 

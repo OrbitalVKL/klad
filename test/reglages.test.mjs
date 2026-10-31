@@ -234,3 +234,58 @@ test('Réglages : modifications visibles tout de suite (écrans, résumé Grafit
     assert.deepEqual(B.erreurs, []);
   } finally { await B.fin(); }
 });
+
+// 1.0.1 : après un changement des bars (ou des règles), encart « Reprendre le classement » avec le nombre
+// d'opérations touchées (aperçu sans rien changer), « Plus tard », reprise annulable.
+test('bars modifiés : encart « Reprendre le classement », aperçu, reprise et annulation', { skip: SAUT, timeout: 600000 }, async () => {
+  const B = await ouvrir({});
+  try {
+    const { page } = B;
+    const classes = () => page.evaluate(() => {
+      const A = window.KladApp, S = A.etat(), cx = window.KladClasse.contexte(S, Date.now()), r = {};
+      for (const o of window.KladClasse.opsVisibles(S)) if (/RESTAURANT FICTIF/.test(o.libelle)) { const c = window.KladClasse.classer(cx, o); r[c.sub] = (r[c.sub] || 0) + 1; }
+      return r;
+    });
+    const avant = await classes();
+    const encart = () => page.locator('#reglThemeCorps [data-encart-reprise]');
+    await page.evaluate(() => window.KladApp.ouvrirVolet('secReglages'));
+    await page.locator('#reglagesCorps [data-reglt="motscles"]').click();
+    assert.equal(await encart().isHidden(), true, 'rien à reprendre au départ');
+    await page.fill('#rg-bars', 'RESTAURANT');
+    await page.locator('#reglThemeCorps [data-rg="enregistrer"]').click();
+    await page.waitForFunction(() => /changeront de catégorie|changera de catégorie/.test((document.querySelector('#reglThemeCorps [data-encart-reprise]') || {}).textContent || ''));
+    const t = await encart().innerText();
+    const n = +t.match(/(\d+) opérations? change/)[1];
+    assert.ok(n > 0, t);
+    assert.deepEqual(await classes(), avant, 'aperçu : rien n\'a changé');
+    // Plus tard : masqué pour la session
+    await encart().locator('[data-reprise="tard"]').click();
+    assert.equal(await encart().isHidden(), true);
+    // autre changement : de nouveau proposé ; retour au changement écarté : masqué (aussi dans Plus › Classement)
+    const enregistrerBars = async v => { await page.fill('#rg-bars', v); await page.locator('#reglThemeCorps [data-rg="enregistrer"]').click(); await B.pause(200); };
+    await enregistrerBars('RESTAURANT|PUB');
+    await page.waitForFunction(() => /Reprendre le classement/.test((document.querySelector('#reglThemeCorps [data-encart-reprise]') || {}).textContent || ''));
+    await enregistrerBars('RESTAURANT');
+    assert.equal(await encart().isHidden(), true, 'changement déjà écarté');
+    await page.evaluate(() => window.KladApp.ouvrirVolet('secClassement'));
+    await B.pause(300);
+    assert.equal(await page.locator('#classementCorps [data-encart-reprise]').isHidden(), true);
+    await page.evaluate(() => window.KladApp.ouvrirVolet('secReglages'));
+    await page.locator('#reglagesCorps [data-reglt="motscles"]').click();
+    await enregistrerBars('RESTAURANT|PUB');
+    await page.waitForFunction(() => /changeront de catégorie|changera de catégorie/.test((document.querySelector('#reglThemeCorps [data-encart-reprise]') || {}).textContent || ''));
+    const n2 = +(await encart().innerText()).match(/(\d+) opérations? change/)[1];
+    assert.ok(n2 >= n, n2 + ' / ' + n);
+    await encart().locator('[data-reprise="go"]').click();
+    await page.waitForFunction(() => /Classement repris : \d+ opération\(s\) ont changé de catégorie/.test(document.getElementById('toast').textContent));
+    assert.match(await page.locator('#toast').innerText(), new RegExp('Classement repris : ' + n2 + ' opération'));
+    const apres = await classes();
+    assert.notDeepEqual(apres, avant, 'reprise faite');
+    await page.waitForFunction(() => document.querySelector('#reglThemeCorps [data-encart-reprise]').hidden);
+    // Annuler : classement d'avant
+    await page.locator('#toast button').click();
+    await B.pause(300);
+    assert.deepEqual(await classes(), avant, 'annulé');
+    assert.deepEqual(B.erreurs, []);
+  } finally { await B.fin(); }
+});

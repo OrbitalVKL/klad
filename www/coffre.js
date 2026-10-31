@@ -185,6 +185,146 @@
     return { payload: JSON.parse(dec.decode(plain)), bk };
   }
 
+  // ------------------------------------------------------------ fichier de sauvegarde (format v2, par morceaux, 1.0.1)
+  // La 1.0.0 chiffrait la sauvegarde d'un seul bloc (plusieurs copies complètes en mémoire, puis un seul message
+  // vers Android) : avec des données réelles, Klad se fermait à l'export. Le format v2 s'écrit et se lit morceau par
+  // morceau ; seul un bloc de données à la fois est en clair en mémoire.
+  //   ligne 1 (JSON, ASCII) : { format, v: 2, kdf: { nom, iter, sel }, date, morceau } puis « \n » ;
+  //   puis des enregistrements : longueur (4 octets, gros-boutiste) | IV (12 octets) | texte chiffré + étiquette GCM.
+  //   Donnée associée de chaque enregistrement : ligne 1 + son rang (4 octets) : ni ordre changé, ni morceau d'un
+  //   autre fichier. Clair : en-tête JSON { n: bloc, i: rang dans le bloc, f: dernier morceau du bloc } « \n » octets,
+  //   ou { fin: true, app, v, blocs, prefs, n } pour le dernier (sans lui, le fichier est tronqué).
+  const SAUV_V2 = 2;
+  const MORCEAU = 256 * 1024;            // octets de données par enregistrement (≈ 350 Ko en base64 vers Android)
+
+  function u32(n) { const a = new Uint8Array(4); new DataView(a.buffer).setUint32(0, n >>> 0); return a; }
+  function concat(parts, n) {
+    const out = new Uint8Array(n == null ? parts.reduce((t, p) => t + p.length, 0) : n);
+    let o = 0;
+    for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+  function aadV2(ligne, rang) { return concat([ligne, u32(rang)]); }
+
+  // contenu : { app, v, blocs, prefs } (contenuSauvegarde) ; ajouter(octets) : écrit la suite du fichier (async).
+  // → { octets, enregistrements }.
+  async function ecrireSauvegarde(bk, contenu, ajouter, now = new Date(), morceau = MORCEAU) {
+    if (!bk || !bk.cle) throw fail('sauvegarde', 'Clé de sauvegarde absente.');
+    const ligne = enc.encode(JSON.stringify({ format: SAUV_FORMAT, v: SAUV_V2, kdf: { nom: 'PBKDF2-SHA256', iter: bk.iter, sel: bk.sel },
+      date: now.toISOString().slice(0, 10), morceau }) + '\n');
+    const cle = await backupKey(bk.cle);
+    let rang = 0, octets = 0;
+    const emettre = async (tete, data) => {
+      const plain = concat([enc.encode(JSON.stringify(tete) + '\n'), data || new Uint8Array(0)]);
+      const iv = random(IV);
+      const ct = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: aadV2(ligne, rang) }, cle, plain));
+      const rec = concat([u32(IV + ct.length), iv, ct]);
+      rang++; octets += rec.length;
+      await ajouter(rec);
+    };
+    await ajouter(ligne); octets += ligne.length;
+    const noms = Object.keys(contenu.blocs);
+    for (const n of noms) {
+      let b = enc.encode(JSON.stringify(contenu.blocs[n]));
+      const nb = Math.max(1, Math.ceil(b.length / morceau));
+      for (let i = 0; i < nb; i++) await emettre({ n, i, f: i === nb - 1 }, b.subarray(i * morceau, (i + 1) * morceau));
+      b = null;
+    }
+    const fin = { fin: true, app: contenu.app, v: contenu.v, blocs: noms, n: rang };
+    if (contenu.prefs) fin.prefs = contenu.prefs;
+    await emettre(fin, null);
+    return { octets, enregistrements: rang };
+  }
+
+  // Lecteur séquentiel d'un fichier : source = { taille, lire(debut, longueur) → Promise<Uint8Array> }.
+  function lecteur(source) {
+    let pos = 0, buf = new Uint8Array(0);
+    return {
+      async prendre(n) {
+        while (buf.length < n && pos < source.taille) {
+          const b = await source.lire(pos, Math.max(MORCEAU, n - buf.length));
+          if (!b.length) break;
+          pos += b.length;
+          buf = buf.length ? concat([buf, b]) : b;
+        }
+        if (buf.length < n) return null;
+        const r = buf.slice(0, n); buf = buf.subarray(n);
+        return r;
+      },
+      fini() { return !buf.length && pos >= source.taille; }
+    };
+  }
+
+  // En-tête d'un fichier choisi → { v, date, kdf } ; v1 : { v: 1, texte } (fichier entier, format JSON de la 1.0.0).
+  async function enteteSauvegarde(source) {
+    const pas = 'Ce fichier n\'est pas une sauvegarde Klad.';
+    if (!source || !(source.taille > 0)) throw fail('format', pas);
+    const debut = await source.lire(0, Math.min(source.taille, 4096));
+    if (debut[0] !== 0x7b) throw fail('format', pas);
+    const nl = debut.indexOf(0x0a);
+    if (nl < 0) {                                            // v1 : un seul objet JSON
+      if (source.taille > 256 * 1024 * 1024) throw fail('format', 'Sauvegarde trop grosse.');
+      const parts = [];
+      for (let p = 0; p < source.taille;) { const b = await source.lire(p, MORCEAU * 2); if (!b.length) break; parts.push(b); p += b.length; }
+      const texte = dec.decode(concat(parts));
+      const o = readBackupHeader(texte);
+      return { v: 1, date: o.date || null, kdf: o.kdf, texte };
+    }
+    let h;
+    try { h = JSON.parse(dec.decode(debut.subarray(0, nl))); } catch (e) { throw fail('format', pas); }
+    if (!h || h.format !== SAUV_FORMAT) throw fail('format', pas);
+    if (h.v !== SAUV_V2) throw fail('version', 'Sauvegarde de version ' + h.v + ' non prise en charge.');
+    if (!h.kdf || h.kdf.nom !== 'PBKDF2-SHA256' || !(h.kdf.iter >= 1) || !h.kdf.sel) throw fail('format', 'Sauvegarde incomplète.');
+    return { v: 2, date: h.date || null, kdf: h.kdf, ligne: debut.slice(0, nl + 1) };
+  }
+
+  // → { payload, bk } (comme importBackup), en lisant la source morceau par morceau.
+  async function ouvrirSauvegarde(source, phrase, entete) {
+    const h = entete || await enteteSauvegarde(source);
+    if (h.v === 1) return importBackup(h.texte, phrase);
+    const bits = await phraseBits(phrase, fromB64(h.kdf.sel), h.kdf.iter);
+    const bk = { sel: h.kdf.sel, iter: h.kdf.iter, cle: toB64(bits), dernier: h.date || null };
+    const cle = await backupKey(bk.cle);
+    const L = lecteur(source);
+    await L.prendre(h.ligne.length);
+    const blocs = {};
+    let parts = [], courant = null, rang = 0, fin = null;
+    while (!fin) {
+      const lg = await L.prendre(4);
+      if (!lg) throw fail('tronque', 'Sauvegarde incomplète : fichier tronqué.');
+      const n = new DataView(lg.buffer, lg.byteOffset, 4).getUint32(0);
+      if (n < IV + 16 || n > MORCEAU * 4) throw fail('integrite', 'Sauvegarde altérée.');
+      const rec = await L.prendre(n);
+      if (!rec) throw fail('tronque', 'Sauvegarde incomplète : fichier tronqué.');
+      let plain;
+      try {
+        plain = new Uint8Array(await subtle().decrypt({ name: 'AES-GCM', iv: rec.subarray(0, IV), additionalData: aadV2(h.ligne, rang) }, cle, rec.subarray(IV)));
+      } catch (e) {
+        if (rang === 0) throw fail('phrase', 'Phrase incorrecte, ou fichier altéré.');
+        throw fail('integrite', 'Sauvegarde altérée (morceau ' + (rang + 1) + ').');
+      }
+      rang++;
+      const nl = plain.indexOf(0x0a);
+      const t = JSON.parse(dec.decode(plain.subarray(0, nl)));
+      if (t.fin) { fin = t; break; }
+      if (!nomValide(t.n) && t.n !== 'journal') throw fail('format', 'Sauvegarde : bloc inattendu.');
+      if (courant !== t.n || t.i !== parts.length) {
+        if (t.i !== 0 || courant != null) throw fail('integrite', 'Sauvegarde altérée (ordre des morceaux).');
+        courant = t.n;
+      }
+      parts.push(plain.subarray(nl + 1));
+      if (t.f) { blocs[t.n] = JSON.parse(dec.decode(concat(parts))); parts = []; courant = null; }
+    }
+    if (courant != null || fin.n !== rang - 1 || !Array.isArray(fin.blocs) || fin.blocs.some(n => !(n in blocs)))
+      throw fail('tronque', 'Sauvegarde incomplète.');
+    const payload = { app: fin.app, v: fin.v, blocs };
+    if (fin.prefs) payload.prefs = fin.prefs;
+    return { payload, bk };
+  }
+
+  // Source en mémoire (navigateur, tests).
+  function sourceOctets(b) { const a = new Uint8Array(b); return { taille: a.length, async lire(d, n) { return a.subarray(d, d + n); } }; }
+
   // ------------------------------------------------------------ état de l'appli ↔ blocs
   const blank = () => ({ appId: '', pem: '', redirectUrl: '', sessions: {}, pending: {}, data: {}, banks: {}, alias: {}, log: [] });
 
@@ -340,6 +480,7 @@
     toB64, fromB64, importDek, seal, open, BLOCS, nomValide, charger, contenuSauvegarde, depuisSauvegarde, comparerSauvegarde,
     newPhrase, normPhrase, pickGroups, checkGroups,
     SAUV_ITER, newBackupKey, exportBackup, readBackupHeader, importBackup,
+    MORCEAU, ecrireSauvegarde, enteteSauvegarde, ouvrirSauvegarde, sourceOctets,
     blank, split, join, PROTO_KEY, migrate
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -17,6 +17,10 @@
     : (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
   const V = isNative ? plugin('KladVault') : demoVault();
   const AppP = isNative ? plugin('App') : null;
+  const ArretP = isNative ? plugin('KladArret') : null;
+  // Action en cours, reprise dans la ligne du journal si Klad s'arrête pendant ce temps (1.0.1).
+  function action(nom) { if (ArretP) ArretP.action({ nom: nom || '' }).catch(() => {}); }
+  window.KladArret = { action };
 
   const LOCK_MS = 5 * 60e3;          // verrouillage après 5 min en arrière-plan
   const RAPPEL_JOURS = 30;           // rappel d'export mensuel
@@ -82,11 +86,75 @@
     }).catch(e => toast('Enregistrement impossible : ' + (e.message || e), true));
     return chain;
   }
+  // ------------------------------------------------------------ fichiers par morceaux (1.0.1)
+  // Rien de gros ne passe en un seul message entre l'appli et Android : le sélecteur ne reçoit qu'un jeton, les
+  // octets passent par morceaux (≤ C.MORCEAU) dans un fichier temporaire privé (voir Transfert.java).
+  // Fichier choisi par le sélecteur Android → source { taille, lire(debut, longueur), fermer() }, ou null si annulé.
+  async function choisirSource(type) {
+    const r = await V.choisirFichier(type ? { type } : {});
+    if (!r.ok) { if (r.reason !== 'annule') throw new Error('Lecture impossible : ' + explain(r)); return null; }
+    const jeton = r.jeton;
+    return {
+      taille: r.taille,
+      async lire(debut, longueur) {
+        const m = await V.tmpLire({ jeton, debut, longueur: Math.min(longueur, C.MORCEAU) });
+        if (!m.ok) throw new Error('Lecture impossible : ' + explain(m));
+        return C.fromB64(m.data);
+      },
+      fermer() { return V.tmpAbandon({ jeton }).catch(() => {}); }
+    };
+  }
+  async function lireTout(src) {
+    const out = new Uint8Array(src.taille);
+    for (let p = 0; p < src.taille;) { const b = await src.lire(p, C.MORCEAU); if (!b.length) break; out.set(b, p); p += b.length; }
+    return out;
+  }
   // Fichier choisi par le sélecteur Android → octets (relevé, éventuellement Excel), ou null si annulé.
   async function choisirOctets(type) {
-    const r = await V.importFile(type ? { type } : {});
-    if (!r.ok) { if (r.reason !== 'annule') throw new Error('Lecture impossible : ' + explain(r)); return null; }
-    return C.fromB64(r.data);
+    const src = await choisirSource(type);
+    if (!src) return null;
+    try { return await lireTout(src); } finally { await src.fermer(); }
+  }
+  // Fichier écrit par morceaux (produire(ajouter)) puis enregistré là où l'utilisateur le choisit (Drive compris).
+  // → { ok, reason, message, taille, jeton } ; le résultat est aussi gardé par Android (resultatsEnAttente).
+  async function enregistrer(name, type, nature, produire) {
+    const o = await V.tmpOuvrir();
+    if (!o.ok) throw new Error('Enregistrement impossible : ' + explain(o));
+    const jeton = o.jeton;
+    try {
+      await produire(async octets => {
+        for (let i = 0; i < octets.length; i += C.MORCEAU) {
+          const r = await V.tmpAjouter({ jeton, data: C.toB64(octets.subarray(i, i + C.MORCEAU)) });
+          if (!r.ok) throw new Error(explain(r));
+        }
+      });
+    } catch (e) {
+      await V.tmpAbandon({ jeton }).catch(() => {});
+      throw e;
+    }
+    return Object.assign({ jeton }, await V.enregistrerFichier({ jeton, name, type: type || '', nature }));
+  }
+  // Résultat d'un enregistrement gardé par Android : reçu directement, ou après un verrouillage, une recréation de
+  // l'activité ou un arrêt de l'appli pendant le sélecteur. Pris en compte une seule fois, appli déverrouillée.
+  const NATURES = { sauvegarde: 'Sauvegarde', controle: 'Relevé de contrôle', texte: 'Fichier' };
+  async function resultatsEnAttente() {
+    if (!V.resultatEnregistrement || !key || !S) return null;
+    let r;
+    try { r = (await V.resultatEnregistrement()).resultat; } catch (e) { return null; }
+    if (!r || !key || !S || !B) return null;
+    const quoi = NATURES[r.nature] || 'Fichier';
+    if (r.ok) {
+      const mo = r.taille >= 1e6 ? (r.taille / 1e6).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(r.taille / 1e3)) + ' Ko';
+      if (r.nature === 'sauvegarde') { B.dernier = new Date(r.le || Date.now()).toISOString(); mark(['sauvegarde']); }
+      A().log('ok', quoi + ' enregistré' + (r.nature === 'sauvegarde' ? 'e' : '') + ' (' + mo + ', fichier relu et identique).');
+      toast(quoi + ' enregistré' + (r.nature === 'sauvegarde' ? 'e' : '') + '.');
+    } else if (r.reason !== 'annule') {
+      A().log('err', quoi + ' : enregistrement impossible (' + (r.message || 'erreur') + '). Rien n\'est resté dans le fichier choisi.');
+      toast(quoi + ' non enregistré' + (r.nature === 'sauvegarde' ? 'e' : '') + ' : ' + (r.message || 'erreur') + '. Rien n\'a été écrit, réessayez.', true);
+    }
+    await V.oublierEnregistrement({ jeton: r.jeton }).catch(() => {});
+    if (key) renderSecu();
+    return r;
   }
   // Fichier choisi par le sélecteur Android (reprise) → texte, ou null si annulé.
   async function choisirFichier() {
@@ -95,11 +163,17 @@
     try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
     catch (e) { return new TextDecoder('windows-1252').decode(b); }      // relevé CSV exporté en Windows-1252
   }
-  // Fichier texte enregistré par le sélecteur Android (Drive compris) → true, false si annulé.
+  // Fichier texte enregistré par le sélecteur Android (Drive compris), par morceaux → true, false si annulé ou en échec
+  // (message déjà affiché).
   async function exporterTexte(name, text, type) {
-    const r = await V.exportFile({ name, data: C.toB64(new TextEncoder().encode(text)), type: type || '' });
-    if (!r.ok && r.reason !== 'annule') throw new Error('Enregistrement impossible : ' + explain(r));
-    return !!r.ok;
+    action('export du relevé de contrôle');
+    try {
+      const r = await enregistrer(name, type, /json/.test(type || '') ? 'controle' : 'texte', async ajouter => { await ajouter(new TextEncoder().encode(text)); });
+      // reçu directement : l'écran appelant affiche le résultat ; verrouillé entre-temps : affiché au déverrouillage
+      if (key) await V.oublierEnregistrement({ jeton: r.jeton }).catch(() => {});
+      if (!r.ok && r.reason !== 'annule') throw new Error('Enregistrement impossible : ' + explain(r) + '. Rien n\'est resté dans le fichier choisi.');
+      return !!r.ok;
+    } finally { action(''); }
   }
   const hooks = { save: () => mark(['*']), saveLog: () => mark(['journal']), flush, choisirFichier, choisirOctets, exporterTexte };
 
@@ -244,8 +318,9 @@
     try { if (AF.THEMES.indexOf(p.theme) >= 0) AF.choisirTheme(p.theme); if (AF.PALETTES.indexOf(p.palette) >= 0) AF.choisirPalette(p.palette); } catch (e) { /* préférence illisible : ignorée */ }
   }
 
-  function phraseForm(root, text, onOk, onBack, backLabel, goLabel) {
-    const h = C.readBackupHeader(text);
+  // src : fichier choisi (pickBackup), avec son en-tête (src.entete).
+  function phraseForm(root, src, onOk, onBack, backLabel, goLabel) {
+    const h = src.entete;
     root.insertAdjacentHTML('beforeend',
       '<h2>Phrase de récupération</h2><p class="muted">Sauvegarde du ' + esc(fmtDate(h.date || '')) +
       '. Saisissez la phrase : 24 caractères, en 6 groupes de 4.</p>' +
@@ -257,17 +332,19 @@
     on(root, 'go', async ev => {
       ev.target.disabled = true;
       msg.className = 'msg muted'; msg.textContent = 'Déchiffrement…';
-      try { onOk(await C.importBackup(text, root.querySelector('.phrase-in').value)); }
+      try { onOk(await C.ouvrirSauvegarde(src, root.querySelector('.phrase-in').value, h)); }
       catch (e) { msg.className = 'msg bad'; msg.textContent = e.message; ev.target.disabled = false; }
     });
   }
 
+  // Sauvegarde choisie → source lue par morceaux, avec son en-tête ; null si annulé ou illisible (message affiché).
+  // L'appelant ferme la source (fichier temporaire supprimé).
   async function pickBackup() {
-    const r = await V.importFile();
-    if (!r.ok) { if (r.reason !== 'annule') toast('Lecture impossible : ' + explain(r), true); return null; }
-    const text = new TextDecoder().decode(C.fromB64(r.data));
-    try { C.readBackupHeader(text); } catch (e) { toast(e.message, true); return null; }
-    return text;
+    let src;
+    try { src = await choisirSource(); } catch (e) { toast(e.message, true); return null; }
+    if (!src) return null;
+    try { src.entete = await C.enteteSauvegarde(src); } catch (e) { await src.fermer(); toast(e.message, true); return null; }
+    return src;
   }
 
   // ------------------------------------------------------------ démarrage
@@ -422,6 +499,18 @@
       ' compte(s), ' + r.migration.operations + ' opération(s), ' + r.migration.soldes + ' solde(s) ; ancien format supprimé.');
     if (pendingUrl) { const u = pendingUrl; pendingUrl = null; A().handleReturn(u); }
     window.KladMaj.check(true);              // publication plus récente ? (bandeau)
+    await arretPrecedent();
+    await resultatsEnAttente();              // enregistrement terminé pendant que Klad était verrouillé
+  }
+
+  // 1.0.1 : arrêt de Klad lors de l'utilisation précédente (plantage Java ou moteur d'affichage perdu) : ligne anonyme
+  // laissée par Android, recopiée dans le journal.
+  async function arretPrecedent() {
+    if (!ArretP) return;
+    try {
+      const r = await ArretP.lire();
+      if (r && r.ligne) { A().log('err', r.ligne); await ArretP.effacer(); }
+    } catch (e) { /* rien à recopier */ }
   }
 
   // ------------------------------------------------------------ écran de verrou
@@ -489,19 +578,23 @@
 
   // ------------------------------------------------------------ restauration
   async function restoreFirst() {
-    const text = await pickBackup();
-    if (!text) return;
+    const src = await pickBackup();
+    if (!src) return;
     screen('');
-    phraseForm(vPanel, text, res => choosePin('Nouveau code', pin => createVault(pin, res)), welcome);
+    phraseForm(vPanel, src, res => { src.fermer(); choosePin('Nouveau code', pin => createVault(pin, res)); }, () => { src.fermer(); welcome(); });
   }
 
   async function restoreInApp() {
-    const text = await pickBackup();
-    if (!text) return;
-    const res = await new Promise(resolve => {
-      showModal('');
-      phraseForm(mPanel, text, r => { closeModal(); resolve(r); }, () => { closeModal(); resolve(null); }, 'Annuler');
-    });
+    const src = await pickBackup();
+    if (!src) return;
+    let res;
+    action('restauration');
+    try {
+      res = await new Promise(resolve => {
+        showModal('');
+        phraseForm(mPanel, src, r => { closeModal(); resolve(r); }, () => { closeModal(); resolve(null); }, 'Annuler');
+      });
+    } finally { await src.fermer(); action(''); }
     if (!res) return;
     if (!await askConfirm('Remplacer les données ?',
       'La clé Enable Banking, les banques et les opérations de ce téléphone seront remplacées par celles de la sauvegarde. ' +
@@ -522,18 +615,24 @@
   }
 
   // ------------------------------------------------------------ section « Sécurité »
+  // 1.0.1 : sauvegarde chiffrée morceau par morceau dans un fichier temporaire (déjà chiffré) AVANT le sélecteur ;
+  // pendant le sélecteur, Klad peut passer en arrière-plan, se verrouiller ou être recréé : la copie se fait quand même
+  // et le résultat est affiché au retour, ou au déverrouillage suivant.
   async function exportNow() {
     await flush();
-    const text = await C.exportBackup(B, C.contenuSauvegarde(S, prefsAffichage()));
+    const s = S, bk = B;
     const name = 'klad-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.klad';
-    const r = await V.exportFile({ name, data: C.toB64(new TextEncoder().encode(text)) });
-    if (r.ok) {
-      B.dernier = new Date().toISOString();
-      mark(['sauvegarde']);
-      A().log('ok', 'Sauvegarde exportée.');
-      toast('Sauvegarde exportée.');
-      renderSecu();
-    } else if (r.reason !== 'annule') toast('Export impossible : ' + explain(r), true);
+    action('export de la sauvegarde');
+    toast('Préparation de la sauvegarde…');
+    let r;
+    try {
+      r = await enregistrer(name, '', 'sauvegarde', ajouter => C.ecrireSauvegarde(bk, C.contenuSauvegarde(s, prefsAffichage()), ajouter));
+    } catch (e) {
+      A().log('err', 'Sauvegarde : préparation impossible (' + (e.message || e) + ').');
+      throw new Error('Sauvegarde non enregistrée : ' + (e.message || e));
+    } finally { action(''); }
+    const vu = await resultatsEnAttente();
+    if (!vu && key && !r.ok && r.reason !== 'annule') toast('Sauvegarde non enregistrée : ' + explain(r), true);
   }
 
   // Vérifier une sauvegarde (1.0) : le fichier est ouvert avec la phrase et comparé bloc par bloc aux données
@@ -549,13 +648,17 @@
   }
   async function verifierSauvegarde() {
     await flush();
-    const text = await pickBackup();
-    if (!text) return;
-    const h = C.readBackupHeader(text);
-    const res = await new Promise(resolve => {
-      showModal('');
-      phraseForm(mPanel, text, r => { closeModal(); resolve(r); }, () => { closeModal(); resolve(null); }, 'Annuler', 'Vérifier');
-    });
+    const src = await pickBackup();
+    if (!src) return;
+    const h = src.entete;
+    let res;
+    action('vérification d\'une sauvegarde');
+    try {
+      res = await new Promise(resolve => {
+        showModal('');
+        phraseForm(mPanel, src, r => { closeModal(); resolve(r); }, () => { closeModal(); resolve(null); }, 'Annuler', 'Vérifier');
+      });
+    } finally { await src.fermer(); action(''); }
     if (!res) return;
     const r = C.comparerSauvegarde(res.payload, S, prefsAffichage());
     const ok = r.lisible && r.complete;
@@ -706,12 +809,17 @@
   // ------------------------------------------------------------ coffre de démonstration (navigateur seulement)
   // Hors Android il n'y a ni Keystore ni empreinte : ce coffre imite KladVault pour essayer l'interface.
   // Il garde son contenu dans sessionStorage (onglet courant) : à n'utiliser qu'avec des données fictives.
+  // Données trop grosses pour sessionStorage (jeu fictif de taille réelle, 1.0.1) : gardées en mémoire seulement.
   function demoVault() {
     const K = 'klad.demo';
-    const load = () => { try { return JSON.parse(sessionStorage.getItem(K)) || { blobs: {} }; } catch (e) { return { blobs: {} }; } };
-    const save = d => sessionStorage.setItem(K, JSON.stringify(d));
+    let memo = null;
+    const load = () => { if (memo) return memo; try { return JSON.parse(sessionStorage.getItem(K)) || { blobs: {} }; } catch (e) { return { blobs: {} }; } };
+    const save = d => { try { sessionStorage.setItem(K, JSON.stringify(d)); memo = null; } catch (e) { memo = d; sessionStorage.removeItem(K); } };
     const b64 = a => btoa(String.fromCharCode.apply(null, a));
     const ok = o => Object.assign({ ok: true }, o || {});
+    const tmp = new Map();
+    window.KladDemoCoffre = { messages: { n: 0, max: 0 }, avantSelecteur: null };
+    const compter = t => { const m = window.KladDemoCoffre.messages; m.n++; m.max = Math.max(m.max, String(t || '').length); };
     const check = (d, pin) => {
       if (pin === d.pin) { d.fails = 0; save(d); return null; }
       d.fails = (d.fails || 0) + 1; save(d);
@@ -722,27 +830,68 @@
       async create({ pin }) { const dek = crypto.getRandomValues(new Uint8Array(32)); save({ pin, dek: b64(dek), fails: 0, blobs: {} }); return ok({ dek: b64(dek) }); },
       async unlockPin({ pin }) { const d = load(); return check(d, pin) || ok({ dek: d.dek }); },
       async changePin({ old, pin }) { const d = load(); const f = check(d, old); if (f) return f; d.pin = pin; save(d); return ok(); },
-      async wipe({ pin }) { const d = load(); const f = check(d, pin); if (f) return f; sessionStorage.removeItem(K); return ok(); },
+      async wipe({ pin }) { const d = load(); const f = check(d, pin); if (f) return f; memo = null; sessionStorage.removeItem(K); return ok(); },
       async unlockBio() { return { ok: false, reason: 'absente' }; },
       async enableBio() { return { ok: false, reason: 'erreur', message: 'Pas d\'empreinte dans le navigateur.' }; },
       async disableBio() { return ok(); },
       async writeBlob({ name, data }) { const d = load(); d.blobs[name] = data; save(d); return ok(); },
       async readBlob({ name }) { return ok({ data: load().blobs[name] || null }); },
       async deleteBlob({ name }) { const d = load(); delete d.blobs[name]; save(d); return ok(); },
-      async exportFile({ name, data }) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([C.fromB64(data)], { type: 'application/octet-stream' }));
-        a.download = name; document.body.appendChild(a); a.click(); a.remove();
-        return ok();
+      // 1.0.1 : fichiers par morceaux, comme KladVault (fichiers temporaires en mémoire). Pour les tests :
+      // KladDemoCoffre.messages (taille du plus gros message reçu), KladDemoCoffre.avantSelecteur (attendu pendant le
+      // « sélecteur » : arrière-plan, verrouillage simulés).
+      async tmpOuvrir() { const j = Array.from(crypto.getRandomValues(new Uint8Array(8)), x => x.toString(16).padStart(2, '0')).join(''); tmp.set(j, []); return ok({ jeton: j }); },
+      async tmpAjouter({ jeton, data }) {
+        compter(data);
+        const t = tmp.get(jeton);
+        if (!t) return { ok: false, reason: 'erreur', message: 'Fichier temporaire absent' };
+        const b = C.fromB64(data);
+        if (b.length > 512 * 1024) { tmp.delete(jeton); return { ok: false, reason: 'erreur', message: 'Morceau trop gros' }; }
+        t.push(b);
+        return ok({ taille: t.reduce((n, x) => n + x.length, 0) });
       },
-      importFile(o) {
+      async tmpLire({ jeton, debut, longueur }) {
+        const t = tmp.get(jeton);
+        if (!t) return { ok: false, reason: 'erreur', message: 'Fichier temporaire absent' };
+        const b = t[0].subarray(debut, debut + Math.min(longueur, 512 * 1024));
+        const r = ok({ data: C.toB64(b), fin: debut + b.length >= t[0].length });
+        compter(r.data);
+        return r;
+      },
+      async tmpAbandon({ jeton }) { tmp.delete(jeton); return ok(); },
+      async enregistrerFichier(o) {
+        compter(JSON.stringify(o));
+        const t = tmp.get(o.jeton);
+        if (!t) return { ok: false, reason: 'erreur', message: 'Fichier préparé introuvable' };
+        const sim = window.KladDemoCoffre.avantSelecteur ? await window.KladDemoCoffre.avantSelecteur(o) : null;
+        const noter = r => { sessionStorage.setItem(K + '.resultat', JSON.stringify(Object.assign({ jeton: o.jeton, nature: o.nature || '', reason: '', message: '', taille: 0, le: Date.now() }, r))); };
+        if (sim && (sim.annule || sim.erreur)) {        // sélecteur fermé sans choisir, ou copie en échec (rien d'écrit)
+          tmp.delete(o.jeton);
+          noter({ ok: false, reason: sim.annule ? 'annule' : 'erreur', message: sim.erreur || '' });
+          return { ok: false, reason: sim.annule ? 'annule' : 'erreur', message: sim.erreur || '' };
+        }
+        const taille = t.reduce((n, x) => n + x.length, 0);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(t, { type: 'application/octet-stream' }));
+        a.download = o.name; document.body.appendChild(a); a.click(); a.remove();
+        tmp.delete(o.jeton);
+        noter({ ok: true, taille });
+        return ok({ taille });
+      },
+      async resultatEnregistrement() { let r = null; try { r = JSON.parse(sessionStorage.getItem(K + '.resultat')); } catch (e) { r = null; } return ok({ resultat: r }); },
+      async oublierEnregistrement({ jeton }) { const r = (await this.resultatEnregistrement()).resultat; if (r && (!jeton || r.jeton === jeton)) sessionStorage.removeItem(K + '.resultat'); return ok(); },
+      choisirFichier(o) {
         return new Promise(resolve => {
           const i = document.createElement('input');
           i.type = 'file';
           if (o && o.type) i.accept = o.type;
           i.onchange = async () => {
             const f = i.files && i.files[0];
-            resolve(f ? ok({ data: C.toB64(new Uint8Array(await f.arrayBuffer())) }) : { ok: false, reason: 'annule' });
+            if (!f) return resolve({ ok: false, reason: 'annule' });
+            const j = (await this.tmpOuvrir()).jeton;
+            const b = new Uint8Array(await f.arrayBuffer());
+            tmp.set(j, [b]);
+            resolve(ok({ jeton: j, taille: b.length }));
           };
           i.click();
         });

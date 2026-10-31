@@ -56,7 +56,7 @@ test('synchro : incrémentale, erreur par compte sans bloquer les autres, journa
   const cl = faux({ u1: [tx('2026-10-20', -1250, 'CB BOULANGERIE'), tx('2026-10-25', 250000, 'SALAIRE FICTIF')], u2: [] }, { panne: 'u2' });
   const log = [];
   const r = await Y.synchroniser(S, { client: () => cl, dispo: DISPO, log: (k, m) => log.push(k + ' ' + m), now: () => NOW });
-  assert.deepEqual(json(r), { comptes: 3, erreurs: 2, nouvelles: 2, fusionnees: 0, retirees: 0 });
+  assert.deepEqual(json(r), { comptes: 3, erreurs: 2, passagers: 0, nouvelles: 2, fusionnees: 0, retirees: 0 });
   assert.equal(S.ops[a.id].length, 2);
   assert.equal(a.sync.erreur, null);
   assert.match(b.sync.erreur, /500/);
@@ -151,4 +151,48 @@ test('synchro : frontière = aujourd\'hui → date de début aujourd\'hui (aucun
   const r2 = await Y.synchroniser(S, { client: () => cl, dispo: DISPO, log: (k, m) => log.push(m), now: () => NOW });
   assert.equal(r2.erreurs, 0);
   assert.match(log.join('\n'), /Banque A · compte 1 : date de début ramenée à aujourd'hui/);
+});
+
+// 1.0.1 : « 400 Error interacting with ASPSP » = panne passagère de la banque : message neutre, pas d'erreur (ni
+// pastille rouge, ni « compte à vérifier », ni SYNC_FAILED dans Grafit) avant 3 fois de suite ou plus de 24 h.
+test('banque momentanément indisponible : sans alerte avant 3 fois de suite ou 24 h, effacée au prochain succès', async () => {
+  const { S, a } = etat();
+  S.modele.comptes = S.modele.comptes.filter(c => c.id === a.id || c.source.type !== 'eb');
+  let panne = true;
+  const cl = {
+    async balances() {
+      if (panne) throw Object.assign(new Error('Enable Banking 400 : Error interacting with ASPSP'), { status: 400, code: '' });
+      return [{ balance_type: 'CLBD', balance_amount: { amount: '10.00' } }];
+    },
+    async transactions() { return [tx('2026-10-20', -1250, 'CB BOULANGERIE')]; }
+  };
+  const log = [];
+  const deps = t => ({ client: () => cl, dispo: async () => ({}), log: (k, m) => log.push(k + ' ' + m), now: () => t });
+  let r = await Y.synchroniser(S, deps(NOW));
+  assert.deepEqual([r.erreurs, r.passagers], [0, 1]);
+  assert.equal(a.sync.erreur, null);
+  assert.equal(Y.passagerDe(a), 'Banque momentanément indisponible, nouvel essai à la prochaine synchro.');
+  assert.notEqual(M.alerteCompte(S, a, NOW), 'Dernière lecture en erreur');
+  assert.match(log.join('\n'), /info Banque A · compte 1 : banque momentanément indisponible \(1\/3\)/);
+  r = await Y.synchroniser(S, deps(NOW + 3 * 3600e3));
+  assert.deepEqual([r.erreurs, r.passagers, a.sync.erreur], [0, 1, null]);
+  r = await Y.synchroniser(S, deps(NOW + 6 * 3600e3));
+  assert.deepEqual([r.erreurs, r.passagers], [1, 0], 'troisième fois de suite : erreur');
+  assert.match(a.sync.erreur, /depuis 3 synchros/);
+  assert.equal(M.alerteCompte(S, a, NOW + 6 * 3600e3), 'Dernière lecture en erreur');
+  // succès : tout est effacé
+  panne = false;
+  r = await Y.synchroniser(S, deps(NOW + 7 * 3600e3));
+  assert.deepEqual([r.erreurs, r.passagers, a.sync.erreur, a.sync.passager], [0, 0, null, undefined]);
+  // plus de 24 h depuis la première panne, même en 2 fois : erreur
+  panne = true;
+  await Y.synchroniser(S, deps(NOW + 8 * 3600e3));
+  r = await Y.synchroniser(S, deps(NOW + 33 * 3600e3));
+  assert.equal(r.erreurs, 1);
+  assert.match(a.sync.erreur, /plus de 24 h/);
+  // autre erreur (500) : erreur aussitôt, comme avant
+  const { S: S2, b } = etat();
+  const r2 = await Y.synchroniser(S2, { client: () => faux({}, { panne: 'u2' }), dispo: async () => ({}), log: () => {}, now: () => NOW });
+  assert.ok(r2.erreurs >= 1 && b.sync.erreur);
+  assert.equal(Y.passager(Object.assign(new Error('Enable Banking 400 : PSU_HEADER_INVALID'), { status: 400 })), false);
 });
