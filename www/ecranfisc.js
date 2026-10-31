@@ -41,11 +41,26 @@
   }
 
   // ------------------------------------------------------------ sous-vues (0.10.5) : résultats d'abord, paramètres à part
+  // 1.1 : onglet Patrimoine en quatre parties (Impôts, Foncier, Épargne, Crypto) ; la taxe foncière quitte les
+  // sous-vues des impôts pour sa propre partie.
   const SV = {
-    impots: [['resume', 'Résumé'], ['prelevements', 'Prélèvements'], ['foncier', 'Taxe foncière'], ['parametres', 'Paramètres']],
+    impots: [['resume', 'Résumé'], ['prelevements', 'Prélèvements'], ['parametres', 'Paramètres']],
     epargne: [['livret', 'Livret'], ['plan', 'Plan d\'épargne'], ['parametres', 'Paramètres']]
   };
   const svUi = { impots: 'resume', epargne: 'livret' };
+  const PARTIES = [['impots', 'Impôts', 'impots'], ['foncier', 'Foncier', 'impots'], ['epargne', 'Épargne', 'epargne'], ['crypto', 'Crypto', 'crypto']];
+  let partie = 'impots', cryptoEdit = null;
+  const vuePatrimoine = () => PARTIES.find(p => p[0] === partie)[2];
+  const barrePatri = () => '<div class="seg sousvues patri sv-4" role="group" aria-label="Patrimoine">' +
+    PARTIES.map(([k, l]) => '<button type="button" data-patri="' + k + '" aria-pressed="' + (partie === k) + '">' + l + '</button>').join('') + '</div>';
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-patri]');
+    if (!b || !A.etat()) return;
+    partie = b.dataset.patri;
+    cryptoEdit = null;
+    const v = vuePatrimoine();
+    if (A.vue() === v) { render(); window.scrollTo(0, 0); } else A.montrer(v, { force: true, haut: true });
+  });
   const barreSV = v => '<div class="seg sousvues sv-' + SV[v].length + '" role="group" aria-label="' + (v === 'impots' ? 'Impôts' : 'Épargne') + ' : sous-vues">' +
     SV[v].map(([k, l]) => '<button type="button" data-sousvue="' + k + '" aria-pressed="' + (svUi[v] === k) + '">' + l + '</button>').join('') + '</div>';
   document.addEventListener('click', ev => {
@@ -68,8 +83,13 @@
         $('sv-eq').innerHTML = EB && EB.barre ? EB.barre('commun', 'equilibre') : '';
         poser('appart-corps', VC.equilibre(B, ui.eq));
       }
-      else if (v === 'impots') { $('view-impots').dataset.sv = svUi.impots; poser('view-impots', barreSV('impots') + VF.impots(B, { annee: ui.annee, lecture: !!(X && X.actif(s, 'claude')), analyse: !!(X && X.actif(s, 'claude')), texteAnalyse: X && X.analyse && X.analyse('impots') })); }
-      else if (v === 'epargne') { $('view-epargne').dataset.sv = svUi.epargne; poser('view-epargne', barreSV('epargne') + VF.epargne(B)); }
+      else if (v === 'impots') {
+        if (partie !== 'impots' && partie !== 'foncier') partie = 'impots';
+        $('view-impots').dataset.sv = partie === 'foncier' ? 'foncier' : svUi.impots;
+        poser('view-impots', barrePatri() + (partie === 'foncier' ? '' : barreSV('impots')) + VF.impots(B, { annee: ui.annee, lecture: !!(X && X.actif(s, 'claude')), analyse: !!(X && X.actif(s, 'claude')), texteAnalyse: X && X.analyse && X.analyse('impots') }));
+      }
+      else if (v === 'epargne') { partie = 'epargne'; $('view-epargne').dataset.sv = svUi.epargne; poser('view-epargne', barrePatri() + barreSV('epargne') + VF.epargne(B)); }
+      else if (v === 'crypto') { partie = 'crypto'; poser('view-crypto', barrePatri() + VF.crypto(B, cryptoEdit)); }
       else if (v === 'donnees') { $('imp-panel').innerHTML = Vu.releves(s, B, Date.now(), { synchro: false }); U.appliquerPli($('imp-panel')); U.appliquerPli($('save-panel')); }
     } catch (e) { A.log('err', 'Écran ' + v + ' : ' + (e.message || e)); }
   }
@@ -222,6 +242,31 @@
     }
   });
 
+  // ------------------------------------------------------------ crypto (1.1)
+  $('view-crypto').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-cr]');
+    if (!b) return;
+    const k = b.dataset.cr;
+    if (k === 'ajout') { cryptoEdit = 'nouvelle'; render(); const n = $('crNom'); if (n) n.focus(); return; }
+    if (k === 'edit') { cryptoEdit = b.dataset.crid; render(); return; }
+    if (k === 'fermer') { cryptoEdit = null; render(); return; }
+    if (k === 'suppr') {
+      if (!A.confirmInline(b, 'Retirer ?')) return;
+      const avant = KF.cryptoRetirer(S(), b.dataset.crid);
+      cryptoEdit = null;
+      modifie('Position retirée.', avant, x => KF.annulerCrypto(S(), x));
+      return;
+    }
+    if (k === 'ok') {
+      const f = b.closest('[data-crform]'), nom = $('crNom').value.trim(), inv = F.saisie($('crInv').value), val = F.saisie($('crVal').value), le = $('crLe').value;
+      if (!nom || val == null || !window.KladModele.dateValide(le)) { A.toast('Indiquez le nom, la valeur actuelle et sa date.', true); return; }
+      const avant = KF.cryptoEnregistrer(S(), { id: f.dataset.crform || null, nom, investi: inv || 0, valeur: val, le });
+      cryptoEdit = null;
+      A.log('info', 'Position crypto enregistrée.');
+      modifie('Position « ' + nom + ' » enregistrée.', avant, x => KF.annulerCrypto(S(), x));
+    }
+  });
+
   // ------------------------------------------------------------ relevés
   $('view-data').addEventListener('click', ev => {
     const t = ev.target;
@@ -260,9 +305,9 @@
   A.preparer.secObs = () => { const B = A.budget(); $('obsCorps').innerHTML = B ? VF.observations(B, A.scope()) : ''; };
   $('obsCorps').addEventListener('click', ev => {
     const f = ev.target.closest('[data-fait]');
-    if (f) { const avant = KO.fait(S(), f.dataset.fait); A.log('info', 'Observation marquée faite.'); modifie('Point marqué fait : il reviendra seulement si la situation se reproduit.', avant, x => KO.annulerFait(S(), x)); return; }
+    if (f) { const avant = KO.fait(S(), f.dataset.fait, Date.now(), A.budget()); A.log('info', 'Observation marquée faite.'); modifie('Point marqué fait : il reviendra seulement si la situation se reproduit.', avant, x => KO.annulerFait(S(), x)); return; }
     if (ev.target.closest('[data-reafficher]')) { const avant = KO.reafficher(S()); modifie('Points réaffichés.', avant, x => KO.annulerFait(S(), x)); }
   });
 
-  window.KladEcranFisc = { ui, render };
+  window.KladEcranFisc = { ui, render, vuePatrimoine, partie: () => partie };
 })();

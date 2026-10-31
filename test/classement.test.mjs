@@ -241,3 +241,47 @@ test('catégories : création, renommage (règles suivies), suppression, nature 
   K.restaurer(S, s0);
   assert.ok(!K.listeCategories(S.classement).includes('Lecture'));
 });
+
+// 1.1 : rapprochement à la main. Côté banque : rapprocher un prélèvement d'un achat choisi (± 30 jours, montant
+// différent possible), ou le garder en dépense ; côté portefeuille : achat « payé autrement ». Tout est annulable.
+test('portefeuille : rapprocher à la main, garder en dépense, payé autrement, annulation', () => {
+  const { S, a, w } = etat();
+  w.prelevement = { motif: 'PORTEFEUILLE FICTIF' };
+  const achat = op(w, '2026-06-09', -5490, 'MARCHAND DE VETEMENTS FICTIF'), autre = op(w, '2026-06-20', -1000, 'AUTRE MARCHAND'), loin = op(w, '2026-03-01', -5490, 'ANCIEN ACHAT');
+  S.ops[w.id].push(achat, autre, loin);
+  const p = op(a, '2026-06-24', -5990, 'PRLV PORTEFEUILLE FICTIF 111');      // montant différent, 15 jours après
+  const q = op(a, '2026-06-25', -800, 'PRLV PORTEFEUILLE FICTIF 222');
+  S.ops[a.id].push(p, q);
+  let cx = K.contexte(S, NOW);
+  assert.equal(K.aRapprocher(cx, p).id, w.id);
+  assert.equal(K.prelevementDe(cx, achat), null, 'aucun prélèvement de même montant');
+  assert.equal(K.portefeuilleDe(cx, achat).id, w.id);
+  assert.deepEqual(json(K.candidatsPortefeuille(cx, p, w).map(x => x.id)), [achat.id, autre.id], '± 30 jours, le plus proche en montant d\'abord');
+  assert.deepEqual(json(K.candidatsBanque(cx, achat).map(x => x.id)), [p.id, q.id]);
+  // rapprocher : prélèvement interne, achat réglé par lui
+  const snap = K.rapprocherAvec(cx, p, w, achat);
+  cx = K.contexte(S, NOW);
+  assert.deepEqual(cl(S, p).slice(0, 2), ['interne', 'Virements internes']);
+  assert.equal(K.aRapprocher(cx, p), null);
+  assert.equal(K.prelevementDe(cx, achat).id, p.id);
+  assert.equal(K.interneManuel(p), true);
+  assert.deepEqual(json(K.candidatsBanque(cx, autre).map(x => x.id)), [q.id], 'déjà rapproché : plus proposé');
+  K.annulerRapprochement(snap);
+  cx = K.contexte(S, NOW);
+  assert.equal(K.aRapprocher(cx, p).id, w.id, 'annulé');
+  assert.equal(achat.rapprochement, undefined);
+  // garder en dépense : plus « à rapprocher », compté en dépense
+  const s2 = K.garderDepense(q);
+  cx = K.contexte(S, NOW);
+  assert.equal(K.aRapprocher(cx, q), null);
+  assert.equal(cl(S, q)[0], 'depense');
+  assert.equal(json(K.attention(cx, NOW)).toMatch, 1, 'seul le premier reste à rapprocher');
+  K.annulerRapprochement(s2);
+  assert.equal(K.aRapprocher(K.contexte(S, NOW), q).id, w.id);
+  // payé autrement : l'achat n'est plus proposé
+  const s3 = K.payeAutrement(autre);
+  assert.equal(autre.rapprochement, 'autrement');
+  assert.deepEqual(K.candidatsPortefeuille(K.contexte(S, NOW), q, w).map(x => x.id), [achat.id]);
+  K.annulerRapprochement(s3);
+  assert.equal(autre.rapprochement, undefined);
+});

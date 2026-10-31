@@ -34,6 +34,8 @@
     { id: 'commun', titre: 'Personnes du commun', sous: 'Noms, part par défaut, virements de l\'autre personne', champs: [
       { k: 'commun.moi', ou: 'r', t: 'texte', l: 'Votre nom (personne A)' },
       { k: 'commun.autre', ou: 'r', t: 'texte', l: 'Nom de l\'autre personne (personne B)' },
+      { k: 'commun.cycle', ou: 'r', t: 'choix', l: 'Période du suivi du commun', options: [['mois', 'Mois civil'], ['salaire', 'Cycle de salaire']], defaut: 'mois',
+        aide: 'Suivi des postes du commun (Commun › Budget). Cycle de salaire : le même que le budget perso. La trésorerie, les virements et les prévisions restent au mois.' },
       { k: 'commun.part', ou: 'r', t: 'nombre', l: 'Votre part par défaut d\'un poste du commun (%)', defaut: 50, aide: 'Un poste dont la part a été réglée dans Commun › Budget mensuel garde sa part.' },
       { k: 'commun.contribution', ou: 'r', t: 'texte', l: 'Poste perso de votre contribution au commun', defaut: 'Contribution compte commun' },
       { k: 'commun.motifAutre', ou: 'r', t: 'motif', l: 'Motif des virements de l\'autre personne', aide: 'Expression reconnue dans le libellé des virements reçus sur le compte commun.' }
@@ -373,7 +375,8 @@
   });
 
   // ------------------------------------------------------------ Plus › Réglages › Complément (écrans par thème)
-  const AUTRES = ['cartes', 'appels', 'mail', 'motscles', 'tf', 'livret', 'pee', 'masquees', 'exclusions', 'carburant', 'apparence'];
+  // 1.1 : le calculateur carburant se règle dans le Budget (fenêtre dédiée), plus ici
+  const AUTRES = ['cartes', 'appels', 'mail', 'motscles', 'tf', 'livret', 'pee', 'masquees', 'exclusions', 'apparence'];
   A.preparer.secReglages = () => {
     neuf();
     const it = (t, attr) => '<button type="button" class="sh-li" ' + attr + '><span>' + esc(t.titre) + '<small>' + esc(t.sous) + '</small></span><span class="r" aria-hidden="true">›</span></button>';

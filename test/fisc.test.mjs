@@ -112,6 +112,21 @@ test('observations : contrat résilié encore prélevé, charges sur un compte s
   assert.equal(KO.observations(ctx(S), 'perso').faire.length, nb - 1);
   KO.annulerFait(S, avant);
   assert.equal(KO.observations(ctx(S), 'perso').faire.length, nb);
+  // 1.1 : historique des points faits, gardé après « réafficher » et quand le point revient ; annulable
+  assert.equal(KO.historique(ctx(S)).length, 0, 'annulé : rien dans l\'historique');
+  KO.fait(S, 'Ancien contrat fictif encore prélevé', NOW, ctx(S));
+  KO.fait(S, 'Charges récurrentes sur le SECOND', NOW + 864e5, ctx(S));
+  const re = KO.reafficher(S, NOW + 2 * 864e5);
+  assert.equal(KO.observations(ctx(S), 'perso').faire.length, nb, 'réaffichés');
+  const H = KO.historique(ctx(S));
+  assert.deepEqual(json(H.map(x => [x.titre, x.le.slice(0, 10), x.niveau, x.scope])), [
+    ['Charges récurrentes sur le SECOND', '2026-10-29', 'warn', 'perso'], ['Ancien contrat fictif encore prélevé', '2026-10-28', 'bad', 'perso']]);
+  assert.ok(H[1].texte);
+  const hv = VF.observations(ctx(S), 'perso');
+  assert.match(hv, /Historique des points faits \(2\)[\s\S]*fait le 29\/10\/2026/);
+  KO.annulerFait(S, re);
+  assert.equal(KO.observations(ctx(S), 'perso').faire.length, nb - 2);
+  assert.equal(KO.historique(ctx(S)).length, 2);
   // résultats du cycle précédent (27/09 → 26/10) : salaire, courses (dont l'achat du 30/09), assurance, ancien contrat
   const P = KO.periodePrecedente(B, 'perso', null);
   assert.deepEqual([P.start, P.end], ['2026-09-27', '2026-10-26']);

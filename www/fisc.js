@@ -449,6 +449,38 @@
     return { [L.compte]: { centimes: L.centimes, texte: I ? '≈ ' + KB().eur(I.centimes) + ' en ' + I.annee : 'taux à saisir (Épargne)' } };
   }
 
+  // ------------------------------------------------------------ crypto (1.1) : positions saisies à la main
+  // S.budget.crypto = { positions: [{ id, nom, investi, valeur, le }] } (centimes, date de la valeur) ; aucune
+  // connexion extérieure. Rappel quand une valeur a plus de CRYPTO_JOURS jours.
+  const CRYPTO_JOURS = 30;
+  function crypto(B) {
+    const L = ((B.S.budget && B.S.budget.crypto && B.S.budget.crypto.positions) || []).filter(p => isObj(p));
+    const positions = L.map(p => {
+      const age = p.le ? KB().dDiff(p.le, B.auj) : null;
+      return Object.assign({}, p, { ecart: (p.valeur || 0) - (p.investi || 0), age, aJour: age != null && age <= CRYPTO_JOURS });
+    });
+    const investi = positions.reduce((t, p) => t + (p.investi || 0), 0), valeur = positions.reduce((t, p) => t + (p.valeur || 0), 0);
+    return { positions, investi, valeur, ecart: valeur - investi, aMettreAJour: positions.filter(p => !p.aJour) };
+  }
+  const etatCrypto = S => JSON.stringify((S.budget && S.budget.crypto) || null);
+  // pos : { id (absent : nouvelle), nom, investi, valeur, le } → état d'avant (annulation).
+  function cryptoEnregistrer(S, pos) {
+    const D = KB().donnees(S), avant = etatCrypto(S);
+    if (!isObj(D.crypto) || !Array.isArray(D.crypto.positions)) D.crypto = { positions: [] };
+    const p = { id: pos.id || 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nom: String(pos.nom || 'Position').trim().slice(0, 40) || 'Position',
+      investi: Math.max(0, Math.round(+pos.investi || 0)), valeur: Math.max(0, Math.round(+pos.valeur || 0)), le: M().dateValide(pos.le) ? pos.le : M().jourLocal(Date.now()) };
+    const i = D.crypto.positions.findIndex(x => x.id === p.id);
+    if (i >= 0) D.crypto.positions[i] = p; else D.crypto.positions.push(p);
+    return avant;
+  }
+  function cryptoRetirer(S, id) {
+    const D = KB().donnees(S), avant = etatCrypto(S);
+    if (isObj(D.crypto) && Array.isArray(D.crypto.positions)) D.crypto.positions = D.crypto.positions.filter(x => x.id !== id);
+    return avant;
+  }
+  function annulerCrypto(S, avant) { const D = KB().donnees(S), o = JSON.parse(avant); if (o == null) delete D.crypto; else D.crypto = o; }
+
   g.KladFisc = { PARAMS, PS_FONC, PASS, HYP0, PART_RULES, importer, fiscDe, irCalc, netSal, foyerCalc, tauxIndiv, contexte, annee, partage, texte,
-    regularisations, resteTexte, alertes, tfAnnee, tfPayee, alertesTF, taxeFonciere, pee, xirr, livret, livretInterets, livretCarte, pct1 };
+    regularisations, resteTexte, alertes, tfAnnee, tfPayee, alertesTF, taxeFonciere, pee, xirr, livret, livretInterets, livretCarte, pct1,
+    CRYPTO_JOURS, crypto, cryptoEnregistrer, cryptoRetirer, annulerCrypto };
 })(typeof window !== 'undefined' ? window : globalThis);

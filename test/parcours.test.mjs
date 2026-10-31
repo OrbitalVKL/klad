@@ -456,6 +456,11 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
       else await page.locator('#plusCorps [data-volet="' + sec + '"]').click();
     };
     const deplier = async id => { if (await page.locator('#' + id).evaluate(e => e.classList.contains('collapsed'))) await page.locator('#' + id + ' .panel-h h2.fold').click(); };
+    // 1.1 : onglet Patrimoine, partie choisie (impots, foncier, epargne, crypto)
+    const patrimoine = async partie => {
+      await page.locator('#app-tb [data-tab="patrimoine"]').click();
+      await page.locator('.vue:not([hidden]) [data-patri="' + partie + '"]').click();
+    };
     const auj = await page.evaluate(() => window.KladModele.jourLocal(Date.now()));
     await plusVers('secReprise');
     const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#btnChoisirReprise').click()]);
@@ -471,10 +476,10 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#app-tb [data-tab="accueil"]').click();
     assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
     const acc = await page.locator('#view-accueil').innerText();
-    assert.match(acc, /Reste à vivre jusqu'au[\s\S]*par jour[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/i);
+    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*par jour[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/i);
     assert.doesNotMatch(acc, SANS_SIGNE);
     await page.locator('#view-accueil [data-aller="rav"]').click();
-    assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
+    assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre[\s\S]*Par jour[\s\S]*restants?/);
     await page.locator('#volet [data-fermer]').last().click();
     await capture(page, '12-accueil');
     await page.locator('#view-accueil [data-aller="budget"]').first().click();
@@ -673,13 +678,14 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
 
     // Lot 8 : impôts, épargne (écrans de Plus), observations (volet) ; observations à faire en tête du Budget
     // 0.10.5 : Impôts (Résumé · Prélèvements · Taxe foncière · Paramètres) et Épargne (Livret · Plan d'épargne · Paramètres)
+    // 1.1 : onglet Patrimoine : Impôts (Résumé · Prélèvements · Paramètres), Foncier, Épargne (Livret · Plan · Paramètres)
     for (const [v, id, vues] of [['impots', 'view-impots', [['resume', /Impôt sur le revenu du foyer[\s\S]*À régulariser entre vous/i], ['prelevements', /Prélèvement à la source/i],
-      ['foncier', /Taxe foncière/i], ['parametres', /Hypothèses[\s\S]*Avis et barèmes/i]]],
+      ['parametres', /Hypothèses[\s\S]*Avis et barèmes/i]]],
+      ['foncier', 'view-impots', [[null, /Taxe foncière/i]]],
       ['epargne', 'view-epargne', [['livret', /Livret[\s\S]*Solde estimé/i], ['plan', /Plan d'épargne entreprise[\s\S]*Versements/i], ['parametres', /Règles du plan/i]]]]) {
-      await page.locator('#app-tb [data-tab="plus"]').click();
-      await page.locator('#plusCorps [data-vue="' + v + '"]').click();
+      await patrimoine(v);
       for (const [k, motif] of vues) {
-        await page.locator('#' + id + ' [data-sousvue="' + k + '"]').click();
+        if (k) await page.locator('#' + id + ' [data-sousvue="' + k + '"]').click();
         const t = await page.locator('#' + id).innerText();
         assert.match(t, motif, v + ' › ' + k);
         assert.doesNotMatch(t, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
@@ -697,8 +703,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#view-accueil [data-av="observations"]').click();
     assert.match(await page.locator('#obsCorps').innerText(), /À faire/i);
     await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#app-tb [data-tab="plus"]').click();
-    await page.locator('#plusCorps [data-vue="impots"]').click();
+    await patrimoine('impots');
     await page.locator('#view-impots [data-sousvue="parametres"]').click();
     await deplier('tx-hyp-panel');
     await page.locator('#view-impots [data-hyp="communG"]').fill('60');
@@ -728,7 +733,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     // Lot 9b : extras désactivés par défaut ; Claude activé → « Lire un bulletin » ; envoi confirmé (aperçu, coût), enregistrement
     await page.locator('#app-tb [data-tab="plus"]').click();
     assert.match(await page.locator('#plusCorps [data-volet="secExtras"]').innerText(), /Mail désactivé · Claude désactivé/);
-    await page.locator('#plusCorps [data-vue="impots"]').click();
+    await patrimoine('impots');
     assert.equal(await page.locator('#view-impots [data-lirebs]').count(), 0);
     await plusVers('secExtras');
     await page.locator('#extrasCorps [data-extra="claude"]').click();
@@ -737,8 +742,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.equal(await page.evaluate(() => window.KladApp.etat().cle.claude.slice(0, 7)), 'sk-ant-');
     await capture(page, '22-extras');
     await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#app-tb [data-tab="plus"]').click();
-    await page.locator('#plusCorps [data-vue="impots"]').click();
+    await patrimoine('impots');
     await page.locator('#view-impots [data-sousvue="prelevements"]').click();
     const nbBs = await page.evaluate(() => Object.keys(window.KladApp.etat().budget.fisc.bs).length);
     const [fb] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#view-impots [data-lirebs]').first().click()]);
@@ -760,8 +764,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await plusVers('secExtras');
     await page.locator('#extrasCorps [data-extra="claude"]').click();
     await page.locator('#volet [data-fermer]').last().click();
-    await page.locator('#app-tb [data-tab="plus"]').click();
-    await page.locator('#plusCorps [data-vue="impots"]').click();
+    await patrimoine('impots');
     assert.equal(await page.locator('#view-impots [data-lirebs]').count(), 0);
     // Lot 9b : « Lire les mails » avec un faux plugin KladMail (aucun réseau) ; PDF fictif fabriqué par Chromium
     const p0 = await browser.newPage();

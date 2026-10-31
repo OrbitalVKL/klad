@@ -228,7 +228,40 @@
     let h = '<h4>À faire</h4>' + (O.faire.length ? '<ul class="obsl">' + O.faire.map(a => it(a, true)).join('') + '</ul>' : '<p class="muted">Aucune action en attente, sur vos comptes comme sur le compte commun.</p>');
     if (O.masques.length) h += '<p class="muted small">' + O.masques.length + ' point(s) marqué(s) « fait » : ' + O.masques.map(a => esc(a.titre)).join(' · ') + ' <button class="lien" data-reafficher="1">réafficher</button></p>';
     h += '<h4>Observations</h4><ul class="obsl">' + (O.infos.length ? O.infos.map(a => it(a, false)).join('') : '<li class="muted">Aucune observation.</li>') + '</ul>';
-    return h + '<p class="muted small">Audit du ' + dfr(B.auj) + ' · vos comptes et le compte commun. « C\'est fait » masque un point jusqu\'à ce que la situation se reproduise.</p>';
+    return h + historiqueObs(B) + '<p class="muted small">Audit du ' + dfr(B.auj) + ' · vos comptes et le compte commun. « C\'est fait » masque un point jusqu\'à ce que la situation se reproduise.</p>';
+  }
+  // 1.1 : historique des points marqués « c'est fait » (gardé même quand le point revient ou est réaffiché).
+  function historiqueObs(B) {
+    const H = KO().historique ? KO().historique(B) : [];
+    if (!H.length) return '';
+    const SC = { perso: 'Perso', commun: 'Commun', all: 'Général' };
+    return '<details class="obs-hist"><summary>Historique des points faits (' + H.length + ')</summary><ul class="list">' + H.map(x =>
+      '<li><div class="grow"><b>' + esc(x.titre) + '</b>' + (x.scope ? ' <small class="chip">' + SC[x.scope] + '</small>' : '') +
+      '<small>fait le ' + esc(dfr(String(x.le).slice(0, 10))) + (x.texte ? ' · ' + esc(x.texte) : '') + '</small></div></li>').join('') + '</ul></details>';
+  }
+
+  // ------------------------------------------------------------ crypto (1.1) : positions saisies à la main
+  // edit : identifiant de la position modifiée, « nouvelle », ou null.
+  function crypto(B, edit) {
+    const C = KF().crypto(B), dfr2 = d => d ? dfr(d) : '—';
+    const gp = v => v > 50 ? '<span class="ok">plus-value ' + eu2(v / 100) + '</span>' : v < -50 ? '<span class="bad">moins-value ' + eu2(-v / 100) + '</span>' : 'à l\'équilibre';
+    const form = p => '<div class="pee-add cr-form" data-crform="' + esc(p ? p.id : '') + '">' +
+      '<label for="crNom">Nom (crypto ou plateforme)<input type="text" id="crNom" maxlength="40" autocomplete="off" value="' + esc(p ? p.nom : '') + '" placeholder="ex. Bitcoin"></label>' +
+      '<label for="crInv">Montant investi (€)<input type="text" inputmode="decimal" id="crInv" autocomplete="off" value="' + esc(p ? F().versSaisie(p.investi) : '') + '"></label>' +
+      '<label for="crVal">Valeur actuelle (€)<input type="text" inputmode="decimal" id="crVal" autocomplete="off" value="' + esc(p ? F().versSaisie(p.valeur) : '') + '"></label>' +
+      '<label for="crLe">Valeur au<input type="date" id="crLe" value="' + esc(p && p.le ? p.le : B.auj) + '"></label>' +
+      '<div class="row"><button class="btn primary" type="button" data-cr="ok">Enregistrer</button><button class="btn" type="button" data-cr="fermer">Annuler</button></div></div>';
+    let h = '<section class="panel" id="cr-panel">' + tete('Crypto', '<span class="muted">saisie à la main, aucune connexion extérieure</span>');
+    if (C.positions.length) {
+      h += '<div class="kpis">' + kp('Valeur', eu2(C.valeur / 100), 'investi ' + eu2(C.investi / 100)) + kp('Résultat', gp(C.ecart), C.positions.length + ' position' + (C.positions.length > 1 ? 's' : '')) + '</div>';
+      if (C.aMettreAJour.length) h += '<p class="note cr-maj">Valeur à mettre à jour (plus de ' + KF().CRYPTO_JOURS + ' jours) : ' + C.aMettreAJour.map(p => esc(p.nom)).join(', ') + '.</p>';
+      h += '<ul class="list cr-list">' + C.positions.map(p => edit === p.id ? '<li>' + form(p) + '</li>' :
+        '<li><div class="grow"><b>' + esc(p.nom) + '</b><small>investi ' + eu2((p.investi || 0) / 100) + ' · ' + gp(p.ecart) + ' · valeur au ' + dfr2(p.le) + (p.aJour ? '' : ' <span class="chip warn">à mettre à jour</span>') + '</small></div>' +
+        '<span class="num">' + eu2((p.valeur || 0) / 100) + '</span><button class="btn small" type="button" data-cr="edit" data-crid="' + esc(p.id) + '">Modifier</button>' +
+        '<button class="btn small" type="button" data-cr="suppr" data-crid="' + esc(p.id) + '">Retirer</button></li>').join('') + '</ul>';
+    } else h += '<p class="muted">Aucune position. Ajoutez chaque crypto (ou plateforme) avec le montant investi et sa valeur actuelle.</p>';
+    h += edit === 'nouvelle' ? form(null) : '<div class="row"><button class="btn" type="button" data-cr="ajout">+ Ajouter une position</button></div>';
+    return h + comment('Valeur et montant investi saisis par vous ; mettez la valeur à jour de temps en temps (rappel après ' + KF().CRYPTO_JOURS + ' jours). Résultat = valeur − montant investi.') + '</section>';
   }
 
   // ------------------------------------------------------------ résultats d'une période et répartition
@@ -259,5 +292,5 @@
     return '<h4>' + esc(titre) + ' · ' + e0(R.total) + '</h4>' + barre(R.natures.map(n => ({ k: NOMS[n.k], v: n.v, c: NC[n.k] }))) + barre(R.categories.map((c, i) => ({ k: c.k, v: c.v, c: CC[i] || CC[7] })));
   }
 
-  g.KladVuesFisc = { impots, taxeFonciere, epargne, observations, resultats, repartition };
+  g.KladVuesFisc = { impots, taxeFonciere, epargne, crypto, observations, historiqueObs, resultats, repartition };
 })(typeof window !== 'undefined' ? window : globalThis);

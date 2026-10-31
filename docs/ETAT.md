@@ -6,6 +6,11 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.1.0** — retours d'usage de la 1.0.1 (sauvegarde et lecture confirmées sur le téléphone : la bascule peut
+reprendre). Saisie du Budget, reste à vivre simplifié, « à surveiller » à 90 %, tolérance des charges, commun sur le
+cycle de salaire, historique des observations, carburant en fenêtre, onglet Patrimoine (dont crypto), rapprochement
+à la main des portefeuilles.
+
 **1.0.1** — correctif de la recette 1.0.0 (plantage à l'export de la sauvegarde, journal des plantages, reprise du
 classement proposée, messages flottants, banque momentanément indisponible). La bascule (arrêt de l'ancienne version)
 reste suspendue tant qu'aucune sauvegarde vérifiée n'existe sur le téléphone.
@@ -25,6 +30,41 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.1.0 — détails techniques
+- Clavier du Budget : `ecranbudget.js` ne redessine plus sur `resize` si la largeur n'a pas changé ou si un champ de
+  `#appli` a le focus (l'ouverture du clavier réduit la hauteur ; le rendu retirait le champ et fermait le clavier).
+- Reste à vivre : Accueil (`vaccueil.js:reste`) = libellé, grand chiffre, « jusqu'au JJ/MM · x € par jour », barre du
+  cycle (texte complet dans `aria-label`) ; `VB.detailRav(rav, base, restants)` ajoute la ligne « Par jour ».
+- `budget.js` : `SURVEILLER = 0.9` (« à surveiller » si consommé ≥ 90 % du budget, plus de critère de projection) ;
+  tolérance `TOL_MIN = 200`, `TOL_PART = 0.02` pour les charges fixes et tous les postes du commun (`tolere`,
+  `tolerance`) : sous le seuil, état « prélevé · x € de plus » / « conforme · x € de plus » (good), cause `sorte: 'tol'`
+  avec `aligner` (bouton « aligner le budget sur le prélevé ») ; ni dans `depasses` ni dans `causes`.
+- Commun : `S.budget.reglages.commun.cycle` (`mois` par défaut, `salaire`) → `B.R.cycleCommun` ; `periode(B, 'commun')`
+  prend le cycle de salaire du perso (si le perso n'est pas au mois civil). Trésorerie, plan et Grafit restent au mois.
+- Observations : `KladObservations.fait(S, titre, now, B)` garde aussi `D.histObs` (200 au plus, le plus récent
+  d'abord, `{ titre, le, niveau, scope, texte }`) ; `reafficher` ne le vide pas ; `annulerFait` accepte l'ancien et le
+  nouveau format ; `historique(B)` ; rendu `KladVuesFisc.historiqueObs` (volet Observations et Budget).
+- Carburant : volet `secCarburant` (`VB.carburantVolet`, gestionnaires dans `ecranbudget.js`), ouvert par `[data-fuel]`
+  (poste Carburant, Suivi et Budget) ; thème `carburant` retiré du menu des Réglages (gardé dans `THEMES`).
+- Onglet Patrimoine (6e onglet, `data-tab="patrimoine"`) : écrans `impots`, `epargne` et nouveau `crypto`
+  (`view-crypto`) ; barre de parties `[data-patri]` (Impôts, Foncier, Épargne, Crypto) dans `ecranfisc.js`
+  (`PARTIES`, `vuePatrimoine`) ; Foncier = écran des impôts en sous-vue `foncier` (retirée des sous-vues des impôts) ;
+  plus de bouton Retour ; entrées Impôts et Épargne retirées de Plus. Banc (`tools/mesures/banc.mjs`) : parcourt
+  chaque partie.
+- Crypto : `S.budget.crypto.positions [{ id, nom, investi, valeur, le }]` (centimes) ; `KladFisc.crypto(B)`,
+  `cryptoEnregistrer`, `cryptoRetirer`, `annulerCrypto`, `CRYPTO_JOURS = 30` ; observation « Crypto : valeur à mettre à
+  jour » ; mode démo : nom → « Position N ».
+- Rapprochement à la main (`classement.js`) : `o.rapprochement` = `'depense'` (prélèvement gardé en dépense, plus « à
+  rapprocher »), `'autrement'` (achat du portefeuille payé autrement), `{ avec }` ; `rapprocherAvec(ctx, o, w, achat)`
+  (prélèvement interne « rapproché à la main », `categorie.lie` = id de l'achat), `garderDepense`, `payeAutrement`,
+  `annulerRapprochement`, `prelevementDe` (prélèvement qui règle un achat), `candidatsPortefeuille`,
+  `candidatsBanque` (± 30 jours, plus proches en montant puis en date). Volet `secRapprocher`, boutons du détail.
+- Six onglets : compteur « à voir » en « 9+ » sur un onglet étroit, et en simple point (nombre dans `aria-label`) quand
+  la place manque à droite de l'icône (petit écran et texte très agrandi) ; recalculé au redimensionnement.
+- Tests : `test/lot11.test.mjs` (Chromium, ajouté au parcours de la fabrication), `budget.test.mjs` (90 %, tolérance,
+  commun sur le cycle), `fisc.test.mjs` (historique), `classement.test.mjs` (rapprochement), `accueil.test.mjs`.
+  Relevé de contrôle et résumé Grafit identiques à la 1.0.1 sur les jeux « mesures » et « personnel ».
 
 ### 1.0.1 — détails techniques
 - **Cause du plantage à l'export (1.0.0)** : `exportFile` recevait toute la sauvegarde (base64 d'un JSON contenant un
@@ -234,6 +274,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Correctif : bandeau du mode démo dans l'écran, test de débordement de tous les écrans, volets, bandeaux et messages | 0.10.11 | fait |
 | 9c | Réglages du complément et du carnet dans Klad (dont Réglages › Budget modifiable), sauvegarde vérifiée, bascule | 1.0.0 | fait, maintenance ensuite |
 | — | Correctif : export de la sauvegarde (plantage), journal des plantages, reprise du classement, messages flottants, panne passagère de la banque | 1.0.1 | fait |
+| — | Retours d'usage : saisie du Budget, reste à vivre, alertes, tolérance, commun en cycle, historique, carburant, onglet Patrimoine, crypto, rapprochement | 1.1.0 | fait |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -437,6 +478,10 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   différences sont listées) ; le rappel compte 30 jours depuis la date du fichier vérifié ; une restauration vaut
   vérification ; le thème et la palette voyagent avec la sauvegarde ; l'import du complément exige la reprise.
 
+- 1.1.0 (décisions prises par défaut, à valider) : « à surveiller » dès 90 % consommés, sans autre condition ;
+  tolérance aussi sur les postes courants du commun ; commun sur le cycle de salaire = celui du budget perso ; partie
+  Foncier = taxe foncière seule ; crypto : rappel et observation à 30 jours ; rapprochement à la main jusqu'à 30 jours
+  d'écart, montant libre ; libellé d'onglet « Patrimoine ».
 - 1.0.1 (décisions prises par défaut, à valider) : nouveau format de sauvegarde par morceaux (v2), les fichiers v1
   restant lisibles ; messages 5 s, erreurs 6 s, « Annuler » 8 s ; un message plus récent remplace un « Annuler » en
   cours ; message en haut de l'écran quand un volet est ouvert ; bandeau du mode démo replié en pastille après 6 s ;

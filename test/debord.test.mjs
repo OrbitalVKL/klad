@@ -19,7 +19,7 @@ const SAUT = !PW && !process.env.KLAD_PARCOURS && 'Playwright absent';
 const LARGEURS = (process.env.KLAD_LARGEURS || '320,360,412').split(',').map(Number);
 const TEXTES = (process.env.KLAD_TEXTES || '100,150,200').split(',').map(Number);
 const VOLETS = ['secReglBudget', 'secImporter', 'secBanques', 'secComptes', 'secReprise', 'secAffichage', 'secModules', 'secVerrou', 'secLog',
-  'secMaj', 'secSync', 'secRav', 'secClassement', 'secAjout', 'secVirements', 'secObs', 'secControle', 'secExtras', 'secDiagAff', 'secReglages', 'secReglAvance'];
+  'secMaj', 'secSync', 'secRav', 'secClassement', 'secAjout', 'secVirements', 'secObs', 'secCarburant', 'secControle', 'secExtras', 'secDiagAff', 'secReglages', 'secReglAvance'];
 const MESSAGE = 'Message assez long pour tenir sur plusieurs lignes : synchronisation terminée, trois comptes à jour, rien à vérifier.';
 
 test('débordements : écrans, volets, verrouillage, bandeaux et messages dans l\'écran (320 à 412 px, texte de 100 à 200 %)', { skip: SAUT, timeout: 1800000 }, async () => {

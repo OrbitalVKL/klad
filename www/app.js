@@ -110,6 +110,7 @@
   function poserBarre() {
     const tb = $('app-tb');
     if (tb && tb.offsetHeight) document.documentElement.style.setProperty('--tbh', tb.offsetHeight + 'px');
+    if (S) renderBadge();
   }
   window.addEventListener('resize', poserBarre);
   if (window.ResizeObserver) new ResizeObserver(poserBarre).observe($('app-tb'));
@@ -176,12 +177,14 @@
   // Onglets : Budget (périmètre perso), Opérations, Commun (budget du compte commun), Plus (volet) ; depuis Plus :
   // Équilibre, Impôts, Épargne, Relevés et sauvegarde.
   const VUES = { accueil: 'view-accueil', budget: 'view-budget', commun: 'view-budget', operations: 'view-budget', operation: 'view-op', plus: 'view-plus',
-    appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', donnees: 'view-data', sauvegarde: 'view-save' };
+    appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', crypto: 'view-crypto', donnees: 'view-data', sauvegarde: 'view-save' };
+  // 1.1 : onglet Patrimoine (Impôts, Foncier, Épargne, Crypto : écrans de ecranfisc.js)
+  const PATRIMOINE = ['impots', 'epargne', 'crypto'];
   const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', plus: 'Plus', appartement: 'Commun',
-    impots: 'Impôts', epargne: 'Épargne', donnees: 'Relevés des comptes', sauvegarde: 'Sauvegarde' };
+    impots: 'Patrimoine', epargne: 'Patrimoine', crypto: 'Patrimoine', donnees: 'Relevés des comptes', sauvegarde: 'Sauvegarde' };
   // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient
   // (par défaut : la liste des opérations, Plus).
-  const RETOUR = { operation: 'operations', impots: 'plus', epargne: 'plus', donnees: 'plus', sauvegarde: 'plus' };
+  const RETOUR = { operation: 'operations', donnees: 'plus', sauvegarde: 'plus' };
   let retourDe = {};
   const pos = {};                    // position de défilement de chaque écran
   let vue = 'accueil', scope = 'perso';
@@ -206,7 +209,7 @@
   }
   // En-tête : titre, ligne du dessus (période), pastille de synchro, recherche (opérations), thème.
   function chrome() {
-    const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue === 'appartement' ? 'commun' : vue;
+    const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue === 'appartement' ? 'commun' : PATRIMOINE.indexOf(vue) >= 0 ? 'patrimoine' : vue;
     $('ah-back').hidden = !RETOUR[vue];
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('ah-title').textContent = TITRES[vue] || 'Accueil';
@@ -238,6 +241,10 @@
     if (!b || !S) return;
     const k = b.dataset.tab;
     if (k === 'plus') { montrer('plus', { force: true, haut: true }); return; }
+    if (k === 'patrimoine') {
+      if (PATRIMOINE.indexOf(vue) >= 0) { window.scrollTo({ top: 0, behavior: 'auto' }); return; }
+      montrer(window.KladEcranFisc ? window.KladEcranFisc.vuePatrimoine() : 'impots', { force: true, haut: true }); return;
+    }
     if (k === vue) { window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
     if (k === 'operations') { opsFin = 0; montrer('operations', { rendre: false }); renderOps(true); return; }
     montrer(k, { force: true });
@@ -387,8 +394,6 @@
         it('📥', 'Importer', 'Relevé d\'un compte, reprise et complément, avec aperçu', 'data-volet="secImporter"') +
         it('🧮', 'Contrôle', 'Relevé pour comparer avec l\'ancienne version', 'data-volet="secControle"')) +
       grp('Modules',
-        it('🏛️', 'Impôts', 'Avis, prélèvements, partage, taxe foncière', 'data-vue="impots"') +
-        it('🐷', 'Épargne', 'Livret, plan d\'épargne', 'data-vue="epargne"') +
         it('🧩', 'Lien Grafit', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : 'Résumé pour Grafit', 'data-volet="secModules"')) +
       grp('Extras',
         it('✨', 'Mail et Claude', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : 'Mail, Claude', 'data-volet="secExtras"')) +
@@ -435,10 +440,16 @@
     return n;
   }
   function renderBadge() {
-    const n = nonVuesScope(), b = $('tb-badge'), t = n > 99 ? '99+' : String(n);
-    if (b.textContent !== t && b.textContent !== '') { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+    // 1.1 : six onglets ; onglet étroit (petit écran, texte agrandi) : « 9+ » pour ne toucher ni l'icône voisine ni le libellé
+    const n = nonVuesScope(), b = $('tb-badge'), etroit = b.parentElement && b.parentElement.offsetWidth > 0 && b.parentElement.offsetWidth < 64;
+    const t = n > 99 ? (etroit ? '9+' : '99+') : n > 9 && etroit ? '9+' : String(n);
+    if (b.textContent !== t && b.textContent !== '' && !b.classList.contains('point')) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+    b.classList.remove('point');
     b.hidden = !n; b.textContent = t;
     b.setAttribute('aria-label', n + ' à voir');
+    // place insuffisante à droite de l'icône (texte très agrandi) : simple point, le nombre reste lu (aria-label)
+    const bt = b.parentElement;
+    if (n && bt && bt.offsetWidth && b.offsetWidth > bt.offsetWidth / 2 - 12 + 4) { b.classList.add('point'); b.textContent = ''; }
   }
   // Haut de l'onglet Budget : grande carte, cartes des comptes, « à voir », « À vérifier ».
   function renderHaut() {
@@ -534,9 +545,13 @@
     else if (act.dataset.act === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
   });
   preparer.secRav = () => {
-    let rav = null;
-    try { const B = budget(); rav = B ? window.KladBudget.suivi(B, 'perso', null).rav : null; } catch (e) { rav = null; }
-    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav, window.KladBudget.baseRav(S)) : '';
+    let rav = null, restants = null;
+    try {
+      const B = budget(), res = B ? window.KladBudget.suivi(B, 'perso', null) : null;
+      rav = res ? res.rav : null;
+      if (res) restants = Math.max(1, res.nbJours - res.jour + 1);
+    } catch (e) { rav = null; }
+    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav, window.KladBudget.baseRav(S), restants) : '';
   };
   // Base du reste à vivre (0.10.7) : interrupteur de l'Accueil, du détail et du Budget ; réglage du budget (Réglages ›
   // Budget), suivi par le résumé Grafit.
@@ -827,6 +842,8 @@
       changed('classement');
       toastAnnuler('Prélèvement marqué interne (réglé par ' + w.libelle + ')' + (venu ? ' : il reste dans la liste, filtre « Internes ».' : '.'),
         () => { KC.annulerInterne(snap); if (venu && filtre.cat === '__int') filtre.cat = '__rap'; changed('classement'); });
+    } else if (['rapprocher', 'rapprocherb', 'garder', 'arapprocher', 'autrement', 'pasautrement'].indexOf(b.dataset.a) >= 0) {
+      rapprochement(b.dataset.a);
     } else if (b.dataset.a === 'depense') {
       const o = trouverOp(opCourante[0], opCourante[1]);
       const snap = o && KC.compterEnDepense(o);
@@ -837,6 +854,59 @@
       changed('classement');
       toastAnnuler('Opération comptée en dépense : elle revient dans « À vérifier ».', () => { KC.annulerInterne(snap); changed('classement'); });
     }
+  });
+
+  // ------------------------------------------------------------ rapprochement à la main (1.1)
+  let rapEnCours = null;            // { cid, id, achats } : opération à rapprocher, sens du choix
+  function rapprochement(a) {
+    const o = trouverOp(opCourante[0], opCourante[1]);
+    if (!o) return;
+    const cx = ctx();
+    const fini = (msg, snap) => { changed('classement'); renderDetail(); toastAnnuler(msg, () => { KC.annulerRapprochement(snap); changed('classement'); if (vue === 'operation') renderDetail(); }); };
+    if (a === 'garder') {
+      if (!KC.aRapprocher(cx, o)) return;
+      log('info', 'Prélèvement de portefeuille gardé en dépense.');
+      fini('Prélèvement gardé en dépense : il ne sera plus proposé au rapprochement.', KC.garderDepense(o));
+    } else if (a === 'arapprocher') {
+      const snap = [{ op: o, categorie: o.categorie, vue: o.vue, rapprochement: o.rapprochement }];
+      delete o.rapprochement;
+      fini('Prélèvement remis « à rapprocher ».', snap);
+    } else if (a === 'autrement') {
+      log('info', 'Achat de portefeuille marqué payé autrement.');
+      fini('Achat marqué « payé autrement » : aucun prélèvement n\'est attendu.', KC.payeAutrement(o));
+    } else if (a === 'pasautrement') {
+      const snap = [{ op: o, categorie: o.categorie, vue: o.vue, rapprochement: o.rapprochement }];
+      delete o.rapprochement;
+      fini('Achat de nouveau en attente de son prélèvement.', snap);
+    } else {
+      rapEnCours = { cid: o.compte, id: o.id, achats: a === 'rapprocher' };
+      ouvrirVolet('secRapprocher', { titre: a === 'rapprocher' ? 'Rapprocher avec un achat' : 'Rapprocher avec un prélèvement' });
+    }
+  }
+  preparer.secRapprocher = () => {
+    const o = rapEnCours && trouverOp(rapEnCours.cid, rapEnCours.id);
+    if (!o) { $('rapCorps').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
+    const cx = ctx(), w = rapEnCours.achats ? KC.aRapprocher(cx, o) : null;
+    const L = rapEnCours.achats ? (w ? KC.candidatsPortefeuille(cx, o, w) : []) : KC.candidatsBanque(cx, o);
+    $('rapCorps').innerHTML = Vu.choixRapprochement(S, o, L, rapEnCours.achats);
+  };
+  $('rapCorps').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-rapid]');
+    if (!b || !rapEnCours) return;
+    const [cid, id] = [b.dataset.rapid.slice(0, b.dataset.rapid.indexOf('|')), b.dataset.rapid.slice(b.dataset.rapid.indexOf('|') + 1)];
+    const o = trouverOp(rapEnCours.cid, rapEnCours.id), x = trouverOp(cid, id);
+    if (!o || !x) return;
+    const cx = ctx();
+    const banque = rapEnCours.achats ? o : x, achat = rapEnCours.achats ? x : o;
+    const w = M.compte(S, achat.compte);
+    if (!KC.aRapprocher(cx, banque) || !w) return;
+    const snap = KC.rapprocherAvec(cx, banque, w, achat);
+    log('info', 'Prélèvement de portefeuille rapproché à la main d\'un achat.');
+    rapEnCours = null;
+    fermerVolet();
+    changed('classement');
+    if (vue === 'operation') renderDetail();
+    toastAnnuler('Rapproché : le prélèvement est interne, l\'achat compte comme dépense.', () => { KC.annulerRapprochement(snap); changed('classement'); if (vue === 'operation') renderDetail(); });
   });
 
   // ------------------------------------------------------------ volet « Classer »

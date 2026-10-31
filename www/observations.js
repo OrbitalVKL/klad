@@ -95,6 +95,11 @@
         }
       } catch (e) { /* pas d'appels */ }
     }
+    // crypto (1.1) : valeurs saisies à la main, à mettre à jour après 30 jours
+    if (KF() && KF().crypto) {
+      const CR = KF().crypto(B);
+      if (CR.aMettreAJour.length) add('warn', 'perso', 'Crypto : valeur à mettre à jour', CR.aMettreAJour.map(p => p.nom).join(', ') + ' : valeur saisie il y a plus de ' + KF().CRYPTO_JOURS + ' jours (Patrimoine › Crypto).');
+    }
     // portefeuilles : détail
     for (const w of B.comptes.filter(c => c.role === 'paiement_en_ligne')) {
       const mots = K().motifs(w.prelevement && w.prelevement.motif);
@@ -201,9 +206,29 @@
     const actifs = all.filter(a => a.niveau === 'bad' || a.niveau === 'warn');
     return { faire: actifs.filter(a => !masque(B, a)), masques: actifs.filter(a => masque(B, a)), infos: all.filter(a => a.niveau === 'good' || a.niveau === 'info') };
   }
-  function fait(S, titre, now) { const D = KB().donnees(S); D.dismiss = D.dismiss || {}; const avant = JSON.stringify(D.dismiss); D.dismiss[titre] = new Date(now == null ? Date.now() : now).toISOString(); return avant; }
-  function reafficher(S, now) { const D = KB().donnees(S); const avant = JSON.stringify(D.dismiss || {}); D.dismiss = { _reset: new Date(now == null ? Date.now() : now).toISOString() }; return avant; }
-  function annulerFait(S, avant) { KB().donnees(S).dismiss = JSON.parse(avant); }
+  // 1.1 : chaque « c'est fait » est aussi gardé dans un historique (D.histObs, le plus récent d'abord, 200 au plus),
+  // qui reste après la réapparition du point ou « réafficher ». B (facultatif) : contexte du budget, pour garder le
+  // niveau, le périmètre et le texte du point.
+  const HIST_MAX = 200;
+  const etatFait = D => JSON.stringify({ dismiss: D.dismiss || {}, hist: D.histObs || [] });
+  function fait(S, titre, now, B) {
+    const D = KB().donnees(S), avant = etatFait(D), le = new Date(now == null ? Date.now() : now).toISOString();
+    D.dismiss = D.dismiss || {};
+    D.dismiss[titre] = le;
+    const a = B ? audit(B).find(x => x.titre === titre) : null;
+    const h = { titre, le };
+    if (a) { h.niveau = a.niveau; h.scope = a.scope; h.texte = a.texte; }
+    D.histObs = [h].concat(Array.isArray(D.histObs) ? D.histObs : []).slice(0, HIST_MAX);
+    return avant;
+  }
+  function reafficher(S, now) { const D = KB().donnees(S); const avant = etatFait(D); D.dismiss = { _reset: new Date(now == null ? Date.now() : now).toISOString() }; return avant; }
+  // avant : état rendu par fait / reafficher (avant la 1.1 : l'objet dismiss seul).
+  function annulerFait(S, avant) {
+    const D = KB().donnees(S), o = JSON.parse(avant);
+    if (o && Array.isArray(o.hist) && o.dismiss !== undefined) { D.dismiss = o.dismiss; if (o.hist.length) D.histObs = o.hist; else delete D.histObs; }
+    else D.dismiss = o;
+  }
+  const historique = B => (B && B.D && Array.isArray(B.D.histObs)) ? B.D.histObs : [];
 
   // ------------------------------------------------------------ résultats d'une période (clôture)
   // Période précédant le cycle en cours (perso : cycle de salaire précédent ; commun : mois précédent), ou la période
@@ -274,5 +299,5 @@
     return { total: dep, natures: ['fixe', 'courante', 'optionnelle'].filter(k => nat[k] > DEMI).map(k => ({ k, v: nat[k] })), categories: parCat };
   }
 
-  g.KladObservations = { reglages, recurrentsSecondaire, audit, observations, masque, fait, reafficher, annulerFait, periodePrecedente, resultats, repartition };
+  g.KladObservations = { reglages, recurrentsSecondaire, audit, observations, masque, fait, reafficher, annulerFait, historique, periodePrecedente, resultats, repartition };
 })(typeof window !== 'undefined' ? window : globalThis);

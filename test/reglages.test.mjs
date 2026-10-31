@@ -225,7 +225,7 @@ test('Réglages : modifications visibles tout de suite (écrans, résumé Grafit
     assert.equal(await page.evaluate(() => window.KladBudget.complement(window.KladApp.etat()).appels.titre), 'Résidence importée');
 
     // écrans par thème : chacun s'ouvre
-    for (const id of ['cartes', 'appels', 'mail', 'motscles', 'tf', 'livret', 'pee', 'masquees', 'exclusions', 'carburant', 'apparence']) {
+    for (const id of ['cartes', 'appels', 'mail', 'motscles', 'tf', 'livret', 'pee', 'masquees', 'exclusions', 'apparence']) {
       await page.evaluate(() => window.KladApp.ouvrirVolet('secReglages'));
       await page.locator('#reglagesCorps [data-reglt="' + id + '"]').click();
       await B.pause(100);

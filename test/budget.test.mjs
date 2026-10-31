@@ -283,3 +283,57 @@ test('opérations (0.9.4) : bornes des périodes, filtre combiné (période, rec
   K.annulerInterne(snap);
   assert.equal(K.interneManuel(o), true);
 });
+
+// 1.1 : « à surveiller » seulement à partir de 90 % du budget utilisé ; tolérance des charges (fixes et commun) :
+// un écart sous le plus grand de 2 € et 2 % du budget ne passe pas le poste en dépassement (correction proposée).
+test('à surveiller à partir de 90 % ; tolérance de 2 € ou 2 % sur les charges, avec « aligner sur le prélevé »', () => {
+  const ligne = (S, sc, key) => { const r = KB.suivi(ctx(S), sc, null); for (const nk of Object.keys(r.sections)) { const a = r.sections[nk].lignes.find(x => x.key === key); if (a) return { a, r }; } return { a: null, r }; };
+  const { S, c } = etat();
+  // Bars : 90 € dépensés sur le cycle
+  S.budget.plan.perso['c|Bars'].amt = 20000;
+  let { a } = ligne(S, 'perso', 'c|Bars');
+  assert.equal(a.cur, 9000);
+  assert.deepEqual([a.cls, a.etat.texte], ['ok', 'conforme'], '45 % : aucune alerte, même si la projection dépasse');
+  S.budget.plan.perso['c|Bars'].amt = 10000;
+  ({ a } = ligne(S, 'perso', 'c|Bars'));
+  assert.deepEqual([a.cls, a.etat.texte], ['warn', 'à surveiller'], '90 % : à surveiller');
+  // poste à 0 % jamais « à surveiller »
+  S.budget.plan.perso['c|Alimentation'].amt = 500000;
+  ({ a } = ligne(S, 'perso', 'c|Alimentation'));
+  assert.notEqual(a.cls, 'warn');
+  // commun : prêt de 1 200 €, prélevé 1 201 € → dans la tolérance (24 €)
+  const ech = S.ops[c.id].find(o => o.date === '2026-10-05');
+  ech.montant = -120100;
+  let r;
+  ({ a, r } = ligne(S, 'commun', 'f|Prêt'));
+  assert.deepEqual([a.cls, a.etat.niveau], ['ok', 'good']);
+  assert.match(a.etat.texte, /^prélevé · 1\s€ de plus$/);
+  assert.deepEqual([a.cause.sorte, a.cause.aligner], ['tol', 120100], 'correction proposée en un appui');
+  assert.ok(!r.depasses.some(x => x.key === 'f|Prêt') && !r.causes.some(x => x.a.key === 'f|Prêt'), 'ni « plus gros écarts » ni causes de dépassement');
+  ech.montant = -122300;          // 23 € de plus : toujours toléré
+  assert.equal(ligne(S, 'commun', 'f|Prêt').a.cls, 'ok');
+  ech.montant = -122500;          // 25 € de plus : au-delà de 2 %
+  ({ a } = ligne(S, 'commun', 'f|Prêt'));
+  assert.deepEqual([a.cls, a.etat.niveau], ['over', 'bad']);
+  assert.notEqual(a.cause.sorte, 'tol');
+});
+
+// 1.1 : suivi du commun au mois (par défaut) ou sur le cycle de salaire du budget perso (réglage commun.cycle).
+test('commun : suivi au mois par défaut, ou sur le cycle de salaire', () => {
+  const { S } = etat();
+  let B = ctx(S), p = KB.periode(B, 'commun', null);
+  assert.deepEqual([p.start, p.salaire], ['2026-10-01', false], 'mois civil par défaut');
+  const pret = B2 => KB.suivi(B2, 'commun', null).sections.fixe.lignes.find(x => x.key === 'f|Prêt');
+  assert.equal(pret(B).cur, 120000);
+  S.budget.reglages.commun.cycle = 'salaire';
+  B = ctx(S); p = KB.periode(B, 'commun', null);
+  assert.deepEqual([p.start, p.end, p.salaire], ['2026-10-27', '2026-11-26', true], 'même cycle que le perso');
+  assert.equal(KB.periode(B, 'perso', null).start, p.start);
+  assert.equal(pret(B).cur, 0, 'échéance du 05/10 : cycle précédent');
+  const prec = KB.periode(B, 'commun', p.prev);
+  assert.equal(prec.start, '2026-09-26');
+  assert.equal(KB.suivi(B, 'commun', p.prev).sections.fixe.lignes.find(x => x.key === 'f|Prêt').cur, 120000);
+  // budget perso au mois civil : le commun suit (pas de cycle)
+  S.budget.reglages.cycle = 'mois';
+  assert.equal(KB.periode(ctx(S), 'commun', null).start, '2026-10-01');
+});
