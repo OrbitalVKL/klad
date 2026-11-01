@@ -979,6 +979,7 @@ table.cats.budget .solbar .sb-v{font-size:28px} @media (max-width:620px){ table.
 .cmp-h>b{font-size:15px}
 table.cmp-t td, table.cmp-t th{padding:6px 6px}
 .cmp-pon{padding:6px 8px;border-radius:8px;background:var(--warn-soft);font-size:13px}
+.cmp-route{margin:8px 0;padding:6px 8px;border-radius:8px;background:var(--surface-2);font-size:13px}
 .cm-h3{font-size:14px;margin:18px 0 8px}
 .cm-cash{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(0,1fr);gap:14px;align-items:start}
 .cm-cash svg{display:block;max-width:100%;height:auto}

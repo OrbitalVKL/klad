@@ -13,7 +13,8 @@
   const ISO = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
   const BLOC_OPS = /^ops-([a-z0-9]{8})-(\d{4})$/;
   const PURGE_JOURS = 10;                        // opération en cours disparue : retirée 10 jours après sa date
-  const RAPPROCHE_JOURS = 4;                     // en cours → comptabilisée : dates à 4 jours au plus
+  const RAPPROCHE_JOURS = 5;                     // en cours → comptabilisée : dates à 5 jours au plus (4 jusqu'à la 1.1.1)
+  const DOUBLON_JOURS = 5;                       // 1.1.2 : même opération relue à une autre date : 5 jours au plus
   const HISTO_MAX = 1500;                        // historique quotidien des soldes : jours gardés par compte
   const SOLDES_PREF = ['CLBD', 'ITAV', 'CLAV', 'XPCD', 'ITBD', 'OPBD', 'PRCD', 'INFO', 'OTHR'];
 
@@ -55,6 +56,17 @@
     const [s, l] = ka.length <= kb.length ? [ka, kb] : [kb, ka];
     return s.length > 0 && l.slice(0, s.length) === s;
   }
+
+  // 1.1.2 : libellé « de base » : libellé normalisé sans les numéros et références de fin (« VIR X 2630… » → « VIR X »).
+  function baseLibelle(s) {
+    const w = cleLibelle(s).split(' ').filter(Boolean);
+    while (w.length > 1 && /\d/.test(w[w.length - 1])) w.pop();
+    return w.join(' ');
+  }
+  // Le libellé porte-t-il une référence de fin (numéro ajouté par la banque à la comptabilisation) ?
+  const avecReference = s => baseLibelle(s) !== cleLibelle(s);
+  // Même opération lue deux fois ? Même montant, dates à 5 jours au plus, même libellé de base.
+  const memeOperation = (a, b) => a.montant === b.montant && Math.abs(ecart(a.date, b.date)) <= DOUBLON_JOURS && baseLibelle(a.libelle) === baseLibelle(b.libelle);
 
   // Hachage court et synchrone (cyrb53) : sert seulement à fabriquer des identifiants.
   function hash(str) {
@@ -299,6 +311,43 @@
 
   const trier = list => list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
+  // 1.1.2 : ce qui a été fait à la main sur une opération (classement, « vu », rapprochements, échéance) passe à
+  // l'opération qui la remplace ; les renvois vers son id (exclusions du budget, équilibre, rapprochements) aussi.
+  // → liste des renvois changés (pour annuler).
+  const ETAT_MAIN = ['categorie', 'rapprochement', 'ecartVu', 'echeance'];
+  function reprendreEtat(S, d, r) {
+    for (const k of ETAT_MAIN) if (r[k] == null && d[k] != null) r[k] = d[k];
+    if (d.vue === true || (d.vue && !r.vue)) r.vue = d.vue;
+    if (d.apparue && (!r.apparue || d.apparue < r.apparue)) r.apparue = d.apparue;
+    if (!r.exEnCours && d.exEnCours) r.exEnCours = d.exEnCours;
+    return renvoyer(S, d.id, r.id);
+  }
+  function renvoyer(S, ancien, nouveau) {
+    const ch = [];
+    const D = S.budget;
+    if (D && D.exc && D.exc[ancien]) { if (!D.exc[nouveau]) { D.exc[nouveau] = D.exc[ancien]; ch.push({ t: 'exc' }); } delete D.exc[ancien]; }
+    if (D && D.equilibre && Array.isArray(D.equilibre.items)) for (const x of D.equilibre.items) if (x && x.op === ancien) { x.op = nouveau; ch.push({ t: 'eq', id: x.id }); }
+    for (const cid of Object.keys(S.ops || {})) for (const o of S.ops[cid] || []) {
+      if (o.categorie && o.categorie.lie === ancien) { o.categorie = Object.assign({}, o.categorie, { lie: nouveau }); ch.push({ t: 'lie', op: o.id, compte: cid }); }
+      if (o.rapprochement && typeof o.rapprochement === 'object' && o.rapprochement.avec === ancien) { o.rapprochement = { avec: nouveau }; ch.push({ t: 'avec', op: o.id, compte: cid }); }
+    }
+    return ch;
+  }
+  // Annule des renvois (nouveau → ancien).
+  function annulerRenvois(S, ancien, nouveau, ch) {
+    const D = S.budget;
+    for (const c of ch || []) {
+      if (c.t === 'exc' && D && D.exc) { D.exc[ancien] = D.exc[nouveau]; delete D.exc[nouveau]; }
+      else if (c.t === 'eq' && D && D.equilibre) { const x = (D.equilibre.items || []).find(y => y.id === c.id); if (x) x.op = ancien; }
+      else {
+        const o = (S.ops[c.compte] || []).find(y => y.id === c.op);
+        if (!o) continue;
+        if (c.t === 'lie' && o.categorie) o.categorie = Object.assign({}, o.categorie, { lie: ancien });
+        if (c.t === 'avec') o.rapprochement = { avec: ancien };
+      }
+    }
+  }
+
   // En cours → comptabilisée (une pour une, date la plus proche d'abord). Renvoie le nombre de fusions.
   function rapprocher(list) {
     const pend = list.filter(o => o.statut === 'en_cours' && o.source === 'eb').sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -352,7 +401,8 @@
     return mots.some(m => L.indexOf(m) >= 0);
   }
 
-  function integrer(S, cid, raw, now) {
+  // opts (1.1.2) : { depuis } : début de la période demandée à la banque (null : tout l'historique accepté).
+  function integrer(S, cid, raw, now, opts) {
     const c = compte(S, cid);
     const jour = jourLocal(now);
     const front = (c && c.frontiere) || '';
@@ -386,6 +436,34 @@
     }
     for (const o of list) if (o.source === 'eb' && o.statut === 'en_cours' && !vues.has(o.id) && !o.absente) o.absente = jour;
     st.fusionnees = rapprocher(list);
+    // 1.1.2 : opération comptabilisée lue auparavant et que la banque ne renvoie plus sur la même période (elle l'a
+    // relue à une autre date, souvent avec une référence ajoutée au libellé) : fusionnée dans la version renvoyée
+    // (même montant, 5 jours au plus, même libellé de base ; ce qui a été fait à la main la suit), sinon retirée.
+    // Deux opérations identiques renvoyées toutes les deux ne sont jamais touchées. Rien n'est retiré si la banque
+    // ne renvoie rien. Saisies à la main et reprise : jamais concernées.
+    if (cands.length) {
+      const lus = new Set(cands.map(x => x.id));
+      const minLu = cands.reduce((m, x) => (x.date < m ? x.date : m), cands[0].date);
+      // période relue : depuis la date demandée ; si la banque ne renvoie rien des premiers jours demandés (historique
+      // limité, relecture complète), seulement depuis la plus ancienne opération renvoyée
+      const dep = opts && opts.depuis;
+      const debut = dep && (dep >= minLu || ecart(minLu, dep) <= 10) ? dep : minLu;
+      const disparues = list.filter(o => o.source === 'eb' && o.statut === 'comptabilisee' && !lus.has(o.id) && o.date >= debut && (!front || o.date >= front))
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      const prises = new Set(), retirer = new Set();
+      for (const d of disparues) {
+        let best = null, bd = Infinity;
+        for (const r of list) {
+          if (r === d || r.source !== 'eb' || r.statut !== 'comptabilisee' || !lus.has(r.id) || prises.has(r.id) || !memeOperation(d, r)) continue;
+          const e = Math.abs(ecart(d.date, r.date));
+          if (e < bd) { best = r; bd = e; }
+        }
+        if (best) { reprendreEtat(S, d, best); prises.add(best.id); st.fusionnees++; }
+        else st.retirees++;
+        retirer.add(d.id);
+      }
+      if (retirer.size) for (let i = list.length - 1; i >= 0; i--) if (retirer.has(list[i].id)) list.splice(i, 1);
+    }
     for (let i = list.length - 1; i >= 0; i--) {
       const o = list[i];
       if (o.statut === 'en_cours' && o.absente && ecart(jour, o.date) > PURGE_JOURS) { list.splice(i, 1); st.retirees++; }
@@ -602,7 +680,7 @@
   }
 
   g.KladModele = {
-    V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId,
+    V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId, baseLibelle, avecReference, memeOperation, reprendreEtat, annulerRenvois, DOUBLON_JOURS,
     vide, nouveauModele, compte, comptesTries, comptesDe, opsDe, roleDefaut, nouveauCompte, compteEB, empreinte,
     associerSession, supprimerCompte, remplacerCompte, reassocier, disponibles, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, bornesRecuperation, debutRecuperation,
     appliquerFrontiere, creditDeReglement, soldePrefere, soldesLus, soldeAffiche, totalCourants, etatAcces, alerteCompte,

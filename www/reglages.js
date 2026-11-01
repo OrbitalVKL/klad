@@ -48,6 +48,13 @@
       { k: 'tolerance.max', ou: 'r', t: 'nombre', l: 'Écart toléré au plus (€)', defaut: 10, borne: [0, 1000],
         aide: 'Charges fixes et postes du commun : un écart jusqu\'au plus grand du minimum et de la part du budget reste « prélevé » ou « conforme », sans dépasser ce plafond. Au-delà, le poste est dépassé.' }
     ] },
+    // 1.1.2 : rattachement à l'échéance : un virement permanent, un contrat ou une charge fixe récurrente payé dans la
+    // fenêtre autour de sa date prévue compte pour l'échéance qu'il règle (date réelle gardée sur l'opération).
+    { id: 'echeance', titre: 'Échéances réglées d\'avance', sous: 'Fenêtre autour de la date prévue', champs: [
+      { k: 'echeance.avant', ou: 'r', t: 'nombre', l: 'Jours avant la date prévue', defaut: 7, borne: [0, 15] },
+      { k: 'echeance.apres', ou: 'r', t: 'nombre', l: 'Jours après la date prévue', defaut: 5, borne: [0, 15],
+        aide: 'Un virement permanent, un prélèvement ou une échéance de contrat débité dans cette fenêtre (week-end, jour férié, virement fait d\'avance) compte pour l\'échéance prévue, partout : budget, observations, échéances, commun, résumé Grafit. La date réelle reste affichée sur l\'opération.' }
+    ] },
     { id: 'secondaire', titre: 'Compte secondaire', sous: 'Charges récurrentes à basculer sur le compte principal', champs: [
       { k: 'observations.secondaire', ou: 'c', t: 'compte', l: 'Compte secondaire', vide: 'Aucun', aide: 'Les charges récurrentes prélevées sur ce compte sont signalées (observations et pastille « récurrent » dans le détail des postes).' },
       { k: 'observations.principal', ou: 'c', t: 'compte', l: 'Compte courant principal', vide: 'Non précisé' },
@@ -375,6 +382,7 @@
       '<div class="row"><button type="button" class="btn" data-a="base">Modifier dans Budget</button></div>' +
       '<h3>Compte commun</h3>' + formHtml(R.theme('commun')) +
       '<h3>Tolérance des charges</h3>' + formHtml(R.theme('tolerance')) +
+      '<h3>Échéances réglées d\'avance</h3>' + formHtml(R.theme('echeance')) +
       '<h3>Compte secondaire</h3>' + formHtml(R.theme('secondaire'));
   };
   $('reglBudgetCorps').addEventListener('click', ev => {

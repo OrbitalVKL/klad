@@ -64,17 +64,35 @@
     if (!KC()) return null;
     const MR = KC().margeReelle(B), F = KC().finDeMois(B), D = KC().plan(B), C = KC().tresorerie(B), W = KC().origine(B);
     if (!F) return null;
-    return {
+    const marge = MR && { solde: ent(MR.solde), fixes: ent(MR.fixes), variable: ent(MR.variable), marge: ent(MR.marge) };
+    // 1.1.2 : seulement s'il y a des virements du mois pas encore arrivés (relevé inchangé sinon)
+    if (marge && MR.enAttente) Object.assign(marge, { enRoute: ent(MR.enRoute), enAttente: ent(MR.enAttente), prevue: ent(MR.prevue) });
+    const fdm = { solde: ent(F.solde), aVenir: ent(F.due), attendus: ent(F.inc), reserve: ent(F.reserve), fin: ent(F.end) };
+    if (F.route) fdm.enRoute = ent(F.route);
+    const route = KC().enRoute ? KC().enRoute(B) : [];
+    const out = {
       mois: B.auj.slice(0, 7),
-      marge: MR && { solde: ent(MR.solde), fixes: ent(MR.fixes), variable: ent(MR.variable), marge: ent(MR.marge) },
-      finDeMois: { solde: ent(F.solde), aVenir: ent(F.due), attendus: ent(F.inc), reserve: ent(F.reserve), fin: ent(F.end) },
-      virements: (D.recus || []).map(x => ({ qui: x.v.qui, attendu: ent(x.v.montant), recu: x.vu ? ent(x.vu.m) : null, date: x.vu ? x.vu.date : null })),
+      marge,
+      finDeMois: fdm,
+      virements: (D.recus || []).map(x => Object.assign({ qui: x.v.qui, attendu: ent(x.v.montant), recu: x.vu ? ent(x.vu.m) : null, date: x.vu ? x.vu.date : null }, x.route ? { enRoute: x.route.depart.date } : {})),
       aMettreEnPlace: (D.changes || []).map(x => ({ qui: x.qui, actuel: ent(x.have), demande: ent(x.want) })),
       ponctuel: { total: ent(D.pon), moi: ent(D.ponMoi), autre: ent(D.ponAutre) },
       tresorerie: C && { pointBas: ent(C.min), date: C.minAt, decouvert: C.negAt || null },
       origine: W && { debut: W.S, mois: W.n, soldeInitial: ent(W.B0), apports: ent(W.credits), attendu: ent(W.attendu), budget: ent(W.bud),
         postes: (W.items || []).map(x => ({ libelle: x.lab, montant: ent(x.e), sorte: x.sorte })) }
     };
+    if (route.length) out.enRoute = route.map(r => ({ depart: r.depart.date, montant: ent(r.montant), pour: r.pour }));
+    return out;
+  }
+  // 1.1.2 : opérations comptées pour une autre période que celle de leur date (échéance réglée d'avance ou en retard,
+  // ou choix à la main). Absent du relevé quand il n'y en a pas.
+  function rattachements(B, ref) {
+    const out = [];
+    for (const r of B.rows) {
+      if (r.ecart || !r.pd || r.pd.slice(0, 7) === r.od.slice(0, 7)) continue;
+      out.push({ date: r.date, compte: ref(r.cid), operation: idOp(r.o), montant: ent(r.m), comptePour: r.pd, main: !!r.main });
+    }
+    return out;
   }
 
   // ------------------------------------------------------------ 5. équilibre des apports
@@ -196,6 +214,8 @@
       empreinte: point(() => empreinte(S, B, ref))
     };
     if (ec && ec.length) out.ecartsRapprochement = ec;
+    const rt = point(() => rattachements(B, ref));
+    if (rt && rt.length) out.rattachements = rt;
     return out;
   }
   // Nom du fichier : klad-controle-AAAAMMJJ-HHMM.json (heure locale).

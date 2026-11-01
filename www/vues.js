@@ -156,7 +156,7 @@
       if (f.reserve > 50) h += '<div class="kpi bal-sum"><span class="eyebrow">Réserve pour échéances</span><span class="v">' + esc(F().montant(f.reserve)) + '</span><span class="s">mise de côté : ' + esc((f.reserveDet || []).join(', ')) + '</span></div>';
       h += '<div class="kpi bal-sum"><span class="eyebrow">Fin de mois estimée</span><span class="v" style="color:' + (f.end < 0 || f.decouvert ? 'var(--bad)' : 'var(--good)') + '">' +
         esc(F().montant(Math.abs(f.end))) + (f.end < 0 ? ' débiteur' : '') + '</span><span class="s">solde ' + esc(F().solde(f.solde)) + ' − prélèvements à venir ' + esc(F().montant(f.due)) +
-        (f.inc ? ' + virements attendus ' + esc(F().montant(f.inc)) : '') + (f.reserve > 50 ? ' − réserve pour échéances ' + esc(F().montant(f.reserve)) : '') +
+        (f.route ? ' + en route ' + esc(F().montant(f.route)) : '') + (f.inc ? ' + virements attendus ' + esc(F().montant(f.inc)) : '') + (f.reserve > 50 ? ' − réserve pour échéances ' + esc(F().montant(f.reserve)) : '') +
         (f.decouvert ? ' · <b class="bad-t">découvert si les prélèvements passent avant les virements</b>' : '') +
         (f.aVenir && f.aVenir.length ? '<br>à venir : ' + esc(f.aVenir.join(', ')) : '') + '</span></div>';
     }
@@ -275,7 +275,9 @@
       '<span class="acct">' + esc(c ? c.libelle : '') + '</span> <span class="tx-cat">' + cat + '</span>' +
       (r.src === 'regle' ? '<span class="tx-tag" title="Classée par une de vos règles">règle</span>' : '') + nc +
       (g.KladCommun && g.KladCommun.equipementDeOp(S, o.id) ? '<span class="tx-tag eq" title="Ajoutée à l\'équilibre des apports">équilibre</span>' : '') +
-      (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') + '</div></div>' +
+      (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') +
+      // 1.1.2 : opération comptée pour l'échéance qu'elle règle (date réelle gardée)
+      (opt && opt.ratt && opt.ratt.get(o.id) ? '<span class="tx-tag" title="La date réelle reste affichée ; seule la période de comptage change">' + esc(opt.ratt.get(o.id)) + '</span>' : '') + '</div></div>' +
       '<div class="amt' + (o.montant > 0 ? ' pos' : '') + (!COMPTEE(r.type) ? ' nc' : '') + '"><span class="amt-v">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></div></div>';
   }
 
@@ -298,7 +300,7 @@
       const dt = new Date(d + 'T12:00:00Z');
       h += '<div class="tx-j"><div class="tx-day"><div><div class="td-in"><span>' + JOURS[dt.getUTCDay()] + ' ' + jjmm(d) + (annee && +d.slice(0, 4) !== annee ? '/' + d.slice(2, 4) : '') +
         '</span><span class="td-t num">' + (Math.abs(tot) < 1 ? '' : esc((tot > 0 ? '+' : '') + F().montant(Math.abs(tot)))) + '</span></div></div></div>' +
-        ops.slice(i, j).map(o => ligne(S, o, { ctx })).join('') + '</div>';
+        ops.slice(i, j).map(o => ligne(S, o, { ctx, ratt: opt && opt.ratt })).join('') + '</div>';
       i = j; jours++;
     }
     return { html: h, fin: i };
@@ -322,7 +324,7 @@
   // Tranche sans en-têtes de jour (ordres « plus grosses dépenses », « par catégorie ») : date sur chaque ligne.
   function trancheSansJours(S, ops, debut, n, opt) {
     const fin = Math.min(ops.length, debut + n);
-    return { html: '<div class="tx-j tx-plat">' + ops.slice(debut, fin).map(o => ligne(S, o, { ctx: opt && opt.ctx, date: true })).join('') + '</div>', fin };
+    return { html: '<div class="tx-j tx-plat">' + ops.slice(debut, fin).map(o => ligne(S, o, { ctx: opt && opt.ctx, ratt: opt && opt.ratt, date: true })).join('') + '</div>', fin };
   }
 
   // Puces des filtres (Toutes, Non vues, Non classées, Catégorie, Compte, Tout marquer vu).
@@ -354,7 +356,8 @@
   }
 
   // ------------------------------------------------------------ détail d'une opération (page)
-  function detail(S, o, ctx) {
+  // B (facultatif, 1.1.2) : contexte du budget, pour la période de comptage (« compte pour : octobre / novembre »).
+  function detail(S, o, ctx, B) {
     const c = M().compte(S, o.compte);
     const cur = (c && c.devise) || 'EUR';
     const r = K().classer(ctx, o);
@@ -390,6 +393,12 @@
         (ecV ? (ec.banque.ecartVu ? ' · vérifié' : ' · à vérifier') : '')] : null,
       ['Vue', vu ? 'oui' : 'non']
     ].filter(Boolean);
+    // 1.1.2 : période de comptage (échéance réglée d'avance ou en retard ; correction à la main, annulable)
+    const KB = g.KladBudget, rt = B && KB ? KB.rattachement(B, o.id) : null, choix = B && KB ? KB.choixRattachement(B, o.id) : [];
+    if (rt && rt.texte) lignes.splice(2, 0, ['Compte pour', rt.texte + (rt.main ? ' (choisi à la main)' : '') + ' · la date réelle reste le ' + F().jour(o.date)]);
+    const compte = choix.length ? '<div class="row" role="group" aria-label="Période où l\'opération compte"><span class="muted small">Compte pour :</span>' +
+      choix.map(x => '<button type="button" class="btn' + (x.actif ? ' primary' : '') + '" data-a="comptepour" data-val="' + esc(x.valeur) + '" aria-pressed="' + (x.actif ? 'true' : 'false') + '">' + esc(x.label) + '</button>').join('') +
+      (rt && rt.main ? '<button type="button" class="btn" data-a="comptepour" data-val="">Automatique</button>' : '') + '</div>' : '';
     return '<div class="sh-head op-h">' + U().icoOp(ctx.C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '<div class="t"><b>' + esc(libelleCourt(o.libelle)) + '</b><span>' +
       esc(jjmm(o.date) + ' · ' + (c ? c.libelle : '') + ' · ') + '<span class="num">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></span></div></div>' +
       '<dl class="op-det">' + lignes.map(x => '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>').join('') + '</dl>' +
@@ -407,7 +416,7 @@
       (achat && o.rapprochement === 'autrement' ? '<button type="button" class="btn" data-a="pasautrement">Annuler : payé autrement</button>' : '') +
       (ecV && !ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartvu">Écart vérifié</button>' : '') +
       (ecV && ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartnonvu">Annuler : écart à vérifier</button>' : '') +
-      (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' +
+      (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' + compte +
       '<button type="button" class="ac-lien" data-a="semblables">Opérations semblables ›</button>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
   }

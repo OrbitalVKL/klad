@@ -399,10 +399,17 @@
     const Mr = g.KladCommun ? g.KladCommun.margeReelle(B) : null;
     if (!Mr) return '<p class="note" style="margin:0 0 12px">La marge réelle apparaîtra dès que le solde du compte commun sera disponible.</p>';
     const crow = (lab, sub, v, cls) => '<div class="cr-r' + (cls ? ' ' + cls : '') + '"><span class="cr-l">' + lab + (sub ? ' <span class="subs">' + sub + '</span>' : '') + '</span><b class="num"' + (cls === 'tot' ? ' style="color:' + col(v) + '"' : '') + '>' + esc(e2(Math.abs(v))) + (v < 0 && cls !== 'minus' ? ' débiteur' : '') + '</b></div>';
-    return '<div class="cm-rav"><div class="cr-h"><span class="rav">Marge réelle du commun</span><b class="num" style="color:' + col(Mr.marge) + '">' + m2(Mr.marge) + '</b></div><div class="cr-calc">' +
-      crow('Disponible', 'solde du compte commun', Mr.solde) + crow('− Charges fixes à venir', 'pas encore prélevées ce mois', Mr.fixes, 'minus') +
-      crow('− Reste du budget variable', 'courantes + optionnelles', Mr.variable, 'minus') + crow('= Marge réelle', Mr.attendus ? '' : 'rien d\'autre attendu ce mois', Mr.marge, 'tot') +
-      (Mr.attendus ? crow('avec virements attendus ' + e2(Mr.attendus), '', Mr.avecAttendus, 'tot') : '') + '</div></div>';
+    // 1.1.2 : tant que des virements du mois manquent (en route ou attendus), la marge affichée est la marge prévue
+    const prevue = Mr.base === 'prevue';
+    return '<div class="cm-rav"><div class="cr-h"><span class="rav">' + (prevue ? 'Marge prévue du commun' : 'Marge réelle du commun') + '</span><b class="num" style="color:' + col(Mr.affichee) + '">' + m2(Mr.affichee) + '</b>' +
+      (prevue ? ' <span class="chip info">prévue · en attente de ' + esc(e2(Mr.enAttente)) + '</span>' : '') + '</div><div class="cr-calc">' +
+      crow('Disponible', 'solde du compte commun', Mr.solde) +
+      (Mr.enRoute ? crow('+ Virements en route', 'partis, pas encore arrivés', Mr.enRoute) : '') +
+      (Mr.attendus ? crow('+ Virements attendus', 'pas encore partis', Mr.attendus) : '') +
+      crow('− Charges fixes à venir', 'pas encore prélevées ce mois', Mr.fixes, 'minus') +
+      crow('− Reste du budget variable', 'courantes + optionnelles', Mr.variable, 'minus') +
+      (prevue ? crow('= Marge prévue', 'quand tous les virements du mois seront arrivés', Mr.prevue, 'tot') + crow('Marge réelle', 'sans les virements pas encore arrivés', Mr.marge, 'tot')
+        : crow('= Marge réelle', 'rien d\'autre attendu ce mois', Mr.marge, 'tot')) + '</div></div>';
   }
 
   // ------------------------------------------------------------ tendance (comme l'ancienne version)

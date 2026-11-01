@@ -172,6 +172,71 @@
     return true;
   }
 
+  // 1.1.2 « doublons » : une même opération bancaire enregistrée deux fois (lue un jour sans référence, relue le
+  // lendemain avec une référence ajoutée au libellé, ou en cours puis comptabilisée sans fusion). Même compte, même
+  // montant, dates à 5 jours au plus, même libellé une fois retirés les numéros de fin ; l'une sans référence (ou en
+  // cours), l'autre avec (et comptabilisée) : la première est retirée, ce qui a été fait à la main passe à la seconde.
+  // Deux opérations identiques de même forme (deux références distinctes, ou aucune) ne sont jamais fusionnées.
+  // Une fois, réversible pendant 7 jours depuis Plus › Journal (annulerDoublons). → { n } ou null (déjà faite).
+  const DOUBLONS = 'doublons', DOUBLONS_JOURS_ANNUL = 7;
+  const formeAncienne = o => o.statut === 'en_cours' || !M().avecReference(o.libelle);
+  const formeNouvelle = o => o.statut === 'comptabilisee' && M().avecReference(o.libelle);
+  function paires(list) {
+    const eb = list.filter(o => o.source === 'eb');
+    const anciennes = eb.filter(formeAncienne), nouvelles = eb.filter(formeNouvelle), prises = new Set(), out = [];
+    for (const a of anciennes.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0))) {
+      if (a.statut === 'comptabilisee' && M().avecReference(a.libelle)) continue;
+      let best = null, bd = Infinity;
+      for (const b of nouvelles) {
+        if (b === a || prises.has(b.id) || !M().memeOperation(a, b)) continue;
+        const d = Math.abs(Date.parse(a.date) - Date.parse(b.date));
+        if (d < bd) { best = b; bd = d; }
+      }
+      if (best) { prises.add(best.id); out.push([a, best]); }
+    }
+    return out;
+  }
+  function doublons(S, now) {
+    if (!S || !S.modele) return null;
+    if (isObj(S.modele.migrations) && S.modele.migrations[DOUBLONS]) return null;
+    const avant = [];
+    for (const c of S.modele.comptes) {
+      const list = S.ops[c.id];
+      if (!Array.isArray(list)) continue;
+      for (const [a, b] of paires(list)) {
+        const copieB = copie(b), i = list.indexOf(a);
+        const renvois = M().reprendreEtat(S, a, b);
+        list.splice(i, 1);
+        avant.push({ compte: c.id, i, op: copie(a), garde: b.id, avantGarde: copieB, renvois });
+      }
+    }
+    S.modele.migrations = isObj(S.modele.migrations) ? S.modele.migrations : {};
+    S.modele.migrations[DOUBLONS] = { le: new Date(now == null ? Date.now() : now).toISOString(), n: avant.length, avant };
+    return { n: avant.length };
+  }
+  // Annulation possible : doublons retirés il y a moins de 7 jours, pas encore remis. → { n, le } ou null.
+  function doublonsAnnulables(S, now) {
+    const m = S && isObj(S.modele.migrations) ? S.modele.migrations[DOUBLONS] : null;
+    if (!m || !m.n || m.annulee || !m.le) return null;
+    if ((now == null ? Date.now() : now) - Date.parse(m.le) > DOUBLONS_JOURS_ANNUL * 864e5) return null;
+    return { n: m.n, le: m.le };
+  }
+  // Remet les opérations retirées et l'état d'avant de celles gardées ; la migration ne se refait pas.
+  function annulerDoublons(S, now) {
+    if (!doublonsAnnulables(S, now)) return false;
+    const m = S.modele.migrations[DOUBLONS];
+    for (const e of m.avant.slice().reverse()) {
+      const list = M().opsDe(S, e.compte);
+      const j = list.findIndex(o => o.id === e.garde);
+      if (j >= 0) list[j] = e.avantGarde;
+      M().annulerRenvois(S, e.op.id, e.garde, e.renvois);
+      if (!list.some(o => o.id === e.op.id)) list.splice(Math.min(e.i, list.length), 0, e.op);
+    }
+    m.annulee = new Date(now == null ? Date.now() : now).toISOString();
+    m.avant = [];
+    return true;
+  }
+
   // État de l'import de l'ancienne version (Plus › Contrôle, relevé de contrôle).
   function etatImport(S) {
     const cx = contenu(S);
@@ -186,5 +251,5 @@
     };
   }
 
-  g.KladMigrations = { payload, annulerPayload, icones, annulerIcones, dessins, annulerDessins, etatImport, contenu, faite };
+  g.KladMigrations = { payload, annulerPayload, icones, annulerIcones, dessins, annulerDessins, doublons, doublonsAnnulables, annulerDoublons, DOUBLONS_JOURS_ANNUL, etatImport, contenu, faite };
 })(typeof window !== 'undefined' ? window : globalThis);

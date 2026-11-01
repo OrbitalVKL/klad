@@ -27,6 +27,17 @@
     return '<details class="cm-sub" data-cc="cm|' + k + '"' + (o ? ' open' : '') + '><summary><span class="cms-t">' + titre + '</span><span class="cms-s">' + resume + '</span></summary><div class="cs-b">' + corps + '</div></details>';
   };
 
+  // 1.1.2 : virements partis d'un compte perso, pas encore arrivés sur le commun (comptés une fois, à leur arrivée).
+  function enRoute(B) {
+    const L = KC().enRoute ? KC().enRoute(B) : [];
+    if (!L.length) return '';
+    const tot = L.reduce((t, r) => t + r.montant, 0), m = B.auj.slice(0, 7);
+    const pour = [...new Set(L.map(r => r.pour))].filter(x => x > m).map(x => MOIS_L[+x.slice(5, 7) - 1]);
+    return '<div class="cmp-route"><span class="chip info">en route</span> <b class="num">' + esc(e2(tot)) + '</b> <span class="subs">' +
+      L.length + ' virement' + (L.length > 1 ? 's partis' : ' parti') + ' le ' + esc([...new Set(L.map(r => jjmm(r.depart.date)))].join(' et ')) + ' du compte perso, pas encore ' + (L.length > 1 ? 'arrivés' : 'arrivé') +
+      (pour.length ? ' (pour ' + esc(pour.join(' et ')) + ')' : '') + ' : comptés une seule fois, à leur arrivée.</span></div>';
+  }
+
   // ------------------------------------------------------------ « Virements à mettre en place » (cm-plan)
   // ui : { cartes: Set (sous-blocs dépliés) }.
   // partie (0.10.4, sous-vues de Commun) : 'mois' = virements seulement ; 'tresorerie' = appels de fonds, trésorerie
@@ -37,7 +48,13 @@
     const R = KC().reglages(B), D = KC().plan(B), V = B.D.virements || [], C = D.C;
     const ouv = ui && ui.cartes;
     const act = (have, want) => { const d = have - want; return Math.abs(d) < 100 ? chip('good', 'à garder') : d < 0 ? chip('bad', 'passer à ' + e0(want)) + ' <span class="subs">' + e0(-d) + ' de plus</span>' : chip('info', 'marge ' + e0(d)) + ' <span class="subs">peut passer à ' + e0(want) + '</span>'; };
-    const recu = v => { const x = D.recus.find(y => y.v === v); if (x && x.vu) return Math.abs(x.vu.m - v.montant) > 1 ? chip('warn', 'reçu ' + e2(x.vu.m) + ' le ' + jjmm(x.vu.date) + ' · prévu ' + e0(v.montant)) : chip('good', 'reçu le ' + jjmm(x.vu.date)); return x && x.retard ? chip('bad', 'non reçu') : chip('info', 'attendu le ' + (+v.jour || 1)); };
+    const recu = v => {
+      const x = D.recus.find(y => y.v === v);
+      if (x && x.vu) return Math.abs(x.vu.m - v.montant) > 1 ? chip('warn', 'reçu ' + e2(x.vu.m) + ' le ' + jjmm(x.vu.date) + ' · prévu ' + e0(v.montant)) : chip('good', 'reçu le ' + jjmm(x.vu.date));
+      // 1.1.2 : parti du compte perso, pas encore arrivé
+      if (x && x.route) return chip('info', 'en route · parti le ' + jjmm(x.route.depart.date));
+      return x && x.retard ? chip('bad', 'non reçu') : chip('info', 'attendu le ' + (+v.jour || 1));
+    };
     const pD = C ? (C.negAt || C.minAt) : '', pDate = !pD ? '' : pD <= KB().plusJours(B.auj, 3) ? 'dès que possible' : 'avant le ' + dfr(pD);
     const vline = (lab, sub, have, want, L) => {
       const diff = want !== null && Math.abs(have - want) >= 100;
@@ -66,7 +83,7 @@
     let h = '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Virements à mettre en place</h2><div class="row"><span class="muted">' +
       (D.changes.length ? pl(D.changes.length, 'ordre') + ' à modifier' : 'ordres permanents conformes au budget') + (D.pon > 0 ? ' · 1 virement ponctuel' : '') + '</span>' +
       '<button class="btn" type="button" data-ouvrir="secVirements">Modifier les ordres</button></div></div>' +
-      '<div class="cmp-grid">' + card('moi', R.moi) + card('autre', R.autre) + '</div>' +
+      '<div class="cmp-grid">' + card('moi', R.moi) + card('autre', R.autre) + '</div>' + enRoute(B) +
       U().comment('« Demandé » = part de chacun des postes du budget commun (colonne « ma part » du mode Budget), regroupée par usage ; les charges trimestrielles comptent pour leur provision mensuelle. Les banques ne transmettent pas les ordres permanents : la liste se tient ici (« Modifier les ordres »), Klad vérifie chaque mois leur arrivée sur le compte commun.');
     if (partie === 'mois') return h;
     if (partie === 'tresorerie') h = '<div class="panel-h"><h2>Trésorerie du compte commun</h2></div>';

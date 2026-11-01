@@ -542,7 +542,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.match(b, /Personne A[\s\S]*Personne B/);
     assert.match(b, /Solde du compte commun/);
     // 0.10.4 : sous-vues Ce mois · Trésorerie · Équilibre ; plus de sélecteur Perso / Commun, ni de catégories en bas
-    assert.match(b, /Ce mois[\s\S]*Trésorerie[\s\S]*Équilibre[\s\S]*Marge réelle du commun[\s\S]*Virements à mettre en place[\s\S]*Budget mensuel/);
+    assert.match(b, /Ce mois[\s\S]*Trésorerie[\s\S]*Équilibre[\s\S]*Marge (réelle|prévue) du commun[\s\S]*Virements à mettre en place[\s\S]*Budget mensuel/);
     assert.doesNotMatch(b, /Trésorerie · 12 mois|Règles de classement/);
     assert.equal(await page.locator('#view-budget [data-scope="perso"]').isVisible(), false);
     assert.match(await page.locator('#bal-panel').innerText(), /Fin de mois estimée/i);

@@ -83,12 +83,12 @@ test('en cours → comptabilisée : référence partagée (≥ 10 caractères av
   assert.equal(ops(S, c)[0].statut, 'comptabilisee');
 });
 
-test('en cours → comptabilisée : rien si plus de 4 jours, autre montant ou libellés sans rapport', () => {
+test('en cours → comptabilisée : rien si plus de 5 jours (1.1.2 ; 4 avant), autre montant ou libellés sans rapport', () => {
   const { S, c } = etat();
   M.integrer(S, c.id, [enCours('2026-10-01', -1000, 'CB LIBRAIRIE'), enCours('2026-10-01', -700, 'CB KIOSQUE'), enCours('2026-10-01', -900, 'CB GARAGE')], J(-25));
   const st = M.integrer(S, c.id, [
     enCours('2026-10-01', -1000, 'CB LIBRAIRIE'), enCours('2026-10-01', -700, 'CB KIOSQUE'), enCours('2026-10-01', -900, 'CB GARAGE'),
-    eb('2026-10-06', -1000, 'CB LIBRAIRIE CENTRE'),      // 5 jours
+    eb('2026-10-07', -1000, 'CB LIBRAIRIE CENTRE'),      // 6 jours
     eb('2026-10-02', -701, 'CB KIOSQUE GARE'),           // autre montant
     eb('2026-10-02', -900, 'CB PRESSING')                // libellé sans rapport
   ], J(-24));
