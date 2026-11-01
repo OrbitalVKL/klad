@@ -392,11 +392,13 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
 - `attention.wallet_to_match` (0.6) : prélèvements de portefeuille à rapprocher. Alerte `BUDGET_OVER` (`caut`,
   « CATÉGORIE +n % ») pour chaque poste dépassé du cycle en cours (3 au plus).
 - `commun` (0.7) : `balance`, `debits_due` (prélèvements mensuels encore à venir ce mois), `transfers_expected`
-  (virements attendus pas encore reçus), `reserve` (mise de côté pour les échéances non mensuelles), `end_of_month`,
+  (virements attendus pas encore partis), `transfers_in_transit` (1.1.2, seulement s'il y en a : virements partis d'un
+  compte perso, pas encore arrivés), `reserve` (mise de côté pour les échéances non mensuelles), `end_of_month`,
   `overdraft_risk` (découvert ce mois ou dans les 12 prochains mois), `low` (`date`, `amount` du point bas s'il est sous
   zéro), `due` (échéances non mensuelles des 3 prochains mois : `month`, `amount` négatif, `late`). Alerte `OVERDRAFT_RISK`
   graduée (0.9) : `crit` si le compte commun passe sous zéro dans les 31 jours, `caut` plus tard dans les 12 mois
-  (« COMPTE COMMUN · JJ/MM », premier jour sous zéro).
+  (« COMPTE COMMUN · JJ/MM », premier jour sous zéro). 1.1.2 : la date est celle de la trésorerie (jour par jour,
+  virements attendus et en route compris), plus « solde − prélèvements à venir » quand la trésorerie existe.
 
 ## Lecture des courriels (plugin `KladMail`)
 

@@ -27,6 +27,10 @@
   // 1.1 : tolérance des charges (le plus grand de 2 € et 2 % du budget) ; 1.1.1 : plafonnée à 10 €, réglable
   // (Plus › Réglages › Budget › Tolérance des charges : S.budget.reglages.tolerance { min, part, max } en € et %).
   const TOL_MIN = 200, TOL_PART = 0.02, TOL_MAX = 1000;
+  // 1.1.2 : rattachement à l'échéance : une occurrence d'un virement permanent, d'un contrat ou d'une charge fixe
+  // récurrente compte pour l'échéance qu'elle règle si elle tombe jusqu'à 7 jours avant ou 5 jours après la date prévue
+  // (Plus › Réglages › Budget : S.budget.reglages.echeance { avant, apres }, en jours).
+  const ECH_AVANT = 7, ECH_APRES = 5, ECH_MAX = 15;
 
   const isObj = o => o != null && typeof o === 'object' && !Array.isArray(o);
   const plusJours = (d, n) => M().plusJours(d, n);
@@ -153,6 +157,12 @@
     const n = (v, d, k) => v != null && v !== '' && isFinite(+v) && +v >= 0 ? Math.round(+v * k) : d;
     return { min: n(t.min, TOL_MIN, 100), part: n(t.part, TOL_PART * 10000, 100) / 10000, max: n(t.max, TOL_MAX, 100) };
   }
+  // 1.1.2 : fenêtre du rattachement à l'échéance (jours). Valeur vide ou invalide → défaut.
+  function echeanceReglee(R) {
+    const t = isObj(R) && isObj(R.echeance) ? R.echeance : {};
+    const n = (v, d) => v != null && v !== '' && isFinite(+v) && +v >= 0 ? Math.min(ECH_MAX, Math.round(+v)) : d;
+    return { avant: n(t.avant, ECH_AVANT), apres: n(t.apres, ECH_APRES) };
+  }
   // Écart toléré pour un budget pm (centimes) : le plus grand du minimum et de la part, plafonné.
   const toleranceDe = (T, pm) => Math.min(T.max, Math.max(T.min, Math.round(pm * T.part)));
 
@@ -177,9 +187,11 @@
         moi: typeof c.moi === 'string' && c.moi.trim() ? c.moi.trim() : null,
         autre: typeof c.autre === 'string' && c.autre.trim() ? c.autre.trim() : null,
         contribution: typeof c.contribution === 'string' && c.contribution.trim() ? c.contribution.trim() : CONTRIBUTION,
-        part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50
+        part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50,
+        motifAutre: typeof c.motifAutre === 'string' && c.motifAutre ? c.motifAutre : null
       },
       tolerance: tolReglee(B.reglages),
+      echeance: echeanceReglee(B.reglages),
       cycle: isObj(B.reglages) && B.reglages.cycle === 'mois' ? 'mois' : 'salaire',
       // 1.1 : suivi du commun au mois (par défaut) ou sur le cycle de salaire du budget perso
       cycleCommun: c.cycle === 'salaire' ? 'salaire' : 'mois'
@@ -220,7 +232,145 @@
     const D = S.budget || nouveau();
     const B = { S, cx, now: now == null ? Date.now() : now, auj, comptes, role, rows, cover, D, R: reglages(S), memo: {} };
     B.exc = isObj(D.exc) ? D.exc : {};
+    rattacher(B);
     return B;
+  }
+
+  // ------------------------------------------------------------ rattachement à l'échéance (1.1.2)
+  // Chaque ligne reçoit r.pd, la date de comptage (période du budget, des observations, des échéances, du commun) :
+  // la date de l'échéance réglée (r.ech) pour une occurrence reconnue dans la fenêtre, sinon la date de dépense (r.od).
+  // La date réelle (r.date) ne change pas. Occurrences reconnues : virements permanents (montant et jour de la liste ;
+  // départ du compte perso et arrivée sur le commun), contrats (motif), charges fixes récurrentes (même compte, même
+  // poste, mêmes premiers mots, au moins 3 mois) ; date prévue : jour de la liste, sinon jour habituel (le plus
+  // fréquent). Correction à la main : o.echeance = date « AAAA-MM-JJ » (compte pour cette date) ou « reel ».
+  const jourDe = d => +d.slice(8, 10);
+  function dateEcheance(m, J) { return m + '-' + String(Math.min(J, joursMois(m))).padStart(2, '0'); }
+  // Échéance du jour J la plus proche de d dans la fenêtre (E − avant ≤ d ≤ E + après), ou null.
+  function echeanceProche(d, J, F) {
+    let best = null, bd = Infinity;
+    for (const k of [-1, 0, 1]) {
+      const E = dateEcheance(shift(d.slice(0, 7), k), J), e = dDiff(d, E);       // e > 0 : payé avant l'échéance
+      if (e > F.avant || -e > F.apres) continue;
+      if (Math.abs(e) < bd) { best = E; bd = Math.abs(e); }
+    }
+    return best;
+  }
+  const deLautre = (B, r) => {
+    const C = B.R.commun;
+    if (!('reAutre' in B.memo)) { let re = null; if (C.motifAutre) { try { re = new RegExp(C.motifAutre, 'i'); } catch (e) { re = null; } } B.memo.reAutre = re; }
+    const re = B.memo.reAutre;
+    return !!((re && re.test(r.label)) || (C.moi && C.autre && r.sub === C.autre));
+  };
+  function rattacher(B) {
+    const F = B.R.echeance, V = (B.D.virements || []).filter(v => isObj(v) && +v.montant > 0);
+    const LINK = B.R.commun.contribution;
+    const jourVir = (B, r) => {
+      if (r.ecart) return null;
+      if (estPerso(B, r) && r.m < 0) {
+        // départ d'un de mes virements : poste « contribution », ou virement du montant d'un de mes ordres permanents
+        if (r.type !== 'depense' || !(r.sub === LINK || /^VIR/.test(fold(r.label)))) return null;
+        const v = V.find(x => x.qui === 'moi' && Math.abs(-r.m - x.montant) < 1);
+        if (v) return +v.jour || 1;
+        if (r.sub === LINK) { const d = V.filter(x => x.qui === 'moi').map(x => +x.jour || 1); if (d.length) return Math.min(...d); }
+        return null;
+      }
+      if (estCommun(B, r) && r.m > 0 && r.type === 'revenu') {
+        const qui = deLautre(B, r) ? 'autre' : 'moi';
+        const v = V.find(x => x.qui === qui && Math.abs(r.m - x.montant) < 1);
+        return v ? +v.jour || 1 : null;
+      }
+      return null;
+    };
+    const series = {}, jours = new Map();
+    const motifs = (B.D.contrats || []).filter(c => isObj(c)).map(c => ({ c, mots: K().motifs(c.motif) })).filter(x => x.mots.length);
+    for (const r of B.rows) {
+      const J = jourVir(B, r);
+      if (J) { jours.set(r, J); continue; }
+      if (r.m >= 0 || r.ecart || r.type !== 'depense' || !(estPerso(B, r) || estCommun(B, r))) continue;
+      const sc = estCommun(B, r) ? 'commun' : 'perso', F0 = fold(r.label);
+      const ct = motifs.find(x => x.c.sc === sc && x.mots.some(m => F0.indexOf(m) >= 0));
+      let k = null;
+      if (ct) k = 'c|' + ct.c.id;
+      else if (natureDe(B, r.cat) === 'fixe') { const kw = K().suggestKw(r.label); if (kw) k = 'f|' + r.cid + '|' + r.sub + '|' + kw; }
+      if (k) (series[k] || (series[k] = [])).push(r);
+    }
+    for (const L of Object.values(series)) {
+      const mois = new Set(L.map(r => r.od.slice(0, 7)));
+      if (mois.size < 3 || L.length > mois.size + Math.ceil(mois.size / 4)) continue;
+      const n = {};
+      for (const r of L) n[jourDe(r.od)] = (n[jourDe(r.od)] || 0) + 1;
+      let J = 0, nJ = 0;
+      for (const d of Object.keys(n)) if (n[d] > nJ || (n[d] === nJ && +d < J)) { J = +d; nJ = n[d]; }
+      if (nJ < 2 || nJ < 0.4 * L.length) continue;
+      for (const r of L) jours.set(r, J);
+    }
+    for (const r of B.rows) {
+      const m = r.o && r.o.echeance;
+      if (m === 'reel') { r.pd = r.od; r.main = true; continue; }
+      if (typeof m === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m)) { r.ech = m; r.pd = m; r.main = true; continue; }
+      const J = jours.get(r);
+      const E = J ? echeanceProche(r.od, J, F) : null;
+      if (E && E !== r.od) r.ech = E;
+      r.pd = r.ech || r.od;
+    }
+  }
+  // Date de comptage d'un revenu ou d'un mouvement de trésorerie (date d'enregistrement, sauf échéance rattachée).
+  const dateCompte = r => r.ech || r.date;
+
+  // Rattachement d'une opération (détail, liste) : → { date, compte (date de comptage), auto, texte } ou null si elle
+  // compte à sa date ; propositions de la correction à la main dans « choix » (chaque période voisine possible).
+  const MOIS_LONG = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  const moisLong = m => MOIS_LONG[+m.slice(5, 7) - 1];
+  function rattachement(B, id) {
+    const r = B.rows.find(x => x.id === id && !x.ecart);
+    if (!r) return null;
+    const out = { date: r.date, compte: r.pd || r.od, auto: !!r.ech && !r.main, main: !!r.main, texte: null };
+    const mo = r.od.slice(0, 7), mp = out.compte.slice(0, 7);
+    if (mp > mo) out.texte = 'réglé d\'avance pour ' + moisLong(mp);
+    else if (mp < mo) out.texte = 'compte pour ' + moisLong(mp) + ' (échéance du ' + jjmm2(out.compte) + ')';
+    else if (out.compte !== r.od && r.o.echeance && r.o.echeance !== 'reel') out.texte = 'compte pour l\'échéance du ' + jjmm2(out.compte);
+    return out;
+  }
+  // Choix proposés dans le détail : la période de la date réelle et la période voisine (suivante si l'opération tombe
+  // dans les derniers jours de sa période, précédente dans les premiers ; ou celle de l'échéance reconnue).
+  // → [{ valeur ('reel' | date), label, actif }] ou [] (rien à proposer).
+  function choixRattachement(B, id) {
+    const r = B.rows.find(x => x.id === id && !x.ecart);
+    if (!r || !(estPerso(B, r) || estCommun(B, r)) || (r.type !== 'depense' && r.type !== 'revenu')) return [];
+    const sc = estCommun(B, r) ? 'commun' : 'perso', F = B.R.echeance;
+    const parCycle = (sc === 'perso' || B.R.cycleCommun === 'salaire') && B.R.cycle !== 'mois' && debuts(B).length;
+    const st = parCycle ? debuts(B).map(x => x.date) : null;
+    // période d'une date : { cle, debut, fin, label }
+    const per = d => {
+      if (st) {
+        let i = -1; st.forEach((x, j) => { if (x <= d) i = j; });
+        if (i >= 0) { const debut = st[i], fin = i + 1 < st.length ? plusJours(st[i + 1], -1) : plusJours(dateEcheance(shift(debut.slice(0, 7), 1), jourDe(debut)), -1); return { cle: debut, debut, fin, label: 'cycle du ' + jjmm2(debut) }; }
+      }
+      const m = d.slice(0, 7);
+      return { cle: m, debut: m + '-01', fin: finMois(m), label: moisLong(m) };
+    };
+    const P = per(r.od), cur = per(r.pd || r.od);
+    let V = null;
+    if (cur.cle !== P.cle) V = cur;
+    else if (dDiff(r.od, P.fin) < F.avant) V = per(plusJours(P.fin, 1));
+    else if (dDiff(P.debut, r.od) < F.apres) V = per(plusJours(P.debut, -1));
+    if (!V || V.cle === P.cle) return [];
+    const dV = V.debut > P.debut ? V.debut : V.fin;          // date de comptage choisie : bord de la période voisine
+    const valV = r.ech && per(r.ech).cle === V.cle ? r.ech : dV;
+    return [{ valeur: 'reel', label: P.label, actif: cur.cle === P.cle }, { valeur: valV, label: V.label, actif: cur.cle === V.cle }];
+  }
+  // Mentions de la liste des opérations : Map id → texte (« réglé d'avance pour novembre »), une fois par contexte.
+  function rattachements(B) {
+    if (B.memo.ratt) return B.memo.ratt;
+    const L = new Map();
+    for (const r of B.rows) if (!r.ecart && r.pd && r.pd.slice(0, 7) !== r.od.slice(0, 7)) { const x = rattachement(B, r.id); if (x && x.texte) L.set(r.id, x.texte); }
+    return (B.memo.ratt = L);
+  }
+  // Correction à la main : valeur 'reel' (compte à sa date), une date, ou null (retour à l'automatique). → valeur d'avant.
+  function rattacherA(o, valeur) {
+    const avant = o.echeance === undefined ? null : o.echeance;
+    if (valeur == null) delete o.echeance; else o.echeance = valeur;
+    return avant;
   }
 
   const estPerso = (B, r) => PERSO.indexOf(r.role) >= 0;
@@ -343,7 +493,7 @@
     const LINK = 'f|' + B.R.commun.contribution;
     for (const r of B.rows) {
       if (r.type !== 'depense' || !dansScope(B, sc, r) || exclue(B, r)) continue;
-      const m = r.od.slice(0, 7), inRef = m >= W.start && m <= W.end, inCur = m === cur, in12 = m >= y12 && m <= W.end;
+      const m = r.pd.slice(0, 7), inRef = m >= W.start && m <= W.end, inCur = m === cur, in12 = m >= y12 && m <= W.end;
       if (!inRef && !inCur && !in12) continue;
       const nat = natureDe(B, r.cat), key = nat === 'fixe' ? 'f|' + r.sub : 'c|' + r.cat, v = -r.m;
       const a = agg[key] || (agg[key] = { key, nat, label: nat === 'fixe' ? r.sub : r.cat, cat: r.cat, ref: 0, cur: 0, y12: 0, mon: {}, m12: {} });
@@ -449,17 +599,17 @@
     for (let i = B.rows.length - 1; i >= 0; i--) {
       const r = B.rows[i];
       if (r.date < lim) break;
-      if (r.type !== 'depense' || r.ecart || !dansScope(B, sc, r) || r.date.slice(0, 7) >= cur) continue;
+      if (r.type !== 'depense' || r.ecart || !dansScope(B, sc, r) || r.pd.slice(0, 7) >= cur) continue;
       if (cleDe(B, r) === key && (!best || -r.m > -best.m)) best = r;
     }
-    if (best) return +best.date.slice(8, 10);
+    if (best) return +best.pd.slice(8, 10);
     for (let i = B.rows.length - 1; i >= 0; i--) {
       const r = B.rows[i];
-      if (r.type !== 'depense' || r.ecart || !dansScope(B, sc, r) || r.date.slice(0, 7) >= cur) continue;
-      if (cleDe(B, r) === key) return +r.date.slice(8, 10);
+      if (r.type !== 'depense' || r.ecart || !dansScope(B, sc, r) || r.pd.slice(0, 7) >= cur) continue;
+      if (cleDe(B, r) === key) return +r.pd.slice(8, 10);
     }
     const c = contratsDe(B, key, sc)[0];
-    if (c) { const d = dernierDebit(B, c); if (d) return +d.date.slice(8, 10); }
+    if (c) { const d = dernierDebit(B, c); if (d) return +dateCompte(d).slice(8, 10); }
     return null;
   }
 
@@ -469,7 +619,7 @@
     return null;
   }
   function moisProchaineEcheance(B, key, per, ech) {
-    const cur = B.auj.slice(0, 7), l = dernierDebitPoste(B, key), lm = l ? l.od.slice(0, 7) : null;
+    const cur = B.auj.slice(0, 7), l = dernierDebitPoste(B, key), lm = l ? l.pd.slice(0, 7) : null;
     const due = m => per === 3 ? (+m.slice(5) - 1) % 3 === 0 : lm ? ((+m.slice(0, 4) * 12 + +m.slice(5)) - (+lm.slice(0, 4) * 12 + +lm.slice(5))) % per === 0 : m === cur;
     if (!l) { let m = cur; for (let i = 0; i < 24 && !due(m); i++) m = shift(m, 1); return m; }
     const k = ech > 0 ? Math.max(1, Math.round(-l.m / ech)) : 1;
@@ -482,7 +632,7 @@
     const det = [];
     for (const a of postes(B, 'commun').lignes) {
       if (!a.on || !(a.per > 1)) continue;
-      const l = dernierDebitPoste(B, a.key), m0 = l ? l.od.slice(0, 7) : null;
+      const l = dernierDebitPoste(B, a.key), m0 = l ? l.pd.slice(0, 7) : null;
       let n = m0 ? 0 : 1;
       if (m0) { let m = m0; while (m < B.auj.slice(0, 7)) { m = shift(m, 1); n++; } n = Math.max(0, n - 1); }
       n = Math.min(n, a.per);
@@ -506,10 +656,12 @@
     const day = past ? dim : cyc ? Math.max(1, dDiff(cyc.start, B.auj) + 1) : Math.max(1, +B.auj.slice(8, 10));
     const frac = Math.min(1, day / dim);
     const inPer = d => cyc ? (d >= cyc.start && d <= (past ? cyc.end : B.auj)) : d.slice(0, 7) === pm0;
+    // 1.1.2 : dépense déjà payée mais rattachée à une échéance à venir de la période (date de comptage après aujourd'hui)
+    const inPerD = d => cyc ? (d >= cyc.start && d <= cyc.end) : d.slice(0, 7) === pm0;
     const lignes = P0.lignes.map(a => Object.assign({}, a));
     const ops = {};
     for (const r of B.rows) {
-      if (r.type !== 'depense' || !dansScope(B, scope, r) || exclue(B, r) || !inPer(r.od)) continue;
+      if (r.type !== 'depense' || !dansScope(B, scope, r) || exclue(B, r) || !inPerD(r.pd)) continue;
       const key = cleDe(B, r);
       (ops[key] || (ops[key] = [])).push(r);
     }
@@ -534,13 +686,13 @@
     };
     // rythme habituel : dépenses des 90 jours précédant la période ÷ 90
     const pStart = cyc ? cyc.start : pm0 + '-01', hFrom = plusJours(pStart, -90), hTo = plusJours(pStart, -1), HR = {};
-    for (const r of B.rows) { if (r.type !== 'depense' || !dansScope(B, scope, r) || exclue(B, r) || r.od < hFrom || r.od > hTo) continue; const key = cleDe(B, r); HR[key] = (HR[key] || 0) - r.m / 90; }
+    for (const r of B.rows) { if (r.type !== 'depense' || !dansScope(B, scope, r) || exclue(B, r) || r.pd < hFrom || r.pd > hTo) continue; const key = cleDe(B, r); HR[key] = (HR[key] || 0) - r.m / 90; }
     const rest = Math.max(0, dim - day);
 
     // revenus
     const rv = {};
     for (const x of B.rows) {
-      if (x.type !== 'revenu' || !inPer(x.date) || !dansScope(B, scope, x)) continue;
+      if (x.type !== 'revenu' || !inPer(dateCompte(x)) || !dansScope(B, scope, x)) continue;
       const key = scope === 'commun' ? (x.sub || x.cat) : x.cat;
       (rv[key] = rv[key] || { got: 0, ops: [] }).got += x.m;
       rv[key].ops.push(x);
@@ -559,10 +711,16 @@
         let dd = null;
         for (let i = B.rows.length - 1; i >= 0; i--) {
           const o = B.rows[i];
-          if (o.type === 'revenu' && (scope === 'commun' ? (o.sub || o.cat) : o.cat) === x.key && (cyc ? o.date < cyc.start : o.date.slice(0, 7) < pm0) && dansScope(B, scope, o)) { dd = +o.date.slice(8, 10); break; }
+          if (o.type === 'revenu' && (scope === 'commun' ? (o.sub || o.cat) : o.cat) === x.key && (cyc ? dateCompte(o) < cyc.start : dateCompte(o).slice(0, 7) < pm0) && dansScope(B, scope, o)) { dd = +dateCompte(o).slice(8, 10); break; }
         }
         x.etat = { niveau: 'info', texte: dd ? 'attendu vers le ' + jjmm(dueDate(dd)) : 'attendu' };
       }
+    }
+    // 1.1.2 : mes virements partis du compte perso et pas encore arrivés sur le commun : « en route », pas « attendus »
+    if (scope === 'commun' && !past && g.KladCommun && g.KladCommun.enRouteMois && B.R.commun.moi) {
+      const x = revList.find(y => y.key === B.R.commun.moi);
+      const rt = x && x.etat && x.etat.niveau === 'info' ? g.KladCommun.enRouteMois(B, pm0).reduce((t, r) => t + r.montant, 0) : 0;
+      if (rt > DEMI) x.etat = { niveau: 'info', texte: 'en route · ' + eur(rt) };
     }
     const RT = { p: revList.reduce((t, x) => t + x.pm, 0), c: revList.reduce((t, x) => t + x.got, 0) };
 
@@ -734,7 +892,7 @@
       if (!c.montant) continue;
       const d = dernierDebit(B, c);
       if (!d) continue;
-      let n = avance(d.date, c.per || 1);
+      let n = avance(dateCompte(d), c.per || 1);
       for (let i = 0; i < 40 && n < B.auj; i++) n = avance(n, c.per || 1);
       ajoute(n, c.montant, c.label, 'contrat', c.sc, c.poste ? c.poste.slice(2) : null);
     }
@@ -748,13 +906,13 @@
       (grp[k] || (grp[k] = [])).push(r);
     }
     for (const k of Object.keys(grp)) {
-      const L = grp[k], mois = new Set(L.map(r => r.date.slice(0, 7)));
+      const L = grp[k], mois = new Set(L.map(r => dateCompte(r).slice(0, 7)));
       if (mois.size < 2 || L.length > mois.size + 1) continue;
       const mts = L.map(r => -r.m), md = median(mts);
       if (mts.some(v => Math.abs(v - md) > Math.max(500, md * 0.15))) continue;
       const last = L[L.length - 1], sc = last.role === 'commun' ? 'commun' : 'perso';
       if (motifsContrats.some(([s, m]) => s === sc && fold(last.label).indexOf(m) >= 0)) continue;
-      const n = avance(last.date, 1);
+      const n = avance(dateCompte(last), 1);
       if (n < plusJours(B.auj, -3)) continue;
       ajoute(n < B.auj ? B.auj : n, md, natureDe(B, last.cat) === 'fixe' ? last.sub : last.cat, 'recurrent', sc);
     }
@@ -782,7 +940,7 @@
         else etat = { niveau: 'warn', texte: eur(Math.abs(ecart), true) + (ecart > 0 ? ' de plus' : ' de moins') };
       }
       let prochaine = null;
-      if (d) { prochaine = avance(d.date, c.per || 1); for (let i = 0; i < 40 && prochaine < B.auj; i++) prochaine = avance(prochaine, c.per || 1); }
+      if (d) { prochaine = avance(dateCompte(d), c.per || 1); for (let i = 0; i < 40 && prochaine < B.auj; i++) prochaine = avance(prochaine, c.per || 1); }
       return Object.assign({}, c, { mensuel: c.montant / (c.per || 1), dernier: d ? { date: d.date, montant: -d.m } : null, etat, prochaine,
         poste: c.poste, posteLabel: c.poste ? c.poste.slice(2) : '', budget: a ? (a.on ? a.amt : 0) : null });
     });
@@ -822,7 +980,7 @@
     const out = pers.map(p => ({ start: p.start, end: p.end, encours: p.encours, fixe: 0, courante: 0, optionnelle: 0, total: 0, cat: 0 }));
     for (const r of B.rows) {
       if (r.type !== 'depense' || !dansScope(B, scope, r) || exclue(B, r)) continue;
-      const p = out.find(x => r.od >= x.start && r.od <= x.end);
+      const p = out.find(x => r.pd >= x.start && r.pd <= x.end);
       if (!p) continue;
       const v = -r.m, nat = natureDe(B, r.cat);
       p[nat] = (p[nat] || 0) + v; p.total += v;
@@ -1007,7 +1165,7 @@
     for (const r of B.rows) {
       if ((r.type !== 'revenu' && r.type !== 'depense') || !dans(r)) continue;
       if (r.type === 'depense') cats.add(r.cat);
-      const i = idx[r.date.slice(0, 7)];
+      const i = idx[dateCompte(r).slice(0, 7)];
       if (i === undefined) continue;
       if (r.type === 'revenu') rev[i] += r.m; else dep[i] -= r.m;
     }
@@ -1035,7 +1193,7 @@
     } else if (mode.startsWith('cat:')) {
       const cat = mode.slice(4);
       out.barres = mois.map(() => 0);
-      for (const r of B.rows) { if (r.type !== 'depense' || r.cat !== cat || !dans(r)) continue; const i = idx[r.date.slice(0, 7)]; if (i !== undefined) out.barres[i] -= r.m; }
+      for (const r of B.rows) { if (r.type !== 'depense' || r.cat !== cat || !dans(r)) continue; const i = idx[dateCompte(r).slice(0, 7)]; if (i !== undefined) out.barres[i] -= r.m; }
       const p = planDe(B, o.scope === 'commun' || sel === 'commun' ? 'commun' : 'perso')['c|' + cat];
       out.ref = p && p.on !== false && +p.amt > 0 ? Math.round(+p.amt) : null;       // budget du poste (centimes par mois)
       out.cat = cat;
@@ -1087,7 +1245,7 @@
     const W = fenetre(B), cur = B.auj.slice(0, 7), out = {};
     for (const r of B.rows) {
       if (r.type !== 'depense' || !dansScope(B, sc, r) || exclue(B, r) || cleDe(B, r) !== key) continue;
-      const m = r.od.slice(0, 7), inRef = m >= W.start && m <= W.end, inCur = m === cur;
+      const m = r.pd.slice(0, 7), inRef = m >= W.start && m <= W.end, inCur = m === cur;
       if (!inRef && !inCur) continue;
       const v = -r.m, fixe = key[0] === 'f';
       const k = fixe ? String(Math.round(v / 100)) : r.sub;
@@ -1100,6 +1258,7 @@
   }
 
   g.KladBudget = {
+    ECH_AVANT, ECH_APRES, ECH_MAX, echeanceReglee, rattachement, rattachements, choixRattachement, rattacherA, dateCompte, deLautre,
     V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, BASES_RAV, baseRav, choisirBaseRav, ravChoisi, nouveau, donnees, importer, reglages, contexte, tolReglee, toleranceDe,
     complement, surcharger, cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,

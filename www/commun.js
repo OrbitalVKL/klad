@@ -57,13 +57,57 @@
     const R = R7(B);
     const deLautre = r => (R.motifAutre && R.motifAutre.test(r.label)) || (R.nomsConnus && r.sub === R.autre);
     const qui = r => v.qui === 'moi' ? !deLautre(r) : deLautre(r);
-    const cand = opsCommun(B).filter(r => r.m > 0 && r.date.slice(0, 7) === m && qui(r));
+    // 1.1.2 : mois de l'échéance réglée (arrivée en avance ou en retard de quelques jours rattachée au bon mois)
+    const cand = opsCommun(B).filter(r => r.m > 0 && KB().dateCompte(r).slice(0, 7) === m && qui(r));
     const ex = cand.find(r => Math.abs(r.m - v.montant) < 1);
     if (ex) return ex;
     const autres = (B.D.virements || []).filter(x => x !== v && x.qui === v.qui).map(x => +x.montant || 0);
     const mot = v.label ? fold(v.label).split(' ')[0] : '';
     return cand.find(r => Math.abs(r.m - v.montant) <= 0.15 * v.montant && !autres.some(o => Math.abs(r.m - o) < 1) && (!v.label || fold(r.label).indexOf(mot) >= 0 || v.qui === 'autre')) || null;
   }
+  // ------------------------------------------------------------ virements « en route » (1.1.2)
+  // Virement parti d'un compte perso vers le commun (montant d'un de mes virements permanents, ou poste « contribution »)
+  // et pas encore arrivé : pas de crédit de même montant sur le commun à 5 jours près. Il reste « en route » 5 jours
+  // après son départ ; au-delà, le virement redevient « non reçu ». À l'arrivée, il est rapproché du départ.
+  // → [{ depart (ligne), montant, pour (mois de l'échéance), v (virement permanent ou null) }].
+  const ROUTE_JOURS = 5;
+  function enRoute(B) {
+    if (B.memo.route) return B.memo.route;
+    if (!B.comptes.some(c => c.role === 'commun')) return (B.memo.route = []);
+    const V = (B.D.virements || []).filter(v => v.qui === 'moi' && +v.montant > 0), LINK = B.R.commun.contribution;
+    const departs = B.rows.filter(r => PERSO.indexOf(r.role) >= 0 && r.m < 0 && !r.ecart && r.type === 'depense' &&
+      (r.sub === LINK || (/^VIR/.test(K().fold(r.label)) && V.some(v => Math.abs(-r.m - v.montant) < 1))));
+    const arrivees = opsCommun(B).filter(r => r.m > 0 && !KB().deLautre(B, r));
+    const prises = new Set(), out = [];
+    for (const d of departs) {
+      let best = null, bd = Infinity;
+      for (const a of arrivees) {
+        if (prises.has(a) || Math.abs(a.m + d.m) >= 1) continue;
+        const e = Math.abs(KB().dDiff(d.date, a.date));
+        if (e <= ROUTE_JOURS && e < bd) { best = a; bd = e; }
+      }
+      if (best) { prises.add(best); continue; }
+      if (d.date > B.auj || KB().dDiff(d.date, B.auj) > ROUTE_JOURS) continue;
+      out.push({ depart: d, montant: -d.m, pour: KB().dateCompte(d).slice(0, 7), v: null });
+    }
+    // chaque départ est relié à un de mes virements (montant identique, sinon à 15 % près), une fois
+    const libres = V.slice();
+    for (const pass of [x => Math.abs(x.r.montant - x.v.montant) < 1, x => Math.abs(x.r.montant - x.v.montant) <= 0.15 * x.v.montant]) {
+      for (const r of out) {
+        if (r.v) continue;
+        const i = libres.findIndex(v => pass({ r, v }));
+        if (i >= 0) { r.v = libres[i]; libres.splice(i, 1); }
+      }
+    }
+    return (B.memo.route = out);
+  }
+  const PERSO = ['courant', 'carte_differee', 'paiement_en_ligne'];
+  // Virements en route pour le mois m (échéance de m ou d'avant), reliés à un virement permanent pas encore reçu.
+  function enRouteMois(B, m) {
+    return enRoute(B).filter(r => r.v && r.pour <= m && !virementVu(B, r.v, m));
+  }
+  const routeDe = (B, v, m) => enRouteMois(B, m).find(r => r.v === v) || null;
+
   const somme = (B, qui, usage) => (B.D.virements || []).filter(v => v.qui === qui && (!usage || v.usage === usage)).reduce((t, v) => t + (+v.montant || 0), 0);
 
   // ------------------------------------------------------------ impôts prélevés sur le commun
@@ -93,7 +137,7 @@
     for (const a of lignesCommun(B)) {
       if (!a.on || !(a.amt > 0)) continue;
       if (a.key === 'f|Impôts' && TXE.length) continue;
-      const l = KB().dernierDebitPoste(B, a.key), lm = l ? l.od.slice(0, 7) : null, day = l ? Math.min(28, +l.od.slice(8, 10)) : 5;
+      const l = KB().dernierDebitPoste(B, a.key), lm = l ? l.pd.slice(0, 7) : null, day = l ? Math.min(28, +l.pd.slice(8, 10)) : 5;
       if (a.per === 1) {
         const amt = ctrMontant(a.key); const v = amt != null ? amt : a.amt;
         for (let k = 0; k < 12; k++) { const m = shift(cur, k); if (k === 0 && lm === cur) continue; ev.push({ m, d: k === 0 ? Math.max(day, dNow) : day, v: -v, lab: a.label }); }
@@ -216,7 +260,11 @@
       if (C.start < 0 && i0 >= 0) retourPositif = ms[i0].m;
       for (const m of ms.slice(1)) if (m.low < -DEMI && (!prochainBas || m.low < prochainBas.v)) prochainBas = { m: m.m, v: m.low };
     }
-    const recus = V.map(v => ({ v, vu: virementVu(B, v, B.auj.slice(0, 7)), retard: +B.auj.slice(8, 10) > Math.min(28, +v.jour || 1) + 3 }));
+    const mC = B.auj.slice(0, 7);
+    const recus = V.map(v => {
+      const vu = virementVu(B, v, mC), route = vu ? null : routeDe(B, v, mC);
+      return { v, vu, route, retard: !vu && !route && +B.auj.slice(8, 10) > Math.min(28, +v.jour || 1) + 3 };
+    });
     return (B.memo.plan = { need, T, wG, pW, pG, C, pon, ponMoi, ponAutre, changes, W, pas, rec, recM, retourPositif, prochainBas, recus });
   }
 
@@ -232,23 +280,34 @@
     const aVenir = [];
     for (const c of (B.D.contrats || []).filter(c => c.sc === 'commun' && (+c.per || 1) === 1 && c.montant > 0)) {
       const d = KB().dernierDebit(B, c);
-      if (!d || d.date.slice(0, 7) !== m) { due += c.montant; aVenir.push(c.label); }
+      if (!d || KB().dateCompte(d).slice(0, 7) !== m) { due += c.montant; aVenir.push(c.label); }
     }
     for (const e of impots(B)) if (e.m === m) { due += -e.v; aVenir.push(e.lab); }
-    for (const v of B.D.virements || []) if (!virementVu(B, v, m)) inc += +v.montant || 0;
+    // 1.1.2 : un virement en route (parti, pas encore arrivé) compte une fois, à part des virements attendus
+    let route = 0;
+    for (const v of B.D.virements || []) { if (virementVu(B, v, m)) continue; const r = routeDe(B, v, m); if (r) route += r.montant; else inc += +v.montant || 0; }
     const RS = KB().reserveCommun(B);
-    const end = bal.v - due + inc - RS.v;
-    return (B.memo.fdm = { solde: bal.v, due, inc, reserve: RS.v, reserveDet: RS.det, end, aVenir, decouvert: bal.v - due < 0 });
+    const end = bal.v - due + inc + route - RS.v;
+    // découvert dans le mois : même calcul que la trésorerie (jour par jour, virements compris) quand elle existe
+    const C = tresorerie(B), mo = C && C.months.find(x => x.m === m);
+    const decouvert = mo ? mo.low < -0.5 : bal.v + route - due < 0;
+    const out = { solde: bal.v, due, inc, reserve: RS.v, reserveDet: RS.det, end, aVenir, decouvert };
+    if (route) out.route = route;
+    return (B.memo.fdm = out);
   }
   // Marge réelle du commun (mois en cours) : solde − charges fixes à venir − reste du budget variable (+ virements attendus).
   function margeReelle(B) {
     const bal = KB().soldes(B, ['commun']);
     if (!bal) return null;
     const s = KB().suivi(B, 'commun', null);
-    const fixes = s.T.fixe.left, variable = s.T.courante.left + s.T.optionnelle.left;
-    const inc = (B.D.virements || []).filter(v => !virementVu(B, v, B.auj.slice(0, 7))).reduce((t, v) => t + (+v.montant || 0), 0);
+    const fixes = s.T.fixe.left, variable = s.T.courante.left + s.T.optionnelle.left, m = B.auj.slice(0, 7);
+    let inc = 0, route = 0;
+    for (const v of B.D.virements || []) { if (virementVu(B, v, m)) continue; const r = routeDe(B, v, m); if (r) route += r.montant; else inc += +v.montant || 0; }
     const marge = bal.v - fixes - variable;
-    return { solde: bal.v, fixes, variable, marge, attendus: inc, avecAttendus: marge + inc };
+    // 1.1.2 : tant que des virements du mois manquent (en route ou attendus), la marge affichée est la marge prévue
+    const enAttente = route + inc;
+    return { solde: bal.v, fixes, variable, marge, attendus: inc, enRoute: route, avecAttendus: marge + enAttente, prevue: marge + enAttente, enAttente,
+      affichee: enAttente > 0 ? marge + enAttente : marge, base: enAttente > 0 ? 'prevue' : 'reelle' };
   }
 
   // ------------------------------------------------------------ appels de fonds (données du carnet, sans lecture de mail)
@@ -429,7 +488,9 @@
     if (!f) return null;
     const C = tresorerie(B);
     let d = C && C.negAt ? C.negAt : '';
-    if (f.decouvert) {
+    // 1.1.2 : avec la trésorerie (jour par jour, virements attendus et en route compris), elle seule fait foi ; avant,
+    // « solde − prélèvements à venir » ignorait les virements pas encore arrivés et annonçait un découvert à la fin du mois.
+    if (f.decouvert && !C) {
       const y = +B.auj.slice(0, 4), m = +B.auj.slice(5, 7);
       const fin = B.auj.slice(0, 8) + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0');
       if (!d || d > fin) d = fin;
@@ -448,6 +509,8 @@
     const e = c => Math.round(c) / 100;
     const out = { balance: e(f.solde), debits_due: e(f.due), transfers_expected: e(f.inc), reserve: e(f.reserve), end_of_month: e(f.end),
       overdraft_risk: !!risqueDecouvert(B) };
+    // 1.1.2 : virements partis d'un compte perso, pas encore arrivés (seulement s'il y en a)
+    if (f.route) out.transfers_in_transit = e(f.route);
     if (C && C.min < 0) out.low = { date: C.minAt, amount: e(C.min) };
     if (C) out.due = C.due.filter(d => d.m <= shift(B.auj.slice(0, 7), 3)).slice(0, 4).map(d => ({ month: d.m, amount: -e(d.v), late: !!d.late }));
     return out;
@@ -469,6 +532,6 @@
     return { appels: Object.keys(D.appels || {}).filter(k => isObj(D.appels[k]) && Array.isArray(D.appels[k].items)).length, equipements: (eq.items || []).length };
   }
 
-  g.KladCommun = { USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
+  g.KladCommun = { ROUTE_JOURS, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
     sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer };
 })(typeof window !== 'undefined' ? window : globalThis);

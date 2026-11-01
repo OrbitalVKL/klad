@@ -74,7 +74,7 @@
         if (!ok()) return null;
         const t = deps.now ? deps.now() : Date.now();
         M().soldesLus(S, c.id, r.bal, t);
-        const st = M().integrer(S, c.id, r.txs, t);
+        const st = M().integrer(S, c.id, r.txs, t, { depuis: from });
         c.sync = { lu: new Date(t).toISOString(), erreur: null };
         res.nouvelles += st.nouvelles; res.fusionnees += st.fusionnees; res.retirees += st.retirees;
         deps.log('ok', nom + ' : ' + st.lues + ' lue(s) depuis ' + (from ? 'le ' + from.split('-').reverse().join('/') : 'le plus tôt possible') +

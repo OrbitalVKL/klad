@@ -136,7 +136,12 @@
         if (V.length) {
           if (miss.length) add('warn', 'commun', 'Virements du mois non reçus', miss.map(x => nom(x.v.qui) + ' · ' + x.v.label + ' (' + e0(+x.v.montant || 0) + ', prévu le ' + (+x.v.jour || 1) + ')').join(' · ') + '.');
           else if (rc.length === V.length) add('good', 'commun', 'Virements du mois reçus', rc.map(x => nom(x.v.qui) + ' ' + e0(x.vu.m) + ' le ' + jjmm(x.vu.date)).join(' · ') + '.');
-          else add('info', 'commun', 'Virements du mois', rc.length + ' sur ' + V.length + ' reçus ; les autres sont attendus le ' + [...new Set(D.recus.filter(x => !x.vu).map(x => +x.v.jour || 1))].join(' et ') + '.');
+          else {
+            // 1.1.2 : virements partis du compte perso, pas encore arrivés : « en route », pas attendus une deuxième fois
+            const rt = D.recus.filter(x => !x.vu && x.route), att = D.recus.filter(x => !x.vu && !x.route);
+            add('info', 'commun', 'Virements du mois', rc.length + ' sur ' + V.length + ' reçus' + (rt.length ? ', ' + rt.length + ' en route (' + e0(rt.reduce((t, x) => t + x.route.montant, 0)) + ', partis le ' + [...new Set(rt.map(x => jjmm(x.route.depart.date)))].join(' et ') + ')' : '') +
+              (att.length ? ' ; les autres sont attendus le ' + [...new Set(att.map(x => +x.v.jour || 1))].join(' et ') : '') + '.');
+          }
         }
         if (!D.changes.length && !D.pon) add('good', 'commun', 'Ordres permanents conformes', RC.moi + ' ' + e0(KC().somme(B, 'moi')) + ' · ' + RC.autre + ' ' + e0(KC().somme(B, 'autre')) + ' par mois : ils couvrent le budget du compte commun.');
       } catch (e) { /* compte commun sans solde */ }

@@ -129,7 +129,7 @@
       mini('Fin de mois estimée', F().solde(fdm.end), fdm.end < 0 || fdm.decouvert) + '</div>';
     for (const x of (pl && pl.recus) || []) {
       const ok = !!x.vu;
-      const sous = ok ? 'reçu le ' + U().jjmm(x.vu.date) : (x.retard ? 'en retard' : 'attendu vers le ' + (x.v.jour || 1));
+      const sous = ok ? 'reçu le ' + U().jjmm(x.vu.date) : x.route ? 'en route · parti le ' + U().jjmm(x.route.depart.date) : (x.retard ? 'en retard' : 'attendu vers le ' + (x.v.jour || 1));
       corps += li('<span class="dot ' + (ok ? 'good' : x.retard ? 'warn' : '') + '" aria-hidden="true"></span>', 'Virement de ' + nom(x.v.qui), sous, 'data-aller="commun"',
         '<span class="num' + (ok ? ' pos-t' : '') + '">' + esc((ok ? '+' : '') + F().montant(ok ? x.vu.m : x.v.montant)) + '</span>');
     }

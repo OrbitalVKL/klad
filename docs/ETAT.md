@@ -6,6 +6,10 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.1.2** — correctif prioritaire (relevé de contrôle 1.1.1 du 01/11 analysé par l'architecte) : opérations bancaires
+enregistrées deux fois (relues à une autre date avec une référence), échéances réglées d'avance rattachées à leur
+échéance, virements « en route » et marge prévue du commun, alerte de découvert alignée sur la trésorerie.
+
 **1.1.1** — correctif de la 1.1.0 (réponse de l'architecte au rapport 1.1.0) : tolérance des charges plafonnée à 10 €
 et réglable, écart de rapprochement à la main gardé en dépense (confirmation, affichage, « À vérifier »), mode démo
 vérifié sur les nouveautés de la 1.1.0.
@@ -34,6 +38,55 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.1.2 — détails techniques
+- **Cause des doublons** : la banque a renvoyé les virements comme comptabilisés (statut `BOOK` ou absent, qui vaut
+  `BOOK` dans `depuisEB`) avec un identifiant fabriqué à partir de la date (`transaction_id` = « AAAA-MM-JJT00:00:00-n »,
+  id Klad `…:r:<cet identifiant>`) ; relus le lendemain avec une autre date de comptabilisation, un autre identifiant et
+  une référence ajoutée au libellé. La fusion « en cours → comptabilisée » (`rapprocher`) ne concerne que les `PDNG` :
+  les deux versions étaient gardées. Les champs bruts (status, entry_reference, value_date) ne sont pas conservés par
+  Klad : diagnostic déduit des identifiants du relevé.
+- `modele.js` : `baseLibelle` (libellé normalisé sans numéros de fin), `avecReference`, `memeOperation` (même montant,
+  dates à `DOUBLON_JOURS` = 5, même libellé de base), `reprendreEtat(S, ancienne, gardee)` (classement, « vu »,
+  rapprochements, `echeance`, `apparue` ; renvois : `S.budget.exc`, `equilibre.items[].op`, `categorie.lie`,
+  `rapprochement.avec`), `annulerRenvois`. `integrer(S, cid, raw, now, { depuis })` : une comptabilisée Enable Banking
+  plus renvoyée sur la période relue (depuis la date demandée, ou la plus ancienne renvoyée si la banque ne renvoie rien
+  des 10 premiers jours demandés ; rien si la banque ne renvoie rien ; jamais avant la frontière) est fusionnée dans une
+  renvoyée qui lui correspond (`fusionnees`), sinon retirée (`retirees`). `RAPPROCHE_JOURS` 4 → 5. `sync.js` passe
+  `{ depuis: from }`.
+- Migration `doublons` (`migrations.js`, au déverrouillage dans `preparerClassement`) : paires (sans référence ou en
+  cours) → (comptabilisée avec référence), même règle ; la première est retirée. Une fois ; `doublonsAnnulables` (7 jours,
+  `DOUBLONS_JOURS_ANNUL`), `annulerDoublons` (opérations remises, état d'avant de la gardée, renvois annulés ; la
+  migration ne se refait pas). Bouton dans Plus › Journal (`#logAnnuler`, `data-annuler-doublons`).
+- **Rattachement à l'échéance** (`budget.js`, `rattacher(B)` dans `contexte`) : chaque ligne reçoit `r.pd` (date de
+  comptage) = `r.ech` (échéance réglée) ou `r.od`. Occurrences : virements permanents (départ perso : poste
+  contribution ou libellé « VIR » du montant d'un de mes ordres ; arrivée sur le commun : revenu du montant d'un ordre,
+  `deLautre` d'après `commun.motifAutre` ou le nom) au jour de la liste ; contrats (motif) et charges fixes récurrentes
+  (`cid|sous-catégorie|suggestKw`, au moins 3 mois, au plus ~1 par mois) au jour le plus fréquent (au moins 2 fois et
+  40 %). Fenêtre `B.R.echeance` (`S.budget.reglages.echeance { avant: 7, apres: 5 }`, 0 à 15 jours, thème `echeance` de
+  `KladReglages.THEMES`). Correction à la main : `o.echeance` = date ou `'reel'` (`rattacherA`, `choixRattachement` :
+  période de la date réelle et période voisine, mois ou cycle de salaire ; `rattachement`, `rattachements` : mention).
+  Utilisé par `postes`, `suivi` (dépenses : `inPerD`, période entière ; revenus : `dateCompte` = `ech || date`),
+  rythme habituel, `jourAttendu`, `dernierDebitPoste` (via `pd`), `moisProchaineEcheance`, `reserveCommun`, `echeances`
+  (contrats et récurrents), `contrats().prochaine`, `tendance`, `tendanceMois`, `detailPoste`, `commun.virementVu`,
+  `tresorerie`, `finDeMois`.
+- **Commun** (`commun.js`) : `enRoute(B)` (départs perso non rapprochés d'une arrivée de même montant à `ROUTE_JOURS` = 5
+  jours ; en route 5 jours après le départ, ensuite « non reçu » ; reliés à un de mes ordres), `enRouteMois`, `plan().recus[].route`,
+  `finDeMois` : `route` (seulement s'il y en a) hors `inc`, `end = solde − due + inc + route − réserve`, `decouvert` =
+  point bas du mois dans la trésorerie ; `margeReelle` : `enRoute`, `enAttente`, `prevue`, `affichee`, `base`
+  (`prevue` tant que des virements du mois manquent) ; `risqueDecouvert` : la trésorerie fait foi (cause de l'écart du
+  01/11 : « solde − prélèvements à venir » ignorait les virements pas encore arrivés → découvert annoncé au 30/11).
+  Résumé Grafit : `commun.transfers_in_transit` seulement s'il y en a.
+- Écrans : mention dans la liste (`tranche(…, { ratt })`) et le détail (`detail(S, o, ctx, B)` : « Compte pour »,
+  boutons `data-a="comptepour"`, « Annuler ») ; `vcommun.plan` : puce « en route · parti le JJ/MM », ligne
+  `.cmp-route` ; `vbudget.ravM` (commun) : « Marge prévue du commun », « prévue · en attente de x € », les deux bases ;
+  Accueil : « en route » ; observation « Virements du mois » : « n en route ».
+- Relevé de contrôle : `commun.marge.enRoute|enAttente|prevue`, `commun.finDeMois.enRoute`, `commun.virements[].enRoute`,
+  `commun.enRoute`, `rattachements` : seulement s'il y en a (non comparés à l'ancienne version).
+- Tests : `test/doublons.test.mjs` (scénario constaté, en cours → comptabilisée, deux vraies opérations identiques,
+  opération plus renvoyée, migration et annulation), `test/anticipe.test.mjs` (jeu « personnel » complété,
+  `test/scenario-anticipe.mjs`, au 31/10, 01/11 et 03/11 ; contre-épreuve ; découvert ; correction à la main ; écrans),
+  relevés des jeux « mesures » et « personnel » comparés aux références 1.1.1 (`test/references/`, `test/jeux.mjs`).
 
 ### 1.1.1 — détails techniques
 - Tolérance (`budget.js`) : `toleranceDe(T, pm) = min(T.max, max(T.min, pm × T.part))`, `tolReglee(S.budget.reglages)`
@@ -309,6 +362,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Correctif : export de la sauvegarde (plantage), journal des plantages, reprise du classement, messages flottants, panne passagère de la banque | 1.0.1 | fait |
 | — | Retours d'usage : saisie du Budget, reste à vivre, alertes, tolérance, commun en cycle, historique, carburant, onglet Patrimoine, crypto, rapprochement | 1.1.0 | fait |
 | — | Correctif : tolérance plafonnée et réglable, écart de rapprochement, mode démo des nouveautés | 1.1.1 | fait |
+| — | Correctif : doublons de la banque, échéances réglées d'avance, virements en route et marge prévue du commun, découvert | 1.1.2 | fait |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -544,6 +598,18 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 1.1.2
+
+- Reste de la 1.1.1 côté architecte (demandes reportées derrière ce correctif) : à reprendre au lot suivant.
+- Décisions prises par défaut, à valider : virement « en route » 5 jours après son départ, puis « non reçu » ; marge
+  prévue = solde + en route + attendus − charges fixes à venir − reste du budget variable (la variable est gardée,
+  comme dans la marge réelle) ; occurrences reconnues limitées aux virements permanents, contrats et charges fixes
+  récurrentes (pas les abonnements classés en dépenses courantes) ; le salaire n'est pas rattaché (il ouvre le cycle).
+- Diagnostic des doublons : Klad ne garde pas les champs bruts de la banque (status, entry_reference, value_date) ;
+  si un cas semblable revient, ajouter un relevé anonyme de ces champs au journal (forme, pas valeurs).
+- Références des relevés : `test/references/releve-*-1.1.1.json` (produites par la 1.1.1, jeux à date du 28/10/2026) ;
+  un lot qui change volontairement un chiffre de ces jeux régénère la référence et l'explique dans le rapport.
 
 ## Points d'appui laissés par la 0.10.10
 

@@ -44,7 +44,16 @@
     saveLog(); renderLog();
   }
   // Journal affiché seulement quand son volet est ouvert (pas de mise en page à chaque ligne écrite).
-  function renderLog() { const el = $('log'); if (!S || !el.closest('#voletCorps')) return; el.textContent = S.journal.log.join('\n'); el.scrollTop = el.scrollHeight; }
+  function renderLog() {
+    const el = $('log'); if (!S || !el.closest('#voletCorps')) return; el.textContent = S.journal.log.join('\n'); el.scrollTop = el.scrollHeight;
+    // 1.1.2 : doublons retirés à l'installation, remis en un appui pendant 7 jours
+    const z = $('logAnnuler'), d = window.KladMigrations && window.KladMigrations.doublonsAnnulables ? window.KladMigrations.doublonsAnnulables(S, Date.now()) : null;
+    if (z) {
+      z.hidden = !d;
+      z.innerHTML = d ? '<button type="button" class="btn small" data-annuler-doublons>Remettre ' + (d.n > 1 ? 'les ' + d.n + ' doublons retirés' : 'le doublon retiré') + ' le ' +
+        d.le.slice(8, 10) + '/' + d.le.slice(5, 7) + '</button>' : '';
+    }
+  }
 
   // Messages en bas d'écran (1.0.1) : un seul à la fois (le suivant remplace le précédent), au-dessus de la barre
   // d'onglets (en haut de l'écran quand un volet est ouvert, pour ne pas couvrir ses boutons) ; un appui le ferme (sur
@@ -643,8 +652,10 @@
   }
   function plus(nbJours) {
     if (opsFin >= opsListe.length) return;
-    const r = Vu.ordreParJour(filtre.ordre) ? Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx() })
-      : Vu.trancheSansJours(S, opsListe, opsFin, nbJours * 2, { ctx: ctx() });
+    let ratt = null;
+    try { ratt = window.KladBudget && budget() ? window.KladBudget.rattachements(budget()) : null; } catch (e) { ratt = null; }
+    const r = Vu.ordreParJour(filtre.ordre) ? Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx(), ratt })
+      : Vu.trancheSansJours(S, opsListe, opsFin, nbJours * 2, { ctx: ctx(), ratt });
     $('tx').insertAdjacentHTML('beforeend', r.html);
     opsFin = r.fin;
     $('tx-suite').innerHTML = opsFin < opsListe.length ? '<div class="row center"><button type="button" class="btn" data-suite>Afficher plus</button></div>' : '';
@@ -816,7 +827,9 @@
   function renderDetail() {
     const o = opCourante && trouverOp(opCourante[0], opCourante[1]);
     if (!o) { $('opDetail').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
-    $('opDetail').innerHTML = Vu.detail(S, o, ctx());
+    let B = null;
+    try { B = window.KladBudget ? budget() : null; } catch (e) { B = null; }
+    $('opDetail').innerHTML = Vu.detail(S, o, ctx(), B);
   }
   // depuis le détail, une action qui remet l'opération dans la liste ramène à la liste
   const versListe = () => { if (vue === 'operation') montrer(retourDe.operation || 'operations', { force: true }); };
@@ -844,6 +857,20 @@
         () => { KC.annulerInterne(snap); if (venu && filtre.cat === '__int') filtre.cat = '__rap'; changed('classement'); });
     } else if (['rapprocher', 'rapprocherb', 'garder', 'arapprocher', 'autrement', 'pasautrement'].indexOf(b.dataset.a) >= 0) {
       rapprochement(b.dataset.a);
+    } else if (b.dataset.a === 'comptepour') {
+      // 1.1.2 : période de comptage choisie à la main (« compte pour : octobre / novembre »), annulable
+      const o = trouverOp(opCourante[0], opCourante[1]);
+      if (!o || !window.KladBudget) return;
+      const v = b.dataset.val || null, rt = window.KladBudget.rattachement(budget(), o.id);
+      // choisir la période de l'échéance reconnue automatiquement revient à l'automatique
+      const val = v && rt && rt.auto && v === rt.compte ? null : v;
+      const avant = window.KladBudget.rattacherA(o, val);
+      log('info', 'Période de comptage d\'une opération choisie à la main.');
+      changed('classement');
+      renderDetail();
+      toastAnnuler('Période de comptage modifiée : budget, commun et échéances recalculés.', () => {
+        window.KladBudget.rattacherA(o, avant); changed('classement'); renderDetail();
+      });
     } else if (b.dataset.a === 'ecartvu' || b.dataset.a === 'ecartnonvu') {
       const o = trouverOp(opCourante[0], opCourante[1]);
       const e = o && KC.ecartDe(ctx(), o);
@@ -1396,6 +1423,13 @@
   // ------------------------------------------------------------ journal
   $('btnCopyLog').addEventListener('click', () => copy('Klad ' + (CFG.version || '') + ' (' + (CFG.build || 'dev') + ')\n' + S.journal.log.join('\n'), 'Journal copié.'));
   $('btnClearLog').addEventListener('click', () => { S.journal.log = []; saveLog(); renderLog(); });
+  $('logAnnuler').addEventListener('click', e => {
+    if (!e.target.closest('[data-annuler-doublons]') || !S || !window.KladMigrations.annulerDoublons(S, Date.now())) return;
+    log('ok', 'Doublons remis (retrait annulé).');
+    toast('Opérations remises.');
+    changed('ops');
+    renderLog();
+  });
   preparer.secLog = () => renderLog();
 
   // ------------------------------------------------------------ ouverture (après déverrouillage) et premier plan
@@ -1499,6 +1533,14 @@
           const r = window.KladMigrations.dessins(s0, Date.now());
           if (r && r.n) { log('ok', 'Icônes : ' + r.n + ' émoji(s) de catégorie remplacé(s) par une icône dessinée (modifiable dans Plus › Classement).'); modifie = true; }
         } catch (e) { log('err', 'Icônes dessinées : ' + (e.message || e)); }
+      }
+      // 1.1.2 : une même opération bancaire enregistrée deux fois (relue avec une référence) : la première version
+      // est retirée, une fois ; annulable 7 jours depuis Plus › Journal.
+      if (window.KladMigrations && window.KladMigrations.doublons) {
+        try {
+          const r = window.KladMigrations.doublons(s0, Date.now());
+          if (r && r.n) { log('ok', r.n + ' doublon(s) retiré(s) (opération lue deux fois par la banque) ; annulable 7 jours depuis Plus › Journal.'); modifie = true; }
+        } catch (e) { log('err', 'Doublons : ' + (e.message || e)); }
       }
       if (init || modifie || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }

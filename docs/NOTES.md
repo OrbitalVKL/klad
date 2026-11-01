@@ -2,6 +2,25 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.1.2
+
+Correctif prioritaire (défaut constaté le 01/11 sur la 1.1.1).
+- **Opérations en double** : quand la banque renvoie une opération déjà lue à une autre date, avec une référence
+  ajoutée au libellé, Klad n'en garde plus qu'une (la plus récente, avec le classement, le « vu » et les rapprochements
+  de l'autre). Une opération que la banque ne renvoie plus lors d'une relecture de la même période est retirée (sauf
+  saisie à la main). Les doublons déjà enregistrés sont retirés une fois à l'installation ; ce retrait s'annule pendant
+  7 jours depuis Plus › Journal. Deux vraies opérations identiques ne sont jamais fusionnées.
+- **Échéances réglées d'avance** : un virement permanent, un prélèvement ou une échéance de contrat débité jusqu'à
+  7 jours avant ou 5 jours après sa date prévue (week-end, jour férié, fait d'avance) compte pour l'échéance prévue,
+  partout : reste à vivre, budget (cycle et mois civil), observations, échéances, commun, résumé Grafit. La date réelle
+  reste affichée, avec la mention « réglé d'avance pour novembre ». Fenêtre réglable dans Plus › Réglages › Budget ›
+  Échéances réglées d'avance ; correction à la main dans le détail de l'opération (« Compte pour »), annulable.
+- **Commun** : un virement parti du compte perso et pas encore arrivé est « en route » (plus « attendu, non reçu ») ;
+  il compte une seule fois. Tant que des virements du mois manquent, la marge affichée est la marge prévue (« prévue ·
+  en attente de x € ») ; la marge réelle reste visible dans le détail et reprend quand tout est arrivé.
+- **Découvert prévu du commun** : l'alerte suit la trésorerie jour par jour (virements attendus et en route compris).
+- Aucun autre chiffre modifié (relevés de contrôle des jeux fictifs identiques à la 1.1.1).
+
 ## 1.1.1
 
 Correctif de la 1.1.0 (décisions de l'architecte).
