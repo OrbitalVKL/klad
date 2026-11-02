@@ -1926,7 +1926,7 @@ label.ctl{max-width:100%;min-width:0;flex-wrap:wrap}
    soit plus coupé sur les bords (défaut vu sur le téléphone : champ « tronqué des deux côtés ») */
 .sh-body{margin-inline:-6px;padding-inline:6px}
 .sheet{padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
-.diag-t{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 var(--mono);background:var(--surface-2);border-radius:12px;padding:10px 12px;margin:0;max-width:100%;box-sizing:border-box}
+.diag-t{white-space:pre-wrap;white-space:break-spaces;overflow-wrap:anywhere;font:12px/1.45 var(--mono);background:var(--surface-2);border-radius:12px;padding:10px 12px;margin:0;max-width:100%;box-sizing:border-box}
 /* Plus › Classement : la fiche dépliée d'une catégorie passe sous son nom, sur toute la largeur (0.10.9 ; jusque-là
    coincée à droite du nom, dans la même rangée) */
 .list.cats>li{flex-wrap:wrap}

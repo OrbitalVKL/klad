@@ -1015,6 +1015,16 @@
     pl[key] = p;
     return snap;
   }
+  // Ligne de journal d'une modification de poste (1.1.3) : périmètre et variation du budget mensuel, sans nom de poste.
+  // snap : retour de modifier / versPrevu / ajouter / retirer.
+  function journalPoste(S, snap, quoi) {
+    const mens = p => (p == null || p.on === false || p.hidden ? 0 : +p.amt || 0);   // absent du plan : hors budget
+    const pl = (donnees(S).plan || {})[snap.scope] || {};
+    const avant = mens(snap.avant), apres = mens(pl[snap.key]);
+    const d = apres - avant;
+    return 'Budget ' + (snap.scope === 'commun' ? 'du commun' : 'perso') + ' : ' + quoi +
+      (Math.abs(d) < 1 ? ' (budget inchangé)' : ' (budget ' + (d > 0 ? 'monté' : 'baissé') + ' de ' + eur(d, true) + ' par mois)') + '.';
+  }
   // Ajout d'un poste (catégorie ou sous-catégorie existante, ou poste fixe nouveau).
   function ajouter(S, scope, key) { return modifier(S, scope, key, { on: true }); }
   // Retrait : le poste sort du budget (la catégorie est conservée) ; un poste saisi à la main est supprimé.
@@ -1262,7 +1272,7 @@
     V, PER, NATS, NOMS, APPORTS, CONTRIBUTION, MODES_SALAIRE, BASES_RAV, baseRav, choisirBaseRav, ravChoisi, nouveau, donnees, importer, reglages, contexte, tolReglee, toleranceDe,
     complement, surcharger, cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
-    devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement,
+    devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement, journalPoste,
     shift, finMois, nomMois, eur, dernierDebit, tendanceMois, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median, planCarnet
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -6,6 +6,11 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.1.3** — réponse de l'architecte au relevé de contrôle 1.1.2 (accepté) : virement « en route » 5 jours ouvrés,
+observation « virements après l'échéance » (retards réels seulement, qui est en retard), « Budget du mois dépassé » sur
+la période du Budget, journal anonyme des fusions et retraits de la synchronisation et des modifications du budget,
+mode démo des nouveautés de la 1.1.2, diagnostic d'affichage (mesure et cadre du texte).
+
 **1.1.2** — correctif prioritaire (relevé de contrôle 1.1.1 du 01/11 analysé par l'architecte) : opérations bancaires
 enregistrées deux fois (relues à une autre date avec une référence), échéances réglées d'avance rattachées à leur
 échéance, virements « en route » et marge prévue du commun, alerte de découvert alignée sur la trésorerie.
@@ -38,6 +43,44 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.1.3 — détails techniques
+- **Jours ouvrés** (`commun.js`) : `paques(y)` (calcul grégorien), `ferie(d)` (11 jours fériés nationaux : 1/1, lundi de
+  Pâques, 1/5, 8/5, Ascension, lundi de Pentecôte, 14/7, 15/8, 1/11, 11/11, 25/12 ; pas Alsace-Moselle, décision du
+  propriétaire), `joursOuvres(a, b)` (jours ouvrés après a jusqu'à b compris). `routes(B)` (mémo `B.memo.routes`) :
+  rapprochement départ → arrivée si l'arrivée est au plus `ROUTE_JOURS` = 5 jours ouvrés après le départ (ou 5 jours de
+  calendrier avant) ; en route tant que `joursOuvres(départ, aujourd'hui) ≤ 5`. `enRoute(B)` inchangé pour les appelants ;
+  `departDe(B, arrivée)` → ligne du départ ou null.
+- **Observation « virements après l'échéance »** (`observations.js`) : un apport « moi » est en retard si son départ
+  (`departDe`) est après l'échéance du prêt (sans départ connu : l'arrivée) ; « autre » : l'arrivée. Titre « Compte
+  commun : virement(s) de <nom>[ et de <nom>] après l'échéance » (noms des réglages du commun, masqués en démo). Aucun
+  apport arrivé mais des virements en route partis avant l'échéance : pas d'avertissement « Aucun apport reçu ». La
+  branche « Tous reçus » prend aussi la date de départ.
+- **« Budget du mois dépassé »** : lignes de `KB.suivi(B, sc, null)` (période de l'écran Budget : cycle de salaire ou
+  mois civil, `pd`), plus `KB.postes` (mois civil). Changement voulu des relevés des jeux fictifs au 28/10 (cycle
+  27/10 → 26/11) : références régénérées `test/references/releve-*-1.1.3.json` (les 1.1.1 gardées pour mémoire).
+- **Journal de la synchronisation** (`modele.js`) : `formeEB(t)` (présence de status, entry_reference, transaction_id,
+  booking_date, value_date ; `idDate` = transaction_id en forme de date), `formeKlad(o)` (identifiant `reference-date` |
+  `reference` | `en-cours` | `empreinte`, statut, date de valeur), `texteForme(d)`. `integrer` → `st.details`
+  `[{ action: fusion | retrait, motif: en-cours | relue | plus-renvoyee | en-cours-absente, renvoyee, ancienne }]` ;
+  `rapprocher(list, noter)`. `sync.js` : une ligne par détail, `JOURNAL_FORMES` = 10 au plus, puis un décompte.
+- **Journal du budget** : `KB.journalPoste(S, snap, quoi)` → « Budget perso|du commun : <quoi> (budget monté|baissé de
+  x € par mois | inchangé). » ; utilisé par aligner (prélevé, contrats, réel habituel, référence « = » qui n'écrivait
+  rien), modifier, ajouter, retirer ; « Tout aligner » donne le périmètre et le nombre de postes.
+- **Diagnostic d'affichage** (`diagaff.js`, `style.css`) : texte témoin de la mesure en `position: fixed` (à 200 %, il
+  élargissait la page à 347 px pendant la mesure : mesures faussées) ; `.diag-t` en `white-space: break-spaces` (les
+  espaces de fin de ligne « pendaient » hors du cadre : échec du test de débordement à 320 px / 200 % selon la police).
+- **Mode démo** : `test/demo-outils.mjs:completer` ajoute un virement en route (parti la veille, libellé avec référence)
+  et un prélèvement réglé d'avance (`echeance` au 1er du mois suivant) ; `test/demo.test.mjs` parcourt Commun, le
+  détail des deux opérations. Rien de nouveau à masquer : dates, montants (multipliés) et libellés passent déjà par le
+  dictionnaire.
+- **Écart de 0,66 € du budget commun (0.10.10 → 1.1.0)** : aucun calcul du budget commun modifié entre ces versions
+  (diff du code). Dans les données de référence, un seul poste du commun a un budget qui diffère de son contrat de
+  exactement cet écart : geste du propriétaire probable (« aligner sur ses contrats » ou saisie). Journal d'alors : « Budget d'un poste aligné sur ses
+  contrats. » ou « Budget d'un poste modifié. », sans périmètre (corrigé en 1.1.3).
+- Tests : `test/lot113.test.mjs` (jours fériés, en route du 31/10 au 06/11 puis non reçu le 09/11, départ 30/10 →
+  arrivée 03/11 et 06/11, retard nommé, en route avant l'échéance, formes du journal, ligne de synchronisation, journal
+  du budget, période du « Budget du mois dépassé »).
 
 ### 1.1.2 — détails techniques
 - **Cause des doublons** : la banque a renvoyé les virements comme comptabilisés (statut `BOOK` ou absent, qui vaut
@@ -363,6 +406,7 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Retours d'usage : saisie du Budget, reste à vivre, alertes, tolérance, commun en cycle, historique, carburant, onglet Patrimoine, crypto, rapprochement | 1.1.0 | fait |
 | — | Correctif : tolérance plafonnée et réglable, écart de rapprochement, mode démo des nouveautés | 1.1.1 | fait |
 | — | Correctif : doublons de la banque, échéances réglées d'avance, virements en route et marge prévue du commun, découvert | 1.1.2 | fait |
+| — | Retours du relevé 1.1.2 : en route en jours ouvrés, retards du commun, période du dépassement, journal, mode démo | 1.1.3 | fait |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -581,6 +625,12 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   l'encart « Reprendre le classement » reste jusqu'au choix (« Plus tard » : écarté pour la session) ; panne passagère
   limitée à la réponse 400 contenant « ASPSP ».
 
+- 1.1.3 (validées par l'architecte) : marge prévue avec le reste du budget variable ; pas de rattachement pour les
+  dépenses courantes ni le salaire ; virement « en route » 5 jours **ouvrés** (jours fériés nationaux seulement, décision
+  du propriétaire), puis « non reçu » ; un virement parti avant l'échéance n'est jamais en retard ; journal anonyme de la
+  forme des champs bancaires à chaque fusion ou retrait. Prises par défaut, à valider : au plus 10 lignes de forme par
+  compte et par synchronisation ; journal du budget avec le périmètre et la variation mensuelle (sans nom de poste).
+
 ## Inventaire des écarts avec l'ancienne version (0.9.0)
 
 Repris en 0.9.0 : interface ; tendance complète (revenus, dépenses, balance, balance cumulée, solde reconstitué ou une
@@ -599,17 +649,16 @@ Restent :
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
 
-## Points d'appui laissés par la 1.1.2
+## Points d'appui laissés par la 1.1.3
 
-- Reste de la 1.1.1 côté architecte (demandes reportées derrière ce correctif) : à reprendre au lot suivant.
-- Décisions prises par défaut, à valider : virement « en route » 5 jours après son départ, puis « non reçu » ; marge
-  prévue = solde + en route + attendus − charges fixes à venir − reste du budget variable (la variable est gardée,
-  comme dans la marge réelle) ; occurrences reconnues limitées aux virements permanents, contrats et charges fixes
-  récurrentes (pas les abonnements classés en dépenses courantes) ; le salaire n'est pas rattaché (il ouvre le cycle).
-- Diagnostic des doublons : Klad ne garde pas les champs bruts de la banque (status, entry_reference, value_date) ;
-  si un cas semblable revient, ajouter un relevé anonyme de ces champs au journal (forme, pas valeurs).
-- Références des relevés : `test/references/releve-*-1.1.1.json` (produites par la 1.1.1, jeux à date du 28/10/2026) ;
-  un lot qui change volontairement un chiffre de ces jeux régénère la référence et l'explique dans le rapport.
+- Reste de la 1.1.1 : tolérance (a) et écart de rapprochement (b) livrés en 1.1.1, vérifiés ; mode démo (c) complété ;
+  « Budget du mois dépassé » (d) corrigé (il suivait encore le mois civil) ; écart de 0,66 € (e) : cause probable donnée,
+  à confirmer par le journal du propriétaire.
+- Références des relevés : `test/references/releve-*-1.1.3.json` (jeux à date du 28/10/2026) ; un lot qui change
+  volontairement un chiffre de ces jeux régénère la référence et l'explique dans le rapport.
+- Comparaison avec l'ancienne version : l'observation « Budget du mois dépassé » (mois civil dans la v65) et le titre
+  de l'observation des virements après l'échéance diffèrent désormais volontairement (voir « Écarts connus »).
+- Journal : si un doublon revient, les lignes « opération fusionnée / retirée » donnent la forme des champs bancaires.
 
 ## Points d'appui laissés par la 0.10.10
 
@@ -709,3 +758,6 @@ et dans ce fichier ; recette manuelle remise au propriétaire.
   fournies en données (extension `klad` : `regles`, `bars`) ; sinon, un geste « Classer aussi les autres » suffit.
 - Le libellé du règlement de carte dans les sous-catégories (« Règlement <carte> (détaillé) ») suit le libellé du compte
   dans Klad.
+- 1.1.3 : « Budget du mois dépassé » suit la période du Budget (cycle de salaire) alors que l'ancienne version prenait le
+  mois civil ; les virements partis avant l'échéance du prêt ne sont plus comptés en retard, et le titre nomme la
+  personne en retard (« Compte commun : virement de … après l'échéance »).

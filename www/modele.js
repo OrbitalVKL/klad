@@ -349,7 +349,8 @@
   }
 
   // En cours → comptabilisée (une pour une, date la plus proche d'abord). Renvoie le nombre de fusions.
-  function rapprocher(list) {
+  // noter(enCours, comptabilisee) (1.1.3) : appelé à chaque fusion, pour le journal.
+  function rapprocher(list, noter) {
     const pend = list.filter(o => o.statut === 'en_cours' && o.source === 'eb').sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     const book = list.filter(o => o.statut === 'comptabilisee' && o.source === 'eb');
     const retirer = new Set();
@@ -372,6 +373,7 @@
       if (best.rapprochement == null && p.rapprochement != null) best.rapprochement = p.rapprochement;
       if (p.ecartVu) best.ecartVu = true;
       retirer.add(p.id);
+      if (noter) noter(p, best);
       n++;
     }
     if (retirer.size) for (let i = list.length - 1; i >= 0; i--) if (retirer.has(list[i].id)) list.splice(i, 1);
@@ -401,20 +403,50 @@
     return mots.some(m => L.indexOf(m) >= 0);
   }
 
+  // ------------------------------------------------------------ forme des champs bruts (1.1.3, journal)
+  // Présence des champs renvoyés par la banque, jamais leurs valeurs : sert à comprendre une fusion ou un retrait.
+  const CHAMPS_EB = ['status', 'entry_reference', 'transaction_id', 'booking_date', 'value_date'];
+  const formeDate = v => /^\d{4}-\d{2}-\d{2}T/.test(String(v || ''));
+  function formeEB(t) {
+    const f = {};
+    for (const k of CHAMPS_EB) f[k] = t != null && t[k] != null && t[k] !== '';
+    f.idDate = !!(t && formeDate(t.transaction_id));
+    return f;
+  }
+  // Forme de ce que Klad a gardé d'une opération : sorte d'identifiant, statut, date de valeur.
+  function formeKlad(o) {
+    const id = String(o.id || ''), r = id.indexOf(':r:');
+    return { id: r >= 0 ? (formeDate(id.slice(r + 3)) ? 'reference-date' : 'reference') : id.indexOf(':p:') >= 0 ? 'en-cours' : 'empreinte',
+      statut: o.statut, dateValeur: !!o.dateValeur };
+  }
+  const MOTIFS_JOURNAL = { 'en-cours': 'en cours devenue comptabilisée', relue: 'relue par la banque', 'plus-renvoyee': 'plus renvoyée par la banque', 'en-cours-absente': 'en cours plus renvoyée' };
+  const ID_JOURNAL = { 'reference-date': 'référence en forme de date', reference: 'référence', 'en-cours': 'en cours', empreinte: 'empreinte' };
+  // Ligne de journal (anonyme) : « fusion (relue par la banque) · renvoyée : status oui, … · remplacée : … ».
+  function texteForme(d) {
+    const oui = b => (b ? 'oui' : 'non');
+    const eb = f => CHAMPS_EB.map(k => k + ' ' + oui(f[k]) + (k === 'transaction_id' && f.idDate ? ' (forme date)' : '')).join(', ');
+    const kl = f => 'identifiant ' + ID_JOURNAL[f.id] + ', ' + (f.statut === 'en_cours' ? 'en cours' : 'comptabilisée') + ', date de valeur ' + oui(f.dateValeur);
+    return (d.action === 'fusion' ? 'opération fusionnée' : 'opération retirée') + ' (' + MOTIFS_JOURNAL[d.motif] + ')' +
+      (d.renvoyee ? ' · champs renvoyés : ' + eb(d.renvoyee) : ' · pas de champs renvoyés') + ' · ' + (d.action === 'fusion' ? 'remplacée' : 'retirée') + ' : ' + kl(d.ancienne);
+  }
+
   // opts (1.1.2) : { depuis } : début de la période demandée à la banque (null : tout l'historique accepté).
   function integrer(S, cid, raw, now, opts) {
     const c = compte(S, cid);
     const jour = jourLocal(now);
     const front = (c && c.frontiere) || '';
-    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, ignorees: 0, reprises: 0, ecartees: 0 };
-    const cands = [];
+    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, ignorees: 0, reprises: 0, ecartees: 0, details: [] };
+    const cands = [], bruts = new Map();
     for (const t of raw || []) {
       const x = depuisEB(t);
       if (!x || (front && x.date < front)) { st.ignorees++; continue; }
       if (creditDeReglement(c, x)) { st.ecartees++; continue; }
-      cands.push(x);
+      cands.push(x); bruts.set(x, t);
     }
     doterIds(cid, cands, 'h');
+    // 1.1.3 : forme des champs bruts de chaque opération renvoyée, par identifiant (journal des fusions et retraits)
+    const formes = new Map(cands.map(x => [x.id, formeEB(bruts.get(x))]));
+    const noter = (action, motif, ancienne, gardee) => st.details.push({ action, motif, renvoyee: gardee ? formes.get(gardee.id) || null : null, ancienne: formeKlad(ancienne) });
     const list = opsDe(S, cid);
     const parId = new Map(list.map(o => [o.id, o]));
     const absorbees = new Set(list.map(o => o.exEnCours).filter(Boolean));
@@ -435,7 +467,7 @@
       }
     }
     for (const o of list) if (o.source === 'eb' && o.statut === 'en_cours' && !vues.has(o.id) && !o.absente) o.absente = jour;
-    st.fusionnees = rapprocher(list);
+    st.fusionnees = rapprocher(list, (p, b) => noter('fusion', 'en-cours', p, b));
     // 1.1.2 : opération comptabilisée lue auparavant et que la banque ne renvoie plus sur la même période (elle l'a
     // relue à une autre date, souvent avec une référence ajoutée au libellé) : fusionnée dans la version renvoyée
     // (même montant, 5 jours au plus, même libellé de base ; ce qui a été fait à la main la suit), sinon retirée.
@@ -458,15 +490,15 @@
           const e = Math.abs(ecart(d.date, r.date));
           if (e < bd) { best = r; bd = e; }
         }
-        if (best) { reprendreEtat(S, d, best); prises.add(best.id); st.fusionnees++; }
-        else st.retirees++;
+        if (best) { reprendreEtat(S, d, best); prises.add(best.id); st.fusionnees++; noter('fusion', 'relue', d, best); }
+        else { st.retirees++; noter('retrait', 'plus-renvoyee', d, null); }
         retirer.add(d.id);
       }
       if (retirer.size) for (let i = list.length - 1; i >= 0; i--) if (retirer.has(list[i].id)) list.splice(i, 1);
     }
     for (let i = list.length - 1; i >= 0; i--) {
       const o = list[i];
-      if (o.statut === 'en_cours' && o.absente && ecart(jour, o.date) > PURGE_JOURS) { list.splice(i, 1); st.retirees++; }
+      if (o.statut === 'en_cours' && o.absente && ecart(jour, o.date) > PURGE_JOURS) { list.splice(i, 1); st.retirees++; noter('retrait', 'en-cours-absente', o, null); }
     }
     trier(list);
     return st;
@@ -682,7 +714,7 @@
   g.KladModele = {
     V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId, baseLibelle, avecReference, memeOperation, reprendreEtat, annulerRenvois, DOUBLON_JOURS,
     vide, nouveauModele, compte, comptesTries, comptesDe, opsDe, roleDefaut, nouveauCompte, compteEB, empreinte,
-    associerSession, supprimerCompte, remplacerCompte, reassocier, disponibles, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, bornesRecuperation, debutRecuperation,
+    associerSession, supprimerCompte, remplacerCompte, reassocier, disponibles, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, formeEB, formeKlad, texteForme, bornesRecuperation, debutRecuperation,
     appliquerFrontiere, creditDeReglement, soldePrefere, soldesLus, soldeAffiche, totalCourants, etatAcces, alerteCompte,
     versBlocs, nomsOps, depuisBlocs, BLOC_OPS, depuis02, surChangement, signaler
   };

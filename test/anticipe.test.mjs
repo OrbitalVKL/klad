@@ -92,10 +92,12 @@ test('contre-épreuve : virements exécutés le 01/11 → mêmes chiffres au 03/
   assert.equal(U.ravSalaire, A.ravSalaire);
 });
 
-test('relevés de contrôle des jeux « mesures » et « personnel » identiques à la 1.1.1', async () => {
+// 1.1.3 : référence régénérée ; seul changement voulu : « Budget du mois dépassé » sur la période du Budget (cycle de
+// salaire en cours, 27/10 → 26/11) et non plus le mois civil (références 1.1.1 gardées pour mémoire).
+test('relevés de contrôle des jeux « mesures » et « personnel » identiques à la 1.1.3', async () => {
   const T = now('2026-10-28');
   for (const [nom, f] of [['mesures', repriseMesures], ['personnel', reprisePersonnelle]]) {
-    const ref = JSON.parse(fs.readFileSync(new URL('./references/releve-' + nom + '-1.1.1.json', import.meta.url)));
+    const ref = JSON.parse(fs.readFileSync(new URL('./references/releve-' + nom + '-1.1.3.json', import.meta.url)));
     const r = releve(X, await etatDepuisReprise(X, f('2026-10-28'), T), T);
     r.meta.version = ref.meta.version;
     assert.deepEqual(r, ref, nom);

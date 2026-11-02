@@ -144,7 +144,7 @@
     const al = t.closest('[data-aligner]');
     if (al) {
       const snap = KB.modifier(S(), A.scope(), al.dataset.aligner, { on: true, amt: +al.dataset.v });
-      A.log('info', 'Budget d\'un poste aligné.');
+      A.log('info', KB.journalPoste(S(), snap, 'un poste aligné sur le prélevé'));
       annulable('Budget aligné sur ' + F.montant(+al.dataset.v) + '.', snap);
       return;
     }
@@ -152,7 +152,7 @@
     if (at) {
       if (!A.confirmInline(at, 'Confirmer : tous les postes ?')) return;
       const r = KB.alignerTout(S(), A.budget(), at.dataset.alignertout);
-      A.log('info', 'Budget : tous les postes alignés sur le réel habituel.');
+      A.log('info', 'Budget ' + (at.dataset.alignertout === 'commun' ? 'du commun' : 'perso') + ' : ' + r.n + ' poste(s) alignés sur le réel habituel.');
       A.changed('budget');
       A.toastAnnuler(r.n + ' poste(s) alignés sur le réel habituel.', () => { KB.annulerAlignement(S(), at.dataset.alignertout, r.snap); A.changed('budget'); });
       return;
@@ -167,6 +167,7 @@
       const a = KB.postes(A.budget(), A.scope()).lignes.find(x => x.key === pa.dataset.paligner);
       if (!a) return;
       const snap = KB.modifier(S(), A.scope(), a.key, { on: true, per: a.per, amt: Math.round(a.avg * a.per / 100) * 100 });
+      A.log('info', KB.journalPoste(S(), snap, 'un poste aligné sur la référence'));
       annulable('Budget aligné : ' + KB.eur(a.avg) + ' / mois pour ' + a.label + '.', snap);
       return;
     }
@@ -174,7 +175,7 @@
     if (pr) {
       if (!A.confirmInline(pr, 'Retirer ?')) return;
       const snap = KB.retirer(S(), A.scope(), pr.dataset.pretirer);
-      A.log('info', 'Poste retiré du budget.');
+      A.log('info', KB.journalPoste(S(), snap, 'un poste retiré'));
       annulable('« ' + pr.dataset.pretirer.slice(2) + ' » retiré du budget.', snap);
       return;
     }
@@ -211,7 +212,7 @@
     const vp = t.closest('[data-versprevu]');
     if (vp) {
       const r = KB.versPrevu(S(), A.scope(), vp.dataset.versprevu);
-      A.log('info', 'Budget d\'un poste aligné sur ses contrats.');
+      A.log('info', KB.journalPoste(S(), r.snap, 'un poste aligné sur ses contrats'));
       annulable('Prévu « ' + vp.dataset.versprevu.slice(2) + ' » : ' + F.montant(r.amt) + ' par mois.', r.snap);
       return;
     }
@@ -355,7 +356,7 @@
     if (b.dataset.pe === 'retirer') {
       if (!A.confirmInline(b, 'Confirmer ?')) return;
       const snap = KB.retirer(S(), scope, key);
-      A.log('info', 'Poste retiré du budget.');
+      A.log('info', KB.journalPoste(S(), snap, 'un poste retiré'));
       A.fermerVolet();
       annulable('« ' + key.slice(2) + ' » retiré du budget.', snap);
       return;
@@ -389,7 +390,7 @@
       }
     }
     const snap = KB.modifier(S(), scope, key, ch);
-    A.log('info', 'Budget d\'un poste modifié.');
+    A.log('info', KB.journalPoste(S(), snap, b.dataset.pe === 'aligner' ? 'un poste aligné sur le réel habituel' : 'un poste modifié'));
     A.fermerVolet();
     annulable('Budget « ' + key.slice(2) + ' » enregistré.', snap);
   });
@@ -413,7 +414,7 @@
       key = 'f|' + n;
     }
     const snap = KB.ajouter(S(), ui.ajout.scope, key);
-    A.log('info', 'Poste ajouté au budget.');
+    A.log('info', KB.journalPoste(S(), snap, 'un poste ajouté'));
     A.fermerVolet();
     ui.edit = { scope: ui.ajout.scope, key };
     annulable('« ' + key.slice(2) + ' » ajouté au budget.', snap);

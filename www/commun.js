@@ -65,29 +65,59 @@
     const mot = v.label ? fold(v.label).split(' ')[0] : '';
     return cand.find(r => Math.abs(r.m - v.montant) <= 0.15 * v.montant && !autres.some(o => Math.abs(r.m - o) < 1) && (!v.label || fold(r.label).indexOf(mot) >= 0 || v.qui === 'autre')) || null;
   }
-  // ------------------------------------------------------------ virements « en route » (1.1.2)
+  // ------------------------------------------------------------ jours ouvrés (1.1.3)
+  // Jours fériés nationaux français (pas ceux d'Alsace-Moselle) : 1er janvier, lundi de Pâques, 1er et 8 mai, Ascension,
+  // lundi de Pentecôte, 14 juillet, 15 août, 1er et 11 novembre, 25 décembre.
+  const FERIES = {};
+  function paques(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    const h = (19 * a + b - d - Math.floor((b - f + 1) / 3) + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mois = Math.floor((h + l - 7 * m + 114) / 31), jour = ((h + l - 7 * m + 114) % 31) + 1;
+    return y + '-' + String(mois).padStart(2, '0') + '-' + String(jour).padStart(2, '0');
+  }
+  function feries(y) {
+    if (FERIES[y]) return FERIES[y];
+    const p = paques(y);
+    const L = ['01-01', '05-01', '05-08', '07-14', '08-15', '11-01', '11-11', '12-25'].map(x => y + '-' + x)
+      .concat([plusJours(p, 1), plusJours(p, 39), plusJours(p, 50)]);
+    return (FERIES[y] = new Set(L));
+  }
+  const ferie = d => feries(+d.slice(0, 4)).has(d);
+  const ouvre = d => { const j = new Date(d + 'T12:00:00Z').getUTCDay(); return j !== 0 && j !== 6 && !ferie(d); };
+  // Nombre de jours ouvrés après le jour a, jusqu'au jour b compris (0 si b ≤ a).
+  function joursOuvres(a, b) {
+    let n = 0;
+    for (let d = plusJours(a, 1); d <= b && n < 400; d = plusJours(d, 1)) if (ouvre(d)) n++;
+    return n;
+  }
+
+  // ------------------------------------------------------------ virements « en route » (1.1.2, jours ouvrés en 1.1.3)
   // Virement parti d'un compte perso vers le commun (montant d'un de mes virements permanents, ou poste « contribution »)
-  // et pas encore arrivé : pas de crédit de même montant sur le commun à 5 jours près. Il reste « en route » 5 jours
-  // après son départ ; au-delà, le virement redevient « non reçu ». À l'arrivée, il est rapproché du départ.
-  // → [{ depart (ligne), montant, pour (mois de l'échéance), v (virement permanent ou null) }].
+  // et pas encore arrivé : pas de crédit de même montant sur le commun dans les 5 jours ouvrés qui suivent le départ
+  // (ou jusqu'à 5 jours avant, si la banque date le départ après l'arrivée). Il reste « en route » 5 jours ouvrés après
+  // son départ (week-ends et jours fériés exclus) ; au-delà, il redevient « non reçu ». À l'arrivée, il est rapproché du
+  // départ (departDe). → [{ depart (ligne), montant, pour (mois de l'échéance), v (virement permanent ou null) }].
   const ROUTE_JOURS = 5;
-  function enRoute(B) {
-    if (B.memo.route) return B.memo.route;
-    if (!B.comptes.some(c => c.role === 'commun')) return (B.memo.route = []);
+  function routes(B) {
+    if (B.memo.routes) return B.memo.routes;
+    const R = B.memo.routes = { out: [], paires: new Map() };
+    if (!B.comptes.some(c => c.role === 'commun')) return R;
     const V = (B.D.virements || []).filter(v => v.qui === 'moi' && +v.montant > 0), LINK = B.R.commun.contribution;
     const departs = B.rows.filter(r => PERSO.indexOf(r.role) >= 0 && r.m < 0 && !r.ecart && r.type === 'depense' &&
       (r.sub === LINK || (/^VIR/.test(K().fold(r.label)) && V.some(v => Math.abs(-r.m - v.montant) < 1))));
     const arrivees = opsCommun(B).filter(r => r.m > 0 && !KB().deLautre(B, r));
-    const prises = new Set(), out = [];
+    const delai = (d, a) => a.date < d.date ? KB().dDiff(a.date, d.date) : joursOuvres(d.date, a.date);
+    const out = R.out;
     for (const d of departs) {
       let best = null, bd = Infinity;
       for (const a of arrivees) {
-        if (prises.has(a) || Math.abs(a.m + d.m) >= 1) continue;
+        if (R.paires.has(a) || Math.abs(a.m + d.m) >= 1 || delai(d, a) > ROUTE_JOURS) continue;
         const e = Math.abs(KB().dDiff(d.date, a.date));
-        if (e <= ROUTE_JOURS && e < bd) { best = a; bd = e; }
+        if (e < bd) { best = a; bd = e; }
       }
-      if (best) { prises.add(best); continue; }
-      if (d.date > B.auj || KB().dDiff(d.date, B.auj) > ROUTE_JOURS) continue;
+      if (best) { R.paires.set(best, d); continue; }
+      if (d.date > B.auj || joursOuvres(d.date, B.auj) > ROUTE_JOURS) continue;
       out.push({ depart: d, montant: -d.m, pour: KB().dateCompte(d).slice(0, 7), v: null });
     }
     // chaque départ est relié à un de mes virements (montant identique, sinon à 15 % près), une fois
@@ -99,8 +129,11 @@
         if (i >= 0) { r.v = libres[i]; libres.splice(i, 1); }
       }
     }
-    return (B.memo.route = out);
+    return R;
   }
+  const enRoute = B => routes(B).out;
+  // Départ (ligne du compte perso) d'un virement arrivé sur le commun, ou null (1.1.3).
+  const departDe = (B, a) => routes(B).paires.get(a) || null;
   const PERSO = ['courant', 'carte_differee', 'paiement_en_ligne'];
   // Virements en route pour le mois m (échéance de m ou d'avant), reliés à un virement permanent pas encore reçu.
   function enRouteMois(B, m) {
@@ -532,6 +565,6 @@
     return { appels: Object.keys(D.appels || {}).filter(k => isObj(D.appels[k]) && Array.isArray(D.appels[k].items)).length, equipements: (eq.items || []).length };
   }
 
-  g.KladCommun = { ROUTE_JOURS, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
+  g.KladCommun = { ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
     sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer };
 })(typeof window !== 'undefined' ? window : globalThis);

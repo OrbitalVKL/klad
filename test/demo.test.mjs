@@ -216,6 +216,21 @@ test('mode démo : rien de réel à l\'écran (jeu « personnel »), champs en l
     await B.pause(250);
     await f('rapprochement›écart achat');
     await B.fermer();
+    // 1.1.3 : virement « en route » (Accueil, Commun) et prélèvement « réglé d'avance pour … » (liste et détail)
+    const A = await page.evaluate(() => window.__demoAnticipe);
+    await B.onglet('commun');
+    await B.pause(300);
+    assert.match(await page.locator('#appli').evaluate(e => e.textContent), /en route/, 'Commun : ligne « en route » présente (bloc éventuellement replié)');
+    await f('commun›en route');
+    await page.evaluate(a => window.KladApp.ouvrirOp(a.cour, a.avance), A);
+    await B.pause(250);
+    assert.match(await page.locator('#opDetail').evaluate(e => e.textContent), /réglé d'avance pour/);
+    await f('opération réglée d\'avance');
+    await B.fermer();
+    await page.evaluate(a => window.KladApp.ouvrirOp(a.cour, a.route), A);
+    await B.pause(250);
+    await f('virement en route');
+    await B.fermer();
     assert.ok(n >= 60, n + ' écrans et volets parcourus');
     assert.deepEqual([...new Set(defauts)], [], 'données réelles affichées en mode démo');
     assert.deepEqual([...new Set(ecrits)], [], 'champs modifiables en mode démo');
