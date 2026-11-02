@@ -2,6 +2,15 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.1.4
+
+Réponse de l'architecte au relevé de contrôle 1.1.3 (après l'arrivée des virements sur le commun).
+- **Commun : virements après l'échéance** : chaque virement permanent est jugé seul. Les virements ponctuels du mois
+  (rattrapage, remboursement) ne sont plus pris pour des retards. La date de référence est le premier prêt du mois,
+  jamais le jour prévu du virement ; une arrivée avant cette date n'est jamais en retard. Une fois le prêt passé, un
+  virement mensuel encore absent est signalé au nom de la personne concernée.
+- **« Virements du mois »** : l'observation donne le montant reçu et ce qui est encore attendu.
+
 ## 1.1.3
 
 Réponse de l'architecte au relevé de contrôle 1.1.2.

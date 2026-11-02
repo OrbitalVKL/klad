@@ -78,7 +78,8 @@ test('« virements après l\'échéance » : seul le virement vraiment en retard
   // mes virements partis avant l'échéance (arrivés après) : pas en retard ; celui de l'autre personne : en retard
   let L = await echeance('2026-11-06');
   assert.deepEqual(json(L.map(x => x.titre)), ['Compte commun : virement de Basile Quenard après l\'échéance']);
-  assert.match(L[0].texte, /1 virement\(s\) sont arrivés après l'échéance du prêt du 05\/11/);
+  // 1.1.4 : un élément par virement en retard
+  assert.match(L[0].texte, /1 virement\(s\) après l'échéance du prêt du 05\/11\/2026 : Basile Quenard · Virement personne B \(600\s€\) arrivé le 06\/11\./);
   // l'autre personne à l'heure : rien en retard
   L = await echeance('2026-11-04');
   assert.deepEqual(json(L.map(x => x.titre)), ['Compte commun : virements à l\'heure']);
@@ -93,7 +94,9 @@ test('« virements après l\'échéance » : un virement encore en route, parti 
   lire(S, 'r2', [eb('2026-11-05', -95000, 'ECH PRET IMMO FICTIF', 'C-9')], '2026-11-06');
   let B = ctx(S, '2026-11-06');
   assert.equal(KC.enRoute(B).length, 3);
-  assert.deepEqual(json(O.audit(B).filter(x => /Compte commun : virement/.test(x.titre)).map(x => x.titre)), [], 'ni retard ni « aucun apport »');
+  // 1.1.4 : mes virements en route ne sont pas en retard ; celui de l'autre personne, absent après l'échéance, l'est
+  assert.deepEqual(json(O.audit(B).filter(x => /Compte commun : virement/.test(x.titre)).map(x => x.titre)), ['Compte commun : virement de Basile Quenard après l\'échéance'], 'ni « aucun apport », ni retard à mon nom');
+  assert.match(O.audit(B).find(x => /après l'échéance/.test(x.titre)).texte, /Basile Quenard · Virement personne B \(600\s€\) pas encore arrivé/);
   // seul celui de l'autre personne arrive, après l'échéance
   lire(S, 'r2', [eb('2026-11-05', -95000, 'ECH PRET IMMO FICTIF', 'C-9'), eb('2026-11-06', 60000, 'VIR M BASILE QUENARD', 'C-4')], '2026-11-06');
   B = ctx(S, '2026-11-06');

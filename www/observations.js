@@ -42,6 +42,66 @@
     return out;
   }
 
+  // ------------------------------------------------------------ virements du commun et échéance du prêt (1.1.4)
+  // Chaque virement permanent (B.D.virements) est jugé seul, sur le mois de l'échéance : les apports ponctuels du mois
+  // (rattrapage, remboursement…) ne comptent pas. Date de référence : le premier prêt du mois (motif des réglages), ou,
+  // tant qu'il n'est pas passé à la banque, son jour habituel (premier prêt du dernier mois connu). Jamais le jour
+  // prévu du virement. En retard : arrivé après cette date (un de mes virements : son départ, s'il est connu, fait foi ;
+  // une arrivée avant l'échéance n'est jamais en retard) ; encore en route mais parti après elle ; pas arrivé du tout
+  // une fois l'échéance du mois en cours passée. Avant l'échéance du mois en cours, le mois précédent est jugé sur les
+  // seuls virements retrouvés (un montant changé depuis ne fait pas conclure à un retard).
+  // → [{ niveau, titre, texte }]
+  function retardsCommun(B, prets, V, nom) {
+    const out = [], cm = B.auj.slice(0, 7);
+    const premier = mm => prets.filter(r => r.date.slice(0, 7) === mm).map(r => r.date).sort()[0] || null;
+    const mL = prets.map(r => r.date).sort().pop().slice(0, 7), lday = +premier(mL).slice(8, 10);
+    const finMois = mm => new Date(Date.UTC(+mm.slice(0, 4), +mm.slice(5, 7), 0)).getUTCDate();
+    const jourDe = mm => mm + '-' + String(Math.min(lday, finMois(mm))).padStart(2, '0');
+    let m, E, habituel = false;
+    if (premier(cm)) { m = cm; E = premier(cm); }
+    else if (B.auj > jourDe(cm)) { m = cm; E = jourDe(cm); habituel = true; }
+    else { m = mL; E = premier(mL); }
+    const etat = (v, mm, ref) => {
+      const vu = KC().virementVu(B, v, mm);
+      if (vu) {
+        const d = v.qui === 'moi' && KC().departDe ? KC().departDe(B, vu) : null, eff = d ? d.date : vu.date;
+        return { v, vu, eff, retard: eff > ref };
+      }
+      const route = (KC().enRouteMois ? KC().enRouteMois(B, mm) : []).find(r => r.v === v);
+      if (route) return { v, route, eff: route.depart.date, retard: route.depart.date > ref };
+      return { v, manque: true, retard: mm === cm && B.auj > ref };
+    };
+    // échéance du mois en cours pas encore passée, virements du mois tous arrivés
+    if (m < cm) {
+      const R = V.map(v => etat(v, cm, jourDe(cm)));
+      if (R.every(x => x.vu)) {
+        const last = R.map(x => x.eff).sort().pop(), ok = last <= jourDe(cm);
+        out.push({ niveau: ok ? 'good' : 'warn', titre: 'Compte commun : virements de ' + MOIS[+cm.slice(5) - 1],
+          texte: 'Tous reçus (dernier le ' + jjmm(last) + ')' + (ok ? ', avant l\'échéance du prêt attendue vers le ' + lday + '.' : ' : après le ' + lday + ', jour habituel de l\'échéance du prêt — risque de découvert.') });
+        return out;
+      }
+    }
+    const R = V.map(v => etat(v, m, E)), late = R.filter(x => x.retard);
+    const j1 = [...new Set(V.map(v => +v.jour || 1))], prevus = j1.length && j1.every(d => d < +E.slice(8, 10));
+    const ech = 'l\'échéance du prêt du ' + dfr(E) + (habituel ? ' (jour habituel)' : '');
+    if (late.length) {
+      const qui = [...new Set(late.map(x => x.v.qui))].sort((a, b) => (a === 'moi' ? -1 : 1));
+      const desc = x => nom(x.v.qui) + ' · ' + (x.v.label || 'virement') + ' (' + e0(x.vu ? x.vu.m : +x.v.montant || 0) + ') ' +
+        (x.vu ? 'arrivé le ' + jjmm(x.vu.date) : x.route ? 'parti le ' + jjmm(x.eff) + ', encore en route' : 'pas encore arrivé');
+      const arr = late.filter(x => !x.manque), manq = late.filter(x => x.manque);
+      out.push({ niveau: m < cm && prevus ? 'warn' : 'bad',
+        titre: 'Compte commun : virement' + (late.length > 1 ? 's' : '') + ' de ' + qui.map(nom).join(' et de ') + ' après l\'échéance',
+        texte: 'En ' + mLong(m) + ', ' + late.length + ' virement(s) après ' + ech + ' : ' + late.map(desc).join(' · ') + '.' +
+          (manq.length ? ' Vérifiez que l\'ordre permanent est bien parti.' : '') +
+          (arr.length ? (prevus ? ' Les ordres sont programmés le ' + j1.join(' et ') + ' : délai de la banque à surveiller.' : ' Avancez les ordres permanents avant le ' + +E.slice(8, 10) + '.') : '') });
+    } else if (R.every(x => x.vu || x.route) && B.auj >= E) {
+      const nr = R.filter(x => x.route).length;
+      out.push({ niveau: 'good', titre: 'Compte commun : virements à l\'heure',
+        texte: 'En ' + mLong(m) + ', vos virements sont ' + (nr ? 'partis' : 'arrivés') + ' avant ' + ech + (nr ? ' (' + nr + ' encore en route)' : '') + '.' });
+    }
+    return out;
+  }
+
   // ------------------------------------------------------------ observations
   // → [{ niveau: bad | warn | info | good, scope: perso | commun | all, titre, texte, depuis? }]
   function audit(B) {
@@ -61,9 +121,12 @@
     const ops = B.rows.filter(r => r.role === 'commun' && !r.ecart);
     const V = B.D.virements || [];
     const prets = RO.pret ? ops.filter(r => r.m < 0 && RO.pret.test(r.label)) : [];
-    if (prets.length && KC()) {
+    // 1.1.4 : avec la liste des virements permanents, chaque virement mensuel est jugé seul (retardsCommun)
+    if (prets.length && KC() && V.length) for (const x of retardsCommun(B, prets, V, nom)) add(x.niveau, 'commun', x.titre, x.texte);
+    else if (prets.length && KC()) {
       const L = prets[prets.length - 1], m = L.date.slice(0, 7), lday = +L.date.slice(8, 10), cm = B.auj.slice(0, 7);
       const vus = V.map(v => KC().virementVu(B, v, cm)), tous = V.length && vus.every(Boolean);
+      // sans liste de virements permanents (avant 1.1.4 : toujours) : apports du mois de l'échéance.
       // 1.1.3 : un de mes virements est à l'heure s'il est parti avant l'échéance (même arrivé après, ou encore en
       // route) ; pour celui de l'autre personne, seule l'arrivée est connue
       const quiDe = r => KB().deLautre(B, r) ? 'autre' : 'moi';
@@ -151,8 +214,10 @@
           else {
             // 1.1.2 : virements partis du compte perso, pas encore arrivés : « en route », pas attendus une deuxième fois
             const rt = D.recus.filter(x => !x.vu && x.route), att = D.recus.filter(x => !x.vu && !x.route);
-            add('info', 'commun', 'Virements du mois', rc.length + ' sur ' + V.length + ' reçus' + (rt.length ? ', ' + rt.length + ' en route (' + e0(rt.reduce((t, x) => t + x.route.montant, 0)) + ', partis le ' + [...new Set(rt.map(x => jjmm(x.route.depart.date)))].join(' et ') + ')' : '') +
-              (att.length ? ' ; les autres sont attendus le ' + [...new Set(att.map(x => +x.v.jour || 1))].join(' et ') : '') + '.');
+            // 1.1.4 : montants reçus et encore attendus (montant des ordres), même sans virement en route
+            const recu = rc.reduce((t, x) => t + x.vu.m, 0), attendu = att.reduce((t, x) => t + (+x.v.montant || 0), 0);
+            add('info', 'commun', 'Virements du mois', rc.length + ' sur ' + V.length + ' reçus' + (rc.length ? ' (' + e0(recu) + ')' : '') + (rt.length ? ', ' + rt.length + ' en route (' + e0(rt.reduce((t, x) => t + x.route.montant, 0)) + ', partis le ' + [...new Set(rt.map(x => jjmm(x.route.depart.date)))].join(' et ') + ')' : '') +
+              (att.length ? ' ; ' + e0(attendu) + ' encore attendu' + (attendu >= 200 ? 's' : '') + ' (' + att.map(x => nom(x.v.qui)).filter((n, i, a) => a.indexOf(n) === i).join(', ') + ', prévu' + (att.length > 1 ? 's' : '') + ' le ' + [...new Set(att.map(x => +x.v.jour || 1))].join(' et ') + ')' : '') + '.');
           }
         }
         if (!D.changes.length && !D.pon) add('good', 'commun', 'Ordres permanents conformes', RC.moi + ' ' + e0(KC().somme(B, 'moi')) + ' · ' + RC.autre + ' ' + e0(KC().somme(B, 'autre')) + ' par mois : ils couvrent le budget du compte commun.');
