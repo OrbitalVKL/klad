@@ -31,6 +31,12 @@ export async function completer(page) {
     S.ops[w.id] = [o(w, 1, j(12), -5490, X.achat)];
     S.ops[cour.id].push(o(cour, 2, j(8), -5990, 'PRLV ' + X.motifPortefeuille + ' ' + P.references[1]));
     window.__demoRap = { w: w.id, cour: cour.id, achat: w.id + ':m:demo1', prel: cour.id + ':m:demo2' };
+    // 1.1.3 : virement parti hier vers le commun, pas encore arrivé (« en route »), et prélèvement réglé d'avance
+    // (compte pour le mois prochain, choisi à la main) : libellés avec une référence, montants distinctifs
+    const dm = new Date(); dm.setUTCDate(1); dm.setUTCMonth(dm.getUTCMonth() + 1);
+    S.ops[cour.id].push(o(cour, 3, j(1), -88000, 'VIR PERMANENT VERS COMMUN ' + P.references[2]),
+      Object.assign(o(cour, 4, j(2), -4500, 'PRLV ASSURANCE AUTO PHENIX ' + P.references[3]), { echeance: dm.toISOString().slice(0, 8) + '01' }));
+    window.__demoAnticipe = { cour: cour.id, route: cour.id + ':m:demo3', avance: cour.id + ':m:demo4' };
     window.KladApp.changed('test');
   }, PERSONNEL);
 }

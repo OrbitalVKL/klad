@@ -2,6 +2,23 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.1.3
+
+Réponse de l'architecte au relevé de contrôle 1.1.2.
+- **Virements « en route »** : un virement reste « en route » pendant 5 jours ouvrés après son départ (week-ends et
+  jours fériés exclus), puis redevient « non reçu ». Un départ le vendredi avant un week-end prolongé peut arriver le
+  mardi sans fausse alerte.
+- **Commun : virements après l'échéance** : un de vos virements parti avant l'échéance du prêt n'est jamais compté en
+  retard, même s'il arrive après ou s'il est encore en route. Le titre de l'observation dit qui est en retard.
+- **« Budget du mois dépassé »** : l'observation suit maintenant la même période que le Budget (cycle de salaire ou
+  mois civil), et non plus toujours le mois civil.
+- **Journal** : à chaque opération fusionnée ou retirée par la synchronisation, une ligne anonyme dit quels champs la
+  banque a envoyés (présents ou absents, jamais leur contenu). Les modifications du budget disent s'il s'agit du budget
+  perso ou du commun et de combien le budget mensuel change ; le bouton « = » du mode Budget est aussi noté.
+- **Diagnostic d'affichage** : la mesure n'élargit plus la page quand le texte est très agrandi, et le texte copié
+  reste dans son cadre.
+- **Mode démo** : virements en route et opérations réglées d'avance vérifiés.
+
 ## 1.1.2
 
 Correctif prioritaire (défaut constaté le 01/11 sur la 1.1.1).

@@ -67,7 +67,8 @@
     // texte agrandi : même texte, avec et sans ajustement de la taille du texte
     const t1 = d.createElement('span'), t2 = d.createElement('span');
     t1.textContent = t2.textContent = 'Nouvelle catégorie de test';
-    t1.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:500 15px sans-serif';
+    // 1.1.3 : en position fixe, le texte témoin (très large à 200 %) n'élargit plus la page pendant la mesure
+    t1.style.cssText = 'position:fixed;left:0;top:0;visibility:hidden;white-space:nowrap;font:500 15px sans-serif';
     t2.style.cssText = t1.style.cssText + ';-webkit-text-size-adjust:none;text-size-adjust:none';
     d.body.append(sonde, t1, t2);
     const sc = getComputedStyle(sonde);

@@ -33,6 +33,7 @@
       erreur: grave ? 'Banque indisponible depuis ' + (p.n >= PASSAGER_FOIS ? p.n + ' synchros' : 'plus de 24 h') + ' (erreur de la banque) : vérifiez l\'accès.' : null });
   }
 
+  const JOURNAL_FORMES = 10;
   const aFaire = (S, now) => !S.modele.sync.derniere || now - S.modele.sync.derniere > AUTO_MS;
 
   // deps : { client() → KladEB.Client, dispo() → Promise<en-têtes disponibles>, log(kind, msg), now() → ms }
@@ -80,6 +81,10 @@
         deps.log('ok', nom + ' : ' + st.lues + ' lue(s) depuis ' + (from ? 'le ' + from.split('-').reverse().join('/') : 'le plus tôt possible') +
           ', ' + st.nouvelles + ' nouvelle(s), ' + st.maj + ' mise(s) à jour, ' + st.fusionnees + ' fusion(s), ' + st.retirees + ' retirée(s), ' +
           st.ignorees + ' ignorée(s)' + (st.reprises ? ' dont ' + st.reprises + ' déjà dans la reprise' : '') + (Object.keys(h).length ? '' : ', sans en-têtes utilisateur'));
+        // 1.1.3 : une ligne par fusion ou retrait (forme des champs de la banque, jamais leurs valeurs), 10 au plus
+        const det = st.details || [];
+        for (const d of det.slice(0, JOURNAL_FORMES)) deps.log('info', nom + ' : ' + M().texteForme(d));
+        if (det.length > JOURNAL_FORMES) deps.log('info', nom + ' : ' + (det.length - JOURNAL_FORMES) + ' autre(s) fusion(s) ou retrait(s) non détaillé(s).');
       } catch (e) {
         if (!ok()) return null;
         if (passager(e)) {

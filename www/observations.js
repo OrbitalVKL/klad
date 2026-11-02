@@ -64,14 +64,26 @@
     if (prets.length && KC()) {
       const L = prets[prets.length - 1], m = L.date.slice(0, 7), lday = +L.date.slice(8, 10), cm = B.auj.slice(0, 7);
       const vus = V.map(v => KC().virementVu(B, v, cm)), tous = V.length && vus.every(Boolean);
+      // 1.1.3 : un de mes virements est à l'heure s'il est parti avant l'échéance (même arrivé après, ou encore en
+      // route) ; pour celui de l'autre personne, seule l'arrivée est connue
+      const quiDe = r => KB().deLautre(B, r) ? 'autre' : 'moi';
+      const parti = r => { const d = quiDe(r) === 'moi' && KC().departDe ? KC().departDe(B, r) : null; return d ? d.date : r.date; };
       if (tous && m < cm) {
-        const last = vus.map(r => r.date).sort().pop();
+        const last = vus.map(parti).sort().pop();
         add(+last.slice(8, 10) < lday ? 'good' : 'warn', 'commun', 'Compte commun : virements de ' + MOIS[+cm.slice(5) - 1], 'Tous reçus (dernier le ' + jjmm(last) + ')' + (+last.slice(8, 10) < lday ? ', avant l\'échéance du prêt attendue vers le ' + lday + '.' : ' : après le ' + lday + ', jour habituel de l\'échéance du prêt — risque de découvert.'));
       } else {
-        const apports = ops.filter(r => r.m > 0 && r.date.slice(0, 7) === m && r.cat === KB().APPORTS), apres = apports.filter(r => r.date > L.date);
+        const apports = ops.filter(r => r.m > 0 && r.date.slice(0, 7) === m && r.cat === KB().APPORTS);
+        // en retard : arrivé après l'échéance du prêt, sauf un de mes virements parti avant elle (arrivé après par le
+        // délai de la banque) ; un virement encore en route parti avant l'échéance n'est pas en retard non plus
+        const apres = apports.filter(r => r.date > L.date && parti(r) > L.date);
+        const routeAvant = KC().enRoute ? KC().enRoute(B).filter(x => x.depart.date <= L.date && x.depart.date.slice(0, 7) >= KB().shift(m, -1)) : [];
         const j1 = [...new Set(V.map(v => +v.jour || 1))], prevus = j1.length && j1.every(d => d < lday);
-        if (!apports.length) add('warn', 'commun', 'Compte commun : virements du mois', 'Aucun apport reçu en ' + mLong(m) + ' alors que l\'échéance du prêt est passée le ' + dfr(L.date) + '.');
-        else if (apres.length) add(m < cm && prevus ? 'warn' : 'bad', 'commun', 'Compte commun : virements après l\'échéance', 'En ' + mLong(m) + ', ' + apres.length + ' virement(s) sont arrivés après l\'échéance du prêt du ' + dfr(L.date) + ' (dès le ' + dfr(apres[0].date) + ').' + (prevus ? ' Les ordres sont désormais programmés le ' + j1.join(' et ') + ' : à vérifier sur ' + MOIS[+cm.slice(5) - 1] + '.' : ' Avancez les ordres permanents avant le ' + lday + '.'));
+        if (!apports.length) { if (!routeAvant.length) add('warn', 'commun', 'Compte commun : virements du mois', 'Aucun apport reçu en ' + mLong(m) + ' alors que l\'échéance du prêt est passée le ' + dfr(L.date) + '.'); }
+        else if (apres.length) {
+          const qui = [...new Set(apres.map(quiDe))].sort((a, b) => (a === 'moi' ? -1 : 1));
+          const titre = 'Compte commun : virement' + (apres.length > 1 ? 's' : '') + ' de ' + qui.map(nom).join(' et de ') + ' après l\'échéance';
+          add(m < cm && prevus ? 'warn' : 'bad', 'commun', titre, 'En ' + mLong(m) + ', ' + apres.length + ' virement(s) sont arrivés après l\'échéance du prêt du ' + dfr(L.date) + ' (dès le ' + dfr(apres[0].date) + ').' + (prevus ? ' Les ordres sont désormais programmés le ' + j1.join(' et ') + ' : à vérifier sur ' + MOIS[+cm.slice(5) - 1] + '.' : ' Avancez les ordres permanents avant le ' + lday + '.'));
+        }
         else add('good', 'commun', 'Compte commun : virements à l\'heure', 'En ' + mLong(m) + ', vos virements sont arrivés avant l\'échéance du prêt du ' + dfr(L.date) + '.');
       }
     }
@@ -161,7 +173,9 @@
     }
     // budget du mois dépassé
     for (const sc of ['perso', 'commun']) {
-      const over = KB().postes(B, sc).lignes.filter(a => a.on && a.amt > 0 && a.per === 1 && !ctrOver[sc + a.key] && a.cur > a.ech * 1.1 + 500).sort((x, z) => (z.cur - z.ech) - (x.cur - x.ech)).slice(0, 3);
+      // 1.1.3 : même période que le Budget (cycle de salaire ou mois civil, échéances rattachées), pas le mois civil
+      const su = KB().suivi(B, sc, null), lignes = ['fixe', 'courante', 'optionnelle'].reduce((t, k) => t.concat(su.sections[k] ? su.sections[k].lignes : []), []);
+      const over = lignes.filter(a => a.on && a.amt > 0 && a.per === 1 && !ctrOver[sc + a.key] && a.cur > a.ech * 1.1 + 500).sort((x, z) => (z.cur - z.ech) - (x.cur - x.ech)).slice(0, 3);
       if (over.length) add('warn', sc, 'Budget du mois dépassé', over.map(a => a.label + ' : ' + e0(a.cur) + ' pour ' + e0(a.ech) + ' de budget').join(' · ') + '.');
     }
     // balance sur 3 mois
