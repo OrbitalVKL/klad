@@ -6,6 +6,9 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.1.4** — réponse de l'architecte au relevé de contrôle 1.1.3 : fausse observation « virements de <nom> après
+l'échéance » (virements ponctuels du mois précédent comptés en retard), « Virements du mois » sans montants.
+
 **1.1.3** — réponse de l'architecte au relevé de contrôle 1.1.2 (accepté) : virement « en route » 5 jours ouvrés,
 observation « virements après l'échéance » (retards réels seulement, qui est en retard), « Budget du mois dépassé » sur
 la période du Budget, journal anonyme des fusions et retraits de la synchronisation et des modifications du budget,
@@ -43,6 +46,28 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.1.4 — détails techniques
+- **Cause du défaut 1** : le 02/11, le prêt du mois n'étant pas encore passé, l'observation jugeait le mois du dernier
+  prêt (octobre) sur **tous les apports** de ce mois arrivés après le prêt ; deux virements ponctuels (rattrapage) du
+  propriétaire, mi-octobre, étaient comptés comme deux virements en retard. Le rapprochement départ ↔ arrivée
+  (`departDe`) n'était pas en cause : il est recalculé à chaque contexte et tient après l'arrivée (testé).
+- `observations.js:retardsCommun(B, prets, V, nom)` (utilisé quand la liste des virements permanents existe ; sinon
+  ancienne règle des apports, inchangée) : chaque virement de `B.D.virements` est jugé seul (`KC.virementVu` pour le
+  mois). Référence `E` = premier prêt du mois (motif `observations.motifPret`) ; tant qu'il n'est pas à la banque, son
+  jour habituel (jour du premier prêt du dernier mois connu, « (jour habituel) » dans le texte) une fois passé. Avant
+  l'échéance du mois en cours : « Tous reçus » si tout est arrivé, sinon le mois précédent jugé sur les seuls virements
+  retrouvés (un virement non retrouvé d'un mois passé ne fait pas conclure). En retard : date effective (départ connu
+  pour « moi », sinon arrivée) > `E` ; en route parti après `E` ; absent du mois en cours après `E`. Titre inchangé
+  (« Compte commun : virement(s) de <nom>[ et de <nom>] après l'échéance ») ; texte : un élément par virement
+  (« nom · libellé (montant) arrivé le JJ/MM | parti le JJ/MM, encore en route | pas encore arrivé »). Niveau inchangé
+  (`warn` si mois passé et ordres programmés avant l'échéance, sinon `bad`). Décision du propriétaire : premier prêt
+  du mois (option A, plutôt que le dernier).
+- « Virements du mois » (info) : « n sur N reçus (x €) [, n en route (…)] ; y € encore attendus (noms, prévus le J) ».
+  Le relevé de contrôle en tire les montants (`chiffres`).
+- Tests : `test/lot114.test.mjs` (scénario constaté sur jeu fictif : départ 31/10 relu, arrivée 02/11, prêts 05 et
+  06, virements ponctuels en octobre ; 02/11 sans retard ; 07/11 au seul nom de l'autre personne ; sans départ connu ;
+  « Tous reçus » avant le prêt). Contre-épreuve : 4 des 5 tests échouent sur la 1.1.3.
 
 ### 1.1.3 — détails techniques
 - **Jours ouvrés** (`commun.js`) : `paques(y)` (calcul grégorien), `ferie(d)` (11 jours fériés nationaux : 1/1, lundi de
@@ -648,6 +673,15 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 1.1.4
+
+- Prochain relevé de contrôle utile : après l'arrivée du virement de l'autre personne (marge « réelle ») et après les
+  prêts du mois (observation « virements à l'heure » ou retard nommé).
+- « Première grosse échéance du commun » (piste de l'architecte quand aucun prêt n'est reconnu) : non faite ; sans
+  prêt reconnu par le motif, pas d'observation d'échéance (inchangé).
+- Le texte de l'observation des virements après l'échéance diffère de l'ancienne version (code identique, chiffres
+  différents) : à garder dans « Écarts connus » lors d'une comparaison.
 
 ## Points d'appui laissés par la 1.1.3
 
