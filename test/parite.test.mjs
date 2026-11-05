@@ -86,10 +86,12 @@ test('parcours 0.10.8 : catégories, règles, tri, total, équilibre', { skip: S
     await page.selectOption('#opsOrdre', 'date');
     await B.pause(200);
     assert.ok(await page.locator('#tx .tx-day').count() > 0);
-    // Accueil : total de tous les comptes, dont épargne
+    // Accueil : « Total perso » (1.2.0 : courants, paiement en ligne et épargne, sans le commun)
     await B.onglet('accueil');
     const so = await page.locator('[data-mesure="soldes"]').innerText();
-    assert.match(so, /Tous les comptes : [\d\s  ,]+€ · dont épargne/);
+    assert.match(so, /Total perso : /);
+    assert.match(so, /sans le commun/);
+    assert.doesNotMatch(so, /Tous les comptes|Total disponible/);
     // Équilibre : une opération n'est ajoutée qu'une fois
     await B.operationsPerso();
     const r = await etat(() => { const S = window.KladApp.etat(); const c = S.modele.comptes.find(x => x.role === 'courant'); const o = S.ops[c.id].find(x => x.montant < 0); return [c.id, o.id]; });

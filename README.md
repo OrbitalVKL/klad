@@ -368,9 +368,11 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
   `balance` = solde affiché, `available` = solde disponible s'il diffère ; `as_of` = date de référence du solde (sinon date
   de lecture) ; `stale` = relevé de plus de 30 h ; `manual` pour un compte manuel. Carte à débit différé : pas de solde brut ;
   `due` = somme à prélever (positive) et `due_since` = date du dernier règlement, si le motif du règlement est connu (0.5).
-- `total` : `savings` = comptes épargne ; `all` = courants, commun et épargne, moins la dette des cartes à débit différé
-  visibles. Un total dont un compte n'a pas de solde (ou une carte pas de dette) connu est omis ; les comptes hors euros ne
-  sont pas comptés.
+- `total` : `savings` = comptes épargne ; `all` = **« Total perso »** de l'Accueil (1.2.0) : comptes courants, paiement en
+  ligne et épargne (livret : solde estimé), moins la dette des cartes à débit différé visibles, **sans le compte commun**.
+  Jusqu'à la 1.1.4, `all` comptait le commun et pas le paiement en ligne : Grafit affiche donc un total plus bas à partir de
+  la 1.2.0 (même format, champ inchangé). Un total dont un compte courant ou épargne n'a pas de solde (ou une carte pas de
+  dette) connu est omis ; un portefeuille sans solde connu compte pour 0 ; les comptes hors euros ne sont pas comptés.
 - `main_after_card` (0.5) : solde du compte de prélèvement de la première carte à débit différé visible, moins sa dette.
 - `attention` (0.5) : `{ "unseen": n, "unclassified": n, "accounts_to_check": n, "backup_days": n }` — opérations à voir,
   non classées des 90 derniers jours, comptes à vérifier ou à réassocier, jours depuis la dernière sauvegarde exportée ;

@@ -2,6 +2,23 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.2.0
+
+Retours d'usage de la 1.1.4.
+- **Pastilles « à vérifier »** dans les Opérations : chaque choix Perso, Commun et Tout porte une pastille avec le nombre
+  d'opérations à vérifier (non vues, non classées des 3 derniers mois, prélèvements de portefeuille à rapprocher ; une
+  opération n'est comptée qu'une fois). Un appui sur un choix qui a une pastille ouvre la liste de ce périmètre filtrée
+  sur « À vérifier » ; « Toutes » retire le filtre. La pastille de l'onglet Opérations donne le total (celui de « Tout ») ;
+  avant, elle ne comptait que les opérations non vues.
+- **Reste à vivre** : plus de montant « par jour » (Accueil et détail). La barre du cycle indique « jour N/T », avec un
+  trait par jour, un trait plus marqué au début de chaque semaine (lundi) et un repère sur aujourd'hui.
+- **Tendance** : période personnalisée au jour près (début et fin), gardée comme dernier choix. Sous 62 jours, un point par
+  jour ; au-delà, un point par mois. Les préréglages restent (1, 3, 6, 12 mois, Tout) ; « 1 mois » s'affiche donc par jour.
+- **Total perso** : sur l'Accueil, un seul total remplace « Total disponible (courants et commun) » et « Tous les comptes » :
+  comptes courants, paiement en ligne et épargne, moins ce que les cartes à débit différé vont prélever, **sans le compte
+  commun**. Grafit reçoit la même valeur : son total baisse du solde du commun.
+- Aucun autre chiffre modifié (relevés de contrôle des jeux fictifs identiques à la 1.1.3, sauf le total).
+
 ## 1.1.4
 
 Réponse de l'architecte au relevé de contrôle 1.1.3 (après l'arrivée des virements sur le commun).

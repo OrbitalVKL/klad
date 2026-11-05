@@ -6,6 +6,10 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.2.0** — lot validé par le propriétaire le 05/11 (développé et publié par l'architecte) : pastilles « à vérifier » par
+périmètre dans les Opérations, reste à vivre sans montant par jour avec une barre du cycle « jour N/T », tendance sur une
+période au jour près, « Total perso » sans le commun (Accueil et résumé Grafit).
+
 **1.1.4** — réponse de l'architecte au relevé de contrôle 1.1.3 : fausse observation « virements de <nom> après
 l'échéance » (virements ponctuels du mois précédent comptés en retard), « Virements du mois » sans montants.
 
@@ -46,6 +50,38 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.2.0 — détails techniques
+- **Total perso** (`modele.js:totalPerso(S, dettes, livrets)`, `ROLES_TOTAL_PERSO`) : comptes visibles en euros de rôle
+  `courant`, `paiement_en_ligne` et `epargne` (livret : estimation `KladFisc.livretCarte` si fournie, sinon solde affiché),
+  moins `dettes[id].centimes` des `carte_differee` ; le commun n'y est jamais. → `{ centimes, n, manque }` (`manque` :
+  libellés d'un courant ou épargne sans solde, d'une carte sans dette ; un portefeuille sans solde compte pour 0).
+  Accueil (`vaccueil.js:soldes`) : une ligne « Total perso » (sous-ligne : ce qui est compté, « incomplet : … » le cas
+  échéant), à la place de « Total disponible (courants et commun) · après les cartes » et « Tous les comptes · dont
+  épargne ». Résumé Grafit (`resume.js:totaux`) : `total.all` = même fonction, mêmes dettes, mêmes livrets (contexte du
+  budget du résumé) ; omis si `manque` n'est pas vide. Changement voulu du relevé de contrôle (`grafit.calcule.total.all`
+  seul) : références `test/references/releve-*-1.2.0.json` (les 1.1.3 gardées : le test vérifie que seul ce champ diffère).
+  Format du résumé inchangé (v1) ; README › Lien Grafit mis à jour.
+- **Reste à vivre** (`vaccueil.js:reste`, `barreCycle(debut, N, T)`) : « jusqu'au JJ/MM · jour N/T » (`res.jour`,
+  `res.nbJours` de `KladBudget.suivi`), SVG `aria-hidden` en pourcentages : fond, écoulé jusqu'à la fin du jour N, T − 1
+  traits (`.jr`, `.sem` plus haut et plus épais avant un lundi, semaines calendaires), repère `.ici` au milieu du jour N.
+  Détail (`vbudget.js:detailRav(rav, base)`) : ligne « Par jour » retirée (`app.js:preparer.secRav` ne passe plus les jours).
+- **Pastilles « à vérifier »** : `classement.js:limiteNC(ctx, now)`, `aVerifierOp(ctx, o, limite)` (non vue, ou non
+  classée depuis `NC_JOURS`, ou `aRapprocher`) ; `vues.js:compteursAVerifier(S, ctx)` → `{ perso, commun, tout }` en un
+  passage (périmètres de `opsDuScope` : perso sans commun ni épargne, tout = tous les comptes visibles),
+  `nAVerifier(S, scope, ctx)`, `filtrer` avec `cat: '__av'`, `perimetre(p, nb)` (pastille `.pst`, `data-av-n`, nom
+  « Perso, n à vérifier »), puce « À vérifier » dans `filtres`. `app.js` : `compteursAV()` (mémo `avMemo`, remis à zéro
+  par `renderBadge` et `renderOps(true)`), `afficherBadge()` = total « Tout » (avant : non vues seules) ; appui sur un
+  choix à pastille → périmètre + `filtre.cat = '__av'`, période « Toute période » ; sans pastille → comme avant (et
+  retire `__av`). Outils de mesure (`banc.mjs:operationsPerso`, `demo-outils.mjs`) : reviennent à « Toutes » après le choix.
+- **Tendance** (`budget.js:tendanceMois`, `TENDANCE_JOURS` = 62) : `o.du`, `o.au` (prioritaires sur `from` / `to`, remis
+  dans l'ordre) ; `pas` = `jour` si la période fait moins de 62 jours (clés `AAAA-MM-JJ`), sinon `mois` (seules les
+  opérations de la période comptent, même coupée en milieu de mois) ; solde « en fin de journée » ; repère du budget
+  mensuel d'une catégorie seulement par mois. `app.js:periode()` : `{ n: 'perso', du, au }` gardé (préférence `periode`),
+  sinon `du` / `au` déduits des mois (préréglage « 1 mois » → par jour). `ecranbudget.js` : champs `#tend-du`, `#tend-au`
+  (à la place des listes de mois `#from`, `#to`), ◀ ▶ décalent une période personnalisée de sa propre longueur.
+  `vbudget.js:tendance` : libellés JJ/MM, titres et notes « par jour ».
+- Tests : `test/lot120.test.mjs` ; parcours adaptés (pastille de l'onglet, « jour N/T », « Total perso »).
 
 ### 1.1.4 — détails techniques
 - **Cause du défaut 1** : le 02/11, le prêt du mois n'étant pas encore passé, l'observation jugeait le mois du dernier
@@ -673,6 +709,15 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 1.2.0
+
+- Décisions prises par défaut, à valider par le propriétaire : appui sur un choix à pastille = liste filtrée (et non un
+  simple changement de périmètre) ; semaines marquées au lundi (et non tous les 7 jours depuis le début du cycle) ;
+  « 1 mois » de la Tendance par jour ; Total perso : estimation du livret, portefeuille sans solde compté pour 0.
+- Relevé réel attendu après installation : Total perso = courants perso + paiement en ligne + livret − dette de carte ;
+  `grafit.calcule.total.all` du relevé = cette valeur ; aucun autre écart avec le relevé précédent hors mouvements réels.
+- Régularisation des impôts (solde avancé par une personne non compté dans « qui verse combien ») : piste ouverte, non faite.
 
 ## Points d'appui laissés par la 1.1.4
 

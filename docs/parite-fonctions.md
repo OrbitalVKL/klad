@@ -82,11 +82,11 @@ bulletins de paie non lus (voir la fin du document). Plus aucun abandon à déci
 
 | Fonction (v65) | Où dans la v65 | Statut Klad | Où dans Klad | Effort / lot | Remarque |
 |---|---|---|---|---|---|
-| Grand total « Total des comptes courants » (perso) avec heure du relevé | `appHome` (`#app-hero`) | Présent adapté | Accueil › Soldes « Total disponible (courants et commun) » — `vaccueil.js:soldes` ; Budget — `vues.js:hero` | — | Décision UX : la grande carte devient la ligne « Total disponible ». |
+| Grand total « Total des comptes courants » (perso) avec heure du relevé | `appHome` (`#app-hero`) | Présent adapté | Accueil › Soldes « Total perso » (1.2.0 : courants, paiement en ligne et épargne, moins les cartes, sans le commun) — `vaccueil.js:soldes` ; Budget — `vues.js:hero` | — | Décision UX : la grande carte devient la ligne « Total disponible ». |
 | Grand total « Solde du compte commun » (commun) | `appHome` | Présent identique | Commun — `vues.js:hero` ; Accueil › Commun — `vaccueil.js:commun` | — | |
 | Carte « N opérations à voir » avec 4 premiers libellés, mène aux non vues | `#app-seen`, `appHome` | Présent adapté | Accueil › À vérifier ; Budget `#app-seen` — `vues.js:aVoir` | — | Sur l'Accueil, ligne de compteur sans libellés. |
 | Carte « Ce mois-ci » : 4 postes les plus consommés, barre, « dépassé de / reste … · presque atteint », jours restants, « Tout le budget › » | `#app-month`, `appHome` | Présent adapté | Accueil › Ce cycle-ci — `vaccueil.js:cycle` | — | Dépassés et à surveiller d'abord. |
-| Grand chiffre « Reste à vivre » | (dans le suivi, `drawTrack`) | Présent adapté | Accueil en tête, avec « soit N par jour » et barres du cycle — `vaccueil.js:reste` | — | Plus visible qu'en v65 (décision UX). |
+| Grand chiffre « Reste à vivre » | (dans le suivi, `drawTrack`) | Présent adapté | Accueil en tête, avec la barre du cycle « jour N/T » (1.2.0 : plus de montant par jour) — `vaccueil.js:reste` | — | Plus visible qu'en v65 (décision UX). |
 | Prochaines échéances | (liste « échéances non mensuelles » du commun, `communCash`) | Présent adapté | Accueil › Prochaines échéances (31 jours, perso et commun) — `vaccueil.js:echeances` | — | Plus large qu'en v65. |
 
 ## 4. Soldes des comptes (tuiles)
@@ -95,8 +95,8 @@ bulletins de paie non lus (voir la fin du document). Plus aucun abandon à déci
 |---|---|---|---|---|---|
 | Tuile par compte (pastille de banque, solde, « il y a N h », relevé ancien) | `drawBalances` | Présent adapté | Accueil › Soldes, liste verticale — `vaccueil.js:soldes` ; Budget `#bal-panel` — `vues.js:tuile` | — | « ancien » au-delà de 30 h ; aucun montant négatif : « débiteur ». |
 | Tuile de la carte à débit différé : montant à prélever | `drawBalances` + fonction de dette de carte | Présent identique | Accueil › Soldes « à prélever le … · depuis le … » — `classement.js:dette` | — | |
-| Tuile « compte principal − carte » (disponible après la carte) | `drawBalances` (`bal-sum`) | Présent adapté | « après les cartes » sur le total — `vaccueil.js:soldes` | — | Calculé sur le total, pas sur le seul compte principal (Grafit garde `main_after_card`). |
-| Tuile « Total » tous comptes, « dont épargne » | `drawBalances` (`bal-tot`) | Présent adapté (0.10.8) | Accueil › Soldes : « Tous les comptes : … · dont épargne … » — `vaccueil.js:soldes` | fait 0.10.8 | Ligne sous le total disponible, seulement s'il y a un compte d'épargne. |
+| Tuile « compte principal − carte » (disponible après la carte) | `drawBalances` (`bal-sum`) | Présent adapté | cartes déduites du « Total perso » (1.2.0) — `vaccueil.js:soldes` | — | Calculé sur le total, pas sur le seul compte principal (Grafit garde `main_after_card`). |
+| Tuile « Total » tous comptes, « dont épargne » | `drawBalances` (`bal-tot`) | Présent adapté (0.10.8, 1.2.0) | Accueil › Soldes : « Total perso » (épargne comprise, sans le commun) — `vaccueil.js:soldes` | fait 0.10.8 | Ligne sous le total disponible, seulement s'il y a un compte d'épargne. |
 | Tuile livret saisi à la main (✎ : montant + date) | `livretBal`, `editLivret` | Présent adapté | Épargne › Livret (ouvert depuis sa ligne de l'Accueil) — `vfisc.js:epargne` | — | Décision ETAT : « le livret saisi à la main s'ouvre sur Épargne depuis sa carte » ; intérêts estimés en plus. |
 | Comptes d'épargne lus à la banque | `drawBalances` (`sav`) | Présent identique | Accueil › Soldes — `vaccueil.js:soldes` | — | |
 | Commun : tuile « Réserve pour échéances » (détail par poste) | `drawBalances`, `communReserve` | Présent identique | Commun — `vues.js:tuile` | — | |

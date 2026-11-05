@@ -578,6 +578,30 @@
     return { centimes: t, n };
   }
 
+  // Total perso (1.2.0) : comptes courants, paiement en ligne et épargne visibles en euros, moins la dette des cartes à
+  // débit différé ; sans le compte commun. Même valeur sur l'Accueil et dans le résumé Grafit (total.all).
+  // dettes : { id: { centimes } | null } (KladClasse.dette) ; livrets : { id: { centimes } } (estimation du livret,
+  // KladFisc.livretCarte), sinon le solde affiché. Un portefeuille sans solde connu compte pour 0.
+  // → { centimes, n, manque: [libellés des comptes ou cartes sans solde ou sans dette connus] }.
+  const ROLES_TOTAL_PERSO = ['courant', 'paiement_en_ligne', 'epargne'];
+  function totalPerso(S, dettes, livrets) {
+    let t = 0, n = 0;
+    const manque = [];
+    for (const c of comptesTries(S)) {
+      if (c.masque || (c.devise || 'EUR') !== 'EUR') continue;
+      if (c.role === 'carte_differee') {
+        const d = dettes && dettes[c.id];
+        if (d) { t -= d.centimes; n++; } else manque.push(c.libelle);
+        continue;
+      }
+      if (ROLES_TOTAL_PERSO.indexOf(c.role) < 0) continue;
+      const lv = livrets && livrets[c.id];
+      const s = lv ? { centimes: lv.centimes } : soldeAffiche(S, c);
+      if (s) { t += s.centimes; n++; } else if (c.role !== 'paiement_en_ligne') manque.push(c.libelle);
+    }
+    return { centimes: t, n, manque };
+  }
+
   // ------------------------------------------------------------ alertes
   // Accès bancaire : 'expire', 'bientot' (moins de 14 jours) ou null.
   function etatAcces(cx, now) {
@@ -715,7 +739,7 @@
     V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId, baseLibelle, avecReference, memeOperation, reprendreEtat, annulerRenvois, DOUBLON_JOURS,
     vide, nouveauModele, compte, comptesTries, comptesDe, opsDe, roleDefaut, nouveauCompte, compteEB, empreinte,
     associerSession, supprimerCompte, remplacerCompte, reassocier, disponibles, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, formeEB, formeKlad, texteForme, bornesRecuperation, debutRecuperation,
-    appliquerFrontiere, creditDeReglement, soldePrefere, soldesLus, soldeAffiche, totalCourants, etatAcces, alerteCompte,
+    appliquerFrontiere, creditDeReglement, soldePrefere, soldesLus, soldeAffiche, totalCourants, totalPerso, ROLES_TOTAL_PERSO, etatAcces, alerteCompte,
     versBlocs, nomsOps, depuisBlocs, BLOC_OPS, depuis02, surChangement, signaler
   };
 })(typeof window !== 'undefined' ? window : globalThis);

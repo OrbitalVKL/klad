@@ -420,6 +420,14 @@
     return { unseen, unclassified, accountsToCheck, toMatch, gaps };
   }
 
+  // 1.2.0 : une opération « à vérifier » (pastilles Perso / Commun / Tout et onglet Opérations) : non vue, ou non classée
+  // depuis la date limite (NC_JOURS), ou prélèvement de portefeuille à rapprocher. Une opération qui coche plusieurs cas
+  // n'est comptée qu'une fois. limite : AAAA-MM-JJ (limiteNC).
+  const limiteNC = (ctx, now) => M().plusJours(M().jourLocal(now == null ? ctx.now : now), -NC_JOURS);
+  function aVerifierOp(ctx, o, limite) {
+    return !vue(ctx.S, o) || (o.date >= limite && !!classer(ctx, o).nc) || !!aRapprocher(ctx, o);
+  }
+
   // ------------------------------------------------------------ volet « Classer »
   // Mot-clé proposé : deux premiers mots utiles du libellé (sans préfixes bancaires, dates ni références).
   function suggestKw(label) {
@@ -646,7 +654,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    aRapprocher, marquerInterne, ECART_SIGNAL, ecartDe, ecarts, ecartAVerifier, marquerEcartVu, annulerEcartVu, ecartPrevu, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, ECART_SIGNAL, ecartDe, ecarts, ecartAVerifier, marquerEcartVu, annulerEcartVu, ecartPrevu, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, limiteNC, aVerifierOp, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,
     creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };

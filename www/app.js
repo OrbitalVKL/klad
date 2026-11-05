@@ -282,8 +282,18 @@
     let p = null;
     p = U.pref('periode');
     const to = dernierMoisComplet();
+    // 1.2.0 : période personnalisée au jour près { n: 'perso', du, au } (dernier choix gardé sur ce téléphone)
+    if (p && p.n === 'perso') {
+      if (M.dateValide(p.du) && M.dateValide(p.au)) {
+        const du = p.du <= p.au ? p.du : p.au, au = p.du <= p.au ? p.au : p.du;
+        return (perMemo = { n: 'perso', du, au, from: du.slice(0, 7), to: au.slice(0, 7) });
+      }
+      p = null;
+    }
     if (!p || !/^\d{4}-\d{2}$/.test(p.from || '') || !/^\d{4}-\d{2}$/.test(p.to || '')) p = { from: window.KladBudget.shift(to, -11), to, n: 12 };
     if (p.n && p.n !== 'tout') { p.to = to; p.from = window.KladBudget.shift(to, -(p.n - 1)); }
+    // bornes au jour : du premier jour du premier mois au dernier jour du dernier mois
+    p = Object.assign({}, p, { du: p.from + '-01', au: window.KladBudget.finMois(p.to) });
     return (perMemo = p);
   }
   function choisirPeriode(p) {
@@ -442,20 +452,22 @@
 
   // ------------------------------------------------------------ rendu
   const rendus = [];            // fonctions de rendu ajoutées par les autres fichiers (écrans)
-  // Badge de l'onglet Opérations : toutes les opérations à voir (perso et commun), comme l'Accueil.
-  function nonVuesScope() {
-    let n = 0;
-    for (const c of Vu.comptesDe(S, 'perso')) for (const o of S.ops[c.id] || []) if (!KC.vue(S, o)) n++;
-    return n;
+  // Badge de l'onglet Opérations (1.2.0) : le total « à vérifier » (pastille « Tout » du haut de la liste) : non vues,
+  // non classées des 3 derniers mois et prélèvements à rapprocher, chacune comptée une fois. Avant : non vues seules.
+  let avMemo = null;
+  function compteursAV() {
+    if (!avMemo) { try { avMemo = Vu.compteursAVerifier(S, ctx()); } catch (e) { avMemo = { perso: 0, commun: 0, tout: 0 }; } }
+    return avMemo;
   }
-  function renderBadge() {
+  function renderBadge() { avMemo = null; afficherBadge(); }
+  function afficherBadge() {
     // 1.1 : six onglets ; onglet étroit (petit écran, texte agrandi) : « 9+ » pour ne toucher ni l'icône voisine ni le libellé
-    const n = nonVuesScope(), b = $('tb-badge'), etroit = b.parentElement && b.parentElement.offsetWidth > 0 && b.parentElement.offsetWidth < 64;
+    const n = compteursAV().tout, b = $('tb-badge'), etroit = b.parentElement && b.parentElement.offsetWidth > 0 && b.parentElement.offsetWidth < 64;
     const t = n > 99 ? (etroit ? '9+' : '99+') : n > 9 && etroit ? '9+' : String(n);
     if (b.textContent !== t && b.textContent !== '' && !b.classList.contains('point')) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
     b.classList.remove('point');
     b.hidden = !n; b.textContent = t;
-    b.setAttribute('aria-label', n + ' à voir');
+    b.setAttribute('aria-label', n + ' à vérifier');
     // place insuffisante à droite de l'icône (texte très agrandi) : simple point, le nombre reste lu (aria-label)
     const bt = b.parentElement;
     if (n && bt && bt.offsetWidth && b.offsetWidth > bt.offsetWidth / 2 - 12 + 4) { b.classList.add('point'); b.textContent = ''; }
@@ -554,13 +566,12 @@
     else if (act.dataset.act === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
   });
   preparer.secRav = () => {
-    let rav = null, restants = null;
+    let rav = null;
     try {
       const B = budget(), res = B ? window.KladBudget.suivi(B, 'perso', null) : null;
       rav = res ? res.rav : null;
-      if (res) restants = Math.max(1, res.nbJours - res.jour + 1);
     } catch (e) { rav = null; }
-    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav, window.KladBudget.baseRav(S), restants) : '';
+    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav, window.KladBudget.baseRav(S)) : '';
   };
   // Base du reste à vivre (0.10.7) : interrupteur de l'Accueil, du détail et du Budget ; réglage du budget (Réglages ›
   // Budget), suivi par le résumé Grafit.
@@ -617,7 +628,9 @@
     if (reset) {
       const cx = ctx();
       filtre.q = $('q').value.trim(); filtre.scope = perimOps;
-      $('ops-scope').innerHTML = Vu.perimetre(perimOps);
+      avMemo = null;
+      $('ops-scope').innerHTML = Vu.perimetre(perimOps, compteursAV());
+      afficherBadge();
       if (filtre.compte && !M.compte(S, filtre.compte)) filtre.compte = '';
       if (filtre.cat && filtre.cat[0] !== '_' && !cx.C.categories[filtre.cat]) filtre.cat = '';
       const bp = bornesOps();
@@ -642,7 +655,7 @@
       $('ops-tot').innerHTML = opsListe.length ? '<span>' + T.n + ' opération' + (T.n > 1 ? 's' : '') + '</span><span>Débit <b class="num">' + Vu.esc(F.montant(T.debit)) +
         '</b></span><span>Crédit <b class="num">' + Vu.esc(F.montant(T.credit)) + '</b></span>' : '';
       $('tx').innerHTML = opsListe.length ? '' : '<div class="muted tx-vide">' +
-        (filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte || perOps.k !== 'tout' ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</div>';
+        (filtre.cat === '__av' ? '✓ Rien à vérifier.' : filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte || perOps.k !== 'tout' ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</div>';
       $('tx-suite').innerHTML = '';
       if (opsListe.length) plus(30);
       chrome();
@@ -678,10 +691,16 @@
   });
   $('ops-scope').addEventListener('click', ev => {
     const b = ev.target.closest('[data-perimetre]');
-    if (!b || b.dataset.perimetre === perimOps) return;
+    if (!b) return;
+    // 1.2.0 : un choix avec une pastille ouvre la liste de ce périmètre filtrée sur « À vérifier », toute période ;
+    // « Toutes » (ou « À vérifier ») retire le filtre.
+    const av = +b.dataset.avN > 0;
+    if (b.dataset.perimetre === perimOps && (!av || filtre.cat === '__av')) return;
     perimOps = b.dataset.perimetre;
     U.pref('opsPerimetre', perimOps);
     if (filtre.compte) filtre.compte = '';
+    if (av) { filtre.cat = '__av'; filtre.nonVues = false; perOps.k = 'tout'; }
+    else if (filtre.cat === '__av') filtre.cat = '';
     opsFin = 0; renderOps(true);
   });
   $('ops-tri').addEventListener('click', ev => { if (ev.target.closest('[data-tri]')) trier(filtre.cat === '__nc' ? 'nc' : 'nv'); });

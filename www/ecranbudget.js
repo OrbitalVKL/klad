@@ -92,7 +92,7 @@
     const p = A.periode();
     const mois = [], debut = (B.rows[0] && B.rows[0].date.slice(0, 7)) || B.auj.slice(0, 7);
     for (let m = B.auj.slice(0, 7); m >= debut && mois.length < 240; m = KB.shift(m, -1)) mois.push(m);
-    return { from: p.from, to: p.to, n: p.n || null, choix: ui.choixPer, mois };
+    return { from: p.from, to: p.to, du: p.du, au: p.au, n: p.n || null, choix: ui.choixPer, mois, min: (B.rows[0] && B.rows[0].date) || '', max: B.auj };
   }
   function regler(p) { A.choisirPeriode(p); A.rendre(); }
 
@@ -197,7 +197,13 @@
     }
     // tendance : période et infobulle
     const st = t.closest('[data-step]');
-    if (st) { const p = A.periode(), k = +st.dataset.step; regler({ from: KB.shift(p.from, k), to: KB.shift(p.to, k), n: null }); return; }
+    if (st) {
+      const p = A.periode(), k = +st.dataset.step;
+      // période personnalisée : décalée de sa propre longueur ; sinon d'un mois
+      if (p.n === 'perso') { const L = (KB.dDiff(p.du, p.au) + 1) * k; regler({ n: 'perso', du: KB.plusJours(p.du, L), au: KB.plusJours(p.au, L) }); }
+      else regler({ from: KB.shift(p.from, k), to: KB.shift(p.to, k), n: null });
+      return;
+    }
     const ps = t.closest('[data-preset]');
     if (ps) {
       const p = A.periode(), k = ps.dataset.preset;
@@ -252,7 +258,14 @@
   vb.addEventListener('change', ev => {
     const t = ev.target, sc = A.scope();
     if (t.id === 'bref') { choisirRef(t.value); return; }
-    if (t.id === 'from' || t.id === 'to') { const p = A.periode(); const f = t.id === 'from' ? t.value : p.from, to = t.id === 'to' ? t.value : p.to; regler({ from: f <= to ? f : to, to: f <= to ? to : f, n: null }); return; }
+    // 1.2.0 : période personnalisée au jour près (début / fin), gardée comme dernier choix
+    if (t.id === 'tend-du' || t.id === 'tend-au') {
+      const p = A.periode(), v = t.value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+      const du = t.id === 'tend-du' ? v : p.du, au = t.id === 'tend-au' ? v : p.au;
+      regler({ n: 'perso', du: du <= au ? du : au, au: du <= au ? au : du });
+      return;
+    }
     if (t.id === 'tend-acc' || t.id === 'tend-mode') {
       tend[t.id === 'tend-acc' ? 'comptes' : 'mode'] = t.value;
       U.pref('tendance', tend);

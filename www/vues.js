@@ -195,6 +195,7 @@
     const k = f.q ? M().cleLibelle(f.q) : '';
     const limNc = f.cat === '__nc' && ctx ? M().plusJours(M().jourLocal(ctx.now), -K().NC_JOURS) : '';
     const rap = f.cat === '__rap' && ctx, gap = f.cat === '__ecart' && ctx;
+    const av = f.cat === '__av' && ctx ? K().limiteNC(ctx) : '';
     const out = [];
     for (const id of ids) {
       for (const o of S.ops[id] || []) {
@@ -207,7 +208,8 @@
           if (!r || M().cleLibelle(r.cat + ' ' + (r.sub || '')).indexOf(k) < 0) continue;
         }
         if (f.nonVues && K().vue(S, o)) continue;
-        if (rap) { if (!K().aRapprocher(ctx, o)) continue; }
+        if (av) { if (!K().aVerifierOp(ctx, o, av)) continue; }
+        else if (rap) { if (!K().aRapprocher(ctx, o)) continue; }
         else if (gap) { const e = K().ecartDe(ctx, o); if (!e || e.banque !== o || !K().ecartAVerifier(e)) continue; }
         else if (f.cat && ctx) {
           const r = K().classer(ctx, o);
@@ -335,6 +337,7 @@
     return '<button type="button" data-f="toutes" aria-pressed="' + toutes + '">Toutes</button>' +
       '<button type="button" data-f="nonVues" class="ch-u" aria-pressed="' + !!f.nonVues + '">Non vues <b>' + nb.unseen + '</b></button>' +
       '<button type="button" data-f="nc" aria-pressed="' + (f.cat === '__nc') + '">Non classées <b>' + nb.nc + '</b></button>' +
+      (f.cat === '__av' ? '<button type="button" data-f="rap" aria-pressed="true">À vérifier</button>' : '') +
       (f.cat === '__rap' ? '<button type="button" data-f="rap" aria-pressed="true">À rapprocher</button>' : '') +
       (f.cat === '__ecart' ? '<button type="button" data-f="rap" aria-pressed="true">Écarts à vérifier</button>' : '') +
       '<button type="button" data-f="int" aria-pressed="' + (f.cat === '__int') + '">Internes <b>' + (nb.int || 0) + '</b></button>' +
@@ -349,10 +352,37 @@
       (nb.visiblesNonVues ? '<button type="button" class="ch-link" data-f="toutVu">Tout marquer vu</button>' : '');
   }
 
-  // Sélecteur du périmètre de la liste (toujours visible) : Perso · Commun · Tout.
-  function perimetre(p) {
-    return '<div class="seg ops-scope" role="group" aria-label="Périmètre des opérations">' + [['perso', 'Perso'], ['commun', 'Commun'], ['tout', 'Tout']].map(([k, l]) =>
-      '<button type="button" data-perimetre="' + k + '" aria-pressed="' + (p === k) + '">' + l + '</button>').join('') + '</div>';
+  // 1.2.0 : nombre d'opérations « à vérifier » d'un périmètre (perso, commun, tout), sans période ni autre filtre :
+  // non vues, non classées des 3 derniers mois, prélèvements de portefeuille à rapprocher, chacune comptée une fois.
+  function nAVerifier(S, scope, ctx) {
+    const lim = K().limiteNC(ctx);
+    let n = 0;
+    for (const c of comptesDe(S, scope)) {
+      if (!opsDuScope(S, scope, c)) continue;
+      for (const o of S.ops[c.id] || []) if (K().aVerifierOp(ctx, o, lim)) n++;
+    }
+    return n;
+  }
+  // Les trois nombres en un seul passage (pastilles du haut et de la barre d'onglets) : { perso, commun, tout }.
+  function compteursAVerifier(S, ctx) {
+    const lim = K().limiteNC(ctx), r = { perso: 0, commun: 0, tout: 0 };
+    for (const c of comptesDe(S, 'tout')) {
+      const pe = opsDuScope(S, 'perso', c), co = opsDuScope(S, 'commun', c);
+      for (const o of S.ops[c.id] || []) {
+        if (!K().aVerifierOp(ctx, o, lim)) continue;
+        r.tout++; if (pe) r.perso++; if (co) r.commun++;
+      }
+    }
+    return r;
+  }
+  const PERIMETRES = [['perso', 'Perso'], ['commun', 'Commun'], ['tout', 'Tout']];
+  // Sélecteur du périmètre de la liste (toujours visible) : Perso · Commun · Tout. nb (1.2.0) : { perso, commun, tout }
+  // nombres « à vérifier » ; une pastille par choix qui en a (un appui ouvre la liste de ce périmètre filtrée).
+  function perimetre(p, nb) {
+    const n = nb || {};
+    return '<div class="seg ops-scope" role="group" aria-label="Périmètre des opérations">' + PERIMETRES.map(([k, l]) =>
+      '<button type="button" data-perimetre="' + k + '" aria-pressed="' + (p === k) + '"' + (n[k] ? ' data-av-n="' + n[k] + '" aria-label="' + esc(l + ', ' + n[k] + ' à vérifier') + '"' : '') + '>' +
+      '<span class="ps-l">' + l + '</span>' + (n[k] ? '<span class="pst" aria-hidden="true">' + (n[k] > 99 ? '99+' : n[k]) + '</span>' : '') + '</button>').join('') + '</div>';
   }
 
   // ------------------------------------------------------------ détail d'une opération (page)
@@ -536,5 +566,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

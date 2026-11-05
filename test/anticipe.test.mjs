@@ -94,13 +94,19 @@ test('contre-épreuve : virements exécutés le 01/11 → mêmes chiffres au 03/
 
 // 1.1.3 : référence régénérée ; seul changement voulu : « Budget du mois dépassé » sur la période du Budget (cycle de
 // salaire en cours, 27/10 → 26/11) et non plus le mois civil (références 1.1.1 gardées pour mémoire).
-test('relevés de contrôle des jeux « mesures » et « personnel » identiques à la 1.1.3', async () => {
+// 1.2.0 : référence régénérée ; seul changement voulu : le total du résumé Grafit (total.all) devient le « Total perso »
+// (sans le compte commun, paiement en ligne compris). Références 1.1.3 gardées : tout le reste leur est identique.
+test('relevés de contrôle des jeux « mesures » et « personnel » identiques à la 1.2.0 (1.1.3 sauf le total)', async () => {
   const T = now('2026-10-28');
+  const lire = (nom, v) => JSON.parse(fs.readFileSync(new URL('./references/releve-' + nom + '-' + v + '.json', import.meta.url)));
   for (const [nom, f] of [['mesures', repriseMesures], ['personnel', reprisePersonnelle]]) {
-    const ref = JSON.parse(fs.readFileSync(new URL('./references/releve-' + nom + '-1.1.3.json', import.meta.url)));
+    const ref = lire(nom, '1.2.0'), ancien = lire(nom, '1.1.3');
     const r = releve(X, await etatDepuisReprise(X, f('2026-10-28'), T), T);
     r.meta.version = ref.meta.version;
     assert.deepEqual(r, ref, nom);
+    const sans = x => { const y = JSON.parse(JSON.stringify(x)); delete y.grafit.calcule.total.all; return y; };
+    assert.deepEqual(sans(ref), sans(ancien), nom + ' : seul le total change depuis la 1.1.3');
+    assert.ok(ref.grafit.calcule.total.all < ancien.grafit.calcule.total.all, nom + ' : le commun n\'est plus compté');
   }
 });
 

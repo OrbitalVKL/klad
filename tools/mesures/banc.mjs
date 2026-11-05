@@ -86,6 +86,9 @@ export async function ouvrir(o) {
     await onglet('operations');
     const p = page.locator('[data-perimetre="perso"]');
     if (await p.count()) { await p.first().click(); await pause(250); }
+    // 1.2.0 : un périmètre avec une pastille ouvre la liste filtrée « À vérifier » : on revient à toutes les opérations
+    const t = page.locator('#app-chips [data-f="toutes"][aria-pressed="false"]');
+    if (await t.count()) { await t.first().click(); await pause(250); }
   }
   const portee = () => page.evaluate(() => document.getElementById('volet') && !document.getElementById('volet').hidden ? '#volet' : '#appli');
   const sousVues = () => page.$$eval('[data-sousvue]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.sousvue))]);

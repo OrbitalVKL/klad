@@ -32,21 +32,36 @@
     const rav = res && res.rav;
     if (!rav) return '<section class="ac-hero" data-mesure="rav" aria-label="Reste à vivre"><span class="lbl">Reste à vivre</span><span class="v">—</span>' +
       '<span class="s">Il se calcule sur le cycle de salaire en cours, dès que le budget est repris ou réglé.</span></section>';
-    // 1.1 : texte réduit à l'essentiel (grand chiffre, échéance, montant par jour, barre du cycle) ; le détail et l'autre
-    // base sont à un appui.
+    // 1.1 : texte réduit à l'essentiel (grand chiffre, échéance, barre du cycle) ; le détail et l'autre base sont à un
+    // appui. 1.2.0 : plus de montant « par jour » ; la barre du cycle dit « jour N/T » (un trait par jour, un trait
+    // marqué au début de chaque semaine, repère sur aujourd'hui).
     const x = KB().ravChoisi(rav, base), b = x.col;
     const surQuoi = x.choix === 'comptes' ? 'sur les comptes courants' : 'sur le dernier salaire';
-    const restants = Math.max(1, res.nbJours - res.jour + 1);
-    const ecoule = Math.round(Math.min(1, res.jour / res.nbJours) * 100);
     const grand = b.reste >= 0 ? F().montant(b.reste) : F().montant(-b.reste);
-    const parJour = b.reste > 0 ? KB().eur(Math.floor(b.reste / restants)) + ' par jour' : 'budget du cycle dépassé';
+    const T = res.nbJours, N = Math.min(T, Math.max(1, res.jour));
     return '<div class="ac-hero-w" data-mesure="rav"><button type="button" class="ac-hero" data-aller="rav" aria-label="' + esc('Reste à vivre jusqu\'au ' + U().jjmm(rav.fin) + ' : ' + grand +
-      (b.reste < 0 ? ' en dépassement' : '') + ' ' + surQuoi + ', ' + parJour + ', cycle écoulé à ' + ecoule + ' %. Détail du calcul') + '">' +
+      (b.reste < 0 ? ' en dépassement' : '') + ' ' + surQuoi + ', jour ' + N + ' sur ' + T + ' du cycle. Détail du calcul') + '">' +
       '<span class="lbl">Reste à vivre</span>' +
       '<span class="v num">' + esc(grand) + (b.reste < 0 ? '<small> dépassé</small>' : '') + '</span>' +
-      '<span class="s">jusqu\'au ' + esc(U().jjmm(rav.fin)) + ' · ' + esc(parJour) + '</span>' +
-      '<span class="prog" aria-hidden="true"><i style="width:' + ecoule + '%"></i></span></button>' +
+      '<span class="s">jusqu\'au ' + esc(U().jjmm(rav.fin)) + ' · <span class="num">jour ' + N + '/' + T + '</span></span>' +
+      barreCycle(debutPeriode(res), N, T) + '</button>' +
       U().interrupteurRav(x.choix, !!rav.comptes) + '</div>';
+  }
+  const debutPeriode = res => res.per ? (res.per.cyc ? res.per.cyc.start : res.per.pm0 + '-01') : null;
+  // Barre du cycle (1.2.0) : T jours ; écoulé jusqu'à la fin du jour N ; un trait entre deux jours, plus haut et plus
+  // épais avant chaque lundi (début de semaine) ; repère sur le milieu du jour N. Dessin seul (aria-hidden), le texte
+  // « jour N/T » est à côté. debut : AAAA-MM-JJ du premier jour (null : pas de semaine marquée).
+  function barreCycle(debut, N, T) {
+    const pct = v => (Math.round(v * 1e4) / 100) + '%';
+    let traits = '';
+    for (let i = 1; i < T; i++) {
+      const lundi = !!debut && new Date(M().plusJours(debut, i) + 'T12:00:00Z').getUTCDay() === 1;
+      traits += '<line class="' + (lundi ? 'sem' : 'jr') + '" x1="' + pct(i / T) + '" x2="' + pct(i / T) + '" y1="' + (lundi ? 16 : 18) + '" y2="' + (lundi ? 26 : 22) + '"/>';
+    }
+    const ici = pct((N - 0.5) / T);
+    return '<svg class="cyc-bar" width="100%" height="26" aria-hidden="true" focusable="false">' +
+      '<rect class="fond" x="0" y="7" width="100%" height="6" rx="3"/><rect class="fait" x="0" y="7" width="' + pct(N / T) + '" height="6" rx="3"/>' + traits +
+      '<line class="ici" x1="' + ici + '" x2="' + ici + '" y1="1" y2="19"/><circle class="ici" cx="' + ici + '" cy="10" r="5"/></svg>';
   }
 
   // ------------------------------------------------------------ 2. « À vérifier » (un seul bloc, masqué s'il n'y a rien)
@@ -90,10 +105,14 @@
         '<span class="num' + (v < 0 ? ' bad-t' : '') + '">' + esc(F().montant(Math.abs(v))) + '</span>' + (v < 0 ? '<small class="bad-t">débiteur</small>' : ''),
         c.libelle + ', ' + F().montant(Math.abs(v)) + (v < 0 ? ' débiteur' : '') + ', ' + sous);
     }).join('');
-    const tot = n ? '<p class="ac-tot">Total disponible (courants et commun) : <b class="num' + (total < 0 ? ' bad-t' : '') + '">' + esc(F().solde(total)) + '</b>' +
-      (cartes ? ' · après les cartes : <b class="num' + (total - cartes < 0 ? ' bad-t' : '') + '">' + esc(F().solde(total - cartes)) + '</b>' : '') + '</p>' +
-      // 0.10.8 : total de tous les comptes, dont épargne (tuile « Total » de l'ancienne version)
-      (nep ? '<p class="ac-tot">Tous les comptes : <b class="num' + (total + ep < 0 ? ' bad-t' : '') + '">' + esc(F().solde(total + ep)) + '</b> · dont épargne <b class="num">' + esc(F().solde(ep)) + '</b></p>' : '') : '';
+    // 1.2.0 : un seul total, « Total perso » (KladModele.totalPerso, même valeur que le total du résumé Grafit) : comptes
+    // courants, paiement en ligne et épargne, moins la dette des cartes à débit différé ; sans le compte commun (il a son
+    // propre solde dans la liste et dans l'onglet Commun). Remplace « Total disponible (courants et commun) » et « Tous
+    // les comptes ».
+    const tp = M().totalPerso(S, o.dettes || {}, o.livrets || {});
+    const tot = tp.n ? '<p class="ac-tot">Total perso : <b class="num' + (tp.centimes < 0 ? ' bad-t' : '') + '">' + esc(F().solde(tp.centimes)) + '</b>' +
+      '<small class="ac-tot-s">' + esc((nep ? 'comptes courants, paiement en ligne et épargne' : 'comptes courants et paiement en ligne') + (cartes ? ', cartes déduites' : '') + ' ; sans le commun' +
+        (tp.manque.length ? ' ; incomplet : ' + tp.manque.join(', ') : '')) + '</small></p>' : '';
     return carte('ac-so', 'Soldes', lu ? 'relevés de ' + hhmm(lu) : '', lignes + tot, ' data-mesure="soldes"');
   }
 
@@ -177,5 +196,5 @@
     return (p.cyc ? 'Cycle du ' + U().jjmm(p.cyc.start) + ' au ' + U().jjmm(p.cyc.end) : U().mLong(p.pm0)) + ' · jour ' + res.jour + ' sur ' + res.nbJours;
   }
 
-  g.KladVuesAccueil = { ecran, reste, aVerifier, soldes, cycle, commun, echeances, actions, bilan, surTitre };
+  g.KladVuesAccueil = { ecran, reste, barreCycle, aVerifier, soldes, cycle, commun, echeances, actions, bilan, surTitre };
 })(typeof window !== 'undefined' ? window : globalThis);
