@@ -196,6 +196,8 @@
     const limNc = f.cat === '__nc' && ctx ? M().plusJours(M().jourLocal(ctx.now), -K().NC_JOURS) : '';
     const rap = f.cat === '__rap' && ctx, gap = f.cat === '__ecart' && ctx;
     const av = f.cat === '__av' && ctx ? K().limiteNC(ctx) : '';
+    // 1.3.0 : « Imprévus » et « Écarts » du compte commun (f.statuts : KladCommun.statuts, Map id → statut)
+    const st = (f.cat === '__imp' || f.cat === '__eca') ? (f.statuts || new Map()) : null, stVoulu = f.cat === '__imp' ? 'imprevu' : 'ecart';
     const out = [];
     for (const id of ids) {
       for (const o of S.ops[id] || []) {
@@ -208,7 +210,8 @@
           if (!r || M().cleLibelle(r.cat + ' ' + (r.sub || '')).indexOf(k) < 0) continue;
         }
         if (f.nonVues && K().vue(S, o)) continue;
-        if (av) { if (!K().aVerifierOp(ctx, o, av)) continue; }
+        if (st) { const x = st.get(o.id); if (!x || x.statut !== stVoulu) continue; }
+        else if (av) { if (!K().aVerifierOp(ctx, o, av)) continue; }
         else if (rap) { if (!K().aRapprocher(ctx, o)) continue; }
         else if (gap) { const e = K().ecartDe(ctx, o); if (!e || e.banque !== o || !K().ecartAVerifier(e)) continue; }
         else if (f.cat && ctx) {
@@ -278,9 +281,17 @@
       (r.src === 'regle' ? '<span class="tx-tag" title="Classée par une de vos règles">règle</span>' : '') + nc +
       (g.KladCommun && g.KladCommun.equipementDeOp(S, o.id) ? '<span class="tx-tag eq" title="Ajoutée à l\'équilibre des apports">équilibre</span>' : '') +
       (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') +
+      // 1.3.0 : statut d'un mouvement du compte commun (couleur et libellé)
+      (opt && opt.statuts && opt.statuts.get(o.id) ? pastilleStatut(opt.statuts.get(o.id)) : '') +
       // 1.1.2 : opération comptée pour l'échéance qu'elle règle (date réelle gardée)
       (opt && opt.ratt && opt.ratt.get(o.id) ? '<span class="tx-tag" title="La date réelle reste affichée ; seule la période de comptage change">' + esc(opt.ratt.get(o.id)) + '</span>' : '') + '</div></div>' +
       '<div class="amt' + (o.montant > 0 ? ' pos' : '') + (!COMPTEE(r.type) ? ' nc' : '') + '"><span class="amt-v">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></div></div>';
+  }
+
+  // 1.3.0 : pastille « prévu » (vert), « écart » (orange), « imprévu » (rouge) d'un mouvement du compte commun.
+  const ST_CLS = { prevu: 'st-ok', ecart: 'st-ecart', imprevu: 'st-imp' }, ST_LIB = { prevu: 'prévu', ecart: 'écart', imprevu: 'imprévu' };
+  function pastilleStatut(s) {
+    return '<span class="tx-tag ' + ST_CLS[s.statut] + '" title="' + esc(s.ecart || s.quoi || '') + '"><span class="st-dot" aria-hidden="true"></span>' + ST_LIB[s.statut] + '</span>';
   }
 
   // Tranche de la liste : à partir de l'indice debut, au moins nbJours jours complets ; un en-tête par jour (total du jour
@@ -302,7 +313,7 @@
       const dt = new Date(d + 'T12:00:00Z');
       h += '<div class="tx-j"><div class="tx-day"><div><div class="td-in"><span>' + JOURS[dt.getUTCDay()] + ' ' + jjmm(d) + (annee && +d.slice(0, 4) !== annee ? '/' + d.slice(2, 4) : '') +
         '</span><span class="td-t num">' + (Math.abs(tot) < 1 ? '' : esc((tot > 0 ? '+' : '') + F().montant(Math.abs(tot)))) + '</span></div></div></div>' +
-        ops.slice(i, j).map(o => ligne(S, o, { ctx, ratt: opt && opt.ratt })).join('') + '</div>';
+        ops.slice(i, j).map(o => ligne(S, o, { ctx, ratt: opt && opt.ratt, statuts: opt && opt.statuts })).join('') + '</div>';
       i = j; jours++;
     }
     return { html: h, fin: i };
@@ -326,7 +337,7 @@
   // Tranche sans en-têtes de jour (ordres « plus grosses dépenses », « par catégorie ») : date sur chaque ligne.
   function trancheSansJours(S, ops, debut, n, opt) {
     const fin = Math.min(ops.length, debut + n);
-    return { html: '<div class="tx-j tx-plat">' + ops.slice(debut, fin).map(o => ligne(S, o, { ctx: opt && opt.ctx, ratt: opt && opt.ratt, date: true })).join('') + '</div>', fin };
+    return { html: '<div class="tx-j tx-plat">' + ops.slice(debut, fin).map(o => ligne(S, o, { ctx: opt && opt.ctx, ratt: opt && opt.ratt, statuts: opt && opt.statuts, date: true })).join('') + '</div>', fin };
   }
 
   // Puces des filtres (Toutes, Non vues, Non classées, Catégorie, Compte, Tout marquer vu).
@@ -338,6 +349,9 @@
       '<button type="button" data-f="nonVues" class="ch-u" aria-pressed="' + !!f.nonVues + '">Non vues <b>' + nb.unseen + '</b></button>' +
       '<button type="button" data-f="nc" aria-pressed="' + (f.cat === '__nc') + '">Non classées <b>' + nb.nc + '</b></button>' +
       (f.cat === '__av' ? '<button type="button" data-f="rap" aria-pressed="true">À vérifier</button>' : '') +
+      // 1.3.0 : mouvements du commun hors du plan (« Imprévus ») ou avec un écart (« Écarts »), périmètres Commun et Tout
+      (nb.imp != null && (f.scope === 'commun' || f.scope === 'tout') ? '<button type="button" data-f="imp" class="ch-st" aria-pressed="' + (f.cat === '__imp') + '">Imprévus <b>' + nb.imp + '</b></button>' +
+        '<button type="button" data-f="eca" class="ch-st" aria-pressed="' + (f.cat === '__eca') + '">Écarts <b>' + nb.eca + '</b></button>' : '') +
       (f.cat === '__rap' ? '<button type="button" data-f="rap" aria-pressed="true">À rapprocher</button>' : '') +
       (f.cat === '__ecart' ? '<button type="button" data-f="rap" aria-pressed="true">Écarts à vérifier</button>' : '') +
       '<button type="button" data-f="int" aria-pressed="' + (f.cat === '__int') + '">Internes <b>' + (nb.int || 0) + '</b></button>' +
@@ -384,6 +398,57 @@
       '<button type="button" data-perimetre="' + k + '" aria-pressed="' + (p === k) + '"' + (n[k] ? ' data-av-n="' + n[k] + '" aria-label="' + esc(l + ', ' + n[k] + ' à vérifier') + '"' : '') + '>' +
       '<span class="ps-l">' + l + '</span>' + (n[k] ? '<span class="pst" aria-hidden="true">' + (n[k] > 99 ? '99+' : n[k]) + '</span>' : '') + '</button>').join('') + '</div>';
   }
+
+  // ------------------------------------------------------------ 1.3.0 : détail d'un mouvement du compte commun
+  // Statut (prévu, écart, imprévu) et sa correction à la main ; affectation d'un virement ponctuel reçu ; enveloppe qui
+  // paie un débit. Tout est annulable (message en bas d'écran).
+  function detailCommun(S, o, B) {
+    const KCo = g.KladCommun, c = M().compte(S, o.compte);
+    if (!B || !KCo || !KCo.statuts || !c || c.role !== 'commun') return '';
+    let s = null;
+    try { s = KCo.statuts(B).get(o.id); } catch (e) { s = null; }
+    if (!s) return '';
+    const etat = o.commun || {};
+    const LIB = { prevu: 'Prévu', ecart: 'Prévu, écart', imprevu: 'Imprévu' };
+    let h = '<div class="cm-op"><h3 class="obs-h3">Compte commun</h3><p>' + pastilleStatut(s) + ' <b>' + esc(LIB[s.statut]) + '</b> · ' + esc(s.quoi) + '</p>' +
+      (s.ecart ? '<p class="note">Écart : ' + esc(s.ecart) + '</p>' : '');
+    const bt = (a, attrs, t, on) => '<button type="button" class="btn' + (on ? ' primary' : '') + '" data-a="' + a + '" ' + attrs + ' aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(t) + '</button>';
+    if (o.montant > 0 && s.sorte === 'ponctuel') {
+      const x = KCo.ponctuels(B).find(y => y.r.id === o.id);
+      const aff = x && x.aff, prop = x ? x.prop : { k: 'avance' }, cur = aff || prop;
+      const an = cur.k === 'impots' && cur.an ? +cur.an : new Date(B.auj).getFullYear() - 1;
+      const postes = KB2().postes(B, 'commun').lignes.filter(a => a.on);
+      h += '<p class="muted small">' + (aff ? 'Affectation : ' + esc(KCo.texteAff(B, aff)) : 'À affecter · proposé : ' + esc(KCo.texteAff(B, prop))) + '</p>' +
+        (!aff ? '<div class="row">' + bt('affecter', 'data-k="proposee"', 'Confirmer : ' + KCo.texteAff(B, prop), true) + '</div>' : '') +
+        '<div class="row cm-aff" role="group" aria-label="Affectation du virement">' +
+        bt('affecter', 'data-k="impots"', 'Impôts', aff && aff.k === 'impots') +
+        '<label class="ctl" for="cmAn">année <select id="cmAn">' + [an - 1, an, an + 1].map(y => '<option' + (y === an ? ' selected' : '') + '>' + y + '</option>').join('') + '</select></label>' +
+        bt('affecter', 'data-k="avance"', 'Avance au commun', aff && aff.k === 'avance') +
+        '<label class="ctl" for="cmPour">pour <select id="cmPour"><option value="renflouement">renflouer le commun</option>' +
+          postes.map(a => '<option value="' + esc(a.key) + '"' + (cur.k === 'avance' && cur.pour === a.key ? ' selected' : '') + '>' + esc(a.label) + '</option>').join('') + '</select></label>' +
+        bt('affecter', 'data-k="reserve"', 'Réserve', aff && aff.k === 'reserve') +
+        bt('affecter', 'data-k="remb"', 'Remboursement', aff && aff.k === 'remb') +
+        '<label class="ctl" for="cmTxt">autre <input id="cmTxt" maxlength="60" autocomplete="off" value="' + esc(aff && aff.k === 'autre' ? aff.txt || '' : '') + '"></label>' +
+        bt('affecter', 'data-k="autre"', 'Autre', aff && aff.k === 'autre') +
+        (aff ? bt('affecter', 'data-k=""', 'À affecter de nouveau', false) : '') + '</div>' +
+        '<p class="muted small">Impôts : enveloppe qui ne paie que les prélèvements d\'impôt. Avance au commun : la part de l\'autre personne est comptée en faveur de celle qui avance dans l\'équilibre. Les autres affectations ne changent pas l\'équilibre.</p>';
+    }
+    if (o.montant < 0) {
+      const EN = KCo.enveloppes(B), lie = EN.parOp.get(o.id);
+      const L = EN.liste.filter(e => e.reste > 50 || e.cle === lie);
+      if (L.length || etat.lien) {
+        h += '<div class="row cm-env"><label class="ctl" for="cmLien">Payé par <select id="cmLien"><option value="">automatique' + (lie && !etat.lien ? ' (' + esc(EN.liste.find(e => e.cle === lie).nom) + ')' : '') + '</option>' +
+          '<option value="aucun"' + (etat.lien === 'aucun' ? ' selected' : '') + '>aucune enveloppe</option>' +
+          L.map(e => '<option value="' + esc(e.cle) + '"' + (etat.lien === e.cle ? ' selected' : '') + '>' + esc(e.nom) + ' (reste ' + esc(F().montant(e.reste)) + ')</option>').join('') + '</select></label>' +
+          bt('relier', '', 'Relier', false) + '</div>';
+      }
+    }
+    h += '<div class="row" role="group" aria-label="Statut choisi à la main"><span class="muted small">Compter comme :</span>' +
+      bt('statutcm', 'data-val="prevu"', 'prévu', etat.statut === 'prevu') + bt('statutcm', 'data-val="imprevu"', 'imprévu', etat.statut === 'imprevu') +
+      (etat.statut ? bt('statutcm', 'data-val=""', 'Automatique', false) : '') + '</div></div>';
+    return h;
+  }
+  const KB2 = () => g.KladBudget;
 
   // ------------------------------------------------------------ détail d'une opération (page)
   // B (facultatif, 1.1.2) : contexte du budget, pour la période de comptage (« compte pour : octobre / novembre »).
@@ -446,7 +511,7 @@
       (achat && o.rapprochement === 'autrement' ? '<button type="button" class="btn" data-a="pasautrement">Annuler : payé autrement</button>' : '') +
       (ecV && !ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartvu">Écart vérifié</button>' : '') +
       (ecV && ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartnonvu">Annuler : écart à vérifier</button>' : '') +
-      (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' + compte +
+      (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' + compte + detailCommun(S, o, B) +
       '<button type="button" class="ac-lien" data-a="semblables">Opérations semblables ›</button>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
   }
@@ -566,5 +631,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

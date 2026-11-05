@@ -103,6 +103,8 @@
         if (r && r.sub) subs.add(r.sub);
       }
     }
+    // 1.3.0 : texte libre d'une affectation de virement ponctuel du commun (« Autre : … »)
+    for (const [o] of classes) if (o && o.commun && o.commun.aff && o.commun.aff.txt) ajouter(o.commun.aff.txt, 'note', true);
     for (const b of C.base || []) if (b && b.sub) subs.add(b.sub);
     for (const u of C.regles || []) if (u && u.sub) subs.add(u.sub);
     const plan = (S.budget && S.budget.plan) || {};

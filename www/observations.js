@@ -203,7 +203,10 @@
     if (KC()) {
       try {
         const D = KC().plan(B);
-        if (D.pon > 0) add('warn', 'commun', 'Virement ponctuel de ' + e0(D.pon) + ' vers le commun', RC.moi + ' ' + e0(D.ponMoi) + ' · ' + RC.autre + ' ' + e0(D.ponAutre) + ', ' + ((D.C.negAt || D.C.minAt) <= M().plusJours(B.auj, 3) ? 'dès que possible' : 'avant le ' + dfr(D.C.negAt || D.C.minAt)) + ' : ' +
+        // 1.3.0 : au-dessus de zéro mais sous la réserve fixe : renflouement pour tenir la réserve
+        if (D.pon > 0 && D.seuil > 0 && D.C.min >= -0.5) add('warn', 'commun', 'Renflouement de ' + e0(D.pon) + ' vers le commun', RC.moi + ' ' + e0(D.ponMoi) + ' · ' + RC.autre + ' ' + e0(D.ponAutre) +
+          ' (parts des postes en cause), avant le ' + dfr(D.C.minAt) + ' : le solde descendrait à ' + e2(D.C.min) + ', sous la réserve fixe de ' + e0(D.seuil) + '.');
+        else if (D.pon > 0) add('warn', 'commun', 'Virement ponctuel de ' + e0(D.pon) + ' vers le commun', RC.moi + ' ' + e0(D.ponMoi) + ' · ' + RC.autre + ' ' + e0(D.ponAutre) + ', ' + ((D.C.negAt || D.C.minAt) <= M().plusJours(B.auj, 3) ? 'dès que possible' : 'avant le ' + dfr(D.C.negAt || D.C.minAt)) + ' : ' +
           (D.C.negAt && D.C.negAt < D.C.minAt ? 'premier découvert prévu le ' + dfr(D.C.negAt) + ' (' + e2(-D.C.negV) + '), puis jusqu\'à ' + e2(-D.C.min) + ' de découvert le ' + dfr(D.C.minAt) + '.' : 'le solde descendrait à ' + e2(-D.C.min) + ' de découvert.') + (D.pas > DEMI ? ' Creux passager (échéances payées d\'un coup, ' + e0(D.pas) + ') : les mises de côté des mois suivants le comblent.' : ''));
         for (const c of D.changes) add('warn', 'commun', 'Ordre permanent à modifier : ' + nom(c.qui), c.label + ' : ' + e0(c.have) + ' → ' + e0(c.want) + ' par mois (' + e0(c.want - c.have) + ' de plus) pour suivre le budget du compte commun.');
         const rc = D.recus.filter(x => x.vu), miss = D.recus.filter(x => !x.vu && x.retard), dif = rc.filter(x => Math.abs(x.vu.m - (+x.v.montant || 0)) > 1);
@@ -220,6 +223,10 @@
               (att.length ? ' ; ' + e0(attendu) + ' encore attendu' + (attendu >= 200 ? 's' : '') + ' (' + att.map(x => nom(x.v.qui)).filter((n, i, a) => a.indexOf(n) === i).join(', ') + ', prévu' + (att.length > 1 ? 's' : '') + ' le ' + [...new Set(att.map(x => +x.v.jour || 1))].join(' et ') + ')' : '') + '.');
           }
         }
+        // 1.3.0 : enveloppe (argent affecté) qui finance autre chose
+        for (const x of KC().enveloppesDetournees ? KC().enveloppesDetournees(B) : []) add('warn', 'commun', 'L\'enveloppe ' + x.nom + ' finance autre chose : ' + e2(x.montant),
+          'Le disponible du compte commun est sous zéro alors que l\'enveloppe ' + x.nom + ' n\'est pas vide' + (x.depense ? ' : depuis ' + MOIS[+x.mois.slice(5) - 1] + ' et le paiement du ' + jjmm(x.depense.date) + ' (' + x.depense.label.slice(0, 32) + ', ' + e2(x.depense.montant) + ')' : '') +
+          '. Elle devra être reconstituée avant ses prochains prélèvements.');
         if (!D.changes.length && !D.pon) add('good', 'commun', 'Ordres permanents conformes', RC.moi + ' ' + e0(KC().somme(B, 'moi')) + ' · ' + RC.autre + ' ' + e0(KC().somme(B, 'autre')) + ' par mois : ils couvrent le budget du compte commun.');
       } catch (e) { /* compte commun sans solde */ }
       // virement récurrent absent de la liste

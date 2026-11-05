@@ -188,7 +188,9 @@
         autre: typeof c.autre === 'string' && c.autre.trim() ? c.autre.trim() : null,
         contribution: typeof c.contribution === 'string' && c.contribution.trim() ? c.contribution.trim() : CONTRIBUTION,
         part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50,
-        motifAutre: typeof c.motifAutre === 'string' && c.motifAutre ? c.motifAutre : null
+        motifAutre: typeof c.motifAutre === 'string' && c.motifAutre ? c.motifAutre : null,
+        // 1.3.0 : réserve fixe du compte commun (centimes) : la trésorerie prévue ne doit pas descendre dessous
+        reserveFixe: c.reserveFixe != null && c.reserveFixe !== '' && isFinite(+c.reserveFixe) && +c.reserveFixe > 0 ? Math.round(+c.reserveFixe * 100) : 0
       },
       tolerance: tolReglee(B.reglages),
       echeance: echeanceReglee(B.reglages),

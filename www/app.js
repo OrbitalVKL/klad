@@ -623,6 +623,10 @@
   // Période des opérations : gardée tant que l'appli reste ouverte (« Toute période » au démarrage).
   const perOps = { k: 'tout', du: '', au: '' };
   const bornesOps = () => Vu.bornesPeriode(perOps.k, M.jourLocal(Date.now()), budget(), perimOps === 'commun' ? 'commun' : 'perso', perOps.du, perOps.au);
+  // 1.3.0 : statut de chaque mouvement du compte commun (prévu, écart, imprévu), une fois par contexte du budget.
+  function statutsCommun() {
+    try { const B = budget(); return B && window.KladCommun && window.KladCommun.statuts ? window.KladCommun.statuts(B) : null; } catch (e) { return null; }
+  }
   function renderOps(reset) {
     if (!S) return;
     if (reset) {
@@ -635,13 +639,17 @@
       if (filtre.cat && filtre.cat[0] !== '_' && !cx.C.categories[filtre.cat]) filtre.cat = '';
       const bp = bornesOps();
       filtre.du = bp.du; filtre.au = bp.au; filtre.per = perOps.k;
+      filtre.statuts = statutsCommun();
       opsListe = Vu.ordonner(Vu.filtrer(S, filtre, cx), filtre.ordre, cx);
       opsFin = 0;
       const base = Object.assign({}, filtre, { cat: '', nonVues: false });
       const unseen = Vu.filtrer(S, Object.assign({}, base, { nonVues: true }), cx).length;
       const nc = Vu.filtrer(S, Object.assign({}, base, { cat: '__nc' }), cx).length;
       const int = Vu.filtrer(S, Object.assign({}, base, { cat: '__int' }), cx).length;
-      $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
+      // 1.3.0 : imprévus et écarts du compte commun (périmètres Commun et Tout)
+      const imp = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__imp' }), cx).length : null;
+      const eca = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__eca' }), cx).length : null;
+      $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, imp, eca, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
       // « Trier une à une » : avec le filtre Non vues ou Non classées
       const nTri = filtre.nonVues || filtre.cat === '__nc' ? opsListe.filter(o => filtre.nonVues ? !KC.vue(S, o) : true).length : 0;
       $('ops-tri').hidden = !nTri;
@@ -667,8 +675,9 @@
     if (opsFin >= opsListe.length) return;
     let ratt = null;
     try { ratt = window.KladBudget && budget() ? window.KladBudget.rattachements(budget()) : null; } catch (e) { ratt = null; }
-    const r = Vu.ordreParJour(filtre.ordre) ? Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx(), ratt })
-      : Vu.trancheSansJours(S, opsListe, opsFin, nbJours * 2, { ctx: ctx(), ratt });
+    const statuts = filtre.statuts || null;
+    const r = Vu.ordreParJour(filtre.ordre) ? Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx(), ratt, statuts })
+      : Vu.trancheSansJours(S, opsListe, opsFin, nbJours * 2, { ctx: ctx(), ratt, statuts });
     $('tx').insertAdjacentHTML('beforeend', r.html);
     opsFin = r.fin;
     $('tx-suite').innerHTML = opsFin < opsListe.length ? '<div class="row center"><button type="button" class="btn" data-suite>Afficher plus</button></div>' : '';
@@ -701,6 +710,7 @@
     if (filtre.compte) filtre.compte = '';
     if (av) { filtre.cat = '__av'; filtre.nonVues = false; perOps.k = 'tout'; }
     else if (filtre.cat === '__av') filtre.cat = '';
+    if (perimOps === 'perso' && (filtre.cat === '__imp' || filtre.cat === '__eca')) filtre.cat = '';
     opsFin = 0; renderOps(true);
   });
   $('ops-tri').addEventListener('click', ev => { if (ev.target.closest('[data-tri]')) trier(filtre.cat === '__nc' ? 'nc' : 'nv'); });
@@ -713,6 +723,7 @@
     else if (f === 'nc') filtre.cat = filtre.cat === '__nc' ? '' : '__nc';
     else if (f === 'rap') filtre.cat = '';
     else if (f === 'int') filtre.cat = filtre.cat === '__int' ? '' : '__int';
+    else if (f === 'imp' || f === 'eca') { const c = f === 'imp' ? '__imp' : '__eca'; filtre.cat = filtre.cat === c ? '' : c; filtre.nonVues = false; }
     else if (f === 'toutVu') {
       const l = opsListe.filter(o => !KC.vue(S, o));
       const avant = KC.marquer(S, l, true);
@@ -876,6 +887,36 @@
         () => { KC.annulerInterne(snap); if (venu && filtre.cat === '__int') filtre.cat = '__rap'; changed('classement'); });
     } else if (['rapprocher', 'rapprocherb', 'garder', 'arapprocher', 'autrement', 'pasautrement'].indexOf(b.dataset.a) >= 0) {
       rapprochement(b.dataset.a);
+    } else if (b.dataset.a === 'affecter' || b.dataset.a === 'relier' || b.dataset.a === 'statutcm') {
+      // 1.3.0 : affectation d'un virement ponctuel du commun, enveloppe qui paie un débit, statut choisi à la main
+      const o = trouverOp(opCourante[0], opCourante[1]), KCo = window.KladCommun;
+      if (!o || !KCo) return;
+      let avant, msg;
+      if (b.dataset.a === 'affecter') {
+        const k = b.dataset.k;
+        let aff = null;
+        if (k === 'proposee') { const x = KCo.ponctuels(budget()).find(y => y.r.id === o.id); aff = x ? x.prop : null; }
+        else if (k === 'impots') aff = { k, an: $('cmAn') ? $('cmAn').value : null };
+        else if (k === 'avance') aff = { k, pour: $('cmPour') ? $('cmPour').value : 'renflouement' };
+        else if (k === 'autre') aff = { k, txt: $('cmTxt') ? $('cmTxt').value.trim() : '' };
+        else if (k) aff = { k };
+        avant = KCo.affecter(o, aff);
+        msg = aff ? 'Virement affecté : ' + KCo.texteAff(budget(), o.commun.aff) + '.' : 'Virement de nouveau à affecter.';
+        log('info', 'Commun : virement ponctuel ' + (aff ? 'affecté (' + KCo.AFFECTATIONS[aff.k] + ')' : 'remis à affecter') + '.');
+      } else if (b.dataset.a === 'relier') {
+        const v = $('cmLien') ? $('cmLien').value : '';
+        avant = KCo.corriger(o, 'lien', v || null);
+        msg = v === 'aucun' ? 'Paiement sorti des enveloppes.' : v ? 'Paiement relié à une enveloppe.' : 'Enveloppe choisie automatiquement.';
+        log('info', 'Commun : enveloppe d\'un paiement ' + (v ? 'choisie à la main' : 'automatique') + '.');
+      } else {
+        const v = b.dataset.val || null;
+        avant = KCo.corriger(o, 'statut', v);
+        msg = v ? 'Compté comme ' + (v === 'prevu' ? 'prévu' : 'imprévu') + '.' : 'Statut automatique.';
+        log('info', 'Commun : statut d\'un mouvement ' + (v ? 'choisi à la main' : 'automatique') + '.');
+      }
+      changed('classement');
+      renderDetail();
+      toastAnnuler(msg + ' Commun et équilibre recalculés.', () => { KCo.restaurer(o, avant); changed('classement'); renderDetail(); });
     } else if (b.dataset.a === 'comptepour') {
       // 1.1.2 : période de comptage choisie à la main (« compte pour : octobre / novembre »), annulable
       const o = trouverOp(opCourante[0], opCourante[1]);
