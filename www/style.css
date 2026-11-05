@@ -2014,7 +2014,8 @@ html.etroit .sousvues.patri{grid-template-columns:repeat(2,minmax(0,1fr))}
 .cm-decomp{display:grid;gap:10px;margin:4px 0 14px}
 .cm-decomp .cd-tot{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
 .cm-decomp .cd-tot b{font-size:22px}
-.cm-decomp .cd-parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.cm-decomp .cd-parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11em),1fr));gap:8px}
+.cm-decomp .cd-p .sb-l{min-width:0;overflow-wrap:anywhere}
 .cm-decomp .cd-p{display:grid;gap:2px;padding:10px 12px;border-radius:12px;background:var(--surface-2);min-width:0}
 .cm-decomp .cd-p.neg{background:var(--bad-soft)}
 .cm-decomp .cd-p .subs{overflow-wrap:anywhere}

@@ -2,6 +2,36 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.0
+
+Compte commun remis à plat (demande du propriétaire du 05/11).
+- **Prévu, écart, imprévu** : chaque mouvement du compte commun porte une pastille. « Prévu » : il correspond au plan
+  (virement permanent, contrat ou poste du budget commun, appel de fonds, impôt prévu ou payé par son enveloppe).
+  « Écart » : élément du plan, mais montant hors tolérance, date hors fenêtre, plusieurs appels payés en une fois ou
+  appel payé en retard ; l'écart est expliqué en une phrase. « Imprévu » : rien dans le plan. Filtres « Imprévus » et
+  « Écarts » dans les Opérations (Commun et Tout). Correction à la main dans le détail (« compter comme prévu /
+  imprévu »), annulable.
+- **Virements ponctuels affectés** : chaque virement ponctuel reçu sur le commun (12 derniers mois) reçoit une
+  affectation proposée d'après son libellé (Impôts <année>, Avance au commun, Réserve, Remboursement, Autre), à confirmer
+  d'un appui (Commun › Ce mois, ou détail de l'opération). Un versement aussitôt reversé est proposé « avance pour » le
+  poste payé.
+- **Enveloppes** : un versement « Impôts <année> » (ou une avance pour un poste) devient une enveloppe qui ne paie que ce
+  à quoi elle est affectée ; les paiements reliés la font diminuer (relier à la main possible). Observation « L'enveloppe
+  … finance autre chose » quand le disponible passe sous zéro alors qu'elle n'est pas vide.
+- **Solde du commun décomposé** : disponible + réserve fixe + provisions des charges non mensuelles + enveloppes.
+- **Avances au commun** : la part de l'autre personne (parts du poste, sinon part par défaut) est comptée en faveur de
+  celle qui avance dans l'équilibre, avec la mention « avance au commun ». Total des avances de chacun dans Commun.
+  L'enveloppe Impôts et ses paiements sont hors équilibre.
+- **Réserve fixe** (Réglages › Budget › Personnes du commun) : la trésorerie prévue ne doit pas descendre dessous ;
+  sinon, renflouement proposé, partagé selon les parts des postes en cause, avec un bouton « Fait ».
+- **Commun › Plan** : part de chacun poste par poste, comparée aux virements permanents en place ; propositions quand
+  les contrats d'un poste ont changé.
+- **Fiche du mois** (Commun › Ce mois, ◀ ▶ pour les mois passés) : « Mois conforme », ou la liste des écarts (dont
+  virements permanents non reçus) et des imprévus.
+- Relevé de contrôle : nouveau bloc « communPlan » (statuts des 7 derniers mois, ponctuels et affectations, enveloppes,
+  avances, réserve, renflouement, équilibre avant / après les affectations). Aucun autre chiffre modifié sur les jeux
+  fictifs.
+
 ## 1.2.0
 
 Retours d'usage de la 1.1.4.

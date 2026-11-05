@@ -53,11 +53,14 @@ test('trésorerie sur 12 mois : point bas, échéances trimestrielles ; virement
   const P = json(KC.plan(ctx(S)));
   assert.equal(P.pon, 0);
   assert.deepEqual(P.changes.map(x => [x.qui, x.usage, x.have, x.want]), [['moi', 'copro', 0, 7500]]);
-  // un découvert prévu → virement ponctuel réparti au prorata des charges non mensuelles
+  // un découvert prévu → virement ponctuel ; 1.3.0 : réparti selon les parts des postes en cause (prélèvements prévus
+  // jusqu'au point bas, chacun à la part de son poste) et non plus au prorata des seules charges non mensuelles
   S.modele.comptes[0].solde.centimes = 10000;
   const P2 = json(KC.plan(ctx(S)));
   assert.equal(P2.C.min, -35000);
-  assert.deepEqual([P2.pon, P2.ponMoi, P2.ponAutre], [35000, 18000, 17000]);
+  assert.deepEqual([P2.pon, P2.ponMoi, P2.ponAutre], [35000, 21000, 14000]);
+  assert.ok(Math.abs(P2.wG - P2.cause.wMoi) < 1e-9);
+  assert.ok(P2.cause.postes.length > 0);
 });
 
 test('appels de fonds : chaque virement règle l\'appel le plus ancien ; reste à payer', () => {
