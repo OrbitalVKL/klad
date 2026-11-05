@@ -428,7 +428,9 @@
   function tendance(B, scope, t, perSel) {
     const opts = [['auto', 'Comme en haut'], ['perso', 'Mes comptes'], ['commun', 'Compte commun'], ['foyer', 'Tous comptes confondus']].concat(B.comptes.filter(c => c.role !== 'epargne').map(c => [c.id, c.libelle]));
     const cmp = opts.some(o => o[0] === t.comptes) ? t.comptes : 'auto';
-    const T = KB().tendanceMois(B, { comptes: cmp, scope, from: perSel.from, to: perSel.to, mode: t.mode });
+    const T = KB().tendanceMois(B, { comptes: cmp, scope, from: perSel.from, to: perSel.to, du: perSel.du, au: perSel.au, mode: t.mode });
+    // 1.2.0 : période de moins de 62 jours → un point par jour
+    const jour = T.pas === 'jour', lb = k => jour ? jjmm(k) : mLabel(k), unite = jour ? 'jour' : 'mois';
     const mode = t.mode && (t.mode.startsWith('cat:') ? T.categories.indexOf(t.mode.slice(4)) >= 0 : ['rd', 'bal', 'cum', 'solde'].indexOf(t.mode) >= 0) ? t.mode : 'rd';
     const lab = cmp === 'auto' ? (scope === 'commun' ? 'Compte commun' : 'Mes comptes') : (opts.find(o => o[0] === cmp) || [0, ''])[1];
     const rm = T.mois, N = rm.length;
@@ -438,30 +440,30 @@
     const sv = v => v < 0 ? 'déficit ' + e0(-v) : '+' + e0(v);
     const tips = [];
     if (mode === 'rd') {
-      titre = 'Revenus, dépenses et balance par mois · ' + lab;
+      titre = 'Revenus, dépenses et balance par ' + unite + ' · ' + lab;
       leg = '<span><i style="background:var(--rev)"></i>Revenus</span><span><i style="background:var(--dep)"></i>Dépenses</span><span><i class="line" style="background:var(--sold)"></i>Balance</span>';
       const fr = axe(Wd, H, Math.min(0, ...T.bal), Math.max(100, ...T.rev, ...T.dep, ...T.bal), pad); const y = fr.y; svg = fr.s;
       const barW = Math.max(2, Math.min(18, bw * 0.32));
       svg += '<line x1="' + pad.l + '" x2="' + (Wd - pad.r) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" stroke="var(--muted)" stroke-width="1"/>';
       const bar = (cx, v, dx, col) => { if (v <= 0) return ''; const top = y(v), h = y(0) - top, r = Math.min(4, barW / 2, h); return '<path d="M' + (cx + dx).toFixed(1) + ',' + y(0).toFixed(1) + ' v' + (-(h - r)).toFixed(1) + ' q0,' + (-r).toFixed(1) + ' ' + r.toFixed(1) + ',' + (-r).toFixed(1) + ' h' + (barW - 2 * r).toFixed(1) + ' q' + r.toFixed(1) + ',0 ' + r.toFixed(1) + ',' + r.toFixed(1) + ' v' + (h - r).toFixed(1) + ' z" fill="' + col + '"/>'; };
-      rm.forEach((m, i) => { const cx = x0(i) + bw / 2; svg += bar(cx, T.rev[i], -barW - 1, 'var(--rev)') + bar(cx, T.dep[i], 1, 'var(--dep)'); if (i % every === 0) svg += '<text x="' + cx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + esc(mLabel(m)) + '</text>'; });
+      rm.forEach((m, i) => { const cx = x0(i) + bw / 2; svg += bar(cx, T.rev[i], -barW - 1, 'var(--rev)') + bar(cx, T.dep[i], 1, 'var(--dep)'); if (i % every === 0) svg += '<text x="' + cx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + esc(lb(m)) + '</text>'; });
       svg += '<polyline fill="none" stroke="var(--sold)" stroke-width="2" stroke-linejoin="round" points="' + T.bal.map((v, i) => (x0(i) + bw / 2).toFixed(1) + ',' + y(v).toFixed(1)).join(' ') + '"/>';
       T.bal.forEach((v, i) => { svg += '<circle cx="' + (x0(i) + bw / 2).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="4" fill="' + (v >= 0 ? 'var(--good)' : 'var(--bad)') + '" stroke="var(--surface)" stroke-width="2"/>'; });
-      rm.forEach((m, i) => tips.push([mLabel(m), [['var(--rev)', 'Revenus', e0(T.rev[i])], ['var(--dep)', 'Dépenses', e0(T.dep[i])], ['var(--sold)', 'Balance', sv(T.bal[i])]]]));
+      rm.forEach((m, i) => tips.push([lb(m), [['var(--rev)', 'Revenus', e0(T.rev[i])], ['var(--dep)', 'Dépenses', e0(T.dep[i])], ['var(--sold)', 'Balance', sv(T.bal[i])]]]));
       const bl = rm.map((m, i) => [m, T.bal[i]]), avg = bl.reduce((s0, x) => s0 + x[1], 0) / Math.max(1, bl.length), neg = bl.filter(x => x[1] < 0);
       const best = bl.slice().sort((a, b) => b[1] - a[1])[0], worst = bl.slice().sort((a, b) => a[1] - b[1])[0];
-      note = !bl.length ? '' : bl.length === 1 ? U().mLong(bl[0][0], B.auj) + ' : balance ' + sv(avg) + '.' : 'Balance moyenne ' + sv(avg) + ' par mois' +
-        (neg.length ? ' ; ' + pluriel(neg.length, 'mois déficitaire', 'mois déficitaires') + ' (le pire : ' + mLabel(worst[0]) + ', déficit ' + e0(-worst[1]) + ')' : ' ; aucun mois déficitaire') + ' ; meilleur mois : ' + mLabel(best[0]) + ' (' + sv(best[1]) + ').';
-      how = 'Comptes : ' + lab + (T.perimetre === 'foyer' ? ' (virements entre comptes et ma part au commun comptés une seule fois)' : '') + '. Virements entre vos comptes, versements sur livrets, règlements de carte ou de portefeuille déjà détaillés et opérations hors budget sont exclus. Balance = revenus − dépenses du mois.';
+      note = !bl.length ? '' : bl.length === 1 ? (jour ? U().dLong(bl[0][0]) : U().mLong(bl[0][0], B.auj)) + ' : balance ' + sv(avg) + '.' : 'Balance moyenne ' + sv(avg) + ' par ' + unite +
+        (neg.length ? ' ; ' + pluriel(neg.length, unite + ' déficitaire', unite + (jour ? 's' : '') + ' déficitaires') + ' (le pire : ' + lb(worst[0]) + ', déficit ' + e0(-worst[1]) + ')' : ' ; aucun ' + unite + ' déficitaire') + ' ; meilleur ' + unite + ' : ' + lb(best[0]) + ' (' + sv(best[1]) + ').';
+      how = 'Comptes : ' + lab + (T.perimetre === 'foyer' ? ' (virements entre comptes et ma part au commun comptés une seule fois)' : '') + '. Virements entre vos comptes, versements sur livrets, règlements de carte ou de portefeuille déjà détaillés et opérations hors budget sont exclus. Balance = revenus − dépenses du ' + unite + '.';
     } else {
       let bars = T.barres || null, line = T.ligne || null, ref = T.ref || null, nom = '', col = 'var(--dep)';
-      if (mode === 'bal') { nom = 'Balance'; titre = 'Balance mensuelle (revenus − dépenses)'; note = 'Vert : mois où les revenus couvrent les dépenses ; rouge : mois déficitaire.'; }
-      else if (mode === 'cum') { nom = 'Balance cumulée'; titre = 'Balance cumulée sur la période'; note = 'Somme des balances mensuelles depuis le premier mois affiché.'; }
+      if (mode === 'bal') { nom = 'Balance'; titre = (jour ? 'Balance par jour' : 'Balance mensuelle') + ' (revenus − dépenses)'; note = 'Vert : ' + unite + ' où les revenus couvrent les dépenses ; rouge : ' + unite + ' déficitaire.'; }
+      else if (mode === 'cum') { nom = 'Balance cumulée'; titre = 'Balance cumulée sur la période'; note = jour ? 'Somme des balances de chaque jour depuis le premier jour affiché.' : 'Somme des balances mensuelles depuis le premier mois affiché.'; }
       else if (mode === 'solde') {
-        nom = 'Solde'; titre = 'Solde fin de mois · ' + (T.soldeComptes || []).join(', ');
+        nom = 'Solde'; titre = (jour ? 'Solde en fin de journée · ' : 'Solde fin de mois · ') + (T.soldeComptes || []).join(', ');
         if (!line) return panneauTendance(perSel, opts, cmp, T, mode, titre, '', '<p class="muted" style="padding:20px">Solde actuel non disponible : la courbe apparaîtra avec la prochaine synchronisation.</p>', '', how);
-        note = 'Reconstitué à partir du solde actuel (' + F().solde(T.solde) + ') en retirant les opérations postérieures à chaque fin de mois.';
-      } else { nom = T.cat; col = 'var(--c1)'; titre = 'Dépenses par mois · ' + T.cat; note = ref ? 'Pointillés : budget mensuel (' + e0(ref) + ').' : 'Pas de budget mensuel pour cette catégorie.'; }
+        note = 'Reconstitué à partir du solde actuel (' + F().solde(T.solde) + ') en retirant les opérations postérieures à chaque fin de ' + (jour ? 'journée' : 'mois') + '.';
+      } else { nom = T.cat; col = 'var(--c1)'; titre = 'Dépenses par ' + unite + ' · ' + T.cat; note = ref ? 'Pointillés : budget mensuel (' + e0(ref) + ').' : jour ? 'Dépenses de chaque jour (le budget mensuel n\'est pas reporté par jour).' : 'Pas de budget mensuel pour cette catégorie.'; }
       const vals = [...(bars || []), ...(line || []).filter(v => v !== null), ...(ref ? [ref] : [])];
       const fr = axe(Wd, H, Math.min(0, ...vals), Math.max(100, ...vals), pad); const y = fr.y; svg = fr.s;
       const barW = Math.max(3, Math.min(26, bw * 0.55));
@@ -472,8 +474,8 @@
         svg += '<polyline fill="none" stroke="var(--sold)" stroke-width="2" stroke-linejoin="round" points="' + line.map((v, i) => v === null ? '' : (x0(i) + bw / 2).toFixed(1) + ',' + y(v).toFixed(1)).filter(Boolean).join(' ') + '"/>';
         line.forEach((v, i) => { if (v !== null) svg += '<circle cx="' + (x0(i) + bw / 2).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="3.5" fill="' + (v >= 0 ? 'var(--good)' : 'var(--bad)') + '" stroke="var(--surface)" stroke-width="2"/>'; });
       }
-      rm.forEach((m, i) => { if (i % every === 0) svg += '<text x="' + (x0(i) + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + esc(mLabel(m)) + '</text>'; });
-      rm.forEach((m, i) => tips.push([mLabel(m), bars ? [[mode === 'bal' ? (bars[i] < 0 ? 'var(--bad)' : 'var(--good)') : col, nom, mode === 'bal' ? sv(bars[i]) : e0(bars[i])]].concat(ref ? [['var(--ink-2)', 'Budget', e0(ref)]] : [])
+      rm.forEach((m, i) => { if (i % every === 0) svg += '<text x="' + (x0(i) + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--muted)" font-family="JetBrains Mono, monospace" font-size="12">' + esc(lb(m)) + '</text>'; });
+      rm.forEach((m, i) => tips.push([lb(m), bars ? [[mode === 'bal' ? (bars[i] < 0 ? 'var(--bad)' : 'var(--good)') : col, nom, mode === 'bal' ? sv(bars[i]) : e0(bars[i])]].concat(ref ? [['var(--ink-2)', 'Budget', e0(ref)]] : [])
         : [['var(--sold)', nom, line[i] === null ? '—' : mode === 'solde' ? F().solde(line[i]) : sv(line[i])]]]));
       if (titre.indexOf(lab) < 0 && mode !== 'solde') titre += ' · ' + lab;
       leg = bars ? (mode === 'bal' ? '<span><i style="background:var(--good)"></i>Positive</span><span><i style="background:var(--bad)"></i>Négative</span>' : '<span><i style="background:' + col + '"></i>' + esc(nom) + '</span>' + (ref ? '<span><i class="line" style="background:var(--ink-2)"></i>Budget</span><span><i style="background:var(--bad)"></i>Au-delà</span>' : ''))
@@ -485,15 +487,20 @@
     return panneauTendance(perSel, opts, cmp, T, mode, titre, leg, box, note, how);
   }
   function panneauTendance(perSel, opts, cmp, T, mode, titre, leg, box, note, how) {
-    const per = perSel.from === perSel.to ? mLabel(perSel.from) : mLabel(perSel.from) + ' → ' + mLabel(perSel.to);
+    // 1.2.0 : période personnalisée au jour près (perSel.n === 'perso')
+    const perso = perSel.n === 'perso' && perSel.du && perSel.au;
+    const per = perso ? (perSel.du === perSel.au ? jjmmaa(perSel.du) : jjmmaa(perSel.du) + ' → ' + jjmmaa(perSel.au))
+      : perSel.from === perSel.to ? mLabel(perSel.from) : mLabel(perSel.from) + ' → ' + mLabel(perSel.to);
     const n = perSel.n;
     return '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Tendance</h2><span class="muted an-per">' + esc(per) + '</span></div>' +
-      '<div class="an-bar"><span class="an-t">Période d\'analyse</span><div class="an-ctl">' +
-      '<button type="button" class="per-step" data-step="-1" aria-label="Décaler la période d\'un mois en arrière">◀</button>' +
+      // 1.2.0 : « custom » quand les champs de la période sont ouverts (sans elle, ils restaient cachés sur téléphone)
+      '<div class="an-bar' + (perSel.choix ? ' custom' : '') + '"><span class="an-t">Période d\'analyse</span><div class="an-ctl">' +
+      '<button type="button" class="per-step" data-step="-1" aria-label="' + (perso ? 'Décaler la période d\'autant en arrière' : 'Décaler la période d\'un mois en arrière') + '">◀</button>' +
       '<button type="button" class="an-lab" id="an-lab" data-anlab="1" aria-expanded="' + !!perSel.choix + '">' + esc(per) + ' ▾</button>' +
-      (perSel.choix ? '<label class="ctl" for="from">Du <select id="from">' + perSel.mois.map(m => '<option value="' + m + '"' + (m === perSel.from ? ' selected' : '') + '>' + esc(mLabel(m)) + '</option>').join('') + '</select></label>' +
-        '<label class="ctl" for="to">au <select id="to">' + perSel.mois.map(m => '<option value="' + m + '"' + (m === perSel.to ? ' selected' : '') + '>' + esc(mLabel(m)) + '</option>').join('') + '</select></label>' : '') +
-      '<button type="button" class="per-step" data-step="1" aria-label="Décaler la période d\'un mois en avant">▶</button>' +
+      '<button type="button" class="per-step" data-step="1" aria-label="' + (perso ? 'Décaler la période d\'autant en avant' : 'Décaler la période d\'un mois en avant') + '">▶</button>' +
+      (perSel.choix ? '<label class="ctl" for="tend-du">Du <input type="date" id="tend-du" value="' + esc(perSel.du || '') + '"' + (perSel.min ? ' min="' + esc(perSel.min) + '"' : '') + (perSel.max ? ' max="' + esc(perSel.max) + '"' : '') + '></label>' +
+        '<label class="ctl" for="tend-au">au <input type="date" id="tend-au" value="' + esc(perSel.au || '') + '"' + (perSel.min ? ' min="' + esc(perSel.min) + '"' : '') + (perSel.max ? ' max="' + esc(perSel.max) + '"' : '') + '></label>' +
+        '<p class="note an-pas">Moins de 62 jours : un point par jour ; sinon, un point par mois.</p>' : '') +
       '<div class="seg" role="group" aria-label="Période rapide">' + [1, 3, 6, 12].map(k => '<button type="button" data-preset="' + k + '" aria-pressed="' + (n === k) + '">' + k + '<span class="pu"> mois</span><span class="pm">m</span></button>').join('') +
       '<button type="button" data-preset="tout" aria-pressed="' + (n === 'tout') + '">Tout</button></div></div></div>' +
       '<div class="tend-ctl"><label class="ctl" for="tend-acc">Comptes <select id="tend-acc" aria-label="Comptes pris en compte dans la Tendance">' + opts.map(o => '<option value="' + esc(o[0]) + '"' + (o[0] === cmp ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select></label>' +
@@ -583,8 +590,8 @@
     return h;
   }
   // base (0.10.7) : colonne choisie (« salaire » ou « comptes »), mise en avant ; les deux colonnes restent affichées.
-  // restants (1.1) : jours restants du cycle, jour même compris → ligne « Par jour ».
-  function detailRav(rav, base, restants) {
+  // 1.2.0 : plus de ligne « Par jour » (le troisième paramètre, jours restants, n'est plus lu).
+  function detailRav(rav, base) {
     if (!rav) return '<p class="muted">Le reste à vivre se calcule sur le cycle en cours du périmètre perso.</p>';
     const b = rav.budget, c = rav.comptes, x = KB().ravChoisi(rav, base);
     const on = k => x.choix === k ? ' class="rav-on"' : '';
@@ -595,8 +602,6 @@
       L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') + L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
       L('= Marge', '', b.marge, c && c.marge, 'mg') + L('− Variable', 'dépensé / reste du budget', b.variable, c && c.variable, 'b') +
       L('= Reste à vivre', '', b.reste, c && c.reste, 'rv') +
-      (restants ? '<tr class="pj"><th>Par jour<span class="subs"> ' + esc(restants + ' jour' + (restants > 1 ? 's' : '') + ' restant' + (restants > 1 ? 's' : '')) + '</span></th>' +
-        [b, c].map(x => !x ? '<td class="muted">—</td>' : '<td class="num">' + (x.reste > 0 ? esc(e0(Math.floor(x.reste / restants))) : '<span class="bad">dépassé</span>') + '</td>').join('') + '</tr>' : '') +
       '</tbody></table></div>' +
       '<p class="muted small">Jusqu\'au ' + esc(jjmmaa(rav.fin)) + '. Colonne « dernier salaire » : le salaire du cycle moins ce qui est déjà dépensé. ' +
       'Colonne « comptes courants » : les soldes des comptes courants moins les charges fixes pas encore prélevées et le reste du budget variable.</p>';

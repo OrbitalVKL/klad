@@ -30,7 +30,7 @@ test('accueil : blocs dans l\'ordre, chiffres des fonctions de calcul, aucun mon
   const h = VA.ecran({ S, B, now: NOW, ext: { attention: K.attention(cx, NOW), sauvegarde: { jours: null } }, res, dettes, livrets: {}, fdm,
     plan: KC.plan(B), R: KC.reglages(B), ech });
   const t = texteVisible(h).replace(/\s+/g, ' ');
-  assert.match(t, /Reste à vivre [\d\s ]+,\d\d € jusqu'au \d\d\/\d\d · [\d\s ]+ € par jour[\s\S]*À vérifier[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/);
+  assert.match(t, /Reste à vivre [\d\s ]+,\d\d € jusqu'au \d\d\/\d\d · jour \d+\/\d+[\s\S]*À vérifier[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/);
   assert.ok(t.includes(F.montant(Math.abs(res.rav.budget.reste)).replace(/\s/g, ' ')) || t.replace(/\s/g, '').includes(F.montant(Math.abs(res.rav.budget.reste)).replace(/\s/g, '')));
   assert.ok(t.replace(/\s/g, '').includes(F.montant(Math.abs(fdm.end)).replace(/\s/g, '')), 'fin de mois du commun');
   assert.ok(ech.slice(0, 1).every(e => t.includes(e.label)), 'première échéance');
@@ -38,6 +38,8 @@ test('accueil : blocs dans l\'ordre, chiffres des fonctions de calcul, aucun mon
   // 1.1 : « à surveiller » seulement à partir de 90 % du budget utilisé (plus jamais sur un poste à 0 %)
   assert.doesNotMatch(t, / 0 € \/ [\d\s ]+ € reste [\d\s ]+ € · à surveiller/);
   assert.match(h, /data-mesure="rav"/);
+  // 1.2.0 : plus de montant « par jour »
+  assert.doesNotMatch(t, /par jour/);
   assert.match(h, /data-mesure="soldes"/);
   assert.match(h, /aria-label="COURANT, [^"]+"/);
   assert.match(h, /Aucune sauvegarde vérifiée/);

@@ -100,24 +100,22 @@
     return out.map((a, i) => [a, i]).sort((x, y) => NIVEAUX[x[0].level] - NIVEAUX[y[0].level] || x[1] - y[1]).map(x => x[0]);
   }
 
-  // Totaux : épargne ; tous comptes (courants, commun, épargne, moins la dette des cartes à débit différé visibles).
-  // Un total dont un compte n'a pas de solde (ou une carte pas de dette) connu est omis. Les comptes hors euros ne sont
-  // pas comptés.
-  function totaux(S, comptes, now) {
-    let ep = 0, nEp = 0, epOk = true, tout = 0, nTout = 0, toutOk = true;
+  // Totaux : épargne ; total (1.2.0 : « Total perso » de l'Accueil, KladModele.totalPerso : courants, paiement en ligne
+  // et épargne, moins la dette des cartes à débit différé visibles, SANS le compte commun ; avant la 1.2.0, le commun y
+  // était et le paiement en ligne non). Un total dont un compte n'a pas de solde (ou une carte pas de dette) connu est
+  // omis. Les comptes hors euros ne sont pas comptés. livrets : estimation du livret (KladFisc.livretCarte), comme l'Accueil.
+  function totaux(S, comptes, now, livrets) {
+    let ep = 0, nEp = 0, epOk = true;
+    const dettes = {};
     for (const c of comptes) {
-      if (c.role === 'carte_differee' && enEuros(c)) {
-        const d = K() ? K().dette(S, c, now) : null;
-        if (d) tout -= d.centimes; else toutOk = false;
-        continue;
-      }
-      if (!enEuros(c) || ['courant', 'commun', 'epargne'].indexOf(c.role) < 0) continue;
+      if (c.role === 'carte_differee' && enEuros(c)) dettes[c.id] = K() ? K().dette(S, c, now) : null;
+      if (!enEuros(c) || c.role !== 'epargne') continue;
       const s = M().soldeAffiche(S, c);
-      if (s) { tout += s.centimes; nTout++; } else toutOk = false;
-      if (c.role === 'epargne') { if (s) { ep += s.centimes; nEp++; } else epOk = false; }
+      if (s) { ep += s.centimes; nEp++; } else epOk = false;
     }
+    const tp = M().totalPerso(S, dettes, livrets);
     const t = {};
-    if (nTout && toutOk) t.all = euros(tout);
+    if (tp.n && !tp.manque.length) t.all = euros(tp.centimes);
     if (nEp && epOk) t.savings = euros(ep);
     return Object.keys(t).length ? t : null;
   }
@@ -197,7 +195,7 @@
     let commun = null;
     let risque = null;
     if (g.KladCommun) { try { commun = g.KladCommun.resume(B); risque = commun && g.KladCommun.risqueDecouvert(B); } catch (e) { commun = null; } }
-    return { month, upcoming, over, commun, risque };
+    return { month, upcoming, over, commun, risque, B };
   }
 
   // ext (facultatif) : { attention: { unseen, unclassified, accountsToCheck, toMatch }, sauvegarde: { jours | null }, maj: version,
@@ -218,7 +216,9 @@
     const st = dernierReleve(S);
     if (st) r.statement_at = st;
     r.accounts = accounts;
-    const t = totaux(S, comptes, now);
+    let livrets = null;
+    try { livrets = bu && bu.B && g.KladFisc && g.KladFisc.livretCarte ? g.KladFisc.livretCarte(bu.B) : null; } catch (e) { livrets = null; }
+    const t = totaux(S, comptes, now, livrets);
     if (t) r.total = t;
     const mac = apresCarte(S, comptes, accounts, now);
     if (mac != null) r.main_after_card = mac;

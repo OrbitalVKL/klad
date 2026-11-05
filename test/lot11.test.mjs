@@ -37,13 +37,13 @@ test('lot 1.1 : clavier du Budget, reste à vivre, Patrimoine et crypto, carbura
     await page.setViewportSize({ width: 412, height: 915 });
     await B.pause(400);
 
-    // 2. Accueil : encart du reste à vivre réduit à l'essentiel ; « par jour » aussi dans le détail
+    // 2. Accueil : encart du reste à vivre réduit à l'essentiel (1.2.0 : « jour N/T » à la place du montant par jour)
     await B.onglet('accueil');
     const hero = await page.locator('#view-accueil [data-aller="rav"]').innerText();
-    assert.match(hero.replace(/\s+/g, ' '), /^RESTE À VIVRE [\d\s  ]+,\d\d € (dépassé )?jusqu'au \d\d\/\d\d · ([\d\s  ]+ € par jour|budget du cycle dépassé)$/i);
+    assert.match(hero.replace(/\s+/g, ' '), /^RESTE À VIVRE [\d\s  ]+,\d\d € (dépassé )?jusqu'au \d\d\/\d\d · jour \d+\/\d+$/i);
     assert.doesNotMatch(hero, /cycle écoulé|budget utilisé|sur le dernier salaire/);
     await page.locator('#view-accueil [data-aller="rav"]').click();
-    assert.match(await page.locator('#ravCorps').innerText(), /Par jour[\s\S]*restants?/);
+    assert.doesNotMatch(await page.locator('#ravCorps').innerText(), /Par jour/);
     await B.fermer();
 
     // 3. Onglet Patrimoine : quatre parties ; plus d'Impôts ni d'Épargne dans Plus ; crypto saisie à la main

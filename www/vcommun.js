@@ -234,9 +234,12 @@
       line('+ Versements sur le compte commun', R.versMoi, R.versAutre, 'mis à jour à chaque synchronisation') +
       line('− Part des charges qui ne comptent pas', R.nonElig * R.rNE, R.nonElig * (1 - R.rNE), 'énergie, eau, internet, assurance habitation, frais, impôts et autres dépenses communes, réparties ' + Math.round(100 * R.rNE) + ' / ' + Math.round(100 * (1 - R.rNE)) + ' : elles ne créent pas d\'écart') +
       line('+ Équipements et travaux payés en direct', R.equipMoi, R.equipAutre, 'dépenses cochées plus bas') +
+      // 1.3.0 : avances au commun (part de l'autre personne comptée en faveur de celle qui avance)
+      (R.avMoi || R.avAutre ? line('+ Avances au commun', R.avMoi, R.avAutre, 'renflouements faits seul : la part de l\'autre personne est comptée en faveur de celle qui avance (' + pl((R.avances || []).length, 'versement') + ')') : '') +
       line('= Investi dans l\'appartement', R.invMoi, R.invAutre, '', 'total') + '<tr class="gsp"><td colspan="4"></td></tr>' +
       '<tr class="total eq-rat"><td>Versé chaque mois sur les postes « Équilibre »<div class="subs">l\'écart mensuel réduit l\'écart d\'investissement</div></td><td class="r num">' + e0(R.mensMoi) + '</td><td class="r num">' + e0(R.mensAutre) + '</td><td class="r num hide-s">' + e0(Math.abs(R.mensMoi - R.mensAutre)) + '</td></tr>' +
-      '</tbody></table></div>' + U().comment('Seuls les postes cochés « Équilibre » du budget du compte commun créent le rattrapage. Montants et parts se règlent dans Commun › Budget mensuel › Budget. Les apports initiaux viennent du complément de l\'ancienne version.') + '</section>';
+      '</tbody></table></div>' + ((R.hors || []).length ? '<p class="note">Hors équilibre : ' + esc(R.hors.map(x => x.mention + ' (' + e2(Math.abs(x.montant)) + ' le ' + jjmm(x.date) + ')').join(' ; ')) + '.</p>' : '') +
+      U().comment('Seuls les postes cochés « Équilibre » du budget du compte commun créent le rattrapage. Montants et parts se règlent dans Commun › Budget mensuel › Budget. Les apports initiaux viennent du complément de l\'ancienne version.') + '</section>';
     // graphique cumulé
     h += '<section class="panel" id="eq-chart-panel">' + U().tete('Investissement cumulé de chacun', '<div class="legend" aria-hidden="true"><span><i style="background:var(--rev)"></i>' + esc(N.moi) + '</span><span><i style="background:var(--dep)"></i>' + esc(N.autre) + '</span><span><i class="line" style="background:var(--muted)"></i>Projection</span></div>') +
       '<div class="chartbox" id="eqchart">' + graphique(B, N) + '</div></section>';
@@ -264,12 +267,12 @@
     // tous les mouvements
     const fk = o.sorte || '';
     const ks = Object.keys(R.libelles).filter(k => Math.abs(R.S[k] || 0) > 50).sort((x, y) => Math.abs(R.S[y]) - Math.abs(R.S[x]));
-    const ops = R.OPS.filter(x => !fk || x[3] === fk).slice().reverse();
+    const ops = R.OPS.map((x, i) => x.concat([i])).filter(x => !fk || x[3] === fk).slice().reverse();
     h += '<section class="panel" id="eq-ops-panel">' + U().tete('Tous les mouvements du compte commun', '<select id="eq-kind" aria-label="Filtrer par nature"><option value="">Tous</option>' + Object.keys(R.libelles).map(k => '<option value="' + k + '"' + (k === fk ? ' selected' : '') + '>' + esc(R.libelles[k]) + '</option>').join('') + '</select>') +
       '<div id="eq-ops-nat" class="eq-nat">' + ks.map(k => '<button type="button" class="eqn' + (fk === k ? ' on' : '') + '" data-eqk="' + k + '"><span>' + esc(R.libelles[k]) + '</span><b class="num' + (R.S[k] > 0 ? ' pos-t' : '') + '">' + (R.S[k] > 0 ? '+' : '') + e0(Math.abs(R.S[k])) + '</b></button>').join('') + '</div>' +
       '<p class="note" id="eq-ops-sum" style="margin-top:0">' + pl(ops.length, 'mouvement') + ', ' + (() => { const t = ops.reduce((x, y) => x + y[2], 0); return t < 0 ? 'sorties nettes ' + e2(-t) : 'entrées nettes ' + e2(t); })() + '</p>' +
       '<div class="scroll tablewrap"><table class="tx"><thead><tr><th>Date</th><th>Nature</th><th>Libellé</th><th style="text-align:right">Montant</th></tr></thead><tbody id="eq-ops">' +
-      ops.slice(0, 600).map(([d, l, a, k]) => '<tr><td class="num">' + dfr(d) + '</td><td>' + esc(R.libelles[k] || k) + '</td><td class="lab">' + esc(l) + '</td><td class="amt' + (a > 0 ? ' pos' : '') + '">' + (a > 0 ? '+' : '') + e2(Math.abs(a)) + '</td></tr>').join('') +
+      ops.slice(0, 600).map(([d, l, a, k, i]) => '<tr><td class="num">' + dfr(d) + '</td><td>' + esc(R.libelles[k] || k) + (R.mentions && R.mentions.get(i) ? '<div class="subs">' + esc(R.mentions.get(i)) + '</div>' : '') + '</td><td class="lab">' + esc(l) + '</td><td class="amt' + (a > 0 ? ' pos' : '') + '">' + (a > 0 ? '+' : '') + e2(Math.abs(a)) + '</td></tr>').join('') +
       (ops.length > 600 ? '<tr><td colspan="4" class="muted">et ' + (ops.length - 600) + ' mouvements plus anciens</td></tr>' : '') + '</tbody></table></div>' +
       U().comment('Avant la reprise, les mouvements viennent de l\'historique de l\'ancienne version ; depuis, ils arrivent par la synchronisation bancaire et sont classés automatiquement par sorte.') + '</section>';
     return h;
@@ -312,8 +315,86 @@
       '<script type="application/json" class="tips">' + JSON.stringify(tips).replace(/</g, '\\u003c') + '</script>';
   }
 
+  // ============================================================ 1.3.0 : commun remis à plat
+  const LIB_ST = { prevu: 'prévu', ecart: 'écart', imprevu: 'imprévu' }, CLS_ST = { prevu: 'st-ok', ecart: 'st-ecart', imprevu: 'st-imp' };
+  const pastille = st => '<span class="tx-tag ' + CLS_ST[st] + '"><span class="st-dot" aria-hidden="true"></span>' + LIB_ST[st] + '</span>';
+  const mvt = (S, cid, id) => cid && id ? ' data-cmop="' + esc(cid + '|' + id) + '"' : '';
+  // Commun › Ce mois (#cm-com) : décomposition du solde, renflouement proposé, fiche du mois (ui.ficheM, ◀ ▶),
+  // virements ponctuels à affecter, enveloppes, avances.
+  function mois(B, ui) {
+    const D = KC().decomposition(B);
+    if (!D) return '';
+    const R = KC().reglages(B), u = ui || {};
+    let h = '<div class="panel-h"><h2>Le compte commun ce mois-ci</h2></div>';
+    // décomposition du solde
+    const part = (lab, v, sub, cls) => '<div class="cd-p' + (cls ? ' ' + cls : '') + '"><span class="sb-l">' + esc(lab) + '</span><b class="num">' + s2(v) + '</b>' + (sub ? '<span class="subs">' + esc(sub) + '</span>' : '') + '</div>';
+    h += '<div class="cm-decomp" aria-label="Décomposition du solde du compte commun"><div class="cd-tot"><span class="sb-l">Solde</span><b class="num">' + s2(D.solde) + '</b></div><div class="cd-parts">' +
+      part('Disponible', D.disponible, D.disponible < -0.5 ? 'pris sur les enveloppes et la réserve' : 'pour les dépenses du mois', D.disponible < -0.5 ? 'neg' : '') +
+      part('Réserve fixe', D.reserve, D.reserve ? 'plancher de la trésorerie' : 'à régler dans Réglages › Budget') +
+      part('Provisions en cours', D.provisions, D.provisionsDet.length ? D.provisionsDet.map(x => x.label + ' ' + e0(x.montant)).join(', ') : 'charges non mensuelles') +
+      part('Enveloppes', D.enveloppes, D.enveloppesDet.length ? D.enveloppesDet.map(x => x.nom + ' ' + e0(x.reste)).join(', ') : 'aucune') + '</div></div>';
+    // renflouement proposé
+    const Rf = KC().renflouement(B);
+    if (Rf) {
+      h += '<div class="cm-renfl"><p>' + chip(Rf.fait ? 'info' : 'warn', Rf.fait ? 'renflouement fait le ' + jjmm(Rf.fait) : 'renflouement proposé') + ' <b class="num">' + e0(Rf.montant) + '</b> <span class="subs">' +
+        'pour ne pas descendre sous ' + (Rf.seuil ? 'la réserve de ' + e0(Rf.seuil) : 'zéro') + ' (point bas prévu ' + s2(Rf.min) + ' le ' + dfr(Rf.minAt) + ')</span></p>' +
+        '<p class="cm-rparts"><span>' + esc(R.moi) + ' <b class="num">' + e0(Rf.moi) + '</b></span><span>' + esc(R.autre) + ' <b class="num">' + e0(Rf.autre) + '</b></span>' +
+        '<span class="subs">selon les parts des postes en cause' + (Rf.postes.length ? ' (' + esc(Rf.postes.map(p => p.label + ' ' + Math.round(p.pg) + '/' + Math.round(100 - p.pg)).join(', ')) + ')' : '') + '</span></p>' +
+        (Rf.avances.moi || Rf.avances.autre ? '<p class="subs">Avances déjà faites : ' + esc(R.moi) + ' ' + e0(Rf.avances.moi) + ', ' + esc(R.autre) + ' ' + e0(Rf.avances.autre) + ' (déjà comptées dans l\'équilibre, pas reprises ici).</p>' : '') +
+        (Rf.fait ? '' : '<div class="row"><button type="button" class="btn" data-renfl="fait">Fait</button></div>') +
+        '<p class="subs">Si une seule personne le verse, la moitié de l\'autre est comptée en sa faveur dans l\'équilibre (affectez le virement « Avance au commun » à son arrivée).</p></div>';
+    }
+    // fiche du mois
+    const cur = B.auj.slice(0, 7), m = u.ficheM && u.ficheM <= cur ? u.ficheM : cur, F = KC().fiche(B, m);
+    const titre = MOIS_L[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4);
+    const ligneF = x => '<li><button type="button" class="cm-fl"' + mvt(null, x.cid, x.id) + (x.id ? '' : ' disabled') + '>' + pastille(x.statut) + '<span class="cm-fl-t"><b>' + esc(x.label) + '</b><span class="subs">' + esc(jjmm(x.date) + ' · ' + x.texte) + '</span></span>' +
+      '<b class="num' + (x.montant > 0 ? ' pos-t' : '') + '">' + esc((x.montant > 0 ? '+' : '') + e2(Math.abs(x.montant))) + '</b></button></li>';
+    h += '<div class="cm-fiche"><div class="cm-fiche-h"><button type="button" class="per-step" data-fiche="-1" aria-label="Mois précédent">◀</button><h3>Fiche de ' + esc(titre) + '</h3>' +
+      '<button type="button" class="per-step" data-fiche="1" aria-label="Mois suivant"' + (m >= cur ? ' disabled' : '') + '>▶</button></div>' +
+      (F.conforme ? '<p>' + chip('good', 'Mois conforme') + ' <span class="subs">' + pl(F.prevus, 'mouvement prévu', 'mouvements prévus') + ', aucun écart ni imprévu' + (m === cur ? ' pour l\'instant' : '') + '.</span></p>'
+        : '<p class="subs">' + pl(F.prevus, 'mouvement prévu', 'mouvements prévus') + ' · ' + pl(F.ecarts.length, 'écart') + ' · ' + pl(F.imprevus.length, 'imprévu') + (F.aAffecter ? ' · ' + pl(F.aAffecter, 'virement') + ' à affecter' : '') + '</p>' +
+          (F.ecarts.length ? '<h4 class="cm-h4">Écarts</h4><ul class="cm-fl-l">' + F.ecarts.map(ligneF).join('') + '</ul>' : '') +
+          (F.imprevus.length ? '<h4 class="cm-h4">Imprévus</h4><ul class="cm-fl-l">' + F.imprevus.map(ligneF).join('') + '</ul>' : '')) + '</div>';
+    // virements ponctuels à affecter
+    const P = KC().ponctuels(B), aff = P.filter(x => !x.aff).sort((a, b) => a.r.date < b.r.date ? 1 : -1);
+    if (aff.length) {
+      h += '<div class="cm-aff-l"><h3 class="obs-h3">Virements ponctuels à affecter <span class="chip warn">' + aff.length + '</span></h3><ul class="cm-fl-l">' + aff.slice(0, 12).map(x =>
+        '<li class="cm-af"><button type="button" class="cm-fl"' + mvt(null, x.r.cid, x.r.id) + '><span class="cm-fl-t"><b>' + esc(x.r.label) + '</b><span class="subs">' + esc(jjmm(x.r.date) + ' · proposé : ' + KC().texteAff(B, x.prop)) + '</span></span>' +
+        '<b class="num pos-t">+' + esc(e2(x.r.m)) + '</b></button><button type="button" class="btn small" data-cmconf="' + esc(x.r.cid + '|' + x.r.id) + '">Confirmer</button></li>').join('') + '</ul>' +
+        (aff.length > 12 ? '<p class="subs">et ' + (aff.length - 12) + ' plus anciens (filtre « Imprévus » des opérations).</p>' : '') +
+        '<p class="subs">« Confirmer » garde la proposition ; un appui sur le virement ouvre son détail pour choisir une autre affectation.</p></div>';
+    }
+    // enveloppes et avances
+    const EN = KC().enveloppes(B).liste, A = KC().avances(B);
+    if (EN.length || A.lignes.length) {
+      h += '<div class="cm-env-l"><h3 class="obs-h3">Enveloppes et avances</h3>' +
+        (EN.length ? '<ul class="cm-fl-l">' + EN.map(e => '<li class="cm-env-i"><span class="cm-fl-t"><b>' + esc(e.nom) + '</b><span class="subs">versé ' + esc(e2(e.montant) + ' le ' + jjmm(e.date) + ' · payé ' + e2(e.utilise) + ' (' + pl(e.paiements.length, 'paiement') + ')') + '</span></span>' +
+          '<span class="r"><span class="sb-l">reste</span> <b class="num">' + esc(e2(e.reste)) + '</b></span></li>').join('') + '</ul>' : '') +
+        (A.lignes.length ? '<div class="cm-av"><span>' + esc(R.moi) + ' : avancé <b class="num">' + e0(A.moi.avance) + '</b>, dont <b class="num">' + e0(A.moi.faveur) + '</b> en sa faveur</span>' +
+          '<span>' + esc(R.autre) + ' : avancé <b class="num">' + e0(A.autre.avance) + '</b>, dont <b class="num">' + e0(A.autre.faveur) + '</b> en sa faveur</span>' +
+          '<span class="subs">Avances au commun : la part de l\'autre personne est comptée en faveur de celle qui avance dans l\'équilibre (mention « avance au commun »).</span></div>' : '') + '</div>';
+    }
+    return h;
+  }
+
+  // Commun › Plan (#cm-planp) : part de chacun poste par poste, comparée aux virements permanents en place.
+  function planPostes(B) {
+    const P = KC().planPostes(B), R = KC().reglages(B);
+    if (!P.lignes.length) return '<div class="panel-h"><h2>Plan du compte commun</h2></div><p class="note">Aucun poste dans le budget du compte commun (Commun › Ce mois › Budget mensuel).</p>';
+    const ec = v => Math.abs(v) < 100 ? chip('good', 'conforme') : v < 0 ? chip('bad', e0(-v) + ' de moins') : chip('info', e0(v) + ' de plus');
+    return '<div class="panel-h"><h2>Plan du compte commun</h2><span class="muted">part de chacun, poste par poste</span></div>' +
+      '<div class="tablewrap"><table class="cats cm-plan-t"><thead><tr><th>Poste</th><th class="r">Par mois</th><th class="r">' + esc(R.moi) + '</th><th class="r">' + esc(R.autre) + '</th></tr></thead><tbody>' +
+      P.lignes.map(x => '<tr><td>' + esc(x.label) + '<div class="subs">' + Math.round(x.pg) + ' / ' + Math.round(100 - x.pg) + (x.per > 1 ? ' · provision d\'une échéance tous les ' + x.per + ' mois' : '') + '</div></td><td class="r num">' + e2(x.mensuel) + '</td><td class="r num">' + e2(x.moi) + '</td><td class="r num">' + e2(x.autre) + '</td></tr>').join('') +
+      '<tr class="total"><td>Total des parts</td><td class="r num">' + e2(P.tot.moi + P.tot.autre) + '</td><td class="r num">' + e2(P.tot.moi) + '</td><td class="r num">' + e2(P.tot.autre) + '</td></tr>' +
+      '<tr><td>Virements permanents en place</td><td></td><td class="r num">' + e2(P.vir.moi) + '</td><td class="r num">' + e2(P.vir.autre) + '</td></tr>' +
+      '<tr><td>Écart</td><td></td><td class="r">' + ec(P.ecart.moi) + '</td><td class="r">' + ec(P.ecart.autre) + '</td></tr></tbody></table></div>' +
+      (P.props.length ? '<h3 class="obs-h3">Contrats qui ont changé</h3><ul class="list">' + P.props.map(x => '<li><div class="grow">' + esc(x.label || x.poste.slice(2)) + '<small>budget ' + e2(x.budget) + ' par mois · contrats ' + e2(x.contrats) + ' par mois</small></div>' +
+        '<span class="subs">virement ' + (x.moi >= 0 ? '+' : '−') + ' ' + esc(e2(Math.abs(x.moi))) + ' pour ' + esc(R.moi) + ', ' + (x.autre >= 0 ? '+' : '−') + ' ' + esc(e2(Math.abs(x.autre))) + ' pour ' + esc(R.autre) + '</span></li>').join('') + '</ul>' : '') +
+      U().comment('Montant par mois du budget du compte commun (provision mensuelle pour les charges non mensuelles) et part de chacun (« ma part » du mode Budget). Les virements en place sont ceux de la liste « Modifier les ordres ».');
+  }
+
   // Ancienne présentation en cartes (gardée pour les tests du Lot 7) : marge, fin de mois, virements, trésorerie.
   function cartes(B, ouverts) { return plan(B, { cartes: ouverts }); }
 
-  g.KladVuesCommun = { plan, cartes, ordres, equilibre, graphique, tresorerie, appels, origine };
+  g.KladVuesCommun = { plan, cartes, ordres, equilibre, graphique, tresorerie, appels, origine, mois, planPostes };
 })(typeof window !== 'undefined' ? window : globalThis);

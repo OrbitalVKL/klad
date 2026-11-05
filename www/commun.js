@@ -173,14 +173,14 @@
       const l = KB().dernierDebitPoste(B, a.key), lm = l ? l.pd.slice(0, 7) : null, day = l ? Math.min(28, +l.pd.slice(8, 10)) : 5;
       if (a.per === 1) {
         const amt = ctrMontant(a.key); const v = amt != null ? amt : a.amt;
-        for (let k = 0; k < 12; k++) { const m = shift(cur, k); if (k === 0 && lm === cur) continue; ev.push({ m, d: k === 0 ? Math.max(day, dNow) : day, v: -v, lab: a.label }); }
+        for (let k = 0; k < 12; k++) { const m = shift(cur, k); if (k === 0 && lm === cur) continue; ev.push({ m, d: k === 0 ? Math.max(day, dNow) : day, v: -v, lab: a.label, key: a.key }); }
       } else {
         const per = a.per, ech = a.ech || a.amt * per;
         const next = KB().moisProchaineEcheance(B, a.key, per, ech);
-        for (let m = next; m < end; m = shift(m, per)) { const late = m < cur; ev.push({ m: late ? cur : m, d: late ? dNow : 5, v: -ech, lab: a.label, per: true }); due.push({ m, lab: a.label, v: ech, late }); }
+        for (let m = next; m < end; m = shift(m, per)) { const late = m < cur; ev.push({ m: late ? cur : m, d: late ? dNow : 5, v: -ech, lab: a.label, per: true, key: a.key }); due.push({ m, lab: a.label, v: ech, late }); }
       }
     }
-    for (const e of TXE) ev.push(Object.assign({}, e, { d: e.m === cur ? Math.max(e.d, dNow) : e.d }));
+    for (const e of TXE) ev.push(Object.assign({}, e, { d: e.m === cur ? Math.max(e.d, dNow) : e.d, key: 'f|Impôts' }));
     for (const v of B.D.virements || []) {
       const amt = +v.montant || 0;
       if (!amt) continue;
@@ -202,7 +202,7 @@
     let last = bal.v;
     for (let m = cur; m < end; m = shift(m, 1)) { const mo = months[m] || { m, in: 0, out: 0, end: last, low: last }; if (mo.low === Infinity) mo.low = mo.end; last = mo.end; ML.push(mo); }
     due.sort((x, y) => x.m < y.m ? -1 : 1);
-    return (B.memo.cash = { start: bal.v, min, minAt, negAt, negV, months: ML, due });
+    return (B.memo.cash = { start: bal.v, min, minAt, negAt, negV, months: ML, due, ev });
   }
 
   // ------------------------------------------------------------ d'où vient le solde
@@ -271,9 +271,14 @@
       bk.moi += m; bk.autre += amt - m;
       if (a.per > 1) { pW += amt; pG += m; }
     }
-    const T = KB().parts(B), wG = pW > 0 ? pG / pW : (T.moi + T.autre > 0 ? T.moi / (T.moi + T.autre) : 0.5);
+    const T = KB().parts(B), wG0 = pW > 0 ? pG / pW : (T.moi + T.autre > 0 ? T.moi / (T.moi + T.autre) : 0.5);
     const C = tresorerie(B);
-    const pon = C && C.min < 0 ? Math.ceil(-C.min / 1000) * 1000 : 0;
+    // 1.3.0 : renflouement (virement ponctuel) dès que la trésorerie prévue passe sous la réserve fixe (0 par défaut :
+    // sous zéro, comme avant), partagé selon les parts des postes en cause (prélèvements prévus jusqu'au point bas)
+    const seuil = B.R.commun.reserveFixe || 0;
+    const pon = C && C.min < seuil - 0.5 ? Math.ceil((seuil - C.min) / 1000) * 1000 : 0;
+    const cause = pon ? partsEnCause(B, C) : null;
+    const wG = cause ? cause.wMoi : wG0;
     const ponMoi = Math.ceil(pon * wG / 1000) * 1000, ponAutre = pon > 0 ? Math.max(0, pon - ponMoi) : 0;
     const V = B.D.virements || [];
     const changes = [];
@@ -298,7 +303,7 @@
       const vu = virementVu(B, v, mC), route = vu ? null : routeDe(B, v, mC);
       return { v, vu, route, retard: !vu && !route && +B.auj.slice(8, 10) > Math.min(28, +v.jour || 1) + 3 };
     });
-    return (B.memo.plan = { need, T, wG, pW, pG, C, pon, ponMoi, ponAutre, changes, W, pas, rec, recM, retourPositif, prochainBas, recus });
+    return (B.memo.plan = { need, T, wG, pW, pG, C, seuil, cause, pon, ponMoi, ponAutre, changes, W, pas, rec, recM, retourPositif, prochainBas, recus });
   }
 
   // ------------------------------------------------------------ fin de mois estimée, marge réelle
@@ -425,13 +430,43 @@
     for (const x of st.items || []) L.push({ id: x.id, date: x.date || '', label: x.label || '', detail: x.src === 'op' ? 'opération' : 'ajout manuel', moi: x.moi || 0, autre: x.autre || 0, on: x.on !== false, op: x.op || null });
     return L;
   }
-  function equilibre(B) {
-    if ('eq' in B.memo) return B.memo.eq;
+  // 1.3.0 : mouvements de l'équilibre reliés à leur opération du commun (même date, même montant), pour les affectations :
+  // → Map(indice dans OPS → { r, aff, env }).
+  function liensEquilibre(B, OPS) {
+    const parCle = new Map();
+    for (const r of opsCommun(B)) { const k = r.date + '|' + Math.round(r.m); (parCle.get(k) || parCle.set(k, []).get(k)).push(r); }
+    const EN = enveloppes(B), out = new Map();
+    OPS.forEach(([d, , a], i) => {
+      const L = parCle.get(d + '|' + Math.round(a));
+      if (!L || !L.length) return;
+      const r = L.shift(), aff = r.m > 0 ? affDe(r.o) : null, cle = r.m < 0 ? EN.parOp.get(r.id) : null;
+      const env = cle ? EN.liste.find(e => e.cle === cle) : null;
+      if (aff || env) out.set(i, { r, aff, env });
+    });
+    return out;
+  }
+  // opts.brut (1.3.0) : sans les affectations (avances, enveloppes Impôts), pour comparer avant / après.
+  function equilibre(B, opts) {
+    const brut = !!(opts && opts.brut), mk = brut ? 'eqBrut' : 'eq';
+    if (mk in B.memo) return B.memo[mk];
     const E = R7(B).equilibre;
     const OPS = mouvements(B);
-    if (!OPS.length || !isObj(E.apport)) return (B.memo.eq = null);
+    if (!OPS.length || !isObj(E.apport)) return (B.memo[mk] = null);
     const Sk = {};
-    for (const [, , a, k] of OPS) Sk[k] = (Sk[k] || 0) + a;
+    // 1.3.0 : enveloppe Impôts (versement et paiements) hors équilibre ; avance au commun : la part de l'autre personne
+    // comptée en faveur de celle qui avance (et non plus tout le versement)
+    const LI = brut ? new Map() : liensEquilibre(B, OPS), AV = avances(B);
+    const hors = [], avs = [], skip = new Set(), mentions = new Map();
+    let avMoi = 0, avAutre = 0;
+    OPS.forEach(([d, l, a, k], i) => {
+      const x = LI.get(i);
+      if (x && ((x.aff && x.aff.k === 'impots') || (x.env && x.env.k === 'impots'))) { hors.push({ date: d, label: l, montant: a, mention: x.aff ? texteAff(B, x.aff) : 'payé par l\'enveloppe ' + x.env.nom }); skip.add(i); mentions.set(i, 'hors équilibre · ' + hors[hors.length - 1].mention); return; }
+      if (x && x.aff && x.aff.k === 'avance') {
+        const y = AV.lignes.find(z => z.r === x.r);
+        if (y) { if (y.qui === 'moi') avMoi += y.faveur; else avAutre += y.faveur; avs.push({ date: d, label: l, montant: a, qui: y.qui, faveur: y.faveur, mention: 'avance au commun' }); skip.add(i); mentions.set(i, 'avance au commun · ' + eur0(y.faveur) + ' comptés'); return; }
+      }
+      Sk[k] = (Sk[k] || 0) + a;
+    });
     const gk = k => Sk[k] || 0, T = KB().parts(B), r = T.rNE;
     const nonElig = -NON_ELIG.reduce((t, k) => t + gk(k), 0) - gk('rf');
     const EQ = equipements(B);
@@ -439,9 +474,9 @@
     for (const x of EQ) if (x.on) { eMoi += x.moi; eAutre += x.autre; }
     const ap = { moi: Math.round((+E.apport.moi || 0) * 100), autre: Math.round((+E.apport.autre || 0) * 100) };
     const R = { apport: ap, versMoi: gk('vg'), versAutre: gk('vs') + gk('rs'), nonElig, rNE: r, equipMoi: eMoi, equipAutre: eAutre,
-      pret: -(gk('pc') + gk('pa') + gk('pi')), travaux: -gk('ve'), debloc: gk('dp'), S: Sk, OPS, EQ };
-    R.invMoi = ap.moi + R.versMoi - nonElig * r + eMoi;
-    R.invAutre = ap.autre + R.versAutre - nonElig * (1 - r) + eAutre;
+      pret: -(gk('pc') + gk('pa') + gk('pi')), travaux: -gk('ve'), debloc: gk('dp'), S: Sk, OPS, EQ, avMoi, avAutre, avances: avs, hors, skip, mentions };
+    R.invMoi = ap.moi + R.versMoi - nonElig * r + eMoi + avMoi;
+    R.invAutre = ap.autre + R.versAutre - nonElig * (1 - r) + eAutre + avAutre;
     R.mensMoi = T.eqMoi; R.mensAutre = T.eqAutre;
     R.ecart = R.invAutre - R.invMoi;                 // > 0 : je dois encore investir plus que l'autre personne
     R.rythme = R.mensMoi - R.mensAutre;
@@ -450,7 +485,7 @@
     R.dateEquilibre = R.mois !== null ? shift(lastM, R.mois) : null;
     R.dernierMois = lastM;
     R.libelles = Object.assign({}, SORTES, isObj(E.libelles) ? E.libelles : {});
-    return (B.memo.eq = R);
+    return (B.memo[mk] = R);
   }
   // Simulation : ajout mensuel x et versement ponctuel y (centimes) → { immediat, jamais, mois, date }.
   function simuler(R, x, y) {
@@ -489,11 +524,13 @@
     if (!R) return null;
     const byM = {}, r = R.rNE;
     const add = (m, a, b) => { const e = byM[m] || (byM[m] = { g: 0, s: 0 }); e.g += a; e.s += b; };
-    for (const [d, , a, k] of R.OPS) {
+    R.OPS.forEach(([d, , a, k], i) => {
       const m = d.slice(0, 7);
+      if (R.skip && R.skip.has(i)) return;            // 1.3.0 : hors équilibre ou avance (comptée ci-dessous)
       if (k === 'vg') add(m, a, 0); else if (k === 'vs' || k === 'rs') add(m, 0, a);
       else if (NON_ELIG.indexOf(k) >= 0 || k === 'rf') add(m, a * r, a * (1 - r));
-    }
+    });
+    for (const x of R.avances || []) add(x.date.slice(0, 7), x.qui === 'moi' ? x.faveur : 0, x.qui === 'moi' ? 0 : x.faveur);
     for (const x of R.EQ) if (x.on && x.date && x.date.slice(0, 7) <= R.dernierMois) add(x.date.slice(0, 7), x.moi, x.autre);
     const ms = Object.keys(byM).sort();
     if (!ms.length) return null;
@@ -534,6 +571,339 @@
     return { date: d, jours, niveau: jours <= 31 ? 'crit' : 'caut' };
   }
 
+  // ============================================================ 1.3.0 : prévu / imprévu, enveloppes, avances, réserve
+  // Chaque mouvement du compte commun est « prévu » (élément du plan : virement permanent, contrat ou poste du budget
+  // commun, appel de fonds, impôt prévu ou payé par son enveloppe), « prévu, écart » (élément du plan, mais montant hors
+  // tolérance, date hors fenêtre, plusieurs échéances en un paiement) ou « imprévu ». Les virements ponctuels reçus
+  // reçoivent une affectation (o.commun.aff, confirmée par le propriétaire) : impots (enveloppe « Impôts <année> »),
+  // reserve, avance (pour : 'renflouement' ou clé d'un poste du commun, alors enveloppe), remb, autre (txt).
+  // Corrections à la main sur l'opération (o.commun) : statut ('prevu' | 'imprevu'), lien (clé d'enveloppe | 'aucun').
+  const AFFECTATIONS = { impots: 'Impôts', reserve: 'Réserve', avance: 'Avance au commun', remb: 'Remboursement', autre: 'Autre' };
+  const STATUTS = { prevu: 'prévu', ecart: 'prévu, écart', imprevu: 'imprévu' };
+  const etatOp = o => (o && isObj(o.commun)) ? o.commun : null;
+  const affDe = o => { const c = etatOp(o); return c && isObj(c.aff) && AFFECTATIONS[c.aff.k] ? c.aff : null; };
+  const eur0 = c => KB().eur(c);
+  const jj = d => d.slice(8, 10) + '/' + d.slice(5, 7);
+  const tolC = (B, pm) => KB().toleranceDe(B.R.tolerance, pm);
+  const dejaRecu = (B, r) => deLautreR(B, r) ? 'autre' : 'moi';
+  function deLautreR(B, r) { const R = R7(B); return !!((R.motifAutre && R.motifAutre.test(r.label)) || (R.nomsConnus && r.sub === R.autre)); }
+  // Début de la reprise des affectations proposées : 12 mois glissants (les affectations confirmées restent toujours).
+  const debutAff = B => shift(B.auj.slice(0, 7), -11) + '-01';
+
+  // Virements permanents reconnus, mois par mois : Map(id d'opération → { v, m }).
+  function virementsVus(B) {
+    if (B.memo.virVus) return B.memo.virVus;
+    const out = new Map(), mois = [...new Set(opsCommun(B).filter(r => r.m > 0).map(r => KB().dateCompte(r).slice(0, 7)))];
+    for (const m of mois) for (const v of virements(B)) { if (!(+v.montant > 0)) continue; const r = virementVu(B, v, m); if (r && !out.has(r.id)) out.set(r.id, { v, m }); }
+    return (B.memo.virVus = out);
+  }
+  // Affectation proposée pour un virement ponctuel reçu (libellé, émetteur).
+  function proposition(B, r) {
+    const L = fold(r.label), an = /\bIMPOTS?\b/.test(L) ? (L.match(/\b(20\d\d)\b/) || [])[1] : null;
+    if (an) return { k: 'impots', an };
+    const I = R7(B).impots;
+    if (I.motif && I.motif.test(r.label)) return { k: 'remb', txt: 'remboursement d\'impôt' };
+    if (/REMB|REMBOURS|RETRO|AVOIR/.test(L)) return { k: 'remb' };
+    // versement aussitôt reversé (même montant débité dans les 5 jours) : avance pour le poste de ce paiement
+    const suite = opsCommun(B).find(x => x.m < 0 && Math.abs(x.m + r.m) < 1 && x.date >= r.date && KB().dDiff(r.date, x.date) <= 5);
+    const cle = suite ? KB().cleDe(B, suite) : null;
+    if (cle && lignesCommun(B).some(a => a.key === cle)) return { k: 'avance', pour: cle, qui: dejaRecu(B, r) };
+    return { k: 'avance', pour: 'renflouement', qui: dejaRecu(B, r) };
+  }
+  const nomEnveloppe = (B, a) => a.k === 'impots' ? 'Impôts ' + (a.an || '') : a.k === 'avance' && a.pour && a.pour !== 'renflouement' ? 'Avance pour ' + (posteLabel(B, a.pour) || a.pour) : null;
+  const cleEnveloppe = a => a.k === 'impots' ? 'impots|' + (a.an || '') : a.k === 'avance' && a.pour && a.pour !== 'renflouement' ? 'avance|' + a.pour : null;
+  function posteLabel(B, key) { const a = lignesCommun(B).find(x => x.key === key); return a ? a.label : (/^[fcm]\|/.test(key) ? key.slice(2) : null); }
+  function texteAff(B, a) {
+    if (!a) return '';
+    if (a.k === 'impots') return 'Impôts ' + (a.an || '');
+    if (a.k === 'avance') return 'Avance au commun' + (a.pour && a.pour !== 'renflouement' ? ' pour ' + (posteLabel(B, a.pour) || a.pour) : ' (renflouement)');
+    if (a.k === 'autre') return 'Autre' + (a.txt ? ' : ' + a.txt : '');
+    return AFFECTATIONS[a.k] + (a.txt ? ' (' + a.txt + ')' : '');
+  }
+
+  // Virements ponctuels reçus (crédits du commun hors virements permanents) depuis debutAff, ou déjà affectés.
+  // → [{ r, aff (confirmée) | null, prop }].
+  function ponctuels(B) {
+    if (B.memo.ponct) return B.memo.ponct;
+    const V = virementsVus(B), deb = debutAff(B), out = [];
+    for (const r of opsCommun(B)) {
+      if (r.m <= 0 || V.has(r.id) || r.type === 'interne') continue;
+      const c = etatOp(r.o), aff = affDe(r.o);
+      if (c && c.statut === 'prevu' && !aff) continue;          // reconnu à la main comme virement prévu
+      if (!aff && r.date < deb) continue;
+      out.push({ r, aff, prop: proposition(B, r) });
+    }
+    return (B.memo.ponct = out);
+  }
+  // Affectation d'un virement ponctuel (null : à affecter de nouveau). → valeur d'avant (annulation).
+  function affecter(o, aff) {
+    const avant = o.commun ? JSON.stringify(o.commun) : null;
+    const c = isObj(o.commun) ? o.commun : (o.commun = {});
+    if (aff && AFFECTATIONS[aff.k]) {
+      const a = { k: aff.k };
+      if (aff.k === 'impots') a.an = /^20\d\d$/.test(String(aff.an)) ? String(aff.an) : String(new Date().getFullYear() - 1);
+      if (aff.k === 'avance') { a.pour = aff.pour || 'renflouement'; if (aff.qui === 'moi' || aff.qui === 'autre') a.qui = aff.qui; if (aff.pg != null && isFinite(+aff.pg)) a.pg = Math.min(100, Math.max(0, +aff.pg)); }
+      if (aff.txt) a.txt = String(aff.txt).slice(0, 60);
+      c.aff = a;
+    } else delete c.aff;
+    if (!Object.keys(c).length) delete o.commun;
+    return avant;
+  }
+  // Correction à la main : champ 'statut' ('prevu' | 'imprevu' | null) ou 'lien' (clé d'enveloppe | 'aucun' | null).
+  function corriger(o, champ, val) {
+    const avant = o.commun ? JSON.stringify(o.commun) : null;
+    const c = isObj(o.commun) ? o.commun : (o.commun = {});
+    if (val == null || val === '') delete c[champ]; else c[champ] = val;
+    if (!Object.keys(c).length) delete o.commun;
+    return avant;
+  }
+  function restaurer(o, avant) { if (avant == null) delete o.commun; else o.commun = JSON.parse(avant); }
+
+  // ------------------------------------------------------------ enveloppes (argent affecté)
+  // Impôts <année> et « Avance pour <poste> » : versements affectés, puis paiements reliés (à la main, ou automatiquement :
+  // impôt prélevé hors prélèvement à la source, ou débit du poste, après le premier versement, la plus ancienne
+  // enveloppe d'abord). Une enveloppe ne paie que ce à quoi elle est affectée ; le reste d'un paiement plus gros qu'elle
+  // est payé par le disponible. → { liste: [{ cle, nom, k, date, montant, credits, paiements: [{ r, part }], utilise, reste }],
+  //   parOp: Map(id d'un paiement → cle) }.
+  function enveloppes(B) {
+    if (B.memo.env) return B.memo.env;
+    const E = new Map(), I = R7(B).impots;
+    for (const x of ponctuels(B)) {
+      if (!x.aff) continue;
+      const cle = cleEnveloppe(x.aff);
+      if (!cle) continue;
+      const e = E.get(cle) || { cle, nom: nomEnveloppe(B, x.aff), k: x.aff.k, an: x.aff.an || null, pour: x.aff.pour || null, date: x.r.date, montant: 0, credits: [], paiements: [], utilise: 0 };
+      e.montant += x.r.m; e.credits.push(x.r); if (x.r.date < e.date) e.date = x.r.date;
+      E.set(cle, e);
+    }
+    const liste = [...E.values()].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    const parOp = new Map();
+    const deb = opsCommun(B).filter(r => r.m < 0).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    const payer = (e, r) => { const part = Math.min(-r.m, e.montant - e.utilise); if (part <= 0.5) return false; e.utilise += part; e.paiements.push({ r, part }); parOp.set(r.id, e.cle); return true; };
+    for (const r of deb) {
+      const c = etatOp(r.o), lien = c && c.lien;
+      if (lien === 'aucun') continue;
+      if (lien) { const e = E.get(lien); if (e) payer(e, r); continue; }
+      const imp = I.motif && I.motif.test(r.label) && !(I.source && I.source.test(r.label));
+      const an = (fold(r.label).match(/\b(20\d\d)\b/) || [])[1];
+      const k = KB().cleDe(B, r);
+      const e = liste.find(x => r.date >= x.date && x.utilise < x.montant - 0.5 &&
+        ((x.k === 'impots' && imp && (!an || an === x.an)) || (x.k === 'avance' && x.pour === k)));
+      if (e) payer(e, r);
+    }
+    for (const e of liste) e.reste = Math.max(0, e.montant - e.utilise);
+    return (B.memo.env = { liste, parOp });
+  }
+
+  // ------------------------------------------------------------ statut de chaque mouvement
+  function jourHabituel(L) {
+    const n = {};
+    for (const r of L) { const d = +r.od.slice(8, 10); n[d] = (n[d] || 0) + 1; }
+    let J = 0, nJ = 0;
+    for (const d of Object.keys(n)) if (n[d] > nJ) { J = +d; nJ = n[d]; }
+    return nJ >= 2 ? J : null;
+  }
+  // Écart en jours entre une date et le jour J du même mois ou d'un mois voisin (le plus proche).
+  function ecartJours(d, J) {
+    let best = null;
+    for (const k of [-1, 0, 1]) {
+      const m = shift(d.slice(0, 7), k), fin = +KB().finMois(m).slice(8, 10);
+      const x = m + '-' + String(Math.min(J, fin)).padStart(2, '0');
+      const e = KB().dDiff(x, d);
+      if (best === null || Math.abs(e) < Math.abs(best)) best = e;
+    }
+    return best;
+  }
+  // → Map(id → { statut: 'prevu' | 'ecart' | 'imprevu', quoi, ecart (phrase) | null, main, sorte }).
+  function statuts(B) {
+    if (B.memo.statuts) return B.memo.statuts;
+    const out = new Map(), F = B.R.echeance, V = virementsVus(B), EN = enveloppes(B), A = appels(B), R = R7(B);
+    const lignes = lignesCommun(B), contrats = (B.D.contrats || []).filter(c => isObj(c) && c.sc === 'commun').map(c => ({ c, mots: K().motifs(c.motif) })).filter(x => x.mots.length);
+    const parContrat = new Map();
+    for (const r of opsCommun(B)) { if (r.m >= 0) continue; const F0 = fold(r.label), x = contrats.find(y => y.mots.some(m => F0.indexOf(m) >= 0)); if (x) (parContrat.get(x.c) || parContrat.set(x.c, []).get(x.c)).push(r); }
+    const montant = (r, attendu, quoi) => Math.abs(Math.abs(r.m) - attendu) > tolC(B, attendu) ? quoi + ' : ' + eur0(Math.abs(r.m)) + ' au lieu de ' + eur0(attendu) : null;
+    const nom = q => q === 'moi' ? R.moi : R.autre;
+    for (const r of opsCommun(B)) {
+      let s = null;
+      const c = etatOp(r.o);
+      if (r.m > 0) {
+        const x = V.get(r.id);
+        if (x) {
+          const v = x.v, J = Math.min(28, +v.jour || 1), du = x.m + '-' + String(J).padStart(2, '0');
+          const dep = departDe(B, r), d = dep ? dep.date : r.od;
+          const tard = d > du && joursOuvres(du, d) > ROUTE_JOURS, tot = KB().dDiff(d, du) > F.avant;
+          const e = [montant(r, v.montant, 'montant'), tard ? (dep ? 'parti' : 'arrivé') + ' le ' + jj(d) + ', prévu le ' + J : null, tot ? 'arrivé le ' + jj(d) + ', bien avant le ' + J : null].filter(Boolean);
+          s = { statut: e.length ? 'ecart' : 'prevu', quoi: 'virement permanent · ' + nom(v.qui) + (v.label ? ' (' + v.label + ')' : ''), ecart: e.length ? e.join(' ; ') : null, sorte: 'virement' };
+        } else {
+          const a = affDe(r.o);
+          s = { statut: 'imprevu', quoi: a ? texteAff(B, a) : 'virement ponctuel à affecter', ecart: null, sorte: 'ponctuel', aff: a };
+        }
+      } else {
+        const cle = EN.parOp.get(r.id), env = cle && EN.liste.find(e => e.cle === cle);
+        // paiement d'appel de fonds : seulement s'il couvre au moins un appel enregistré (sinon : contrat ou poste)
+        const pay = Object.values(A).map(x => ({ x, p: x.pays.find(p => p.d === r.date && Math.abs(p.a + r.m) < 1) }))
+          .map(y => Object.assign(y, { it: y.p ? y.x.items.filter(i => i.pay.indexOf(r.date) >= 0) : [] })).find(y => y.it.length);
+        const F0 = fold(r.label), ct = contrats.find(y => y.mots.some(m => F0.indexOf(m) >= 0));
+        if (env) {
+          const part = env.paiements.find(p => p.r === r).part;
+          s = { statut: 'prevu', quoi: 'payé par l\'enveloppe ' + env.nom, ecart: part < -r.m - 0.5 ? eur0(-r.m - part) + ' payés hors enveloppe (enveloppe épuisée)' : null, sorte: 'enveloppe' };
+          if (s.ecart) s.statut = 'ecart';
+        } else if (pay) {
+          const it = pay.it;
+          const e = [];
+          if (it.length > 1) e.push(it.length + ' appels de fonds (' + it.map(i => jj(i.d)).join(', ') + ') payés en une fois');
+          for (const i of it) { const n = KB().dDiff(i.d, r.date); if (n > F.apres) e.push('appel du ' + jj(i.d) + ' payé ' + n + ' jours après son échéance'); }
+          if (it.length === 1 && Math.abs(pay.p.a - it[0].a) > tolC(B, it[0].a)) e.push('montant : ' + eur0(pay.p.a) + ' au lieu de ' + eur0(it[0].a));
+          s = { statut: e.length ? 'ecart' : 'prevu', quoi: 'appel de fonds · ' + pay.x.lab + (it.length === 1 ? ' du ' + jj(it[0].d) : ''), ecart: e.length ? e.join(' ; ') : null, sorte: 'appel' };
+        } else if (R.impots.motif && R.impots.motif.test(r.label)) {
+          s = R.impots.source && R.impots.source.test(r.label) ? { statut: 'prevu', quoi: 'impôt · prélèvement à la source', ecart: null, sorte: 'impot' }
+            : { statut: 'imprevu', quoi: 'impôt (solde ou régularisation) sans enveloppe', ecart: null, sorte: 'impot' };
+        } else if (ct) {
+          const J = jourHabituel(parContrat.get(ct.c) || []), att = Math.round(ct.c.montant), n = J ? ecartJours(r.od, J) : 0;
+          const e = [montant(r, att, 'montant'), J && !r.ech && (n > F.apres || -n > F.avant) ? 'prélevé le ' + jj(r.od) + ', d\'habitude le ' + J : null].filter(Boolean);
+          s = { statut: e.length ? 'ecart' : 'prevu', quoi: 'contrat · ' + ct.c.label, ecart: e.length ? e.join(' ; ') : null, sorte: 'contrat' };
+        } else {
+          const a = lignes.find(x => x.key === KB().cleDe(B, r) && x.on && x.amt > DEMI);
+          if (a) {
+            const fixe = a.nat === 'fixe' || a.per > 1, att = a.per > 1 ? a.ech : a.amt;
+            const e = fixe ? montant(r, att, 'montant') : null;
+            s = { statut: e ? 'ecart' : 'prevu', quoi: 'poste · ' + a.label, ecart: e, sorte: 'poste' };
+          } else s = { statut: 'imprevu', quoi: 'hors du plan', ecart: null, sorte: 'autre' };
+        }
+      }
+      if (c && (c.statut === 'prevu' || c.statut === 'imprevu') && c.statut !== s.statut) s = Object.assign({}, s, { statut: c.statut, ecart: null, main: true, quoi: s.quoi + ' · choisi à la main' });
+      out.set(r.id, s);
+    }
+    return (B.memo.statuts = out);
+  }
+
+  // ------------------------------------------------------------ avances au commun
+  // Avance : versement ponctuel affecté « avance ». La part de l'autre personne (parts des postes en cause : poste choisi,
+  // sinon part par défaut du commun) est comptée en faveur de celle qui avance dans l'équilibre.
+  // → { lignes: [{ r, qui, pg (ma part %), faveur }], moi: { avance, faveur }, autre: { avance, faveur } }.
+  function avances(B) {
+    if (B.memo.av) return B.memo.av;
+    const out = { lignes: [], moi: { avance: 0, faveur: 0 }, autre: { avance: 0, faveur: 0 } };
+    for (const x of ponctuels(B)) {
+      if (!x.aff || x.aff.k !== 'avance') continue;
+      const qui = x.aff.qui || dejaRecu(B, x.r);
+      const pg = x.aff.pg != null ? +x.aff.pg : x.aff.pour && x.aff.pour !== 'renflouement' ? KB().partDe(B, x.aff.pour).pg : B.R.commun.part;
+      const faveur = Math.round(x.r.m * (qui === 'moi' ? (100 - pg) : pg) / 100);
+      out.lignes.push({ r: x.r, qui, pg, faveur });
+      out[qui].avance += x.r.m; out[qui].faveur += faveur;
+    }
+    return (B.memo.av = out);
+  }
+
+  // ------------------------------------------------------------ décomposition du solde, enveloppe détournée
+  // Solde = disponible + réserve fixe + provisions des charges non mensuelles en cours (copropriété…) + enveloppes.
+  function decomposition(B) {
+    if ('decomp' in B.memo) return B.memo.decomp;
+    const bal = KB().soldes(B, ['commun']);
+    if (!bal) return (B.memo.decomp = null);
+    const EN = enveloppes(B).liste.filter(e => e.reste > DEMI), RS = KB().reserveCommun(B);
+    const env = EN.reduce((t, e) => t + e.reste, 0), reserve = B.R.commun.reserveFixe || 0;
+    return (B.memo.decomp = { solde: bal.v, reserve, provisions: RS.v, provisionsDet: RS.det, enveloppes: env, enveloppesDet: EN.map(e => ({ nom: e.nom, reste: e.reste })),
+      disponible: bal.v - reserve - RS.v - env });
+  }
+  // Enveloppes qui financent autre chose : disponible sous zéro alors qu'une enveloppe n'est pas vide. Dépense en cause :
+  // premier débit hors enveloppe, depuis le premier versement, après lequel le solde passe sous le total des enveloppes.
+  // → [{ nom, montant, mois, depense: { date, label, montant } | null }].
+  function enveloppesDetournees(B) {
+    const D = decomposition(B);
+    if (!D || D.disponible >= -0.5 || D.enveloppes <= DEMI) return [];
+    const EN = enveloppes(B), L = EN.liste.filter(e => e.reste > DEMI);
+    const rows = opsCommun(B).slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    const debut = L.reduce((d, e) => e.date < d ? e.date : d, B.auj);
+    let solde = D.solde - rows.filter(r => r.date > B.auj).reduce((t, r) => t + r.m, 0);
+    const soldeApres = new Map();
+    for (const r of rows.slice().reverse()) { if (r.date > B.auj) continue; soldeApres.set(r, solde); solde -= r.m; }
+    const resteA = d => EN.liste.reduce((t, e) => e.date > d ? t : t + e.montant - e.paiements.filter(p => p.r.date <= d).reduce((x, p) => x + p.part, 0), 0);
+    let cause = null;
+    for (const r of rows) { if (r.date < debut || r.m >= 0 || EN.parOp.has(r.id) || !soldeApres.has(r)) continue; if (soldeApres.get(r) < resteA(r.date) - 0.5) { cause = r; break; } }
+    if (!cause) cause = rows.filter(r => r.m < 0 && !EN.parOp.has(r.id) && r.date >= debut).sort((a, b) => a.m - b.m)[0] || null;
+    let manque = -D.disponible;
+    return L.map(e => { const x = Math.min(e.reste, manque); manque -= x; return { nom: e.nom, montant: x, mois: cause ? cause.date.slice(0, 7) : B.auj.slice(0, 7), depense: cause ? { date: cause.date, label: cause.label, montant: -cause.m } : null }; }).filter(x => x.montant > DEMI);
+  }
+
+  // ------------------------------------------------------------ réserve fixe et renflouement
+  // Parts des postes en cause : prélèvements prévus de la trésorerie jusqu'au point bas, chacun selon la part de son poste.
+  function partsEnCause(B, C) {
+    let t = 0, m = 0;
+    const det = {};
+    // point bas aujourd'hui (le solde est déjà sous la réserve) : prélèvements des 31 prochains jours
+    const fin = C.minAt > B.auj ? C.minAt : plusJours(B.auj, 31);
+    for (const e of C.ev || []) {
+      const d = e.m + '-' + String(e.d).padStart(2, '0');
+      if (e.v >= 0 || d > fin || !e.key) continue;
+      const pg = KB().partDe(B, e.key).pg;
+      t += -e.v; m += -e.v * pg / 100;
+      const x = det[e.key] || (det[e.key] = { label: e.lab, montant: 0, pg });
+      x.montant += -e.v;
+    }
+    return t > 0 ? { wMoi: m / t, postes: Object.values(det) } : null;
+  }
+  // → null (rien à proposer) ou { seuil, min, minAt, montant, moi, autre, wMoi, postes, avant (date), fait (date) | null, avances }.
+  function renflouement(B) {
+    const P = plan(B);
+    if (!P.pon || !P.C) return null;
+    const f = isObj(B.D.renflouement) ? B.D.renflouement : null;
+    const fait = f && f.le && KB().dDiff(f.le, B.auj) <= 7 ? f.le : null;
+    const A = avances(B);
+    return { seuil: P.seuil, min: P.C.min, minAt: P.C.minAt, montant: P.pon, moi: P.ponMoi, autre: P.ponAutre, wMoi: P.wG, postes: P.cause ? P.cause.postes : [],
+      fait, avances: { moi: A.moi.avance, autre: A.autre.avance } };
+  }
+  // « Fait » : le renflouement proposé est parti (la proposition reste marquée « fait » 7 jours, le temps qu'il arrive).
+  function renflouementFait(S, le, montant) {
+    const D = KB().donnees(S), avant = D.renflouement ? JSON.stringify(D.renflouement) : null;
+    D.renflouement = { le, montant: Math.round(+montant || 0) };
+    return avant;
+  }
+  function annulerRenflouement(S, avant) { const D = KB().donnees(S); if (avant == null) delete D.renflouement; else D.renflouement = JSON.parse(avant); }
+
+  // ------------------------------------------------------------ fiche du mois
+  // « Mois conforme » ou liste des écarts (dont virements permanents non reçus) et des imprévus du mois m (date de
+  // comptage). → { m, conforme, prevus, ecarts: [{ date, label, montant, texte }], imprevus: [...], aAffecter }.
+  function fiche(B, m) {
+    const ST = statuts(B), out = { m, prevus: 0, ecarts: [], imprevus: [], aAffecter: 0 };
+    const R = R7(B), nom = q => q === 'moi' ? R.moi : R.autre;
+    for (const r of opsCommun(B)) {
+      if (KB().dateCompte(r).slice(0, 7) !== m) continue;
+      const s = ST.get(r.id);
+      if (!s) continue;
+      const l = { date: r.date, label: r.label, montant: r.m, id: r.id, cid: r.cid, texte: s.ecart || s.quoi, statut: s.statut };
+      if (s.statut === 'prevu') out.prevus++;
+      else if (s.statut === 'ecart') out.ecarts.push(l);
+      else { out.imprevus.push(l); if (s.sorte === 'ponctuel' && !s.aff) out.aAffecter++; }
+    }
+    const cur = B.auj.slice(0, 7);
+    if (m <= cur) for (const v of virements(B)) {
+      if (!(+v.montant > 0) || virementVu(B, v, m)) continue;
+      const J = Math.min(28, +v.jour || 1), du = m + '-' + String(J).padStart(2, '0');
+      if (m === cur && (B.auj <= du || joursOuvres(du, B.auj) <= ROUTE_JOURS || routeDe(B, v, m))) continue;
+      out.ecarts.push({ date: du, label: v.label || 'Virement permanent', montant: +v.montant, texte: 'virement de ' + nom(v.qui) + ' non reçu' + (m === cur ? '' : ' ce mois-là'), statut: 'ecart', manquant: true });
+    }
+    out.conforme = !out.ecarts.length && !out.imprevus.length;
+    return out;
+  }
+
+  // ------------------------------------------------------------ plan poste par poste
+  // Part de chacun pour chaque poste du budget commun (montant mensuel, provision pour les charges non mensuelles),
+  // comparée aux virements permanents en place ; propositions quand les contrats d'un poste ne suivent plus le budget.
+  function planPostes(B) {
+    const L = lignesCommun(B).filter(a => a.on && a.amt > DEMI).map(a => {
+      const { pg } = KB().partDe(B, a.key), moi = Math.round(a.amt * pg / 100);
+      return { key: a.key, label: a.label, mensuel: Math.round(a.amt), per: a.per, pg, moi, autre: Math.round(a.amt) - moi };
+    });
+    const tot = { moi: L.reduce((t, x) => t + x.moi, 0), autre: L.reduce((t, x) => t + x.autre, 0) };
+    const vir = { moi: somme(B, 'moi'), autre: somme(B, 'autre') };
+    const props = KB().contratsParPoste(B, 'commun').filter(x => x.budget != null && Math.abs(x.budget - x.contrats) >= DEMI).map(x => {
+      const { pg } = KB().partDe(B, x.poste), d = x.contrats - x.budget;
+      return { poste: x.poste, label: x.label, budget: x.budget, contrats: x.contrats, moi: Math.round(d * pg / 100), autre: d - Math.round(d * pg / 100) };
+    });
+    return { lignes: L, tot, vir, ecart: { moi: vir.moi - tot.moi, autre: vir.autre - tot.autre }, props };
+  }
+
   // ------------------------------------------------------------ résumé Grafit « commun »
   function resume(B) {
     const f = finDeMois(B);
@@ -566,5 +936,7 @@
   }
 
   g.KladCommun = { ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
-    sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer };
+    sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer,
+    AFFECTATIONS, STATUTS, virementsVus, proposition, ponctuels, affecter, corriger, restaurer, texteAff, enveloppes, statuts, avances, decomposition,
+    enveloppesDetournees, partsEnCause, renflouement, renflouementFait, annulerRenflouement, fiche, planPostes };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -95,6 +95,37 @@
     return out;
   }
 
+  // ------------------------------------------------------------ 4 bis (1.3.0). compte commun remis à plat
+  // Statuts (prévu, écart, imprévu) mois par mois, virements ponctuels et affectations, enveloppes, avances, réserve fixe,
+  // décomposition du solde, renflouement proposé, équilibre avant / après les affectations.
+  function communPlan(B) {
+    const C = KC();
+    if (!C || !C.statuts || !C.decomposition(B)) return null;
+    const D = C.decomposition(B), cur = B.auj.slice(0, 7), mois = [];
+    for (let k = 6; k >= 0; k--) {
+      const m = KB().shift(cur, -k), F = C.fiche(B, m);
+      mois.push({ mois: m, conforme: F.conforme, prevus: F.prevus,
+        ecarts: F.ecarts.map(x => Object.assign({ date: x.date, montant: ent(x.montant), texte: x.texte }, x.id ? { operation: idOp({ id: x.id }) } : { manquant: true })),
+        imprevus: F.imprevus.map(x => ({ date: x.date, montant: ent(x.montant), texte: x.texte, operation: idOp({ id: x.id }) })) });
+    }
+    const EN = C.enveloppes(B).liste, A = C.avances(B), Rf = C.renflouement(B);
+    const E = C.equilibre(B), E0 = C.equilibre(B, { brut: true });
+    const ecartEq = R => R ? ent(R.invAutre - R.invMoi) : null;          // > 0 : moi doit encore investir plus
+    return {
+      reserveFixe: ent(B.R.commun.reserveFixe || 0),
+      decomposition: { solde: ent(D.solde), disponible: ent(D.disponible), reserve: ent(D.reserve), provisions: ent(D.provisions), enveloppes: ent(D.enveloppes) },
+      mois,
+      ponctuels: C.ponctuels(B).map(x => ({ date: x.r.date, montant: ent(x.r.m), operation: idOp(x.r.o), affectation: x.aff ? C.texteAff(B, x.aff) : null, proposition: C.texteAff(B, x.prop) })),
+      enveloppes: EN.map(e => ({ nom: e.nom, verse: ent(e.montant), paye: ent(e.utilise), reste: ent(e.reste), paiements: e.paiements.map(p => ({ date: p.r.date, montant: ent(-p.r.m), part: ent(p.part) })) })),
+      avances: { moi: { avance: ent(A.moi.avance), faveur: ent(A.moi.faveur) }, autre: { avance: ent(A.autre.avance), faveur: ent(A.autre.faveur) },
+        lignes: A.lignes.map(x => ({ date: x.r.date, qui: x.qui, montant: ent(x.r.m), part: x.pg, faveur: ent(x.faveur) })) },
+      renflouement: Rf ? { montant: ent(Rf.montant), moi: ent(Rf.moi), autre: ent(Rf.autre), seuil: ent(Rf.seuil), pointBas: ent(Rf.min), date: Rf.minAt, fait: Rf.fait } : null,
+      enveloppesDetournees: C.enveloppesDetournees(B).map(x => ({ nom: x.nom, montant: ent(x.montant), mois: x.mois, depense: x.depense ? { date: x.depense.date, montant: ent(x.depense.montant) } : null })),
+      equilibre: E && E0 ? { ecartAvant: ecartEq(E0), ecartApres: ecartEq(E), difference: ent((E.invAutre - E.invMoi) - (E0.invAutre - E0.invMoi)),
+        horsEquilibre: (E.hors || []).map(x => ({ date: x.date, montant: ent(x.montant), mention: x.mention })) } : null
+    };
+  }
+
   // ------------------------------------------------------------ 5. équilibre des apports
   function equilibre(B) {
     const E = KC() && KC().equilibre(B);
@@ -205,6 +236,7 @@
       budget: point(() => budget(B)),
       commun: point(() => commun(B)),
       equilibre: point(() => equilibre(B)),
+      communPlan: point(() => communPlan(B)),
       contrats: point(() => contrats(B)),
       impots: point(() => impots(B)),
       observations: point(() => observations(B)),

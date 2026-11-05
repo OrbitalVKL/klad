@@ -188,7 +188,9 @@
         autre: typeof c.autre === 'string' && c.autre.trim() ? c.autre.trim() : null,
         contribution: typeof c.contribution === 'string' && c.contribution.trim() ? c.contribution.trim() : CONTRIBUTION,
         part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50,
-        motifAutre: typeof c.motifAutre === 'string' && c.motifAutre ? c.motifAutre : null
+        motifAutre: typeof c.motifAutre === 'string' && c.motifAutre ? c.motifAutre : null,
+        // 1.3.0 : réserve fixe du compte commun (centimes) : la trésorerie prévue ne doit pas descendre dessous
+        reserveFixe: c.reserveFixe != null && c.reserveFixe !== '' && isFinite(+c.reserveFixe) && +c.reserveFixe > 0 ? Math.round(+c.reserveFixe * 100) : 0
       },
       tolerance: tolReglee(B.reglages),
       echeance: echeanceReglee(B.reglages),
@@ -1153,7 +1155,11 @@
   //       mode: 'rd' | 'bal' | 'cum' | 'solde' | 'cat:<catégorie>' }.
   // Revenus et dépenses par mois (date d'enregistrement), virements internes, épargne et hors budget exclus ; « foyer » :
   // tous les comptes, ma contribution au commun et mes apports comptés une seule fois.
-  // → { mois, rev, dep, bal, barres?, ligne?, ref?, categories, perimetre, compte? } (centimes).
+  // 1.2.0 : o.du, o.au (AAAA-MM-JJ, bornes incluses, prioritaires sur from / to) : période au jour près ; regroupement par
+  // jour quand elle fait moins de TENDANCE_JOURS jours, sinon par mois (opérations de la période seulement).
+  // → { mois (clés : 'AAAA-MM' ou 'AAAA-MM-JJ'), pas ('mois' | 'jour'), rev, dep, bal, barres?, ligne?, ref?, categories,
+  //     perimetre, compte? } (centimes).
+  const TENDANCE_JOURS = 62;
   function tendanceMois(B, o) {
     const sel = o.comptes && o.comptes !== 'auto' ? o.comptes : (o.scope === 'commun' ? 'commun' : 'perso');
     const cpt = ['perso', 'commun', 'foyer'].indexOf(sel) < 0 ? B.comptes.find(c => c.id === sel) : null;
@@ -1167,20 +1173,28 @@
       if (r.cat === APPORTS && R.moi && r.sub === R.moi) return false;
       return true;
     };
+    const du = o.du && o.au ? (o.du <= o.au ? o.du : o.au) : '', au = o.du && o.au ? (o.du <= o.au ? o.au : o.du) : '';
+    const pas = du && dDiff(du, au) + 1 < TENDANCE_JOURS ? 'jour' : 'mois';
     const mois = [];
-    for (let m = o.from; m <= o.to && mois.length < 240; m = shift(m, 1)) mois.push(m);
+    if (pas === 'jour') for (let d = du; d <= au && mois.length < TENDANCE_JOURS; d = plusJours(d, 1)) mois.push(d);
+    else {
+      const m0 = du ? du.slice(0, 7) : o.from, m1 = au ? au.slice(0, 7) : o.to;
+      for (let m = m0; m <= m1 && mois.length < 240; m = shift(m, 1)) mois.push(m);
+    }
     const idx = {}; mois.forEach((m, i) => { idx[m] = i; });
+    // clé d'une date de comptage : hors période (bornes au jour) → undefined
+    const cle = d => (du && (d < du || d > au)) ? undefined : idx[pas === 'jour' ? d : d.slice(0, 7)];
     const rev = mois.map(() => 0), dep = mois.map(() => 0);
     const cats = new Set();
     for (const r of B.rows) {
       if ((r.type !== 'revenu' && r.type !== 'depense') || !dans(r)) continue;
       if (r.type === 'depense') cats.add(r.cat);
-      const i = idx[dateCompte(r).slice(0, 7)];
+      const i = cle(dateCompte(r));
       if (i === undefined) continue;
       if (r.type === 'revenu') rev[i] += r.m; else dep[i] -= r.m;
     }
     const bal = mois.map((m, i) => rev[i] - dep[i]);
-    const out = { mois, rev, dep, bal, categories: [...cats].filter(Boolean).sort((a, b) => a.localeCompare(b, 'fr')), perimetre: sel, compte: cpt ? cpt.libelle : null };
+    const out = { mois, pas, rev, dep, bal, categories: [...cats].filter(Boolean).sort((a, b) => a.localeCompare(b, 'fr')), perimetre: sel, compte: cpt ? cpt.libelle : null };
     const mode = o.mode || 'rd';
     if (mode === 'bal') out.barres = bal;
     else if (mode === 'cum') { let c = 0; out.ligne = bal.map(v => (c += v)); }
@@ -1198,14 +1212,20 @@
         const debut = L.map(c => (B.cover[c.id] || {}).min).filter(Boolean).sort().pop() || '0000';
         const apres = B.rows.filter(r => ids.has(r.cid) && !r.ecart);
         out.solde = v;
-        out.ligne = mois.map(m => { const fin = finMois(m); if (fin < debut) return null; return v - apres.filter(r => r.date > fin).reduce((t, r) => t + r.m, 0); });
+        out.ligne = mois.map(m => {
+          let fin = pas === 'jour' ? m : finMois(m);
+          if (au && fin > au) fin = au;
+          if (fin < debut) return null;
+          return v - apres.filter(r => r.date > fin).reduce((t, r) => t + r.m, 0);
+        });
       }
     } else if (mode.startsWith('cat:')) {
       const cat = mode.slice(4);
       out.barres = mois.map(() => 0);
-      for (const r of B.rows) { if (r.type !== 'depense' || r.cat !== cat || !dans(r)) continue; const i = idx[dateCompte(r).slice(0, 7)]; if (i !== undefined) out.barres[i] -= r.m; }
+      for (const r of B.rows) { if (r.type !== 'depense' || r.cat !== cat || !dans(r)) continue; const i = cle(dateCompte(r)); if (i !== undefined) out.barres[i] -= r.m; }
       const p = planDe(B, o.scope === 'commun' || sel === 'commun' ? 'commun' : 'perso')['c|' + cat];
-      out.ref = p && p.on !== false && +p.amt > 0 ? Math.round(+p.amt) : null;       // budget du poste (centimes par mois)
+      // budget du poste (centimes par mois) ; pas de repère par jour
+      out.ref = pas === 'mois' && p && p.on !== false && +p.amt > 0 ? Math.round(+p.amt) : null;
       out.cat = cat;
     }
     return out;
@@ -1273,6 +1293,6 @@
     complement, surcharger, cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
     devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement, journalPoste,
-    shift, finMois, nomMois, eur, dernierDebit, tendanceMois, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median, planCarnet
+    shift, finMois, nomMois, eur, dernierDebit, tendanceMois, TENDANCE_JOURS, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median, planCarnet
   };
 })(typeof window !== 'undefined' ? window : globalThis);

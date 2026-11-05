@@ -254,13 +254,16 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     const ligneOp = t => page.locator('#tx .txr', { hasText: t });
     assert.match(await ligneOp('CB RESTAURANT').textContent(), /COURANT\s+Restaurant/);
     assert.match(await ligneOp('CB EPICERIE FICTIVE').textContent(), /Alimentation · Courses/);
-    assert.match(await page.locator('#tb-badge').innerText(), /^3$/);
+    // 1.2.0 : la pastille de l'onglet compte tout ce qui est « à vérifier » (non vues, non classées, à rapprocher, une fois
+    // chacune) ; les non vues se suivent ici par leur nombre.
+    assert.equal(await page.evaluate(() => window.KladApp.extras(Date.now()).attention.unseen), 3);
+    assert.equal(await page.locator('#tb-badge').innerText(), String(await page.evaluate(() => window.KladVues.compteursAVerifier(window.KladApp.etat(), window.KladApp.ctx()).tout)));
     // détail par un appui ; « Marquer vue » (bouton, alternative au geste)
     await ligneOp('CB CAFE').locator('.tl').click();
     await page.waitForSelector('#opDetail [data-a="classer"]');
     assert.match(await page.locator('#opDetail').innerText(), /Autres › Non classé/);
     await page.locator('#opDetail [data-a="vue"]').click();
-    await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '2');
+    await page.waitForFunction(() => window.KladApp.extras(Date.now()).attention.unseen === 2);
     // Classer : règle « CAFE » → Bars, puis Annuler
     await page.locator('#opDetail [data-a="classer"]').click();
     await page.waitForSelector('#clsCorps [data-a="go"]');
@@ -310,7 +313,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.waitForTimeout(300);
     assert.equal(await page.locator('#tx .sw-act').count(), 0, 'action retirée après le geste');
     await glisser('SALAIRE FICTIF', 120);
-    await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '1');
+    await page.waitForFunction(() => window.KladApp.extras(Date.now()).attention.unseen === 1);
     await glisser('CB EPICERIE FICTIVE', -120);
     await page.waitForFunction(() => !document.getElementById('volet').hidden && /CB EPICERIE FICTIVE/.test(document.getElementById('clsCorps').textContent));
     await page.locator('#volet [data-fermer]').last().click();
@@ -318,17 +321,21 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.locator('#app-chips [data-f="nonVues"]').click();
     assert.equal(await page.locator('#tx .txr').count(), 1);
     await page.locator('#app-chips [data-f="toutVu"]').click();
-    await page.waitForFunction(() => document.getElementById('tb-badge').hidden);
+    await page.waitForFunction(() => window.KladApp.extras(Date.now()).attention.unseen === 0);
     assert.match(await page.locator('#tx').textContent(), /Toutes les opérations de la période ont été vues/);
     await page.locator('#toast button').click();
-    await page.waitForFunction(() => document.getElementById('tb-badge').textContent === '1');
+    await page.waitForFunction(() => window.KladApp.extras(Date.now()).attention.unseen === 1);
     await page.locator('#app-chips [data-f="nonVues"]').click();
     await page.locator('#app-chips [data-f="nc"]').click();
     assert.ok(await page.locator('#tx .txr').count() >= 1);
     await page.locator('#app-chips [data-f="nc"]').click();
     await capture(page, '10-operations-lot5');
-    // 0.10.2 : périmètre gardé sur ce téléphone ; badge = toutes les opérations à voir
+    // 0.10.2 : périmètre gardé sur ce téléphone ; 1.2.0 : un choix avec une pastille ouvre la liste filtrée « À vérifier »
     await page.locator('#ops-scope [data-perimetre="tout"]').click();
+    if (await page.locator('#ops-scope [data-perimetre="tout"] .pst').count()) {
+      assert.equal(await page.locator('#app-chips [data-f="rap"]').innerText(), 'À vérifier');
+      await page.locator('#app-chips [data-f="toutes"]').click();
+    }
     assert.equal(await page.evaluate(() => localStorage.getItem('klad.opsPerimetre')), '"tout"');
     assert.equal(await page.locator('#ops-scope [data-perimetre="tout"]').getAttribute('aria-pressed'), 'true');
     // « Trier une à une » : à voir puis non classées ; non classée → Classer (catégorie, « Classer en … ») ; à voir → « C'est bon, vue »
@@ -476,10 +483,11 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#app-tb [data-tab="accueil"]').click();
     assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
     const acc = await page.locator('#view-accueil').innerText();
-    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*par jour[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/i);
+    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*jour \d+\/\d+[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/i);
     assert.doesNotMatch(acc, SANS_SIGNE);
     await page.locator('#view-accueil [data-aller="rav"]').click();
-    assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre[\s\S]*Par jour[\s\S]*restants?/);
+    assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
+    assert.doesNotMatch(await page.locator('#ravCorps').innerText(), /Par jour/);
     await page.locator('#volet [data-fermer]').last().click();
     await capture(page, '12-accueil');
     await page.locator('#view-accueil [data-aller="budget"]').first().click();

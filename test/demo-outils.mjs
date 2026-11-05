@@ -123,7 +123,7 @@ export async function parcoursComplet(B, f) {
   await B.operationsPerso();
   for (const q of ['atlantide', 'courses', 'quenard']) {
     if (!(await page.locator('#q:visible').count())) break;
-    await page.evaluate(() => { const b = document.querySelector('[data-perimetre="tout"]'); if (b) b.click(); });
+    await page.evaluate(() => { const b = document.querySelector('[data-perimetre="tout"]'); if (b) b.click(); const t = document.querySelector('#app-chips [data-f="toutes"][aria-pressed="false"]'); if (t) t.click(); });
     await page.locator('#q:visible').fill(q, { timeout: 3000 }).catch(() => {});
     await B.pause(400);
     await f('recherche›' + q);

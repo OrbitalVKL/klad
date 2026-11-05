@@ -282,8 +282,18 @@
     let p = null;
     p = U.pref('periode');
     const to = dernierMoisComplet();
+    // 1.2.0 : période personnalisée au jour près { n: 'perso', du, au } (dernier choix gardé sur ce téléphone)
+    if (p && p.n === 'perso') {
+      if (M.dateValide(p.du) && M.dateValide(p.au)) {
+        const du = p.du <= p.au ? p.du : p.au, au = p.du <= p.au ? p.au : p.du;
+        return (perMemo = { n: 'perso', du, au, from: du.slice(0, 7), to: au.slice(0, 7) });
+      }
+      p = null;
+    }
     if (!p || !/^\d{4}-\d{2}$/.test(p.from || '') || !/^\d{4}-\d{2}$/.test(p.to || '')) p = { from: window.KladBudget.shift(to, -11), to, n: 12 };
     if (p.n && p.n !== 'tout') { p.to = to; p.from = window.KladBudget.shift(to, -(p.n - 1)); }
+    // bornes au jour : du premier jour du premier mois au dernier jour du dernier mois
+    p = Object.assign({}, p, { du: p.from + '-01', au: window.KladBudget.finMois(p.to) });
     return (perMemo = p);
   }
   function choisirPeriode(p) {
@@ -442,20 +452,22 @@
 
   // ------------------------------------------------------------ rendu
   const rendus = [];            // fonctions de rendu ajoutées par les autres fichiers (écrans)
-  // Badge de l'onglet Opérations : toutes les opérations à voir (perso et commun), comme l'Accueil.
-  function nonVuesScope() {
-    let n = 0;
-    for (const c of Vu.comptesDe(S, 'perso')) for (const o of S.ops[c.id] || []) if (!KC.vue(S, o)) n++;
-    return n;
+  // Badge de l'onglet Opérations (1.2.0) : le total « à vérifier » (pastille « Tout » du haut de la liste) : non vues,
+  // non classées des 3 derniers mois et prélèvements à rapprocher, chacune comptée une fois. Avant : non vues seules.
+  let avMemo = null;
+  function compteursAV() {
+    if (!avMemo) { try { avMemo = Vu.compteursAVerifier(S, ctx()); } catch (e) { avMemo = { perso: 0, commun: 0, tout: 0 }; } }
+    return avMemo;
   }
-  function renderBadge() {
+  function renderBadge() { avMemo = null; afficherBadge(); }
+  function afficherBadge() {
     // 1.1 : six onglets ; onglet étroit (petit écran, texte agrandi) : « 9+ » pour ne toucher ni l'icône voisine ni le libellé
-    const n = nonVuesScope(), b = $('tb-badge'), etroit = b.parentElement && b.parentElement.offsetWidth > 0 && b.parentElement.offsetWidth < 64;
+    const n = compteursAV().tout, b = $('tb-badge'), etroit = b.parentElement && b.parentElement.offsetWidth > 0 && b.parentElement.offsetWidth < 64;
     const t = n > 99 ? (etroit ? '9+' : '99+') : n > 9 && etroit ? '9+' : String(n);
     if (b.textContent !== t && b.textContent !== '' && !b.classList.contains('point')) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
     b.classList.remove('point');
     b.hidden = !n; b.textContent = t;
-    b.setAttribute('aria-label', n + ' à voir');
+    b.setAttribute('aria-label', n + ' à vérifier');
     // place insuffisante à droite de l'icône (texte très agrandi) : simple point, le nombre reste lu (aria-label)
     const bt = b.parentElement;
     if (n && bt && bt.offsetWidth && b.offsetWidth > bt.offsetWidth / 2 - 12 + 4) { b.classList.add('point'); b.textContent = ''; }
@@ -554,13 +566,12 @@
     else if (act.dataset.act === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
   });
   preparer.secRav = () => {
-    let rav = null, restants = null;
+    let rav = null;
     try {
       const B = budget(), res = B ? window.KladBudget.suivi(B, 'perso', null) : null;
       rav = res ? res.rav : null;
-      if (res) restants = Math.max(1, res.nbJours - res.jour + 1);
     } catch (e) { rav = null; }
-    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav, window.KladBudget.baseRav(S), restants) : '';
+    $('ravCorps').innerHTML = window.KladVuesBudget ? window.KladVuesBudget.detailRav(rav, window.KladBudget.baseRav(S)) : '';
   };
   // Base du reste à vivre (0.10.7) : interrupteur de l'Accueil, du détail et du Budget ; réglage du budget (Réglages ›
   // Budget), suivi par le résumé Grafit.
@@ -612,23 +623,33 @@
   // Période des opérations : gardée tant que l'appli reste ouverte (« Toute période » au démarrage).
   const perOps = { k: 'tout', du: '', au: '' };
   const bornesOps = () => Vu.bornesPeriode(perOps.k, M.jourLocal(Date.now()), budget(), perimOps === 'commun' ? 'commun' : 'perso', perOps.du, perOps.au);
+  // 1.3.0 : statut de chaque mouvement du compte commun (prévu, écart, imprévu), une fois par contexte du budget.
+  function statutsCommun() {
+    try { const B = budget(); return B && window.KladCommun && window.KladCommun.statuts ? window.KladCommun.statuts(B) : null; } catch (e) { return null; }
+  }
   function renderOps(reset) {
     if (!S) return;
     if (reset) {
       const cx = ctx();
       filtre.q = $('q').value.trim(); filtre.scope = perimOps;
-      $('ops-scope').innerHTML = Vu.perimetre(perimOps);
+      avMemo = null;
+      $('ops-scope').innerHTML = Vu.perimetre(perimOps, compteursAV());
+      afficherBadge();
       if (filtre.compte && !M.compte(S, filtre.compte)) filtre.compte = '';
       if (filtre.cat && filtre.cat[0] !== '_' && !cx.C.categories[filtre.cat]) filtre.cat = '';
       const bp = bornesOps();
       filtre.du = bp.du; filtre.au = bp.au; filtre.per = perOps.k;
+      filtre.statuts = statutsCommun();
       opsListe = Vu.ordonner(Vu.filtrer(S, filtre, cx), filtre.ordre, cx);
       opsFin = 0;
       const base = Object.assign({}, filtre, { cat: '', nonVues: false });
       const unseen = Vu.filtrer(S, Object.assign({}, base, { nonVues: true }), cx).length;
       const nc = Vu.filtrer(S, Object.assign({}, base, { cat: '__nc' }), cx).length;
       const int = Vu.filtrer(S, Object.assign({}, base, { cat: '__int' }), cx).length;
-      $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
+      // 1.3.0 : imprévus et écarts du compte commun (périmètres Commun et Tout)
+      const imp = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__imp' }), cx).length : null;
+      const eca = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__eca' }), cx).length : null;
+      $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, imp, eca, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
       // « Trier une à une » : avec le filtre Non vues ou Non classées
       const nTri = filtre.nonVues || filtre.cat === '__nc' ? opsListe.filter(o => filtre.nonVues ? !KC.vue(S, o) : true).length : 0;
       $('ops-tri').hidden = !nTri;
@@ -642,7 +663,7 @@
       $('ops-tot').innerHTML = opsListe.length ? '<span>' + T.n + ' opération' + (T.n > 1 ? 's' : '') + '</span><span>Débit <b class="num">' + Vu.esc(F.montant(T.debit)) +
         '</b></span><span>Crédit <b class="num">' + Vu.esc(F.montant(T.credit)) + '</b></span>' : '';
       $('tx').innerHTML = opsListe.length ? '' : '<div class="muted tx-vide">' +
-        (filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte || perOps.k !== 'tout' ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</div>';
+        (filtre.cat === '__av' ? '✓ Rien à vérifier.' : filtre.nonVues ? '✓ Toutes les opérations de la période ont été vues.' : filtre.q || filtre.cat || filtre.compte || perOps.k !== 'tout' ? 'Aucune opération ne correspond.' : 'Aucune opération pour l\'instant.') + '</div>';
       $('tx-suite').innerHTML = '';
       if (opsListe.length) plus(30);
       chrome();
@@ -654,8 +675,9 @@
     if (opsFin >= opsListe.length) return;
     let ratt = null;
     try { ratt = window.KladBudget && budget() ? window.KladBudget.rattachements(budget()) : null; } catch (e) { ratt = null; }
-    const r = Vu.ordreParJour(filtre.ordre) ? Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx(), ratt })
-      : Vu.trancheSansJours(S, opsListe, opsFin, nbJours * 2, { ctx: ctx(), ratt });
+    const statuts = filtre.statuts || null;
+    const r = Vu.ordreParJour(filtre.ordre) ? Vu.tranche(S, opsListe, opsFin, nbJours, { annee: new Date().getFullYear(), ctx: ctx(), ratt, statuts })
+      : Vu.trancheSansJours(S, opsListe, opsFin, nbJours * 2, { ctx: ctx(), ratt, statuts });
     $('tx').insertAdjacentHTML('beforeend', r.html);
     opsFin = r.fin;
     $('tx-suite').innerHTML = opsFin < opsListe.length ? '<div class="row center"><button type="button" class="btn" data-suite>Afficher plus</button></div>' : '';
@@ -678,10 +700,17 @@
   });
   $('ops-scope').addEventListener('click', ev => {
     const b = ev.target.closest('[data-perimetre]');
-    if (!b || b.dataset.perimetre === perimOps) return;
+    if (!b) return;
+    // 1.2.0 : un choix avec une pastille ouvre la liste de ce périmètre filtrée sur « À vérifier », toute période ;
+    // « Toutes » (ou « À vérifier ») retire le filtre.
+    const av = +b.dataset.avN > 0;
+    if (b.dataset.perimetre === perimOps && (!av || filtre.cat === '__av')) return;
     perimOps = b.dataset.perimetre;
     U.pref('opsPerimetre', perimOps);
     if (filtre.compte) filtre.compte = '';
+    if (av) { filtre.cat = '__av'; filtre.nonVues = false; perOps.k = 'tout'; }
+    else if (filtre.cat === '__av') filtre.cat = '';
+    if (perimOps === 'perso' && (filtre.cat === '__imp' || filtre.cat === '__eca')) filtre.cat = '';
     opsFin = 0; renderOps(true);
   });
   $('ops-tri').addEventListener('click', ev => { if (ev.target.closest('[data-tri]')) trier(filtre.cat === '__nc' ? 'nc' : 'nv'); });
@@ -694,6 +723,7 @@
     else if (f === 'nc') filtre.cat = filtre.cat === '__nc' ? '' : '__nc';
     else if (f === 'rap') filtre.cat = '';
     else if (f === 'int') filtre.cat = filtre.cat === '__int' ? '' : '__int';
+    else if (f === 'imp' || f === 'eca') { const c = f === 'imp' ? '__imp' : '__eca'; filtre.cat = filtre.cat === c ? '' : c; filtre.nonVues = false; }
     else if (f === 'toutVu') {
       const l = opsListe.filter(o => !KC.vue(S, o));
       const avant = KC.marquer(S, l, true);
@@ -857,6 +887,36 @@
         () => { KC.annulerInterne(snap); if (venu && filtre.cat === '__int') filtre.cat = '__rap'; changed('classement'); });
     } else if (['rapprocher', 'rapprocherb', 'garder', 'arapprocher', 'autrement', 'pasautrement'].indexOf(b.dataset.a) >= 0) {
       rapprochement(b.dataset.a);
+    } else if (b.dataset.a === 'affecter' || b.dataset.a === 'relier' || b.dataset.a === 'statutcm') {
+      // 1.3.0 : affectation d'un virement ponctuel du commun, enveloppe qui paie un débit, statut choisi à la main
+      const o = trouverOp(opCourante[0], opCourante[1]), KCo = window.KladCommun;
+      if (!o || !KCo) return;
+      let avant, msg;
+      if (b.dataset.a === 'affecter') {
+        const k = b.dataset.k;
+        let aff = null;
+        if (k === 'proposee') { const x = KCo.ponctuels(budget()).find(y => y.r.id === o.id); aff = x ? x.prop : null; }
+        else if (k === 'impots') aff = { k, an: $('cmAn') ? $('cmAn').value : null };
+        else if (k === 'avance') aff = { k, pour: $('cmPour') ? $('cmPour').value : 'renflouement' };
+        else if (k === 'autre') aff = { k, txt: $('cmTxt') ? $('cmTxt').value.trim() : '' };
+        else if (k) aff = { k };
+        avant = KCo.affecter(o, aff);
+        msg = aff ? 'Virement affecté : ' + KCo.texteAff(budget(), o.commun.aff) + '.' : 'Virement de nouveau à affecter.';
+        log('info', 'Commun : virement ponctuel ' + (aff ? 'affecté (' + KCo.AFFECTATIONS[aff.k] + ')' : 'remis à affecter') + '.');
+      } else if (b.dataset.a === 'relier') {
+        const v = $('cmLien') ? $('cmLien').value : '';
+        avant = KCo.corriger(o, 'lien', v || null);
+        msg = v === 'aucun' ? 'Paiement sorti des enveloppes.' : v ? 'Paiement relié à une enveloppe.' : 'Enveloppe choisie automatiquement.';
+        log('info', 'Commun : enveloppe d\'un paiement ' + (v ? 'choisie à la main' : 'automatique') + '.');
+      } else {
+        const v = b.dataset.val || null;
+        avant = KCo.corriger(o, 'statut', v);
+        msg = v ? 'Compté comme ' + (v === 'prevu' ? 'prévu' : 'imprévu') + '.' : 'Statut automatique.';
+        log('info', 'Commun : statut d\'un mouvement ' + (v ? 'choisi à la main' : 'automatique') + '.');
+      }
+      changed('classement');
+      renderDetail();
+      toastAnnuler(msg + ' Commun et équilibre recalculés.', () => { KCo.restaurer(o, avant); changed('classement'); renderDetail(); });
     } else if (b.dataset.a === 'comptepour') {
       // 1.1.2 : période de comptage choisie à la main (« compte pour : octobre / novembre »), annulable
       const o = trouverOp(opCourante[0], opCourante[1]);
