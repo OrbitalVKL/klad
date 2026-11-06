@@ -308,7 +308,7 @@
 
   // ------------------------------------------------------------ fin de mois estimée, marge réelle
   // Fin de mois : solde − prélèvements mensuels des contrats pas encore passés ce mois − impôts du mois
-  //               + virements attendus pas encore reçus − réserve pour échéances.
+  //               + virements attendus pas encore reçus − provisions en cours (charges non mensuelles).
   function finDeMois(B) {
     if ('fdm' in B.memo) return B.memo.fdm;
     const bal = KB().soldes(B, ['commun']);
@@ -888,12 +888,13 @@
   }
 
   // ------------------------------------------------------------ plan poste par poste
+  // 1.3.1 : sert au détail par poste de « Virements à mettre en place » (montants exacts, en centimes).
   // Part de chacun pour chaque poste du budget commun (montant mensuel, provision pour les charges non mensuelles),
   // comparée aux virements permanents en place ; propositions quand les contrats d'un poste ne suivent plus le budget.
   function planPostes(B) {
     const L = lignesCommun(B).filter(a => a.on && a.amt > DEMI).map(a => {
-      const { pg } = KB().partDe(B, a.key), moi = Math.round(a.amt * pg / 100);
-      return { key: a.key, label: a.label, mensuel: Math.round(a.amt), per: a.per, pg, moi, autre: Math.round(a.amt) - moi };
+      const { pg } = KB().partDe(B, a.key), moi = a.amt * pg / 100;
+      return { key: a.key, label: a.label, mensuel: a.amt, per: a.per, pg, moi, autre: a.amt - moi };
     });
     const tot = { moi: L.reduce((t, x) => t + x.moi, 0), autre: L.reduce((t, x) => t + x.autre, 0) };
     const vir = { moi: somme(B, 'moi'), autre: somme(B, 'autre') };

@@ -6,9 +6,14 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.3.1** — correctif de la 1.3.0 (retour du propriétaire, 06/11 ; développé et publié par l'architecte) : carte
+« Provisions en cours » du commun lisible (ancienne « Réserve pour échéances », qui affichait « [object Object] ») ;
+sous-vue Commun › Plan retirée (redondante avec le budget du commun et « Virements à mettre en place »), détail par poste
+déplié sous « Virements à mettre en place » ; test garde-fou des textes illisibles sur tous les écrans.
+
 **1.3.0** — compte commun remis à plat (points 1 à 7 du propriétaire, 05/11) : statut prévu / écart / imprévu de chaque
 mouvement du commun, virements ponctuels affectés, enveloppes, avances au commun dans l'équilibre, réserve fixe et
-renflouement partagé, Commun › Plan, fiche du mois, bloc « communPlan » du relevé. Point 8 (échéances ponctuelles :
+renflouement partagé, Commun › Plan (retiré en 1.3.1), fiche du mois, bloc « communPlan » du relevé. Point 8 (échéances ponctuelles :
 impôt estimé, taxe foncière, provisions) : lot 1.4.0.
 
 **1.2.0** — lot validé par le propriétaire le 05/11 (développé et publié par l'architecte) : pastilles « à vérifier » par
@@ -56,6 +61,21 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
 
+### 1.3.1 — détails techniques
+- `vues.js:rangee` (cartes du commun) : `provisionsTexte(f.reserveDet)` — `reserveDet` (budget.js `reserveCommun`) est une
+  liste `{ label, montant }` (centimes) ; libellés courts Copropriété / Parking. Carte et texte de fin de mois : « Provisions
+  en cours » (extras.js : texte envoyé à Claude idem).
+- `ecranbudget.js` : `SOUSVUES.commun` = Ce mois · Trésorerie · Équilibre ; une sous-vue mémorisée qui n'existe plus
+  retombe sur la première. `index.html` : section #cm-planp retirée ; `style.css` : règles #cm-planp / .cm-plan-t retirées,
+  `.cm-dp*` (détail par poste).
+- `vcommun.js:plan` : `detailPostes(qui, tot)` dans chaque carte (`details.cm-dp`, état gardé dans `ui.cartes` avec la clé
+  `cm|dp-moi` / `cm|dp-autre`), lignes de `KC.planPostes(B)`, total = `plan().T`. `KC.planPostes` garde des montants
+  exacts (plus d'arrondi à l'euro).
+- Tests : `test/lot131.test.mjs` (carte des provisions ; sous-vue retirée ; garde-fou Chromium « textes illisibles » :
+  textes du DOM y compris cachés, title / aria-label / placeholder, valeurs des champs ; jeux « mesures » et
+  « personnel », hors et en mode démo). `test/lot130.test.mjs` : plan poste par poste → détail par poste.
+- Relevé de contrôle et résumé Grafit inchangés (références 1.3.0).
+
 ### 1.3.0 — détails techniques
 Tout est dans `commun.js` (section « 1.3.0 ») pour rester chargé par les tests existants ; données sur l'opération
 (`o.commun` : `aff` { k: impots | reserve | avance | remb | autre, an, pour ('renflouement' | clé de poste), qui, pg, txt },
@@ -88,7 +108,8 @@ Tout est dans `commun.js` (section « 1.3.0 ») pour rester chargé par les test
 - `plan()` : `seuil`, `cause` ; `pon` dès que le point bas passe sous la réserve fixe (0 : comme avant), réparti selon
   les postes en cause (avant : charges non mensuelles). Observation « Renflouement » (au-dessus de zéro, sous la réserve),
   « L'enveloppe … finance autre chose ».
-- Écrans : `vcommun.js:mois` (#cm-com, sous-vue Ce mois), `planPostes` (#cm-planp, nouvelle sous-vue « Plan ») ;
+- Écrans : `vcommun.js:mois` (#cm-com, sous-vue Ce mois) ; `planPostes` (#cm-planp, sous-vue « Plan ») retirés en
+  1.3.1 : `KC.planPostes(B)` (montants exacts en centimes) sert au « Détail par poste » de `vcommun.js:plan` ;
   Équilibre : ligne « + Avances au commun », « Hors équilibre », mention sur chaque mouvement ; `vues.js` :
   `pastilleStatut`, filtres `__imp` / `__eca` (avec `f.statuts`), `detailCommun` (affectation, enveloppe, statut) ;
   `app.js` : `statutsCommun()`, actions `affecter` / `relier` / `statutcm` (annulables) ; `ecranbudget.js` : `data-fiche`,

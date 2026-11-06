@@ -20,8 +20,8 @@
 
   const PANNEAUX = ['actions', 'cm-plan', 'cm-tres', 'budget-main', 'tend-panel', 'p-contrats'];
   // Sous-vues (0.10.4) : Budget = Suivi · Tendance · Contrats ; Commun = Ce mois · Trésorerie · Équilibre (écran Équilibre).
-  // 1.3.0 : Commun › Plan (part de chacun poste par poste)
-  const SOUSVUES = { perso: [['suivi', 'Suivi'], ['tendance', 'Tendance'], ['contrats', 'Contrats']], commun: [['mois', 'Ce mois'], ['plan', 'Plan'], ['tresorerie', 'Trésorerie'], ['equilibre', 'Équilibre']] };
+  // 1.3.1 : la sous-vue « Plan » (1.3.0) est retirée ; le détail par poste est sous « Virements à mettre en place ».
+  const SOUSVUES = { perso: [['suivi', 'Suivi'], ['tendance', 'Tendance'], ['contrats', 'Contrats']], commun: [['mois', 'Ce mois'], ['tresorerie', 'Trésorerie'], ['equilibre', 'Équilibre']] };
   const barre = (scope, actif) => '<div class="seg sousvues" role="group" aria-label="' + (scope === 'commun' ? 'Commun' : 'Budget') + ' : sous-vues">' +
     SOUSVUES[scope].map(([k, l]) => '<button type="button" data-sousvue="' + k + '" aria-pressed="' + (k === actif) + '">' + l + '</button>').join('') + '</div>';
   function plis(root) { (root || document).querySelectorAll('.panel[id]').forEach(U.appliquerPli); }
@@ -35,7 +35,7 @@
     const scope = A.scope();
     if (scopeRendu !== scope) { ui.nav = null; ui.ouverts.clear(); scopeRendu = scope; }
     const sur = (id, fn) => { try { $(id).innerHTML = fn(); } catch (e) { $(id).innerHTML = '<p class="muted">Calcul impossible.</p>'; A.log('err', 'Budget (' + id + ') : ' + (e.message || e)); } };
-    const sv = ui.sv[scope] === 'equilibre' ? 'mois' : ui.sv[scope];
+    const sv = ui.sv[scope] === 'equilibre' || !SOUSVUES[scope].some(([k]) => k === ui.sv[scope]) ? (scope === 'commun' ? 'mois' : 'suivi') : ui.sv[scope];
     $('view-budget').dataset.sv = sv;
     $('sv-bar').innerHTML = barre(scope, sv);
     sur('cyc-nav', () => VB.cycNav(B, scope, ui.nav));
@@ -46,11 +46,9 @@
     const cm = planC('mois'), ct = planC('tresorerie');
     $('cm-plan').innerHTML = cm; $('cm-plan').hidden = !cm;
     $('cm-tres').innerHTML = ct; $('cm-tres').hidden = !ct;
-    // 1.3.0 : décomposition du solde, renflouement, fiche du mois, enveloppes et avances ; plan poste par poste
+    // 1.3.0 : décomposition du solde, renflouement, fiche du mois, enveloppes et avances (le plan poste par poste est dans « Virements à mettre en place » depuis la 1.3.1)
     const com = scope === 'commun' && VC && VC.mois ? (() => { try { return VC.mois(B, ui); } catch (e) { A.log('err', 'Commun (ce mois) : ' + (e.message || e)); return ''; } })() : '';
     $('cm-com').innerHTML = com; $('cm-com').hidden = !com;
-    const pp = scope === 'commun' && VC && VC.planPostes ? (() => { try { return VC.planPostes(B); } catch (e) { A.log('err', 'Commun (plan) : ' + (e.message || e)); return ''; } })() : '';
-    $('cm-planp').innerHTML = pp; $('cm-planp').hidden = !pp;
     sur('budget-main', () => VB.teteBudget(B, scope, ui) + (ui.mode === 'plan' ? VB.plan(B, scope, { ouverts: ui.ouvertsPlan }) : depasses(B, scope) + VB.suivi(B, scope, ui).html));
     sur('tend-panel', () => VB.tendance(B, scope, tend, periodeTendance(B)));
     sur('ctr-zone', () => '<section class="panel" id="p-contrats">' + VB.contrats(B, scope, ui.ctrEdit) + '</section>');

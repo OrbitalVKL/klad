@@ -133,6 +133,11 @@
       '</span><span class="v" style="color:' + col + '">' + esc(F().montant(Math.abs(v))) + '</span><span class="s">' + esc(sub) + (ancien ? ' <span class="chip warn">ancien</span>' : '') + '</span></button>';
   }
 
+  // 1.3.1 : « Copropriété 377 €, Parking 64 € » à partir des provisions { label, montant } (montants en centimes).
+  const COURT = { 'Charges de copropriété': 'Copropriété', 'Charges parking': 'Parking' };
+  function provisionsTexte(det) {
+    return (det || []).filter(x => x && typeof x === 'object').map(x => (COURT[x.label] || String(x.label || 'Charge')) + ' ' + F().montant(Math.round(+x.montant || 0))).join(', ');
+  }
   // Rangée des cartes de comptes. opt : { dettes: { id: dette }, livrets: { id: texte }, fdm (fin de mois du commun) }.
   // Perso : tous les comptes, puis « <compte> − <carte> » après chaque carte à débit différé rattachée.
   function rangee(S, scope, now, opt) {
@@ -153,10 +158,11 @@
     }
     if (scope === 'commun' && o.fdm) {
       const f = o.fdm;
-      if (f.reserve > 50) h += '<div class="kpi bal-sum"><span class="eyebrow">Réserve pour échéances</span><span class="v">' + esc(F().montant(f.reserve)) + '</span><span class="s">mise de côté : ' + esc((f.reserveDet || []).join(', ')) + '</span></div>';
+      // 1.3.1 : provisions des charges non mensuelles (liste { label, montant }), même nom que Commun › Ce mois
+      if (f.reserve > 50) h += '<div class="kpi bal-sum"><span class="eyebrow">Provisions en cours</span><span class="v">' + esc(F().montant(f.reserve)) + '</span><span class="s">mis de côté : ' + esc(provisionsTexte(f.reserveDet)) + '</span></div>';
       h += '<div class="kpi bal-sum"><span class="eyebrow">Fin de mois estimée</span><span class="v" style="color:' + (f.end < 0 || f.decouvert ? 'var(--bad)' : 'var(--good)') + '">' +
         esc(F().montant(Math.abs(f.end))) + (f.end < 0 ? ' débiteur' : '') + '</span><span class="s">solde ' + esc(F().solde(f.solde)) + ' − prélèvements à venir ' + esc(F().montant(f.due)) +
-        (f.route ? ' + en route ' + esc(F().montant(f.route)) : '') + (f.inc ? ' + virements attendus ' + esc(F().montant(f.inc)) : '') + (f.reserve > 50 ? ' − réserve pour échéances ' + esc(F().montant(f.reserve)) : '') +
+        (f.route ? ' + en route ' + esc(F().montant(f.route)) : '') + (f.inc ? ' + virements attendus ' + esc(F().montant(f.inc)) : '') + (f.reserve > 50 ? ' − provisions en cours ' + esc(F().montant(f.reserve)) : '') +
         (f.decouvert ? ' · <b class="bad-t">découvert si les prélèvements passent avant les virements</b>' : '') +
         (f.aVenir && f.aVenir.length ? '<br>à venir : ' + esc(f.aVenir.join(', ')) : '') + '</span></div>';
     }

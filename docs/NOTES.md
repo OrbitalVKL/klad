@@ -2,6 +2,19 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.1
+
+Correctif de la 1.3.0 (retour du propriétaire, 06/11).
+- **Carte « Provisions en cours »** du compte commun (ancienne « Réserve pour échéances ») : la ligne « mis de côté »
+  affiche les postes et leurs montants (« Copropriété 377,46 €, Parking 64,20 € ») au lieu de « [object Object] ». Le
+  nouveau nom évite la confusion avec la réserve fixe (plancher de la trésorerie).
+- **Plus de sous-vue « Plan »** dans Commun : elle reprenait le budget du commun et « Virements à mettre en place ». Le
+  détail par poste (part de chacun, poste par poste, total égal au « demandé ») se déplie maintenant sous chaque
+  personne dans « Virements à mettre en place ». Les montants et les parts se règlent dans le budget du commun, seule
+  source.
+- **Garde-fou** : un test parcourt tous les écrans et volets (jeux fictifs, mode démo compris) et échoue si un texte
+  illisible (« [object Object] », « undefined », « NaN », « null ») apparaît.
+
 ## 1.3.0
 
 Compte commun remis à plat (demande du propriétaire du 05/11).
