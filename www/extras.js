@@ -55,7 +55,7 @@
       if (scope === 'commun') {
         try {
           const f = KC().finDeMois(B), C = KC().tresorerie(B), E = KC().equilibre(B), A = KC().appels(B);
-          if (f) L.push('Compte commun : solde ' + sg(f.solde) + ', prélèvements encore à venir ce mois ' + eu(f.due) + ', virements attendus ' + eu(f.inc) + ', réserve pour échéances ' + eu(f.reserve) + ', fin de mois estimée ' + sg(f.end) + '.');
+          if (f) L.push('Compte commun : solde ' + sg(f.solde) + ', prélèvements encore à venir ce mois ' + eu(f.due) + ', virements attendus ' + eu(f.inc) + ', provisions en cours ' + eu(f.reserve) + ', fin de mois estimée ' + sg(f.end) + '.');
           if (C) L.push('Trésorerie sur 12 mois : point bas ' + sg(C.min) + ' le ' + C.minAt + (C.negAt ? ', passage sous zéro le ' + C.negAt : '') + '.');
           const reste = Object.values(A || {}).reduce((t, x) => t + Math.max(0, x.reste), 0);
           if (Object.keys(A || {}).length) L.push('Appels de fonds : ' + (reste > 50 ? eu(reste) + ' restent à virer au syndic' : 'tous réglés') + '.');

@@ -1,6 +1,6 @@
 // Tests du lot 1.3.0 : compte commun remis à plat — statut de chaque mouvement (prévu, écart, imprévu), virements
 // ponctuels affectés (enveloppe Impôts, avances au commun), enveloppes et paiements reliés, décomposition du solde,
-// enveloppe qui finance autre chose, réserve fixe et renflouement partagé, fiche du mois, plan poste par poste,
+// enveloppe qui finance autre chose, réserve fixe et renflouement partagé, fiche du mois, détail par poste (1.3.1, sous « Virements à mettre en place »),
 // équilibre avant / après les affectations, relevé de contrôle. Scénario FICTIF inspiré d'un cas réel : virement
 // « impôts » mis de côté, deux appels de fonds payés ensemble et en retard, renflouements faits par une seule personne.
 // Aucune donnée réelle : libellés, noms et montants inventés.
@@ -188,7 +188,7 @@ test('corrections à la main : affectation, paiement sorti de l\'enveloppe, stat
   assert.equal(KC.avances(B).moi.avance, 27000, 'reste une avance');
 });
 
-test('fiche du mois, plan poste par poste, filtres « Imprévus » / « Écarts », détail d\'un mouvement, Ce mois', async () => {
+test('fiche du mois, détail par poste (1.3.1, sous « Virements à mettre en place »), filtres « Imprévus » / « Écarts », détail d\'un mouvement, Ce mois', async () => {
   const S = await etatAffecte();
   const B = ctx(S);
   const F9 = KC.fiche(B, '2026-09');
@@ -209,8 +209,13 @@ test('fiche du mois, plan poste par poste, filtres « Imprévus » / « Écarts 
   assert.ok(P.lignes.find(x => x.key === 'f|Prêt immobilier' && x.pg === 60 && x.moi === 57000 && x.autre === 38000));
   assert.equal(P.vir.moi, 80000);
   assert.equal(P.ecart.moi, P.vir.moi - P.tot.moi);
-  const hp = texteVisible(VC.planPostes(B));
-  assert.match(hp, /Plan du compte commun[\s\S]*Prêt immobilier[\s\S]*Virements permanents en place[\s\S]*Écart/);
+  // 1.3.1 : plus d'écran « Plan » ; détail par poste sous « Virements à mettre en place », total = demandé
+  assert.equal(VC.planPostes, undefined, 'écran Plan retiré');
+  const hp = VC.plan(B, { cartes: new Set(['cm|dp-moi', 'cm|dp-autre']) }, 'mois'), tp = texteVisible(hp);
+  assert.match(tp, /Virements à mettre en place[\s\S]*Détail par poste[\s\S]*Prêt immobilier[\s\S]*60 \/ 40[\s\S]*Total demandé/);
+  assert.doesNotMatch(hp, /object Object|undefined|NaN/);
+  const D = KC.plan(B), sm = q => P.lignes.reduce((t, x) => t + x[q], 0);
+  assert.ok(Math.abs(sm('moi') - D.T.moi) < 1 && Math.abs(sm('autre') - D.T.autre) < 1, 'détail par poste = demandé');
   // filtres de la liste
   const cx = K.contexte(S, NOW), ST = KC.statuts(B);
   const imp = Vu.filtrer(S, { scope: 'commun', cat: '__imp', statuts: ST }, cx), eca = Vu.filtrer(S, { scope: 'commun', cat: '__eca', statuts: ST }, cx);

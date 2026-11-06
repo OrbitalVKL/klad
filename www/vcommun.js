@@ -20,6 +20,7 @@
   const mLabel = m => U().mLabel(m);
   const MOIS_L = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   const chip = (niv, t) => '<span class="chip ' + niv + '">' + esc(t) + '</span>';
+  const DEMI_C = 50; // centimes
   const pl = (n, s, p) => n + ' ' + (n > 1 ? (p || s + 's') : s);
   // Sous-bloc repliable (cm-sub) ; ouverts : Set des clés dépliées par l'utilisateur, def : ouvert par défaut.
   const cmSub = (ouverts, k, titre, resume, corps, def) => {
@@ -61,6 +62,15 @@
       return '<div class="vo"><b class="vo-n">' + esc(lab) + '</b><b class="num vo-a">' + e0(have) + '</b><div class="vo-s"><span class="subs">' + esc(sub) + '</span>' + L.map(recu).join(' ') + '</div>' +
         (diff ? '<div class="vo-d"><span class="subs">en place ' + e0(have) + ' → demandé ' + e0(want) + '</span> ' + act(have, want) + '</div>' : '') + '</div>';
     };
+    // 1.3.1 : détail par poste de la part demandée (remplace l'écran « Plan du compte commun »).
+    const PP = KC().planPostes(B);
+    const detailPostes = (qui, tot) => {
+      const L = PP.lignes.filter(x => x[qui] > DEMI_C);
+      if (!L.length) return '';
+      return '<details class="cm-dp" data-cc="cm|dp-' + qui + '"' + (ouv && ouv.has('cm|dp-' + qui) ? ' open' : '') + '><summary><span class="subs">Détail par poste</span></summary><ul class="cm-dp-l">' +
+        L.map(x => '<li><span class="cm-dp-t">' + esc(x.label) + '<span class="subs">' + Math.round(x.pg) + ' / ' + Math.round(100 - x.pg) + (x.per > 1 ? ' · provision d\'une échéance tous les ' + x.per + ' mois' : '') + '</span></span><b class="num">' + e2(x[qui]) + '</b></li>').join('') +
+        '<li class="cm-dp-tot"><span class="cm-dp-t">Total demandé</span><b class="num">' + e2(tot) + '</b></li></ul></details>';
+    };
     const card = (qui, nom) => {
       let rows = '';
       if (qui === 'moi') {
@@ -78,6 +88,7 @@
       }
       const tot = qui === 'moi' ? D.T.moi : D.T.autre, p = qui === 'moi' ? D.ponMoi : D.ponAutre;
       return '<div class="cmp-card"><div class="cmp-h"><b>' + esc(nom) + '</b><span class="subs"><b class="num">' + e0(Math.ceil(tot / 100) * 100) + '</b> / mois demandés par le budget</span></div><div class="vo-list">' + rows + '</div>' +
+        detailPostes(qui, tot) +
         (p > 0 ? '<div class="cmp-pon">' + chip('warn', 'virement ponctuel') + ' <b class="num">' + e0(p) + '</b> <span class="subs">une fois, ' + esc(pDate) + '</span></div>' : '') + '</div>';
     };
     let h = '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Virements à mettre en place</h2><div class="row"><span class="muted">' +
@@ -377,24 +388,8 @@
     return h;
   }
 
-  // Commun › Plan (#cm-planp) : part de chacun poste par poste, comparée aux virements permanents en place.
-  function planPostes(B) {
-    const P = KC().planPostes(B), R = KC().reglages(B);
-    if (!P.lignes.length) return '<div class="panel-h"><h2>Plan du compte commun</h2></div><p class="note">Aucun poste dans le budget du compte commun (Commun › Ce mois › Budget mensuel).</p>';
-    const ec = v => Math.abs(v) < 100 ? chip('good', 'conforme') : v < 0 ? chip('bad', e0(-v) + ' de moins') : chip('info', e0(v) + ' de plus');
-    return '<div class="panel-h"><h2>Plan du compte commun</h2><span class="muted">part de chacun, poste par poste</span></div>' +
-      '<div class="tablewrap"><table class="cats cm-plan-t"><thead><tr><th>Poste</th><th class="r">Par mois</th><th class="r">' + esc(R.moi) + '</th><th class="r">' + esc(R.autre) + '</th></tr></thead><tbody>' +
-      P.lignes.map(x => '<tr><td>' + esc(x.label) + '<div class="subs">' + Math.round(x.pg) + ' / ' + Math.round(100 - x.pg) + (x.per > 1 ? ' · provision d\'une échéance tous les ' + x.per + ' mois' : '') + '</div></td><td class="r num">' + e2(x.mensuel) + '</td><td class="r num">' + e2(x.moi) + '</td><td class="r num">' + e2(x.autre) + '</td></tr>').join('') +
-      '<tr class="total"><td>Total des parts</td><td class="r num">' + e2(P.tot.moi + P.tot.autre) + '</td><td class="r num">' + e2(P.tot.moi) + '</td><td class="r num">' + e2(P.tot.autre) + '</td></tr>' +
-      '<tr><td>Virements permanents en place</td><td></td><td class="r num">' + e2(P.vir.moi) + '</td><td class="r num">' + e2(P.vir.autre) + '</td></tr>' +
-      '<tr><td>Écart</td><td></td><td class="r">' + ec(P.ecart.moi) + '</td><td class="r">' + ec(P.ecart.autre) + '</td></tr></tbody></table></div>' +
-      (P.props.length ? '<h3 class="obs-h3">Contrats qui ont changé</h3><ul class="list">' + P.props.map(x => '<li><div class="grow">' + esc(x.label || x.poste.slice(2)) + '<small>budget ' + e2(x.budget) + ' par mois · contrats ' + e2(x.contrats) + ' par mois</small></div>' +
-        '<span class="subs">virement ' + (x.moi >= 0 ? '+' : '−') + ' ' + esc(e2(Math.abs(x.moi))) + ' pour ' + esc(R.moi) + ', ' + (x.autre >= 0 ? '+' : '−') + ' ' + esc(e2(Math.abs(x.autre))) + ' pour ' + esc(R.autre) + '</span></li>').join('') + '</ul>' : '') +
-      U().comment('Montant par mois du budget du compte commun (provision mensuelle pour les charges non mensuelles) et part de chacun (« ma part » du mode Budget). Les virements en place sont ceux de la liste « Modifier les ordres ».');
-  }
-
   // Ancienne présentation en cartes (gardée pour les tests du Lot 7) : marge, fin de mois, virements, trésorerie.
   function cartes(B, ouverts) { return plan(B, { cartes: ouverts }); }
 
-  g.KladVuesCommun = { plan, cartes, ordres, equilibre, graphique, tresorerie, appels, origine, mois, planPostes };
+  g.KladVuesCommun = { plan, cartes, ordres, equilibre, graphique, tresorerie, appels, origine, mois };
 })(typeof window !== 'undefined' ? window : globalThis);
