@@ -122,7 +122,9 @@
       renflouement: Rf ? { montant: ent(Rf.montant), moi: ent(Rf.moi), autre: ent(Rf.autre), seuil: ent(Rf.seuil), pointBas: ent(Rf.min), date: Rf.minAt, fait: Rf.fait } : null,
       enveloppesDetournees: C.enveloppesDetournees(B).map(x => ({ nom: x.nom, montant: ent(x.montant), mois: x.mois, depense: x.depense ? { date: x.depense.date, montant: ent(x.depense.montant) } : null })),
       equilibre: E && E0 ? { ecartAvant: ecartEq(E0), ecartApres: ecartEq(E), difference: ent((E.invAutre - E.invMoi) - (E0.invAutre - E0.invMoi)),
-        horsEquilibre: (E.hors || []).map(x => ({ date: x.date, montant: ent(x.montant), mention: x.mention })) } : null
+        horsEquilibre: (E.hors || []).map(x => ({ date: x.date, montant: ent(x.montant), mention: x.mention })),
+        // 1.3.3 : virements « Autre » comptés en faveur de l'un (seulement s'il y en a)
+        ...((E.autres || []).length ? { autres: E.autres.map(x => ({ date: x.date, montant: ent(x.montant), qui: x.qui, faveur: ent(x.faveur) })) } : {}) } : null
     };
   }
 

@@ -15,6 +15,9 @@ Correctif d'affichage (retour du propriétaire, 07/11).
   dit clairement son affectation et son effet (par exemple « 50 € comptés en faveur de … dans l'équilibre »), puis
   propose « Accepter la proposition » ou un autre choix : une carte par choix, avec son effet et son champ (poste,
   année, précision) dans la même carte. Une fois affecté, la pastille devient « imprévu · affecté » (vert).
+- **« Autre » avec un effet dans l'équilibre** : comme son classement d'origine, hors équilibre, ou en faveur de l'un
+  (en entier ou pour moitié) ; ligne « + Autres virements affectés » dans « Comment chacun a investi ». Réserve et
+  Remboursement disent maintenant que l'équilibre garde le classement d'origine du virement (versement de …, etc.).
 
 ## 1.3.2
 

@@ -867,7 +867,7 @@
   // l'affectation est mise à jour (même chemin qu'un appui sur le choix, annulable)
   $('opDetail').addEventListener('change', ev => {
     const t = ev.target;
-    if (!t || ['cmAn', 'cmPour', 'cmTxt'].indexOf(t.id) < 0) return;
+    if (!t || ['cmAn', 'cmPour', 'cmTxt', 'cmEq'].indexOf(t.id) < 0) return;
     const c = t.closest('.cm-ch'), b = c && c.querySelector('.cm-ch-b[aria-pressed="true"]');
     if (b) b.click();
   });
@@ -917,7 +917,7 @@
         if (k === 'proposee') { const x = KCo.ponctuels(budget()).find(y => y.r.id === o.id); aff = x ? x.prop : (KCo.propositionOp ? KCo.propositionOp(budget(), o.id) : null); }
         else if (k === 'impots') aff = { k, an: $('cmAn') ? $('cmAn').value : null };
         else if (k === 'avance') aff = { k, pour: $('cmPour') ? $('cmPour').value : 'renflouement' };
-        else if (k === 'autre') aff = { k, txt: $('cmTxt') ? $('cmTxt').value.trim() : '' };
+        else if (k === 'autre') aff = { k, txt: $('cmTxt') ? $('cmTxt').value.trim() : '', eq: $('cmEq') ? $('cmEq').value : '' };
         else if (k) aff = { k };
         avant = KCo.affecter(o, aff);
         msg = aff ? 'Virement affecté : ' + KCo.texteAff(budget(), o.commun.aff) + '.' : 'Virement de nouveau à affecter.';

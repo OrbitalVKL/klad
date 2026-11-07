@@ -92,6 +92,12 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   une phrase, champ propre au choix dans la même carte (poste pour Avance, année pour Impôts, précision pour Autre) ;
   un champ modifié sur le choix actuel le réapplique (`app.js`, écouteur `change`). « Remettre à affecter ». Pastille
   « imprévu · affecté » (vert) pour un virement ponctuel affecté ou antérieur au suivi des avances.
+- « Autre » avec effet dans l'équilibre (`o.commun.aff.eq` : `hors`, `moi-tout`, `moi-moitie`, `autre-tout`,
+  `autre-moitie` ; absent : classement d'origine) : `commun.js:equilibre` (hors équilibre, ou `autMoi` / `autAutre`
+  ajoutés à l'investi, liste `autres`), ligne « + Autres virements affectés » (`vcommun.js`), `origineEq(B, r)` (classement
+  d'origine en clair : versement de …, remboursement de charges, déblocage, non compté), `texteEqAutre`. Réserve et
+  Remboursement : texte corrigé (« comme son classement d'origine (…) », et non plus « aucun effet »). Relevé :
+  `communPlan.equilibre.autres` seulement s'il y en a (références des jeux fictifs inchangées).
 - Tests : `test/lot133.test.mjs` (rendu, plis, Chromium : Commun › Trésorerie et Budget › Tendance), ajouté à l'étape
   Chromium du workflow. Relevé de contrôle et résumé Grafit inchangés (références 1.3.2).
 

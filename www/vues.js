@@ -434,6 +434,8 @@
       const an = cur.k === 'impots' && cur.an ? +cur.an : new Date(B.auj).getFullYear() - 1;
       const postes = KB2().postes(B, 'commun').lignes.filter(a => a.on);
       const Rc = B.R.commun || {}, qui = (cur.k === 'avance' && cur.qui) || 'moi';
+      const orig = KCo.origineEq ? KCo.origineEq(B, { date: o.date, m: o.montant }) : 'non compté';
+      const nM = Rc.moi || 'vous', nA = Rc.autre || 'l\'autre personne', eqCur = aff && aff.k === 'autre' ? aff.eq || '' : '';
       const autreNom = qui === 'autre' ? (Rc.moi || 'l\'autre personne') : (Rc.autre || 'l\'autre personne');
       const effet = a => {
         if (a.k === 'impots') return 'hors de l\'équilibre de l\'appartement ; l\'enveloppe ne paie que les prélèvements d\'impôt';
@@ -443,7 +445,8 @@
           return l ? F().montant(l.faveur) + ' comptés en faveur de ' + pour + ' dans l\'équilibre (la part de l\'autre personne)'
             : 'la part de ' + autreNom + ' sera comptée en faveur de celui ou celle qui a versé, dans l\'équilibre';
         }
-        return 'aucun effet sur l\'équilibre de l\'appartement';
+        if (a.k === 'autre' && a.eq) return 'dans l\'équilibre : ' + KCo.texteEqAutre(B, a.eq);
+        return 'dans l\'équilibre : comme son classement d\'origine (' + orig + ')';
       };
       h += '<h4 class="cm-aff-t">Affectation de ce virement</h4>' +
         (aff ? '<p class="cm-aff-etat"><b>Affecté : ' + esc(KCo.texteAff(B, aff)) + '</b><br><span class="muted small">' + esc(effet(aff)) + '</span></p>'
@@ -462,10 +465,14 @@
           postes.map(a => '<option value="' + esc(a.key) + '"' + (cur.k === 'avance' && cur.pour === a.key ? ' selected' : '') + '>' + esc(a.label) + '</option>').join('') + '</select></label>') +
         choix('impots', 'Impôts', 'Mis de côté pour l\'impôt : hors équilibre, ne paie que les prélèvements d\'impôt.',
           '<label class="ctl" for="cmAn">année <select id="cmAn">' + [an - 1, an, an + 1].map(y => '<option' + (y === an ? ' selected' : '') + '>' + y + '</option>').join('') + '</select></label>') +
-        choix('reserve', 'Réserve', 'Mis de côté sur le commun : aucun effet sur l\'équilibre.') +
-        choix('remb', 'Remboursement', 'Argent rendu (trop-perçu, remboursement) : aucun effet sur l\'équilibre.') +
-        choix('autre', 'Autre', 'À préciser : aucun effet sur l\'équilibre.',
-          '<label class="ctl" for="cmTxt">précision <input id="cmTxt" maxlength="60" autocomplete="off" value="' + esc(aff && aff.k === 'autre' ? aff.txt || '' : '') + '"></label>') +
+        choix('reserve', 'Réserve', 'Mis de côté sur le commun. Dans l\'équilibre : comme son classement d\'origine (' + orig + ').') +
+        choix('remb', 'Remboursement', 'Argent rendu (trop-perçu, remboursement). Dans l\'équilibre : comme son classement d\'origine (' + orig + ').') +
+        choix('autre', 'Autre', 'À préciser, avec son effet dans l\'équilibre.',
+          '<label class="ctl" for="cmTxt">précision <input id="cmTxt" maxlength="60" autocomplete="off" value="' + esc(aff && aff.k === 'autre' ? aff.txt || '' : '') + '"></label>' +
+          '<label class="ctl cm-eq" for="cmEq">dans l\'équilibre <select id="cmEq">' +
+          [['', 'comme son classement d\'origine (' + orig + ')'], ['hors', 'hors équilibre'], ['moi-tout', 'en faveur de ' + nM + ', en entier'], ['moi-moitie', 'en faveur de ' + nM + ', pour moitié'],
+            ['autre-tout', 'en faveur de ' + nA + ', en entier'], ['autre-moitie', 'en faveur de ' + nA + ', pour moitié']]
+            .map(([v, l]) => '<option value="' + v + '"' + (v === eqCur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></label>') +
         '</div>' + (aff ? '<div class="row">' + bt('affecter', 'data-k=""', 'Remettre à affecter', false) + '</div>' : '');
     }
     if (o.montant < 0) {

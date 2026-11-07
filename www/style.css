@@ -2071,3 +2071,5 @@ html.etroit .sousvues.patri{grid-template-columns:repeat(2,minmax(0,1fr))}
 .cm-ch-f{padding:0 12px 10px 40px;display:flex;flex-wrap:wrap;gap:6px}
 .cm-ch-f .ctl{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%}
 .cm-ch-f select,.cm-ch-f input{min-width:0;max-width:100%;min-height:44px}
+.cm-ch-f .cm-eq{flex-wrap:wrap}
+.cm-ch-f .cm-eq select{flex:1 1 220px}

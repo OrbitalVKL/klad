@@ -107,8 +107,49 @@ test('affectation à la main d\'un virement écarté des propositions : comptée
   assert.match(h, /data-k="impots" aria-pressed="false">[\s\S]*?<\/button><div class="cm-ch-f"><label class="ctl" for="cmAn">/);
   assert.match(h, /data-k="autre" aria-pressed="false">[\s\S]*?<\/button><div class="cm-ch-f"><label class="ctl" for="cmTxt">/);
   assert.match(h, /tx-tag st-ok[^>]*><span class="st-dot" aria-hidden="true"><\/span>imprévu · affecté/);
-  // Réserve : sans effet, dit comme tel
+  // Réserve : pas d'effet propre, l'équilibre garde le classement d'origine (dit en clair)
   KC.affecter(o, { k: 'reserve' });
   h = Vu.detail(S, o, K.contexte(S, NOW), ctx());
-  assert.match(h, /Affecté : Réserve[\s\S]*aucun effet sur l(?:'|&#39;)équilibre/);
+  assert.match(h, /Affecté : Réserve[\s\S]*comme son classement d(?:'|&#39;)origine \(déblocage de prêt, non compté\)/);
+});
+
+test('« Autre » : effet choisi dans l\'équilibre (classement d\'origine, hors équilibre, en faveur de l\'un, en entier ou pour moitié)', async () => {
+  const X = outils(['ui.js', 'vues.js', 'vbudget.js', 'vcommun.js']);
+  const { KladClasse: K, KladBudget: KB, KladCommun: KC, KladVues: Vu } = X;
+  const r = repriseFictive(FIN);
+  r.transactions.push({ account: 'r2', date: '2026-10-21', amount: 12000, label: 'VIR PERSONNE A DIVERS FICTIF', status: 'comptabilisee' });
+  r.transactions.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const S = await etatDepuisReprise(X, r, NOW);
+  const ctx = () => KB.contexte(S, NOW, K.contexte(S, NOW));
+  const c = S.modele.comptes.find(x => x.role === 'commun'), o = S.ops[c.id].find(x => x.montant === 12000 && x.date === '2026-10-21');
+  const E0 = KC.equilibre(ctx());
+  // classement d'origine : versement de Personne A, compté en entier (même résultat sans affectation)
+  KC.affecter(o, { k: 'autre', txt: 'divers' });
+  let B = ctx(), E = KC.equilibre(B);
+  assert.equal(E.invMoi, E0.invMoi);
+  assert.equal(KC.origineEq(B, { date: o.date, m: o.montant }), 'versement de Personne A, compté en entier');
+  let h = Vu.detail(S, o, K.contexte(S, NOW), B);
+  assert.match(h, /data-k="autre" aria-pressed="true">[\s\S]*?<label class="ctl cm-eq" for="cmEq">dans l(?:'|&#39;)équilibre <select id="cmEq"><option value="" selected>comme son classement d(?:'|&#39;)origine \(versement de Personne A, compté en entier\)/);
+  // hors équilibre : le versement ne compte plus
+  KC.affecter(o, { k: 'autre', txt: 'divers', eq: 'hors' });
+  E = KC.equilibre(ctx());
+  assert.equal(E.invMoi, E0.invMoi - 12000);
+  assert.ok(E.hors.some(x => x.montant === 12000 && /Autre : divers · hors équilibre/.test(x.mention)));
+  // en faveur de Personne B, pour moitié
+  KC.affecter(o, { k: 'autre', txt: 'divers', eq: 'autre-moitie' });
+  B = ctx(); E = KC.equilibre(B);
+  assert.equal(E.invMoi, E0.invMoi - 12000);
+  assert.equal(E.invAutre, E0.invAutre + 6000);
+  assert.equal(E.autAutre, 6000);
+  h = Vu.detail(S, o, K.contexte(S, NOW), B);
+  assert.match(h, /Affecté : Autre : divers · en faveur de Personne B, pour moitié/);
+  assert.match(h, /<option value="autre-moitie" selected>/);
+  // en faveur de Personne A, en entier : comme le versement d'origine
+  KC.affecter(o, { k: 'autre', eq: 'moi-tout' });
+  E = KC.equilibre(ctx());
+  assert.equal(E.invMoi, E0.invMoi);
+  assert.equal(E.autMoi, 12000);
+  // valeur inconnue ignorée
+  KC.affecter(o, { k: 'autre', eq: 'nimporte' });
+  assert.equal(o.commun.aff.eq, undefined);
 });
