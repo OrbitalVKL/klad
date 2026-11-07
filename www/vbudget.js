@@ -528,7 +528,9 @@
     if (!L.length) liste += '<p class="muted">Aucun contrat ' + (scope === 'commun' ? 'du compte commun' : 'perso') + '.</p>';
     else liste += '<div class="tablewrap"><table class="cats ctr-t"><thead><tr><th>Contrat</th><th class="r">Montant</th><th>Dernier prélèvement</th><th>État</th></tr></thead><tbody>' +
       L.map(c => ed === c.id ? '<tr><td colspan="4">' + g.KladVuesBudget.formContrat(B, scope, ed) + '</td></tr>'
-        : '<tr><td><b>' + esc(c.label) + '</b>' + (c.posteLabel ? '<div class="subs">poste ' + esc(c.posteLabel) + '</div>' : '') + (c.src || c.note ? '<div class="subs">' + esc([c.src, c.note].filter(Boolean).join(' · ')) + '</div>' : '') +
+        : '<tr><td><b>' + esc(c.label) + '</b>' + (c.posteLabel ? '<div class="subs">poste ' + esc(c.posteLabel) + '</div>' : '') +
+          // 1.3.4 : numéro et fin du contrat
+          (c.num || c.fin ? '<div class="subs">' + esc([c.num ? 'n° ' + c.num : '', c.fin ? 'fin le ' + jjmmaa(c.fin) : ''].filter(Boolean).join(' · ')) + '</div>' : '') + (c.src || c.note ? '<div class="subs">' + esc([c.src, c.note].filter(Boolean).join(' · ')) + '</div>' : '') +
           (ed ? ' <button class="linkbtn" type="button" data-ctedit="' + esc(c.id) + '">modifier</button>' : '') + '</td>' +
           '<td class="r num">' + e2(c.montant) + ' <span class="subs">' + esc(PERLAB[c.per || 1]) + '</span>' + (c.per > 1 ? '<div class="subs">soit ' + e2(c.mensuel) + ' / mois</div>' : '') + '</td>' +
           '<td>' + (c.dernier ? e2(c.dernier.montant) + ' <span class="subs">le ' + jjmmaa(c.dernier.date) + '</span>' : '<span class="muted">aucun trouvé</span>') + (c.prochaine ? '<div class="subs">prochaine échéance le ' + jjmmaa(c.prochaine) + '</div>' : '') + '</td>' +
@@ -562,6 +564,17 @@
       '<div class="grp"><label class="sh-l"><span class="sh-lab">Montant du document</span><input class="sh-in" id="ctMontant" inputmode="decimal" autocomplete="off" value="' + esc(c.montant ? F().versSaisie(c.montant) : '') + '"></label>' +
       '<label class="sh-l"><span class="sh-lab">Périodicité</span><select class="sh-in" id="ctPer">' + KB().PER.map(p => '<option value="' + p + '"' + (p === (+c.per || 1) ? ' selected' : '') + '>' + esc(PERLAB[p]) + '</option>').join('') + '</select></label></div>' +
       '<label class="sh-l"><span class="sh-lab">Mot du libellé bancaire</span><input class="sh-in" id="ctMotif" maxlength="200" autocomplete="off" spellcheck="false" value="' + esc(c.motif) + '" placeholder="plusieurs possibles, séparés par |"></label>' +
+      // 1.3.4 : numéro de contrat (prioritaire sur le mot) avec les numéros trouvés dans les prélèvements ; fin du contrat
+      (() => {
+        const NP = c.id ? KB().numerosProposes(B, c) : [];
+        return '<label class="sh-l"><span class="sh-lab">Numéro de contrat</span><input class="sh-in" id="ctNum" maxlength="40" autocomplete="off" spellcheck="false" value="' + esc(c.num || '') + '" placeholder="facultatif, ex. AB1234567"></label>' +
+          '<p class="muted small ct-aide">Reconnu dans le libellé du prélèvement, avant le mot : utile quand plusieurs contrats ont le même organisme.</p>' +
+          (NP.length ? '<div class="ct-nums" role="group" aria-label="Numéros trouvés dans les prélèvements"><span class="muted small">Trouvés dans les prélèvements :</span>' +
+            NP.map(x => '<button type="button" class="puce' + (x.num === (c.num || '') ? ' on' : '') + '" data-ctnum="' + esc(x.num) + '">' + esc(x.num) +
+              ' <span class="subs">' + esc(F().montant(x.montant) + ' le ' + x.date.slice(8, 10) + '/' + x.date.slice(5, 7) + (x.autre ? ' · ' + x.autre : '')) + '</span></button>').join('') + '</div>' : '') +
+          '<label class="sh-l"><span class="sh-lab">Fin du contrat (résiliation)</span><input class="sh-in" id="ctFin" type="date" value="' + esc(c.fin || '') + '"></label>' +
+          '<p class="muted small ct-aide">Après cette date, un prélèvement de ce contrat est « non prévu » : signalé, et compté à part du poste.</p>';
+      })() +
       '<label class="sh-l"><span class="sh-lab">Poste du budget</span><select class="sh-in" id="ctPoste"><option value="">' + (c.id ? '— aucun —' : 'deviner d\'après le libellé') + '</option>' +
       keys.map(k => '<option value="' + esc(k) + '"' + (k === c.poste ? ' selected' : '') + '>' + esc(k.slice(2)) + '</option>').join('') +
       '<option value="__nouveau">Nouveau poste fixe au nom du contrat</option></select></label>' +

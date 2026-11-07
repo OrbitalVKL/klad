@@ -625,7 +625,15 @@
   const bornesOps = () => Vu.bornesPeriode(perOps.k, M.jourLocal(Date.now()), budget(), perimOps === 'commun' ? 'commun' : 'perso', perOps.du, perOps.au);
   // 1.3.0 : statut de chaque mouvement du compte commun (prévu, écart, imprévu), une fois par contexte du budget.
   function statutsCommun() {
-    try { const B = budget(); return B && window.KladCommun && window.KladCommun.statuts ? window.KladCommun.statuts(B) : null; } catch (e) { return null; }
+    try {
+      const B = budget();
+      const M0 = B && window.KladCommun && window.KladCommun.statuts ? window.KladCommun.statuts(B) : null;
+      // 1.3.4 : prélèvements perso après la fin d'un contrat : même pastille « non prévu »
+      if (!B || !B.np || !B.np.size) return M0;
+      const out = new Map(M0 || []);
+      for (const [id, c] of B.np) if (!out.has(id)) out.set(id, { statut: 'imprevu', quoi: 'prélevé après la fin du contrat ' + c.label + ' (fin le ' + c.fin.slice(8, 10) + '/' + c.fin.slice(5, 7) + ')', ecart: null, sorte: 'apresfin' });
+      return out;
+    } catch (e) { return null; }
   }
   function renderOps(reset) {
     if (!S) return;

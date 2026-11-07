@@ -97,6 +97,8 @@
     if (ext && ext.maj && /^\d+\.\d+\.\d+$/.test(ext.maj)) out.push({ level: 'info', code: 'UPDATE_AVAILABLE', text: 'KLAD ' + ext.maj });
     for (const b of (ext && ext.budgetOver) || []) out.push({ level: 'caut', code: 'BUDGET_OVER', text: b });
     if (ext && ext.decouvert) out.push({ level: ext.decouvert.niveau === 'crit' ? 'crit' : 'caut', code: 'OVERDRAFT_RISK', text: ext.decouvert.texte });
+    // 1.3.4 : prélèvement d'un contrat résilié (après sa date de fin), pas encore vu
+    if (ext && ext.apresFin > 0) out.push({ level: 'caut', code: 'CANCELLED_CONTRACT_DEBIT', text: 'CONTRAT RÉSILIÉ PRÉLEVÉ' + (ext.apresFin > 1 ? ' · ' + ext.apresFin : '') });
     if (ext && ext.imprevus > 0) out.push({ level: 'crit', code: 'COMMUN_UNPLANNED', text: ext.imprevus + (ext.imprevus > 1 ? ' DÉBITS IMPRÉVUS · COMMUN' : ' DÉBIT IMPRÉVU · COMMUN') });
     return out.map((a, i) => [a, i]).sort((x, y) => NIVEAUX[x[0].level] - NIVEAUX[y[0].level] || x[1] - y[1]).map(x => x[0]);
   }
@@ -196,9 +198,12 @@
     let commun = null;
     let risque = null;
     if (g.KladCommun) { try { commun = g.KladCommun.resume(B); risque = commun && g.KladCommun.risqueDecouvert(B); } catch (e) { commun = null; } }
+    // 1.3.4 : prélèvements après la fin d'un contrat, pas encore vus (90 derniers jours)
+    let finNv = 0;
+    try { const dep = KB().plusJours(B.auj, -90); if (B.np) for (const r of B.rows) if (B.np.has(r.id) && r.date >= dep && r.o && !K().vue(S, r.o)) finNv++; } catch (e) { finNv = 0; }
     // 1.3.2 : débits imprévus du commun dans le mois en cours (seulement s'il y en a)
     if (commun && g.KladCommun.imprevusMois) { try { const u = g.KladCommun.imprevusMois(B); if (u) commun.unplanned = u; } catch (e) { /* champ omis */ } }
-    return { month, upcoming, over, commun, risque, B };
+    return { month, upcoming, over, commun, risque, B, finNv };
   }
 
   // ext (facultatif) : { attention: { unseen, unclassified, accountsToCheck, toMatch }, sauvegarde: { jours | null }, maj: version,
@@ -217,6 +222,7 @@
     // 1.3.2 : débits imprévus du commun pas encore vus dans Klad : « crit » (texte sans montant)
     const u = bu && bu.commun && bu.commun.unplanned;
     if (u && u.unseen > 0) ext = Object.assign({}, ext, { imprevus: u.unseen });
+    if (bu && bu.finNv > 0) ext = Object.assign({}, ext, { apresFin: bu.finNv });
     const accounts = comptes.map(c => compteResume(S, c, now));
     const r = { v: V, state: 'ok', generated: now };
     const st = dernierReleve(S);

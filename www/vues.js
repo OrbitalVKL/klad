@@ -300,6 +300,8 @@
     // 1.3.3 : virement ponctuel affecté (ou antérieur au suivi des avances) : « imprévu · affecté », en vert (rien à faire)
     if (s.statut === 'imprevu' && s.sorte === 'ponctuel' && (s.aff || s.avant))
       return '<span class="tx-tag st-ok" title="' + esc(s.quoi || '') + '"><span class="st-dot" aria-hidden="true"></span>' + ST_LIB.imprevu + ' · affecté</span>';
+    // 1.3.4 : prélevé après la fin d'un contrat : « non prévu »
+    if (s.sorte === 'apresfin') return '<span class="tx-tag st-imp" title="' + esc(s.quoi || '') + '"><span class="st-dot" aria-hidden="true"></span>non prévu</span>';
     return '<span class="tx-tag ' + ST_CLS[s.statut] + '" title="' + esc(s.ecart || s.quoi || '') + '"><span class="st-dot" aria-hidden="true"></span>' + ST_LIB[s.statut] + '</span>';
   }
 
@@ -520,6 +522,8 @@
       [o.montant < 0 ? 'Débit' : 'Crédit', F().montant(o.montant, cur)],
       o.contrepartie ? ['Contrepartie', o.contrepartie] : null,
       ['Catégorie', r.cat + (r.sub && r.sub !== r.cat ? ' › ' + r.sub : '') + ' (' + (SOURCES[r.src] || '') + ')'],
+      // 1.3.4 : prélevé après la fin d'un contrat
+      B && B.np && B.np.get(o.id) ? ['Non prévu', 'prélevé après la fin du contrat « ' + B.np.get(o.id).label + ' » (fin le ' + F().date(B.np.get(o.id).fin) + ') : compté à part du poste, sur la ligne « ' + (g.KladBudget ? g.KladBudget.APRES_FIN : 'Après la fin d\'un contrat') + ' »'] : null,
       r.type === 'interne' ? ['Interne', (man ? 'marquée interne à la main' : r.src === 'reglement' ? 'règlement détaillé sur ' + nomDetail + ', compté automatiquement interne' : 'virement entre vos comptes') +
         ' : pas comptée dans le budget'] : null,
       achat ? ['Réglé par', regle ? 'prélèvement du ' + F().date(regle.date) + ' sur ' + ((M().compte(S, regle.compte) || {}).libelle || 'un compte') + (regle.categorie && regle.categorie.lie === o.id ? ' (rapproché à la main)' : '')

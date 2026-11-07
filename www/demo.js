@@ -178,6 +178,7 @@
       const poste = String(c.poste || '').replace(/^[a-z]\|/, '');
       ajouter(c.label, poste ? generique(poste) : 'Contrat');
       ajouter(c.motif, poste ? generique(poste) : 'Contrat');
+      ajouter(c.num, 'n° de contrat');                       // 1.3.4
       ajouter(c.src, 'justificatif'); ajouter(c.note, 'note');
     });
     (D.virements || []).forEach((v, i) => { if (isObj(v)) { ajouter(v.label, 'Virement ' + (i + 1)); ajouter(v.depuis, 'Compte ' + (i + 1)); } });

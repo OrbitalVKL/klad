@@ -234,6 +234,13 @@
       annulable('Prévu « ' + vp.dataset.versprevu.slice(2) + ' » : ' + F.montant(r.amt) + ' par mois.', r.snap);
       return;
     }
+    // 1.3.4 : numéro trouvé dans les prélèvements → champ « Numéro de contrat »
+    const cn = t.closest('[data-ctnum]');
+    if (cn) {
+      const f = $('ctNum');
+      if (f) { f.value = cn.dataset.ctnum; cn.parentElement.querySelectorAll('[data-ctnum]').forEach(b => b.classList.toggle('on', b === cn)); }
+      return;
+    }
     const ct = t.closest('[data-ct]');
     if (ct) { contrat(ct); return; }
     // observations
@@ -388,7 +395,8 @@
     if (!lab) { A.toast('Indiquez le libellé du contrat.', true); return; }
     if (montant == null) { A.toast('Montant illisible.', true); return; }
     const snap = KB.enregistrerContrat(S(), A.budget(), { id: id || null, sc: A.scope(), label: lab, montant, per: +$('ctPer').value || 1,
-      motif: $('ctMotif').value, poste: $('ctPoste').value, src: $('ctSrc').value, note: $('ctNote').value });
+      motif: $('ctMotif').value, poste: $('ctPoste').value, src: $('ctSrc').value, note: $('ctNote').value,
+      num: $('ctNum') ? $('ctNum').value : '', fin: $('ctFin') ? $('ctFin').value : '' });
     A.log('info', id ? 'Contrat modifié.' : 'Contrat ajouté.');
     fin(id ? 'Contrat enregistré.' : 'Contrat ajouté.', snap);
   }

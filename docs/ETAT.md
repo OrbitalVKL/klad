@@ -6,6 +6,11 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.3.4** — contrats : numéro de contrat (prélèvement reconnu par son numéro avant le mot du libellé ; plusieurs contrats
+chez le même organisme ; numéros proposés d'après les prélèvements) et fin du contrat (résiliation) : un prélèvement après
+la fin est « non prévu » (compté à part du poste, pastille, observation, alerte Grafit `CANCELLED_CONTRACT_DEBIT` CAUT
+tant qu'il n'est pas vu) ; plus d'échéance après la fin (demande du propriétaire, 07/11).
+
 **1.3.3** — correctif d'affichage (retour du propriétaire, 07/11 ; développé et publié par l'architecte) : Tendance
 repliable dans Commun › Trésorerie ; sous-sections des contrats (liste, prévu du poste, échéances) repliables, état gardé
 sur le téléphone ; « Confirmer ? » du journal en rouge ; un virement reçu sur le commun et classé virement interne ou
@@ -74,6 +79,24 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.3.4 — détails techniques
+- `budget.js` : `numContrat(c)` (c.num sans espaces), `appartient(B, c, libellé)` (numéro, sinon mot et aucun numéro d'un
+  autre contrat du périmètre), `contratDe(B, sc, libellé)` (contrats à numéro d'abord), utilisés par `dernierDebit`,
+  `rattacher`, `echeances` (récurrents) et `commun.js:statuts`. `apresFin(B)` → `B.np` (Map id de ligne → contrat) au
+  contexte : débit dont la date de comptage dépasse `c.fin`. `cleDe` et `postes` : clé `c|Après la fin d'un contrat`
+  (ligne hors budget, `APRES_FIN`). `contrats()` : état « prélevé après la fin » (bad) ou « fin le JJ/MM » (info), pas de
+  prochaine échéance après la fin ; `echeances` : rien après la fin. `enregistrerContrat` : `num` (sans espaces, 40 car.),
+  `fin` (AAAA-MM-JJ), absents si vides. `numerosProposes(B, c)` : jetons « lettres + chiffres » des prélèvements reconnus
+  par le mot (12 mois ; sans RMS, FR, RUM, ICS), contrat qui l'a déjà.
+- Écrans : formulaire du contrat (`vbudget.js:formContrat`) : « Numéro de contrat », puces des numéros trouvés
+  (`data-ctnum`, `ecranbudget.js`), « Fin du contrat (résiliation) » ; liste : « n° … · fin le … ». Opérations : pastille
+  « non prévu » (`app.js:statutsCommun` fusionne `B.np` ; `vues.js:pastilleStatut`, sorte `apresfin`) ; détail : ligne
+  « Non prévu ». Commun : statut `imprevu` (sorte `apresfin`). `observations.js` : « <contrat> prélevé après la fin du
+  contrat » (nombre, total, dernier). `resume.js` : alerte `CANCELLED_CONTRACT_DEBIT` (caut) « CONTRAT RÉSILIÉ PRÉLEVÉ »
+  (« · n » si plusieurs) pour les prélèvements après la fin non vus des 90 derniers jours ; jamais de numéro. `demo.js` :
+  numéro masqué. Relevé : `contrats.liste[].fin` et `etat` seulement pour un contrat avec une fin (références inchangées).
+- Tests : `test/lot134.test.mjs`.
 
 ### 1.3.3 — détails techniques
 - `ecranbudget.js` : `force-open` seulement sur la section seule de la sous-vue (périmètre perso : `tend-panel` en

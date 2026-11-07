@@ -409,6 +409,9 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
   si `unseen` > 0) : « 1 DÉBIT IMPRÉVU · COMMUN » ou « n DÉBITS IMPRÉVUS · COMMUN » (n : débits imprévus non vus), sans
   montant ; elle disparaît dès que tous ont été vus, `commun.unplanned` reste. Le résumé est réécrit quand une opération
   est vue ou que son statut est corrigé à la main. Format v1 inchangé (champ en plus).
+- Alerte `CANCELLED_CONTRACT_DEBIT` (1.3.4, `caut`) : « CONTRAT RÉSILIÉ PRÉLEVÉ » (« · n » s'il y en a plusieurs) tant
+  qu'un prélèvement passé après la date de fin d'un contrat (Contrats › fiche › « Fin du contrat ») n'a pas été vu dans
+  Klad (90 derniers jours). Ni montant, ni numéro de contrat.
 
 ## Lecture des courriels (plugin `KladMail`)
 
