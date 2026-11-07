@@ -2,11 +2,23 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.2
+
+Correctif (retour du propriétaire, 07/11).
+- **Opérations qui disparaissaient** : une opération que la banque ne renvoie plus lors d'une relecture n'est plus jamais
+  retirée. Elle reste comptée ; si elle est bien à l'intérieur de la période relue, elle repasse « non vue » avec une note
+  dans son détail et un bouton « Retirer (opération en double) ». L'historique bancaire est relu une fois à la première
+  synchro pour remettre les opérations retirées à tort (si la banque les renvoie).
+- **Équilibre de l'appartement** : les avances au commun comptent à partir d'une date (Réglages › Personnes du commun ›
+  Début du suivi des avances). Avant, chaque virement garde son classement d'origine, même s'il a été affecté ; seule
+  l'enveloppe Impôts s'applique. Un déblocage de prêt n'est plus proposé comme virement à affecter.
+- **Lien Grafit** : débits imprévus du compte commun du mois en cours dans le résumé, et alerte tant qu'ils ne sont pas vus.
+
 ## 1.3.1
 
 Correctif de la 1.3.0 (retour du propriétaire, 06/11).
 - **Carte « Provisions en cours »** du compte commun (ancienne « Réserve pour échéances ») : la ligne « mis de côté »
-  affiche les postes et leurs montants (« Copropriété 377,46 €, Parking 64,20 € ») au lieu de « [object Object] ». Le
+  affiche les postes et leurs montants (par exemple « Copropriété 250,00 €, Parking 40,00 € ») au lieu de « [object Object] ». Le
   nouveau nom évite la confusion avec la réserve fixe (plancher de la trésorerie).
 - **Plus de sous-vue « Plan »** dans Commun : elle reprenait le budget du commun et « Virements à mettre en place ». Le
   détail par poste (part de chacun, poste par poste, total égal au « demandé ») se déplie maintenant sous chaque

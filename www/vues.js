@@ -133,7 +133,7 @@
       '</span><span class="v" style="color:' + col + '">' + esc(F().montant(Math.abs(v))) + '</span><span class="s">' + esc(sub) + (ancien ? ' <span class="chip warn">ancien</span>' : '') + '</span></button>';
   }
 
-  // 1.3.1 : « Copropriété 377 €, Parking 64 € » à partir des provisions { label, montant } (montants en centimes).
+  // 1.3.1 : « Copropriété 250 €, Parking 40 € » à partir des provisions { label, montant } (montants en centimes).
   const COURT = { 'Charges de copropriété': 'Copropriété', 'Charges parking': 'Parking' };
   function provisionsTexte(det) {
     return (det || []).filter(x => x && typeof x === 'object').map(x => (COURT[x.label] || String(x.label || 'Charge')) + ' ' + F().montant(Math.round(+x.montant || 0))).join(', ');
@@ -419,7 +419,10 @@
     let h = '<div class="cm-op"><h3 class="obs-h3">Compte commun</h3><p>' + pastilleStatut(s) + ' <b>' + esc(LIB[s.statut]) + '</b> · ' + esc(s.quoi) + '</p>' +
       (s.ecart ? '<p class="note">Écart : ' + esc(s.ecart) + '</p>' : '');
     const bt = (a, attrs, t, on) => '<button type="button" class="btn' + (on ? ' primary' : '') + '" data-a="' + a + '" ' + attrs + ' aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(t) + '</button>';
-    if (o.montant > 0 && s.sorte === 'ponctuel') {
+    if (o.montant > 0 && s.sorte === 'ponctuel' && s.avant) {
+      // 1.3.2 : avant le début du suivi des avances, le classement d'origine de l'équilibre s'applique
+      h += '<p class="muted small">Virement antérieur au suivi des avances (' + esc(B.R.commun.debutAvances.split('-').reverse().join('/')) + ') : il garde son classement d\'origine dans l\'équilibre de l\'appartement.</p>';
+    } else if (o.montant > 0 && s.sorte === 'ponctuel') {
       const x = KCo.ponctuels(B).find(y => y.r.id === o.id);
       const aff = x && x.aff, prop = x ? x.prop : { k: 'avance' }, cur = aff || prop;
       const an = cur.k === 'impots' && cur.an ? +cur.an : new Date(B.auj).getFullYear() - 1;
@@ -505,6 +508,9 @@
       '<dl class="op-det">' + lignes.map(x => '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>').join('') + '</dl>' +
       (w ? '<p class="note">Prélèvement de ' + esc(w.libelle) + ' sans opération de même montant dans son détail : il est compté comme une dépense. ' +
         'Rapprochez-le de l\'achat correspondant, marquez-le interne s\'il est déjà détaillé, ou gardez-le en dépense.</p>' : '') +
+      // 1.3.2 : opération que la banque ne renvoie plus : gardée et comptée ; retrait à la main si c'est un double
+      (o.nonRenvoyee ? '<p class="note">La banque ne renvoie plus cette opération depuis le ' + esc(F().date(o.nonRenvoyee)) + '. Elle reste comptée. ' +
+        'Si elle apparaît en double dans la liste (même montant, autre libellé ou autre date), retirez celle-ci ; sinon, marquez-la vue.</p>' : '') +
       (achat && !regle && o.rapprochement !== 'autrement' ? '<p class="note">Aucun prélèvement de ' + esc(wc.libelle) + ' ne correspond à cet achat. ' +
         (cBanque.length ? 'Rapprochez-le d\'un prélèvement, ou ' : '') + 'marquez-le « payé autrement » s\'il a été réglé avec le solde de ' + esc(wc.libelle) + ' ou un autre moyen.</p>' : '') +
       '<div class="row"><button type="button" class="btn primary" data-a="classer">Classer</button>' +
@@ -517,7 +523,8 @@
       (achat && o.rapprochement === 'autrement' ? '<button type="button" class="btn" data-a="pasautrement">Annuler : payé autrement</button>' : '') +
       (ecV && !ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartvu">Écart vérifié</button>' : '') +
       (ecV && ec.banque.ecartVu ? '<button type="button" class="btn" data-a="ecartnonvu">Annuler : écart à vérifier</button>' : '') +
-      (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') + '</div>' + compte + detailCommun(S, o, B) +
+      (man ? '<button type="button" class="btn" data-a="depense">Annuler : compter en dépense</button>' : '') +
+      (o.nonRenvoyee ? '<button type="button" class="btn" data-a="retirerop">Retirer (opération en double)</button>' : '') + '</div>' + compte + detailCommun(S, o, B) +
       '<button type="button" class="ac-lien" data-a="semblables">Opérations semblables ›</button>' +
       '<p class="muted small">Sur la liste : glisser une opération vers la droite la marque vue (ou non vue), vers la gauche ouvre « Classer ».</p>';
   }

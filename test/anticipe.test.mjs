@@ -97,16 +97,21 @@ test('contre-épreuve : virements exécutés le 01/11 → mêmes chiffres au 03/
 // 1.2.0 : référence régénérée ; seul changement voulu : le total du résumé Grafit (total.all) devient le « Total perso »
 // (sans le compte commun, paiement en ligne compris). 1.3.0 : référence régénérée ; seul ajout : le bloc « communPlan »
 // (statuts, enveloppes, avances, réserve fixe) ; tout le reste est identique à la 1.2.0 (et à la 1.1.3 sauf le total).
-test('relevés de contrôle des jeux « mesures » et « personnel » identiques à la 1.3.0 (1.2.0 plus le bloc communPlan)', async () => {
+// 1.3.2 : référence régénérée ; seul changement voulu : résumé Grafit, champ commun.unplanned (débits imprévus du commun
+// dans le mois en cours) et alerte COMMUN_UNPLANNED ; tout le reste est identique à la 1.3.0.
+test('relevés de contrôle des jeux « mesures » et « personnel » identiques à la 1.3.2 (1.3.0 plus commun.unplanned et COMMUN_UNPLANNED)', async () => {
   const T = now('2026-10-28');
   const lire = (nom, v) => JSON.parse(fs.readFileSync(new URL('./references/releve-' + nom + '-' + v + '.json', import.meta.url)));
   for (const [nom, f] of [['mesures', repriseMesures], ['personnel', reprisePersonnelle]]) {
-    const ref = lire(nom, '1.3.0'), r120 = lire(nom, '1.2.0'), ancien = lire(nom, '1.1.3');
+    const ref = lire(nom, '1.3.2'), r130 = lire(nom, '1.3.0'), r120 = lire(nom, '1.2.0'), ancien = lire(nom, '1.1.3');
     const r = releve(X, await etatDepuisReprise(X, f('2026-10-28'), T), T);
     r.meta.version = ref.meta.version;
     assert.deepEqual(r, ref, nom);
+    const sansImprevus = x => { const y = JSON.parse(JSON.stringify(x)); delete y.grafit.calcule.commun.unplanned; y.grafit.calcule.alerts = y.grafit.calcule.alerts.filter(a => a.code !== 'COMMUN_UNPLANNED'); return y; };
+    assert.ok(ref.grafit.calcule.commun.unplanned, nom + ' : champ commun.unplanned présent');
+    assert.deepEqual(sansImprevus(ref), r130, nom + ' : seuls commun.unplanned et COMMUN_UNPLANNED s\'ajoutent depuis la 1.3.0');
     const sansPlan = x => { const y = JSON.parse(JSON.stringify(x)); delete y.communPlan; return y; };
-    assert.deepEqual(sansPlan(ref), r120, nom + ' : seul le bloc communPlan s\'ajoute depuis la 1.2.0');
+    assert.deepEqual(sansPlan(r130), r120, nom + ' : seul le bloc communPlan s\'ajoute depuis la 1.2.0');
     const sans = x => { const y = sansPlan(x); delete y.grafit.calcule.total.all; return y; };
     assert.deepEqual(sans(r120), sans(ancien), nom + ' : seul le total change entre la 1.1.3 et la 1.2.0');
     assert.ok(r120.grafit.calcule.total.all < ancien.grafit.calcule.total.all, nom + ' : le commun n\'est plus compté');

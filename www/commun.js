@@ -439,7 +439,7 @@
     OPS.forEach(([d, , a], i) => {
       const L = parCle.get(d + '|' + Math.round(a));
       if (!L || !L.length) return;
-      const r = L.shift(), aff = r.m > 0 ? affDe(r.o) : null, cle = r.m < 0 ? EN.parOp.get(r.id) : null;
+      const r = L.shift(), aff = r.m > 0 ? affEff(B, r) : null, cle = r.m < 0 ? EN.parOp.get(r.id) : null;
       const env = cle ? EN.liste.find(e => e.cle === cle) : null;
       if (aff || env) out.set(i, { r, aff, env });
     });
@@ -589,6 +589,21 @@
   function deLautreR(B, r) { const R = R7(B); return !!((R.motifAutre && R.motifAutre.test(r.label)) || (R.nomsConnus && r.sub === R.autre)); }
   // Début de la reprise des affectations proposées : 12 mois glissants (les affectations confirmées restent toujours).
   const debutAff = B => shift(B.auj.slice(0, 7), -11) + '-01';
+  // 1.3.2 : avant le début du suivi des avances (réglage commun.debutAvances), un virement ponctuel garde son classement
+  // d'origine dans l'équilibre : son affectation (gardée sur l'opération) ne compte pas, sauf l'enveloppe Impôts.
+  const debutAv = B => (B.R.commun && B.R.commun.debutAvances) || '0000-00-00';
+  const avantSuivi = (B, r) => r.date < debutAv(B);
+  function affEff(B, r) {
+    const a = affDe(r.o);
+    return a && (a.k === 'impots' || !avantSuivi(B, r)) ? a : null;
+  }
+  // Crédits de l'équilibre classés « déblocage de prêt » (même date, même montant) : jamais des virements ponctuels.
+  function deblocages(B) {
+    if (B.memo.dpK) return B.memo.dpK;
+    const out = new Set();
+    try { for (const [d, , a, k] of mouvements(B)) if (k === 'dp') out.add(d + '|' + Math.round(a)); } catch (e) { /* sans équilibre */ }
+    return (B.memo.dpK = out);
+  }
 
   // Virements permanents reconnus, mois par mois : Map(id d'opération → { v, m }).
   function virementsVus(B) {
@@ -625,10 +640,10 @@
   // → [{ r, aff (confirmée) | null, prop }].
   function ponctuels(B) {
     if (B.memo.ponct) return B.memo.ponct;
-    const V = virementsVus(B), deb = debutAff(B), out = [];
+    const V = virementsVus(B), d12 = debutAff(B), deb = d12 > debutAv(B) ? d12 : debutAv(B), DP = deblocages(B), out = [];
     for (const r of opsCommun(B)) {
-      if (r.m <= 0 || V.has(r.id) || r.type === 'interne') continue;
-      const c = etatOp(r.o), aff = affDe(r.o);
+      if (r.m <= 0 || V.has(r.id) || r.type === 'interne' || DP.has(r.date + '|' + Math.round(r.m))) continue;
+      const c = etatOp(r.o), aff = affEff(B, r);
       if (c && c.statut === 'prevu' && !aff) continue;          // reconnu à la main comme virement prévu
       if (!aff && r.date < deb) continue;
       out.push({ r, aff, prop: proposition(B, r) });
@@ -735,8 +750,12 @@
           const e = [montant(r, v.montant, 'montant'), tard ? (dep ? 'parti' : 'arrivé') + ' le ' + jj(d) + ', prévu le ' + J : null, tot ? 'arrivé le ' + jj(d) + ', bien avant le ' + J : null].filter(Boolean);
           s = { statut: e.length ? 'ecart' : 'prevu', quoi: 'virement permanent · ' + nom(v.qui) + (v.label ? ' (' + v.label + ')' : ''), ecart: e.length ? e.join(' ; ') : null, sorte: 'virement' };
         } else {
-          const a = affDe(r.o);
-          s = { statut: 'imprevu', quoi: a ? texteAff(B, a) : 'virement ponctuel à affecter', ecart: null, sorte: 'ponctuel', aff: a };
+          const a = affEff(B, r);
+          if (!a && avantSuivi(B, r)) {
+            // 1.3.2 : avant le suivi des avances : classement d'origine dans l'équilibre, rien à affecter
+            const brut = affDe(r.o);
+            s = { statut: 'imprevu', quoi: (brut ? texteAff(B, brut) + ' · ' : '') + 'avant le suivi des avances (classement d\'origine)', ecart: null, sorte: 'ponctuel', aff: null, avant: true };
+          } else s = { statut: 'imprevu', quoi: a ? texteAff(B, a) : 'virement ponctuel à affecter', ecart: null, sorte: 'ponctuel', aff: a };
         }
       } else {
         const cle = EN.parOp.get(r.id), env = cle && EN.liste.find(e => e.cle === cle);
@@ -874,7 +893,7 @@
       const l = { date: r.date, label: r.label, montant: r.m, id: r.id, cid: r.cid, texte: s.ecart || s.quoi, statut: s.statut };
       if (s.statut === 'prevu') out.prevus++;
       else if (s.statut === 'ecart') out.ecarts.push(l);
-      else { out.imprevus.push(l); if (s.sorte === 'ponctuel' && !s.aff) out.aAffecter++; }
+      else { out.imprevus.push(l); if (s.sorte === 'ponctuel' && !s.aff && !s.avant) out.aAffecter++; }
     }
     const cur = B.auj.slice(0, 7);
     if (m <= cur) for (const v of virements(B)) {
@@ -884,6 +903,28 @@
       out.ecarts.push({ date: du, label: v.label || 'Virement permanent', montant: +v.montant, texte: 'virement de ' + nom(v.qui) + ' non reçu' + (m === cur ? '' : ' ce mois-là'), statut: 'ecart', manquant: true });
     }
     out.conforme = !out.ecarts.length && !out.imprevus.length;
+    return out;
+  }
+
+  // ------------------------------------------------------------ 1.3.2 : débits imprévus du mois (résumé Grafit)
+  // Débits du compte commun au statut « imprévu » (corrections à la main comprises) dans le mois de comptage en cours
+  // (celui de la fiche du mois). Crédits (virements ponctuels) et écarts exclus. Pas de mémo : « vue » change sans
+  // nouveau contexte. → { n, amount (euros, positif), unseen (omis si 0), last (AAAA-MM-JJ) } ou null s'il n'y en a pas.
+  function imprevusMois(B) {
+    const m = B.auj.slice(0, 7), ST = statuts(B);
+    let n = 0, c = 0, nv = 0, last = '';
+    for (const r of opsCommun(B)) {
+      if (r.m >= 0 || KB().dateCompte(r).slice(0, 7) !== m) continue;
+      const s = ST.get(r.id);
+      if (!s || s.statut !== 'imprevu') continue;
+      n++; c -= r.m;
+      if (r.o && !K().vue(B.S, r.o)) nv++;
+      if (r.date > last) last = r.date;
+    }
+    if (!n) return null;
+    const out = { n, amount: Math.round(c) / 100 };
+    if (nv) out.unseen = nv;
+    out.last = last;
     return out;
   }
 
@@ -936,7 +977,7 @@
     return { appels: Object.keys(D.appels || {}).filter(k => isObj(D.appels[k]) && Array.isArray(D.appels[k].items)).length, equipements: (eq.items || []).length };
   }
 
-  g.KladCommun = { ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
+  g.KladCommun = { imprevusMois, ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
     sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer,
     AFFECTATIONS, STATUTS, virementsVus, proposition, ponctuels, affecter, corriger, restaurer, texteAff, enveloppes, statuts, avances, decomposition,
     enveloppesDetournees, partsEnCause, renflouement, renflouementFait, annulerRenflouement, fiche, planPostes };

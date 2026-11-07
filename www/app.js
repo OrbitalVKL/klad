@@ -867,6 +867,17 @@
     const b = ev.target.closest('[data-a]');
     if (!b || !opCourante) return;
     if (b.dataset.a === 'vue') { basculerVue(opCourante[0], opCourante[1]); renderDetail(); }
+    else if (b.dataset.a === 'retirerop') {
+      // 1.3.2 : opération que la banque ne renvoie plus, retirée à la main (double) ; annulable
+      const [cid, id] = opCourante, list = S.ops[cid] || [], i = list.findIndex(x => x.id === id);
+      if (i < 0 || !list[i].nonRenvoyee) return;
+      if (!confirmInline(b, 'Confirmer le retrait ?')) return;
+      const [o] = list.splice(i, 1);
+      log('info', 'Opération plus renvoyée par la banque retirée à la main.');
+      changed('ops');
+      versListe();
+      toastAnnuler('Opération retirée.', () => { const l = S.ops[cid] || (S.ops[cid] = []); if (!l.some(x => x.id === o.id)) { l.splice(Math.min(i, l.length), 0, o); changed('ops'); } });
+    }
     else if (b.dataset.a === 'classer') ouvrirClasser(opCourante[0], opCourante[1]);
     else if (b.dataset.a === 'semblables') {
       const o = trouverOp(opCourante[0], opCourante[1]);
@@ -1601,6 +1612,20 @@
           const r = window.KladMigrations.doublons(s0, Date.now());
           if (r && r.n) { log('ok', r.n + ' doublon(s) retiré(s) (opération lue deux fois par la banque) ; annulable 7 jours depuis Plus › Journal.'); modifie = true; }
         } catch (e) { log('err', 'Doublons : ' + (e.message || e)); }
+      }
+      // 1.3.2 : historique bancaire relu une fois (opérations retirées à tort avant la 1.3.2), à la prochaine synchro
+      if (window.KladMigrations && window.KladMigrations.relecture) {
+        try {
+          const r = window.KladMigrations.relecture(s0, Date.now());
+          if (r && r.n) { log('info', r.n + ' compte(s) : historique bancaire relu à la prochaine synchro (opérations retirées à tort remises si la banque les renvoie).'); modifie = true; }
+        } catch (e) { log('err', 'Relecture : ' + (e.message || e)); }
+      }
+      // 1.3.2 : début du suivi des avances au commun (coffre passé par la 1.3.0), une fois
+      if (window.KladMigrations && window.KladMigrations.debutAvances) {
+        try {
+          const r = window.KladMigrations.debutAvances(s0, Date.now());
+          if (r && r.pose) { log('ok', 'Commun : avances comptées dans l\'équilibre à partir du 01/10/2026 ; avant, classement d\'origine (Réglages › Personnes du commun).'); modifie = true; }
+        } catch (e) { log('err', 'Suivi des avances : ' + (e.message || e)); }
       }
       if (init || modifie || bud) changed('classement');
     } catch (e) { log('err', 'Classement : ' + (e.message || e)); }

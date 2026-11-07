@@ -22,12 +22,12 @@ test('commun : carte « Provisions en cours » avec les postes et leurs montants
   const { KladModele: M, KladVues: Vu } = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'icones-donnees.js', 'icones.js', 'classement.js', 'ui.js', 'vues.js']);
   const S = M.vide();
   M.nouveauCompte(S, { libelle: 'Commun', role: 'commun', solde: { centimes: 120000, date: '2026-11-05' } });
-  const fdm = { solde: 120000, due: 40000, inc: 30000, end: 90000, reserve: 44166,
-    reserveDet: [{ label: 'Charges de copropriété', montant: 37746 }, { label: 'Charges parking', montant: 6420 }], aVenir: [] };
+  const fdm = { solde: 120000, due: 40000, inc: 30000, end: 90000, reserve: 29000,
+    reserveDet: [{ label: 'Charges de copropriété', montant: 25000 }, { label: 'Charges parking', montant: 4000 }], aVenir: [] };
   const h = Vu.rangee(S, 'commun', NOW, { fdm }), t = texte(h);
   assert.doesNotMatch(h, /object Object|undefined|NaN/);
-  assert.match(t, /Provisions en cours 441,66 € mis de côté : Copropriété 377,46 €, Parking 64,20 €/);
-  assert.match(t, /− provisions en cours 441,66 €/);
+  assert.match(t, /Provisions en cours 290,00 € mis de côté : Copropriété 250,00 €, Parking 40,00 €/);
+  assert.match(t, /− provisions en cours 290,00 €/);
   assert.doesNotMatch(t, /Réserve pour échéances/i, 'plus de confusion avec la réserve fixe');
   // liste vide ou incomplète : rien d'illisible
   const h2 = Vu.rangee(S, 'commun', NOW, { fdm: Object.assign({}, fdm, { reserveDet: [null, { montant: 1000 }] }) });

@@ -190,7 +190,10 @@
         part: c.part != null && c.part !== '' && isFinite(+c.part) ? Math.min(100, Math.max(0, +c.part)) : 50,
         motifAutre: typeof c.motifAutre === 'string' && c.motifAutre ? c.motifAutre : null,
         // 1.3.0 : réserve fixe du compte commun (centimes) : la trésorerie prévue ne doit pas descendre dessous
-        reserveFixe: c.reserveFixe != null && c.reserveFixe !== '' && isFinite(+c.reserveFixe) && +c.reserveFixe > 0 ? Math.round(+c.reserveFixe * 100) : 0
+        reserveFixe: c.reserveFixe != null && c.reserveFixe !== '' && isFinite(+c.reserveFixe) && +c.reserveFixe > 0 ? Math.round(+c.reserveFixe * 100) : 0,
+        // 1.3.2 : début du suivi des avances (AAAA-MM-JJ, null : depuis toujours) : avant, les virements ponctuels gardent
+        // leur classement d'origine dans l'équilibre (seule l'enveloppe Impôts s'applique), même s'ils ont été affectés
+        debutAvances: typeof c.debutAvances === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.debutAvances) ? c.debutAvances : null
       },
       tolerance: tolReglee(B.reglages),
       echeance: echeanceReglee(B.reglages),

@@ -251,5 +251,40 @@
     };
   }
 
-  g.KladMigrations = { payload, annulerPayload, icones, annulerIcones, dessins, annulerDessins, doublons, doublonsAnnulables, annulerDoublons, DOUBLONS_JOURS_ANNUL, etatImport, contenu, faite };
+  // 1.3.2 : début du suivi des avances au commun. Un coffre passé par la 1.3.0 (au moins un virement du commun affecté)
+  // reçoit le réglage commun.debutAvances = 01/10/2026 (décision du propriétaire) s'il n'en a pas : avant cette date, les
+  // virements ponctuels gardent leur classement d'origine dans l'équilibre (les affectations restent sur les opérations,
+  // rien n'est effacé ; changer ou vider le réglage les fait compter de nouveau). Une fois. → { pose } ou null.
+  const AVANCES = 'avances', DEBUT_AVANCES = '2026-10-01';
+  function debutAvances(S, now) {
+    if (!S || !S.modele) return null;
+    if (isObj(S.modele.migrations) && S.modele.migrations[AVANCES]) return null;
+    const affectee = S.modele.comptes.some(c => c.role === 'commun' && (S.ops[c.id] || []).some(o => isObj(o.commun) && isObj(o.commun.aff)));
+    const B = S.budget, R = B && isObj(B.reglages) ? B.reglages : null, deja = R && isObj(R.commun) && R.commun.debutAvances != null;
+    let pose = false;
+    if (affectee && !deja && B) {
+      B.reglages = isObj(B.reglages) ? B.reglages : {};
+      B.reglages.commun = Object.assign({}, isObj(B.reglages.commun) ? B.reglages.commun : {}, { debutAvances: DEBUT_AVANCES });
+      pose = true;
+    }
+    S.modele.migrations = isObj(S.modele.migrations) ? S.modele.migrations : {};
+    S.modele.migrations[AVANCES] = { le: new Date(now == null ? Date.now() : now).toISOString(), pose };
+    return { pose };
+  }
+
+  // 1.3.2 : relecture, une fois, de l'historique bancaire de chaque compte Enable Banking (depuis la frontière de
+  // reprise) : les opérations retirées à tort avant la 1.3.2 (« plus renvoyées par la banque ») reviennent si la banque
+  // les renvoie ; plus rien n'est retiré à la relecture. → { n (comptes à relire) } ou null.
+  const RELECTURE = 'relecture132';
+  function relecture(S, now) {
+    if (!S || !S.modele) return null;
+    if (isObj(S.modele.migrations) && S.modele.migrations[RELECTURE]) return null;
+    let n = 0;
+    for (const c of S.modele.comptes) if (c.source && c.source.type === 'eb') { c.sync = Object.assign({}, c.sync, { relire: true }); n++; }
+    S.modele.migrations = isObj(S.modele.migrations) ? S.modele.migrations : {};
+    S.modele.migrations[RELECTURE] = { le: new Date(now == null ? Date.now() : now).toISOString(), n };
+    return { n };
+  }
+
+  g.KladMigrations = { relecture, debutAvances, DEBUT_AVANCES, payload, annulerPayload, icones, annulerIcones, dessins, annulerDessins, doublons, doublonsAnnulables, annulerDoublons, DOUBLONS_JOURS_ANNUL, etatImport, contenu, faite };
 })(typeof window !== 'undefined' ? window : globalThis);
