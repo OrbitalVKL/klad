@@ -13,6 +13,7 @@ Correctif (retour du propriétaire, 07/11).
   Début du suivi des avances). Avant, chaque virement garde son classement d'origine, même s'il a été affecté ; seule
   l'enveloppe Impôts s'applique. Un déblocage de prêt n'est plus proposé comme virement à affecter.
 - **Lien Grafit** : débits imprévus du compte commun du mois en cours dans le résumé, et alerte tant qu'ils ne sont pas vus.
+- **Journal** : « Vider » demande une confirmation (second appui) et peut être annulé.
 
 ## 1.3.1
 

@@ -12,7 +12,7 @@ au bord de la période relue, disparus des dépenses perso, reste à vivre fauss
 l'historique bancaire ; (2) suivi des avances au commun à partir d'une date (réglage, posée au 01/10/2026 pour un coffre
 passé par la 1.3.0) : avant, chaque virement ponctuel garde son classement d'origine dans l'équilibre (affectations
 gardées, non comptées ; seule l'enveloppe Impôts s'applique) ; déblocage de prêt jamais proposé comme virement ponctuel ;
-(3) résumé Grafit : `commun.unplanned` et alerte `COMMUN_UNPLANNED` (débits imprévus du commun du mois en cours).
+(3) résumé Grafit : `commun.unplanned` et alerte `COMMUN_UNPLANNED` (débits imprévus du commun du mois en cours) ; (4) journal : « Vider » confirmé (second appui) et annulable.
 
 **1.3.1** — correctif de la 1.3.0 (retour du propriétaire, 06/11 ; développé et publié par l'architecte) : carte
 « Provisions en cours » du commun lisible (ancienne « Réserve pour échéances », qui affichait « [object Object] ») ;
@@ -90,6 +90,7 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   = débits du commun au statut `imprevu` (corrections à la main comprises) dont la date de comptage est dans le mois en
   cours ; alerte `COMMUN_UNPLANNED` (`crit`) si `unseen` > 0, texte « n DÉBIT(S) IMPRÉVU(S) · COMMUN » (n = non vus). Résumé
   réécrit par `M.signaler('vu')` et `changed('classement')` (déjà en place). Jeux fictifs : un débit imprévu non vu.
+- Journal (`app.js`, #btnClearLog) : `confirmInline` puis `toastAnnuler` (journal d'avant remis devant les lignes ajoutées depuis).
 - Tests : `test/lot132.test.mjs` (Grafit vu / non vu, correction prévu ↔ imprévu, crédit et mois précédent exclus, jeu de
   démonstration ; suivi des avances ; déblocage ; migrations ; détail « Retirer ») ; `doublons.test.mjs` et
   `lot113.test.mjs` : retrait → gardée. Références `test/references/releve-*-1.3.2.json` : seuls

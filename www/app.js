@@ -1493,7 +1493,15 @@
 
   // ------------------------------------------------------------ journal
   $('btnCopyLog').addEventListener('click', () => copy('Klad ' + (CFG.version || '') + ' (' + (CFG.build || 'dev') + ')\n' + S.journal.log.join('\n'), 'Journal copié.'));
-  $('btnClearLog').addEventListener('click', () => { S.journal.log = []; saveLog(); renderLog(); });
+  // 1.3.2 : vider le journal demande un second appui (« Confirmer ? ») et reste annulable
+  $('btnClearLog').addEventListener('click', ev => {
+    const b = ev.currentTarget;
+    if (!S || !confirmInline(b, 'Confirmer ?')) return;
+    b.dataset.armed = ''; b.textContent = 'Vider';
+    const avant = S.journal.log.slice();
+    S.journal.log = []; saveLog(); renderLog();
+    toastAnnuler('Journal vidé.', () => { S.journal.log = avant.concat(S.journal.log); saveLog(); renderLog(); });
+  });
   $('logAnnuler').addEventListener('click', e => {
     if (!e.target.closest('[data-annuler-doublons]') || !S || !window.KladMigrations.annulerDoublons(S, Date.now())) return;
     log('ok', 'Doublons remis (retrait annulé).');

@@ -6,6 +6,7 @@
 // Scénario et jeux FICTIFS uniquement : libellés, noms et montants inventés.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { json } from './charge.mjs';
 import { outils, etatDepuisReprise } from './jeux.mjs';
 import { repriseFictive } from './fictif.mjs';
@@ -201,4 +202,12 @@ test('opération que la banque ne renvoie plus : détail avec la note et « Reti
   const h = Vu.detail(S, o, cx, ctx(S));
   assert.match(h, /La banque ne renvoie plus cette opération depuis le 27\/10\/2026\. Elle reste comptée\./);
   assert.match(h, /data-a="retirerop"/);
+});
+
+test('journal : « Vider » demande une confirmation et reste annulable', () => {
+  const app = fs.readFileSync(new URL('../www/app.js', import.meta.url), 'utf8');
+  const i = app.indexOf("$('btnClearLog').addEventListener"), bloc = app.slice(i, i + 600);
+  assert.ok(i > 0);
+  assert.match(bloc, /confirmInline\(b, 'Confirmer \?'\)/);
+  assert.match(bloc, /toastAnnuler\('Journal vidé\.'/);
 });
