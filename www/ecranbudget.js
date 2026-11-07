@@ -53,8 +53,10 @@
     sur('tend-panel', () => VB.tendance(B, scope, tend, periodeTendance(B)));
     sur('ctr-zone', () => '<section class="panel" id="p-contrats">' + VB.contrats(B, scope, ui.ctrEdit) + '</section>');
     plis($('view-budget'));
-    // une sous-vue ne s'ouvre jamais sur une section repliée seule
-    for (const id of ['tend-panel', 'p-contrats']) { const p = $(id); if (p) { p.classList.add('force-open'); U.appliquerPli(p); } }
+    // une sous-vue ne s'ouvre jamais sur une section repliée seule (Budget › Tendance, Budget › Contrats) ; 1.3.3 : ailleurs
+    // (Commun › Trésorerie, avec la trésorerie au-dessus) ces sections se replient comme les autres
+    const seule = scope === 'perso' ? { tendance: 'tend-panel', contrats: 'p-contrats' }[sv] : null;
+    for (const id of ['tend-panel', 'p-contrats']) { const p = $(id); if (p) { p.classList.toggle('force-open', id === seule); U.appliquerPli(p); } }
   }
   // Suivi : postes dépassés d'abord (mêmes chiffres que les sections du budget, KladBudget.suivi).
   function depasses(B, scope) {
@@ -104,6 +106,12 @@
     A.changed('budget');
     A.toastAnnuler(msg, () => { KB.annuler(S(), snap); A.changed('budget'); });
   }
+
+  // 1.3.3 : sous-sections repliables (details[data-pli]) : état gardé sur ce téléphone, comme les sections
+  document.addEventListener('toggle', ev => {
+    const d = ev.target;
+    if (d && d.matches && d.matches('details[data-pli]')) U.plier(d.dataset.pli, !d.open);
+  }, true);
 
   // ------------------------------------------------------------ sections dépliantes (tous les écrans)
   document.addEventListener('click', ev => {

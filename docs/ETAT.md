@@ -6,6 +6,12 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.3.3** — correctif d'affichage (retour du propriétaire, 07/11 ; développé et publié par l'architecte) : Tendance
+repliable dans Commun › Trésorerie ; sous-sections des contrats (liste, prévu du poste, échéances) repliables, état gardé
+sur le téléphone ; « Confirmer ? » du journal en rouge ; un virement reçu sur le commun et classé virement interne ou
+déblocage, affecté à la main, compte enfin (son affectation était ignorée et « Confirmer » ne faisait rien) ; détail
+d'un virement ponctuel réécrit (état, effet sur l'équilibre, proposition, choix).
+
 **1.3.2** — correctif (retour du propriétaire, 07/11 ; développé et publié par l'architecte) : (1) une opération
 comptabilisée que la banque ne renvoie plus n'est plus jamais retirée à la synchro (cause probable : virements perso → commun
 au bord de la période relue, disparus des dépenses perso, reste à vivre faussé dans les deux colonnes) ; relecture unique de
@@ -68,6 +74,32 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.3.3 — détails techniques
+- `ecranbudget.js` : `force-open` seulement sur la section seule de la sous-vue (périmètre perso : `tend-panel` en
+  Tendance, `p-contrats` en Contrats) ; retiré ailleurs (Commun › Trésorerie). Écouteur `toggle` (capture) sur
+  `details[data-pli]` → `U.plier(clé, !open)`.
+- `vbudget.js:contrats` : sous-sections `details.ctr-sub[data-pli="p-contrats-<périmètre>-liste|postes|echeances"]`,
+  ouvertes sauf repliées sur ce téléphone (`U.replie`) ; liste toujours ouverte en modification ; résumé dans le titre
+  (nombre de contrats et à vérifier, postes à aligner, échéances). `style.css` : `.ctr-sub` (résumé ≥ 48 px).
+- `app.js` (#btnClearLog) : classe `danger` pendant « Confirmer ? ».
+- `commun.js:ponctuels` : virement interne ou crédit `dp` exclu seulement s'il n'est pas affecté (l'affectation à la main
+  compte) ; `propositionOp(B, id)` (proposition hors liste), utilisée par l'action « proposee » (`app.js`) et le détail.
+  `vues.js:detailCommun` : affectation lue dans le statut (`s.aff`) ; « Affectation de ce virement » : « Affecté : … » et
+  son effet (montant en faveur de qui pour une avance, hors équilibre pour Impôts, sans effet sinon), ou « Pas encore
+  affecté » + proposition + « Accepter la proposition » ; puis « Changer l'affectation » / « Ou choisir ».
+  Choix en cartes (`.cm-choix` / `.cm-ch`) : bouton du choix (rond coché pour le choix actuel, `aria-pressed`), effet en
+  une phrase, champ propre au choix dans la même carte (poste pour Avance, année pour Impôts, précision pour Autre) ;
+  un champ modifié sur le choix actuel le réapplique (`app.js`, écouteur `change`). « Remettre à affecter ». Pastille
+  « imprévu · affecté » (vert) pour un virement ponctuel affecté ou antérieur au suivi des avances.
+- « Autre » avec effet dans l'équilibre (`o.commun.aff.eq` : `hors`, `moi-tout`, `moi-moitie`, `autre-tout`,
+  `autre-moitie` ; absent : classement d'origine) : `commun.js:equilibre` (hors équilibre, ou `autMoi` / `autAutre`
+  ajoutés à l'investi, liste `autres`), ligne « + Autres virements affectés » (`vcommun.js`), `origineEq(B, r)` (classement
+  d'origine en clair : versement de …, remboursement de charges, déblocage, non compté), `texteEqAutre`. Réserve et
+  Remboursement : texte corrigé (« comme son classement d'origine (…) », et non plus « aucun effet »). Relevé :
+  `communPlan.equilibre.autres` seulement s'il y en a (références des jeux fictifs inchangées).
+- Tests : `test/lot133.test.mjs` (rendu, plis, Chromium : Commun › Trésorerie et Budget › Tendance), ajouté à l'étape
+  Chromium du workflow. Relevé de contrôle et résumé Grafit inchangés (références 1.3.2).
 
 ### 1.3.2 — détails techniques
 - Synchro (`modele.js:integrer`) : une opération comptabilisée lue auparavant, plus renvoyée sur la période relue et sans

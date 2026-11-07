@@ -456,11 +456,19 @@
     // 1.3.0 : enveloppe Impôts (versement et paiements) hors équilibre ; avance au commun : la part de l'autre personne
     // comptée en faveur de celle qui avance (et non plus tout le versement)
     const LI = brut ? new Map() : liensEquilibre(B, OPS), AV = avances(B);
-    const hors = [], avs = [], skip = new Set(), mentions = new Map();
-    let avMoi = 0, avAutre = 0;
+    const hors = [], avs = [], auts = [], skip = new Set(), mentions = new Map();
+    let avMoi = 0, avAutre = 0, autMoi = 0, autAutre = 0;
     OPS.forEach(([d, l, a, k], i) => {
       const x = LI.get(i);
       if (x && ((x.aff && x.aff.k === 'impots') || (x.env && x.env.k === 'impots'))) { hors.push({ date: d, label: l, montant: a, mention: x.aff ? texteAff(B, x.aff) : 'payé par l\'enveloppe ' + x.env.nom }); skip.add(i); mentions.set(i, 'hors équilibre · ' + hors[hors.length - 1].mention); return; }
+      // 1.3.3 : « Autre » avec un effet choisi : hors équilibre, ou compté en faveur de l'un (en entier ou pour moitié)
+      if (x && x.aff && x.aff.k === 'autre' && x.aff.eq) {
+        const t = texteAff(B, x.aff);
+        if (x.aff.eq === 'hors') { hors.push({ date: d, label: l, montant: a, mention: t }); skip.add(i); mentions.set(i, 'hors équilibre · ' + t); return; }
+        const [q, p] = x.aff.eq.split('-'), v = p === 'tout' ? a : Math.round(a / 2);
+        if (q === 'moi') autMoi += v; else autAutre += v;
+        auts.push({ date: d, label: l, montant: a, qui: q, faveur: v, mention: t }); skip.add(i); mentions.set(i, t + ' · ' + eur0(v) + ' comptés'); return;
+      }
       if (x && x.aff && x.aff.k === 'avance') {
         const y = AV.lignes.find(z => z.r === x.r);
         if (y) { if (y.qui === 'moi') avMoi += y.faveur; else avAutre += y.faveur; avs.push({ date: d, label: l, montant: a, qui: y.qui, faveur: y.faveur, mention: 'avance au commun' }); skip.add(i); mentions.set(i, 'avance au commun · ' + eur0(y.faveur) + ' comptés'); return; }
@@ -474,9 +482,9 @@
     for (const x of EQ) if (x.on) { eMoi += x.moi; eAutre += x.autre; }
     const ap = { moi: Math.round((+E.apport.moi || 0) * 100), autre: Math.round((+E.apport.autre || 0) * 100) };
     const R = { apport: ap, versMoi: gk('vg'), versAutre: gk('vs') + gk('rs'), nonElig, rNE: r, equipMoi: eMoi, equipAutre: eAutre,
-      pret: -(gk('pc') + gk('pa') + gk('pi')), travaux: -gk('ve'), debloc: gk('dp'), S: Sk, OPS, EQ, avMoi, avAutre, avances: avs, hors, skip, mentions };
-    R.invMoi = ap.moi + R.versMoi - nonElig * r + eMoi + avMoi;
-    R.invAutre = ap.autre + R.versAutre - nonElig * (1 - r) + eAutre + avAutre;
+      pret: -(gk('pc') + gk('pa') + gk('pi')), travaux: -gk('ve'), debloc: gk('dp'), S: Sk, OPS, EQ, avMoi, avAutre, avances: avs, autMoi, autAutre, autres: auts, hors, skip, mentions };
+    R.invMoi = ap.moi + R.versMoi - nonElig * r + eMoi + avMoi + autMoi;
+    R.invAutre = ap.autre + R.versAutre - nonElig * (1 - r) + eAutre + avAutre + autAutre;
     R.mensMoi = T.eqMoi; R.mensAutre = T.eqAutre;
     R.ecart = R.invAutre - R.invMoi;                 // > 0 : je dois encore investir plus que l'autre personne
     R.rythme = R.mensMoi - R.mensAutre;
@@ -628,11 +636,31 @@
   const nomEnveloppe = (B, a) => a.k === 'impots' ? 'Impôts ' + (a.an || '') : a.k === 'avance' && a.pour && a.pour !== 'renflouement' ? 'Avance pour ' + (posteLabel(B, a.pour) || a.pour) : null;
   const cleEnveloppe = a => a.k === 'impots' ? 'impots|' + (a.an || '') : a.k === 'avance' && a.pour && a.pour !== 'renflouement' ? 'avance|' + a.pour : null;
   function posteLabel(B, key) { const a = lignesCommun(B).find(x => x.key === key); return a ? a.label : (/^[fcm]\|/.test(key) ? key.slice(2) : null); }
+  // 1.3.3 : « Autre » avec son effet dans l'équilibre (a.eq) : 'hors', 'moi-tout', 'moi-moitie', 'autre-tout',
+  // 'autre-moitie' ; absent : classement d'origine du mouvement.
+  const EQ_AUTRE = ['hors', 'moi-tout', 'moi-moitie', 'autre-tout', 'autre-moitie'];
+  function texteEqAutre(B, eq) {
+    if (eq === 'hors') return 'hors équilibre';
+    const [q, p] = String(eq || '').split('-'), R = B.R.commun || {};
+    if (!p) return '';
+    return 'en faveur de ' + (q === 'autre' ? (R.autre || 'l\'autre personne') : (R.moi || 'vous')) + (p === 'tout' ? ', en entier' : ', pour moitié');
+  }
+  // Classement d'origine d'un crédit du commun dans l'équilibre (mouvement de même date et même montant), en clair.
+  function origineEq(B, r) {
+    let k = null;
+    try { const m = mouvements(B).find(([d, , a]) => d === r.date && Math.round(a) === Math.round(r.m)); k = m ? m[3] : null; } catch (e) { k = null; }
+    const R = B.R.commun || {};
+    if (k === 'vg') return 'versement de ' + (R.moi || 'vous') + ', compté en entier';
+    if (k === 'vs' || k === 'rs') return 'versement de ' + (R.autre || 'l\'autre personne') + ', compté en entier';
+    if (k === 'rf') return 'remboursement de charges, qui réduit les charges partagées';
+    if (k === 'dp') return 'déblocage de prêt, non compté';
+    return 'non compté';
+  }
   function texteAff(B, a) {
     if (!a) return '';
     if (a.k === 'impots') return 'Impôts ' + (a.an || '');
     if (a.k === 'avance') return 'Avance au commun' + (a.pour && a.pour !== 'renflouement' ? ' pour ' + (posteLabel(B, a.pour) || a.pour) : ' (renflouement)');
-    if (a.k === 'autre') return 'Autre' + (a.txt ? ' : ' + a.txt : '');
+    if (a.k === 'autre') return 'Autre' + (a.txt ? ' : ' + a.txt : '') + (a.eq ? ' · ' + texteEqAutre(B, a.eq) : '');
     return AFFECTATIONS[a.k] + (a.txt ? ' (' + a.txt + ')' : '');
   }
 
@@ -642,14 +670,18 @@
     if (B.memo.ponct) return B.memo.ponct;
     const V = virementsVus(B), d12 = debutAff(B), deb = d12 > debutAv(B) ? d12 : debutAv(B), DP = deblocages(B), out = [];
     for (const r of opsCommun(B)) {
-      if (r.m <= 0 || V.has(r.id) || r.type === 'interne' || DP.has(r.date + '|' + Math.round(r.m))) continue;
+      if (r.m <= 0 || V.has(r.id)) continue;
       const c = etatOp(r.o), aff = affEff(B, r);
+      // virement interne ou déblocage de prêt : pas proposé ; 1.3.3 : sauf s'il a été affecté à la main (le choix compte)
+      if (!aff && (r.type === 'interne' || DP.has(r.date + '|' + Math.round(r.m)))) continue;
       if (c && c.statut === 'prevu' && !aff) continue;          // reconnu à la main comme virement prévu
       if (!aff && r.date < deb) continue;
       out.push({ r, aff, prop: proposition(B, r) });
     }
     return (B.memo.ponct = out);
   }
+  // 1.3.3 : proposition pour un crédit du commun, même s'il n'est pas dans la liste (virement interne, déblocage).
+  function propositionOp(B, id) { const r = opsCommun(B).find(x => x.id === id); return r && r.m > 0 ? proposition(B, r) : null; }
   // Affectation d'un virement ponctuel (null : à affecter de nouveau). → valeur d'avant (annulation).
   function affecter(o, aff) {
     const avant = o.commun ? JSON.stringify(o.commun) : null;
@@ -659,6 +691,7 @@
       if (aff.k === 'impots') a.an = /^20\d\d$/.test(String(aff.an)) ? String(aff.an) : String(new Date().getFullYear() - 1);
       if (aff.k === 'avance') { a.pour = aff.pour || 'renflouement'; if (aff.qui === 'moi' || aff.qui === 'autre') a.qui = aff.qui; if (aff.pg != null && isFinite(+aff.pg)) a.pg = Math.min(100, Math.max(0, +aff.pg)); }
       if (aff.txt) a.txt = String(aff.txt).slice(0, 60);
+      if (aff.k === 'autre' && EQ_AUTRE.indexOf(aff.eq) >= 0) a.eq = aff.eq;
       c.aff = a;
     } else delete c.aff;
     if (!Object.keys(c).length) delete o.commun;
@@ -977,7 +1010,7 @@
     return { appels: Object.keys(D.appels || {}).filter(k => isObj(D.appels[k]) && Array.isArray(D.appels[k].items)).length, equipements: (eq.items || []).length };
   }
 
-  g.KladCommun = { imprevusMois, ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
+  g.KladCommun = { EQ_AUTRE, texteEqAutre, origineEq, propositionOp, imprevusMois, ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
     sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer,
     AFFECTATIONS, STATUTS, virementsVus, proposition, ponctuels, affecter, corriger, restaurer, texteAff, enveloppes, statuts, avances, decomposition,
     enveloppesDetournees, partsEnCause, renflouement, renflouementFait, annulerRenflouement, fiche, planPostes };

@@ -247,6 +247,8 @@
       line('+ Équipements et travaux payés en direct', R.equipMoi, R.equipAutre, 'dépenses cochées plus bas') +
       // 1.3.0 : avances au commun (part de l'autre personne comptée en faveur de celle qui avance)
       (R.avMoi || R.avAutre ? line('+ Avances au commun', R.avMoi, R.avAutre, 'renflouements faits seul : la part de l\'autre personne est comptée en faveur de celle qui avance (' + pl((R.avances || []).length, 'versement') + ')') : '') +
+      // 1.3.3 : virements affectés « Autre » comptés en faveur de l'un
+      (R.autMoi || R.autAutre ? line('+ Autres virements affectés', R.autMoi, R.autAutre, 'affectés « Autre » et comptés en faveur de l\'un (' + pl((R.autres || []).length, 'versement') + ')') : '') +
       line('= Investi dans l\'appartement', R.invMoi, R.invAutre, '', 'total') + '<tr class="gsp"><td colspan="4"></td></tr>' +
       '<tr class="total eq-rat"><td>Versé chaque mois sur les postes « Équilibre »<div class="subs">l\'écart mensuel réduit l\'écart d\'investissement</div></td><td class="r num">' + e0(R.mensMoi) + '</td><td class="r num">' + e0(R.mensAutre) + '</td><td class="r num hide-s">' + e0(Math.abs(R.mensMoi - R.mensAutre)) + '</td></tr>' +
       '</tbody></table></div>' + ((R.hors || []).length ? '<p class="note">Hors équilibre : ' + esc(R.hors.map(x => x.mention + ' (' + e2(Math.abs(x.montant)) + ' le ' + jjmm(x.date) + ')').join(' ; ')) + '.</p>' : '') +

@@ -517,25 +517,36 @@
     let h = U().tete('Contrats — montants des documents', '<div class="row"><span class="muted">' + (scope === 'commun' ? 'appartement, compte commun' : 'vos contrats personnels') + '</span>' +
       '<button class="btn" type="button" data-ctedit="' + (ed ? '' : 'liste') + '">' + (ed ? 'Terminer' : 'Modifier la liste') + '</button></div>');
     if (ed === 'nouveau') h += g.KladVuesBudget.formContrat(B, scope, ed);
-    if (!L.length) h += '<p class="muted">Aucun contrat ' + (scope === 'commun' ? 'du compte commun' : 'perso') + '.</p>';
-    else h += '<div class="tablewrap"><table class="cats ctr-t"><thead><tr><th>Contrat</th><th class="r">Montant</th><th>Dernier prélèvement</th><th>État</th></tr></thead><tbody>' +
+    // 1.3.3 : trois sous-sections repliables (liste, prévu du poste, échéances), état gardé sur ce téléphone ; en
+    // modification, la liste reste ouverte
+    const sous = (k, titre, resume, corps, ouvert) => {
+      const id = 'p-contrats-' + scope + '-' + k, o = ouvert || !U().replie(id);
+      return '<details class="ctr-sub" data-pli="' + id + '"' + (o ? ' open' : '') + '><summary><h3 class="obs-h3">' + esc(titre) + '</h3>' +
+        (resume ? '<span class="subs">' + esc(resume) + '</span>' : '') + '</summary>' + corps + '</details>';
+    };
+    let liste = '';
+    if (!L.length) liste += '<p class="muted">Aucun contrat ' + (scope === 'commun' ? 'du compte commun' : 'perso') + '.</p>';
+    else liste += '<div class="tablewrap"><table class="cats ctr-t"><thead><tr><th>Contrat</th><th class="r">Montant</th><th>Dernier prélèvement</th><th>État</th></tr></thead><tbody>' +
       L.map(c => ed === c.id ? '<tr><td colspan="4">' + g.KladVuesBudget.formContrat(B, scope, ed) + '</td></tr>'
         : '<tr><td><b>' + esc(c.label) + '</b>' + (c.posteLabel ? '<div class="subs">poste ' + esc(c.posteLabel) + '</div>' : '') + (c.src || c.note ? '<div class="subs">' + esc([c.src, c.note].filter(Boolean).join(' · ')) + '</div>' : '') +
           (ed ? ' <button class="linkbtn" type="button" data-ctedit="' + esc(c.id) + '">modifier</button>' : '') + '</td>' +
           '<td class="r num">' + e2(c.montant) + ' <span class="subs">' + esc(PERLAB[c.per || 1]) + '</span>' + (c.per > 1 ? '<div class="subs">soit ' + e2(c.mensuel) + ' / mois</div>' : '') + '</td>' +
           '<td>' + (c.dernier ? e2(c.dernier.montant) + ' <span class="subs">le ' + jjmmaa(c.dernier.date) + '</span>' : '<span class="muted">aucun trouvé</span>') + (c.prochaine ? '<div class="subs">prochaine échéance le ' + jjmmaa(c.prochaine) + '</div>' : '') + '</td>' +
           '<td>' + chip(c.etat) + '</td></tr>').join('') + '</tbody></table></div>';
-    if (ed && ed !== 'nouveau') h += '<div class="row"><button class="btn" type="button" data-ctedit="nouveau">+ Ajouter un contrat</button></div>';
+    if (ed && ed !== 'nouveau') liste += '<div class="row"><button class="btn" type="button" data-ctedit="nouveau">+ Ajouter un contrat</button></div>';
+    const aVoir = L.filter(c => c.etat && c.etat.niveau !== 'good').length;
+    h += sous('liste', 'Contrats', L.length + ' contrat' + (L.length > 1 ? 's' : '') + (aVoir ? ' · ' + aVoir + ' à vérifier' : ''), liste, !!ed);
     const PP = KB().contratsParPoste(B, scope);
     if (PP.length) {
-      h += '<h3 class="obs-h3" style="margin-top:14px">Prévu du poste et contrats</h3><ul class="list">' + PP.map(x => '<li><div class="grow">' + esc(x.label) +
+      const ecarts = PP.filter(x => x.etat.texte !== 'aligné').length;
+      h += sous('postes', 'Prévu du poste et contrats', ecarts ? ecarts + ' poste' + (ecarts > 1 ? 's' : '') + ' à aligner' : 'tout est aligné', '<ul class="list">' + PP.map(x => '<li><div class="grow">' + esc(x.label) +
         '<small>' + (x.budget == null ? 'poste absent du budget' : 'prévu ' + e2(x.budget) + ' par mois') + ' · contrats ' + e2(x.contrats) + ' par mois' + (x.n > 1 ? ' (' + x.n + ')' : '') + '</small></div>' +
-        chip(x.etat) + (x.etat.texte !== 'aligné' ? ' <button class="linkbtn" type="button" data-versprevu="' + esc(x.poste) + '">→ prévu</button>' : '') + '</li>').join('') + '</ul>';
+        chip(x.etat) + (x.etat.texte !== 'aligné' ? ' <button class="linkbtn" type="button" data-versprevu="' + esc(x.poste) + '">→ prévu</button>' : '') + '</li>').join('') + '</ul>');
     }
     const E = KB().echeances(B, 31).filter(x => x.scope === scope || x.sorte === 'carte');
-    h += '<h3 class="obs-h3" style="margin-top:14px">Échéances des 31 prochains jours</h3>' + (E.length ? '<ul class="list">' + E.map(x => '<li><div class="grow">' + esc(x.label) +
+    h += sous('echeances', 'Échéances des 31 prochains jours', E.length ? E.length + ' échéance' + (E.length > 1 ? 's' : '') : 'aucune', (E.length ? '<ul class="list">' + E.map(x => '<li><div class="grow">' + esc(x.label) +
       '<small>' + esc(jjmmaa(x.date) + ' · ' + ({ contrat: 'contrat', recurrent: 'prélèvement récurrent', carte: 'carte à débit différé' }[x.sorte])) + '</small></div><span class="num">' + esc(e2(x.montant)) + '</span></li>').join('') + '</ul>'
-      : '<p class="muted">Aucune échéance connue.</p>');
+      : '<p class="muted">Aucune échéance connue.</p>'));
     h += U().comment('Montants des contrats et documents (pas des relevés), comparés au dernier prélèvement trouvé avec le mot du libellé bancaire. « → prévu » reporte le total des contrats du poste dans le budget (annulable).');
     return h;
   }

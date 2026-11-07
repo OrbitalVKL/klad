@@ -2,6 +2,23 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.3
+
+Correctif d'affichage (retour du propriétaire, 07/11).
+- **Commun › Trésorerie** : la section Tendance se replie comme les autres (elle reste toujours ouverte dans Budget ›
+  Tendance, où elle est seule).
+- **Contrats** : les sous-sections (liste des contrats, prévu du poste et contrats, échéances des 31 prochains jours) se
+  replient d'un appui ; leur état est gardé sur le téléphone.
+- **Journal** : « Confirmer ? » s'affiche en rouge avant de vider le journal.
+- **Virements reçus sur le commun** : un virement venu d'un de vos comptes, affecté à la main (par exemple « Avance au
+  commun »), compte maintenant dans l'équilibre ; avant, l'affectation était gardée mais ignorée. Le détail du virement
+  dit clairement son affectation et son effet (par exemple « 50 € comptés en faveur de … dans l'équilibre »), puis
+  propose « Accepter la proposition » ou un autre choix : une carte par choix, avec son effet et son champ (poste,
+  année, précision) dans la même carte. Une fois affecté, la pastille devient « imprévu · affecté » (vert).
+- **« Autre » avec un effet dans l'équilibre** : comme son classement d'origine, hors équilibre, ou en faveur de l'un
+  (en entier ou pour moitié) ; ligne « + Autres virements affectés » dans « Comment chacun a investi ». Réserve et
+  Remboursement disent maintenant que l'équilibre garde le classement d'origine du virement (versement de …, etc.).
+
 ## 1.3.2
 
 Correctif (retour du propriétaire, 07/11).

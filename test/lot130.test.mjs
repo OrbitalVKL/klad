@@ -231,7 +231,7 @@ test('fiche du mois, détail par poste (1.3.1, sous « Virements à mettre en pl
   assert.match(d, /Prévu, écart[\s\S]*Écart : 2 appels de fonds/);
   assert.match(d, /data-a="statutcm" data-val="prevu"/);
   const dp = Vu.detail(S, opCommun(S, '2026-10-13', 8500), cx, B);
-  assert.match(dp, /Affectation : Avance au commun \(renflouement\)/);
+  assert.match(dp, /Affecté : Avance au commun \(renflouement\)/);
   assert.match(dp, /data-a="affecter" data-k="impots"/);
   const di = Vu.detail(S, opCommun(S, '2026-10-26', -8500), cx, B);
   assert.match(di, /id="cmLien"/);

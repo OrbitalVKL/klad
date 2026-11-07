@@ -863,6 +863,14 @@
   }
   // depuis le détail, une action qui remet l'opération dans la liste ramène à la liste
   const versListe = () => { if (vue === 'operation') montrer(retourDe.operation || 'operations', { force: true }); };
+  // 1.3.3 : champ d'un choix d'affectation (année, poste, précision) modifié alors que ce choix est le choix actuel :
+  // l'affectation est mise à jour (même chemin qu'un appui sur le choix, annulable)
+  $('opDetail').addEventListener('change', ev => {
+    const t = ev.target;
+    if (!t || ['cmAn', 'cmPour', 'cmTxt', 'cmEq'].indexOf(t.id) < 0) return;
+    const c = t.closest('.cm-ch'), b = c && c.querySelector('.cm-ch-b[aria-pressed="true"]');
+    if (b) b.click();
+  });
   $('opDetail').addEventListener('click', ev => {
     const b = ev.target.closest('[data-a]');
     if (!b || !opCourante) return;
@@ -906,10 +914,10 @@
       if (b.dataset.a === 'affecter') {
         const k = b.dataset.k;
         let aff = null;
-        if (k === 'proposee') { const x = KCo.ponctuels(budget()).find(y => y.r.id === o.id); aff = x ? x.prop : null; }
+        if (k === 'proposee') { const x = KCo.ponctuels(budget()).find(y => y.r.id === o.id); aff = x ? x.prop : (KCo.propositionOp ? KCo.propositionOp(budget(), o.id) : null); }
         else if (k === 'impots') aff = { k, an: $('cmAn') ? $('cmAn').value : null };
         else if (k === 'avance') aff = { k, pour: $('cmPour') ? $('cmPour').value : 'renflouement' };
-        else if (k === 'autre') aff = { k, txt: $('cmTxt') ? $('cmTxt').value.trim() : '' };
+        else if (k === 'autre') aff = { k, txt: $('cmTxt') ? $('cmTxt').value.trim() : '', eq: $('cmEq') ? $('cmEq').value : '' };
         else if (k) aff = { k };
         avant = KCo.affecter(o, aff);
         msg = aff ? 'Virement affecté : ' + KCo.texteAff(budget(), o.commun.aff) + '.' : 'Virement de nouveau à affecter.';
@@ -1496,8 +1504,10 @@
   // 1.3.2 : vider le journal demande un second appui (« Confirmer ? ») et reste annulable
   $('btnClearLog').addEventListener('click', ev => {
     const b = ev.currentTarget;
-    if (!S || !confirmInline(b, 'Confirmer ?')) return;
-    b.dataset.armed = ''; b.textContent = 'Vider';
+    if (!S) return;
+    // 1.3.3 : « Confirmer ? » en rouge (action qui efface)
+    if (!confirmInline(b, 'Confirmer ?')) { b.classList.add('danger'); setTimeout(() => b.classList.remove('danger'), 4000); return; }
+    b.dataset.armed = ''; b.textContent = 'Vider'; b.classList.remove('danger');
     const avant = S.journal.log.slice();
     S.journal.log = []; saveLog(); renderLog();
     toastAnnuler('Journal vidé.', () => { S.journal.log = avant.concat(S.journal.log); saveLog(); renderLog(); });
