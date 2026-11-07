@@ -2,6 +2,15 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.3
+
+Correctif d'affichage (retour du propriétaire, 07/11).
+- **Commun › Trésorerie** : la section Tendance se replie comme les autres (elle reste toujours ouverte dans Budget ›
+  Tendance, où elle est seule).
+- **Contrats** : les sous-sections (liste des contrats, prévu du poste et contrats, échéances des 31 prochains jours) se
+  replient d'un appui ; leur état est gardé sur le téléphone.
+- **Journal** : « Confirmer ? » s'affiche en rouge avant de vider le journal.
+
 ## 1.3.2
 
 Correctif (retour du propriétaire, 07/11).

@@ -1496,8 +1496,10 @@
   // 1.3.2 : vider le journal demande un second appui (« Confirmer ? ») et reste annulable
   $('btnClearLog').addEventListener('click', ev => {
     const b = ev.currentTarget;
-    if (!S || !confirmInline(b, 'Confirmer ?')) return;
-    b.dataset.armed = ''; b.textContent = 'Vider';
+    if (!S) return;
+    // 1.3.3 : « Confirmer ? » en rouge (action qui efface)
+    if (!confirmInline(b, 'Confirmer ?')) { b.classList.add('danger'); setTimeout(() => b.classList.remove('danger'), 4000); return; }
+    b.dataset.armed = ''; b.textContent = 'Vider'; b.classList.remove('danger');
     const avant = S.journal.log.slice();
     S.journal.log = []; saveLog(); renderLog();
     toastAnnuler('Journal vidé.', () => { S.journal.log = avant.concat(S.journal.log); saveLog(); renderLog(); });
