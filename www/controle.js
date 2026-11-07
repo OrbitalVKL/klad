@@ -141,7 +141,9 @@
   // ------------------------------------------------------------ 6. contrats et échéances à 31 jours
   function contrats(B) {
     const liste = [];
-    for (const sc of ['perso', 'commun']) for (const c of KB().contrats(B, sc)) liste.push({ perimetre: sc, libelle: c.label, poste: c.poste || null, montant: ent(c.montant), periodicite: +c.per || 1, prochaine: c.prochaine || null });
+    for (const sc of ['perso', 'commun']) for (const c of KB().contrats(B, sc)) liste.push(Object.assign({ perimetre: sc, libelle: c.label, poste: c.poste || null, montant: ent(c.montant), periodicite: +c.per || 1, prochaine: c.prochaine || null },
+      // 1.3.4 : fin du contrat et état « prélevé après la fin » (seulement s'il y a une fin)
+      c.fin ? { fin: c.fin, etat: c.etat ? c.etat.texte : null } : {}));
     return { liste, echeances31: KB().echeances(B, 31).map(e => ({ date: e.date, libelle: e.label, montant: ent(e.montant), sorte: e.sorte })) };
   }
 

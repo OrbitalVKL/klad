@@ -766,9 +766,10 @@
   function statuts(B) {
     if (B.memo.statuts) return B.memo.statuts;
     const out = new Map(), F = B.R.echeance, V = virementsVus(B), EN = enveloppes(B), A = appels(B), R = R7(B);
-    const lignes = lignesCommun(B), contrats = (B.D.contrats || []).filter(c => isObj(c) && c.sc === 'commun').map(c => ({ c, mots: K().motifs(c.motif) })).filter(x => x.mots.length);
+    // 1.3.4 : contrat d'un prélèvement par son numéro, puis par son mot (KladBudget.contratDe)
+    const lignes = lignesCommun(B), ctDe = r => { const c = KB().contratDe(B, 'commun', r.label); return c ? { c } : null; };
     const parContrat = new Map();
-    for (const r of opsCommun(B)) { if (r.m >= 0) continue; const F0 = fold(r.label), x = contrats.find(y => y.mots.some(m => F0.indexOf(m) >= 0)); if (x) (parContrat.get(x.c) || parContrat.set(x.c, []).get(x.c)).push(r); }
+    for (const r of opsCommun(B)) { if (r.m >= 0) continue; const x = ctDe(r); if (x) (parContrat.get(x.c) || parContrat.set(x.c, []).get(x.c)).push(r); }
     const montant = (r, attendu, quoi) => Math.abs(Math.abs(r.m) - attendu) > tolC(B, attendu) ? quoi + ' : ' + eur0(Math.abs(r.m)) + ' au lieu de ' + eur0(attendu) : null;
     const nom = q => q === 'moi' ? R.moi : R.autre;
     for (const r of opsCommun(B)) {
@@ -795,8 +796,11 @@
         // paiement d'appel de fonds : seulement s'il couvre au moins un appel enregistré (sinon : contrat ou poste)
         const pay = Object.values(A).map(x => ({ x, p: x.pays.find(p => p.d === r.date && Math.abs(p.a + r.m) < 1) }))
           .map(y => Object.assign(y, { it: y.p ? y.x.items.filter(i => i.pay.indexOf(r.date) >= 0) : [] })).find(y => y.it.length);
-        const F0 = fold(r.label), ct = contrats.find(y => y.mots.some(m => F0.indexOf(m) >= 0));
-        if (env) {
+        const ct = ctDe(r), fin = B.np && B.np.get(r.id);
+        if (fin) {
+          // 1.3.4 : prélevé après la fin du contrat : imprévu
+          s = { statut: 'imprevu', quoi: 'prélevé après la fin du contrat ' + fin.label + ' (fin le ' + jj(fin.fin) + ')', ecart: null, sorte: 'apresfin' };
+        } else if (env) {
           const part = env.paiements.find(p => p.r === r).part;
           s = { statut: 'prevu', quoi: 'payé par l\'enveloppe ' + env.nom, ecart: part < -r.m - 0.5 ? eur0(-r.m - part) + ' payés hors enveloppe (enveloppe épuisée)' : null, sorte: 'enveloppe' };
           if (s.ecart) s.statut = 'ecart';

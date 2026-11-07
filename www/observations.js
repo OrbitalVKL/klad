@@ -151,7 +151,12 @@
       }
     }
     // contrats résiliés (montant 0) encore prélevés ; prélèvements mensuels du commun absents
+    // 1.3.4 : prélèvements après la fin d'un contrat (date de fin réglée) : total et nombre, dernier en date
+    const fins = new Map();
+    for (const r of B.rows) { const c = B.np && B.np.get(r.id); if (c) { const x = fins.get(c) || { n: 0, t: 0, d: '' }; x.n++; x.t -= r.m; if (r.date > x.d) x.d = r.date; fins.set(c, x); } }
+    for (const [c, x] of fins) add('bad', c.sc, c.label + ' prélevé après la fin du contrat', (x.n + (x.n > 1 ? ' prélèvements' : ' prélèvement')) + ' depuis le ' + dfr(c.fin) + ' : ' + e2(x.t) + ' (dernier le ' + dfr(x.d) + '). Demandez l\'arrêt et le remboursement à l\'organisme.');
     for (const c of B.D.contrats || []) {
+      if (fins.has(c)) continue;
       const d = KB().dernierDebit(B, c);
       if (!c.montant && d) {
         if (jours(B, d.date) <= 40) add('bad', c.sc, c.label + ' encore prélevé', e2(-d.m) + ' prélevés le ' + dfr(d.date) + '. Résiliation demandée : si un prélèvement passe encore le mois prochain, relancez l\'organisme.');

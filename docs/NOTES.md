@@ -2,6 +2,17 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.4
+
+Contrats (demande du propriétaire, 07/11).
+- **Numéro de contrat** : un prélèvement est reconnu par le numéro de contrat écrit dans son libellé, avant le mot. Utile
+  quand plusieurs contrats ont le même organisme (habitation, auto, accidents de la vie…). Klad propose les numéros
+  trouvés dans les prélèvements.
+- **Fin du contrat (résiliation)** : après cette date, un prélèvement de ce contrat est « non prévu » : pastille rouge
+  dans Opérations, compté à part du poste (ligne « Après la fin d'un contrat »), observation avec le total prélevé depuis
+  la fin. Plus d'échéance annoncée après la fin.
+- **Lien Grafit** : alerte « CONTRAT RÉSILIÉ PRÉLEVÉ » tant que le prélèvement n'a pas été vu.
+
 ## 1.3.3
 
 Correctif d'affichage (retour du propriétaire, 07/11).

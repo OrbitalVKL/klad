@@ -238,6 +238,7 @@
     const B = { S, cx, now: now == null ? Date.now() : now, auj, comptes, role, rows, cover, D, R: reglages(S), memo: {} };
     B.exc = isObj(D.exc) ? D.exc : {};
     rattacher(B);
+    B.np = apresFin(B);
     return B;
   }
 
@@ -287,13 +288,13 @@
       return null;
     };
     const series = {}, jours = new Map();
-    const motifs = (B.D.contrats || []).filter(c => isObj(c)).map(c => ({ c, mots: K().motifs(c.motif) })).filter(x => x.mots.length);
+    const aContrat = (B.D.contrats || []).some(c => isObj(c) && (numContrat(c) || K().motifs(c.motif).length));
     for (const r of B.rows) {
       const J = jourVir(B, r);
       if (J) { jours.set(r, J); continue; }
       if (r.m >= 0 || r.ecart || r.type !== 'depense' || !(estPerso(B, r) || estCommun(B, r))) continue;
       const sc = estCommun(B, r) ? 'commun' : 'perso', F0 = fold(r.label);
-      const ct = motifs.find(x => x.c.sc === sc && x.mots.some(m => F0.indexOf(m) >= 0));
+      const ctc = aContrat ? contratDe(B, sc, r.label) : null, ct = ctc ? { c: ctc } : null;
       let k = null;
       if (ct) k = 'c|' + ct.c.id;
       else if (natureDe(B, r.cat) === 'fixe') { const kw = K().suggestKw(r.label); if (kw) k = 'f|' + r.cid + '|' + r.sub + '|' + kw; }
@@ -382,7 +383,7 @@
   const estCommun = (B, r) => r.role === 'commun';
   const dansScope = (B, sc, r) => sc === 'commun' ? estCommun(B, r) : estPerso(B, r);
   const natureDe = (B, cat) => K().natureDe(B.cx.C, cat);
-  const cleDe = (B, r) => natureDe(B, r.cat) === 'fixe' ? 'f|' + r.sub : 'c|' + r.cat;
+  const cleDe = (B, r) => B.np && B.np.has(r.id) ? 'c|' + APRES_FIN : natureDe(B, r.cat) === 'fixe' ? 'f|' + r.sub : 'c|' + r.cat;
   const exclue = (B, r) => !!B.exc[r.id];
   const planDe = (B, sc) => (B.D.plan && isObj(B.D.plan[sc])) ? B.D.plan[sc] : {};
 
@@ -500,8 +501,9 @@
       if (r.type !== 'depense' || !dansScope(B, sc, r) || exclue(B, r)) continue;
       const m = r.pd.slice(0, 7), inRef = m >= W.start && m <= W.end, inCur = m === cur, in12 = m >= y12 && m <= W.end;
       if (!inRef && !inCur && !in12) continue;
-      const nat = natureDe(B, r.cat), key = nat === 'fixe' ? 'f|' + r.sub : 'c|' + r.cat, v = -r.m;
-      const a = agg[key] || (agg[key] = { key, nat, label: nat === 'fixe' ? r.sub : r.cat, cat: r.cat, ref: 0, cur: 0, y12: 0, mon: {}, m12: {} });
+      // 1.3.4 : prélevé après la fin d'un contrat : ligne à part (hors budget), pas dans le poste du contrat
+      const np = B.np && B.np.has(r.id), nat = np ? 'optionnelle' : natureDe(B, r.cat), key = np ? 'c|' + APRES_FIN : nat === 'fixe' ? 'f|' + r.sub : 'c|' + r.cat, v = -r.m;
+      const a = agg[key] || (agg[key] = { key, nat, label: np ? APRES_FIN : nat === 'fixe' ? r.sub : r.cat, cat: np ? APRES_FIN : r.cat, ref: 0, cur: 0, y12: 0, mon: {}, m12: {} });
       if (in12) { a.y12 += v; a.m12[m] = (a.m12[m] || 0) + v; }
       if (inRef) { a.ref += v; a.mon[m] = (a.mon[m] || 0) + v; }
       if (inCur) a.cur += v;
@@ -581,15 +583,53 @@
   }
 
   // ------------------------------------------------------------ contrats
-  function dernierDebit(B, c) {
+  // 1.3.4 : numéro de contrat (c.num) : un prélèvement est reconnu par ce numéro (espaces ignorés), avant le mot du
+  // libellé ; un prélèvement reconnu par le numéro d'un contrat n'appartient plus aux contrats du même périmètre reconnus
+  // par leur seul mot (ex. trois contrats chez le même assureur). Sans numéro : comme avant.
+  const numContrat = c => c && typeof c.num === 'string' ? fold(c.num).replace(/\s+/g, '') : '';
+  const sansEsp = s => fold(s).replace(/\s+/g, '');
+  function numerotes(B, sc) {
+    const k = 'nums|' + sc;
+    return B.memo[k] || (B.memo[k] = (B.D.contrats || []).filter(c => isObj(c) && c.sc === sc && numContrat(c)).map(c => numContrat(c)));
+  }
+  function appartient(B, c, label) {
+    if (!isObj(c)) return false;
+    const n = numContrat(c);
+    if (n) return sansEsp(label).indexOf(n) >= 0;
     const mots = K().motifs(c.motif);
-    if (!mots.length) return null;
+    if (!mots.length || !mots.some(m => fold(label).indexOf(m) >= 0)) return false;
+    const L = sansEsp(label);
+    return !numerotes(B, c.sc).some(x => L.indexOf(x) >= 0);
+  }
+  // Contrat d'un prélèvement : ceux à numéro d'abord, puis l'ordre de la liste. → contrat ou null.
+  function contratDe(B, sc, label) {
+    const L = (B.D.contrats || []).filter(c => isObj(c) && c.sc === sc);
+    return L.filter(numContrat).find(c => appartient(B, c, label)) || L.filter(c => !numContrat(c)).find(c => appartient(B, c, label)) || null;
+  }
+  function dernierDebit(B, c) {
+    if (!numContrat(c) && !K().motifs(c.motif).length) return null;
     for (let i = B.rows.length - 1; i >= 0; i--) {
       const r = B.rows[i];
-      if (r.m < 0 && !r.ecart && dansScope(B, c.sc, r) && mots.some(m => fold(r.label).indexOf(m) >= 0)) return r;
+      if (r.m < 0 && !r.ecart && dansScope(B, c.sc, r) && appartient(B, c, r.label)) return r;
     }
     return null;
   }
+  // 1.3.4 : prélèvements « non prévus » : prélevés (date de comptage) après la fin d'un contrat (c.fin, AAAA-MM-JJ).
+  // → Map(id de ligne → contrat). Calculé une fois par contexte (B.np).
+  function apresFin(B) {
+    const out = new Map(), C = (B.D.contrats || []).filter(c => isObj(c) && typeof c.fin === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.fin));
+    if (!C.length) return out;
+    for (const r of B.rows) {
+      if (r.m >= 0 || r.ecart) continue;
+      const sc = PERSO.indexOf(r.role) >= 0 ? 'perso' : r.role === 'commun' ? 'commun' : null;
+      if (!sc) continue;
+      const c = contratDe(B, sc, r.label);
+      if (c && c.fin && (r.ech || r.date) > c.fin) out.set(r.id, c);
+    }
+    return out;
+  }
+  // Libellé de la ligne de budget des prélèvements après la fin d'un contrat (hors budget).
+  const APRES_FIN = 'Après la fin d\'un contrat';
   const contratsDe = (B, key, sc) => (B.D.contrats || []).filter(c => c.sc === sc && c.poste === key);
 
   // Jour du mois attendu pour un poste fixe (plus grosse opération des 100 derniers jours, sinon la dernière, sinon le
@@ -890,15 +930,13 @@
     const fin = plusJours(B.auj, jours), out = [];
     const ajoute = (date, montant, label, sorte, scope, poste) => { if (date >= B.auj && date <= fin && montant > DEMI) out.push({ date, montant: Math.round(montant), label, sorte, scope, poste: poste || null }); };
     const avance = (d, per) => { const m = shift(d.slice(0, 7), per); return m + '-' + String(Math.min(+d.slice(8, 10), joursMois(m))).padStart(2, '0'); };
-    const motifsContrats = [];
     for (const c of B.D.contrats || []) {
-      const mots = K().motifs(c.motif);
-      motifsContrats.push(...mots.map(m => [c.sc, m]));
       if (!c.montant) continue;
       const d = dernierDebit(B, c);
       if (!d) continue;
       let n = avance(dateCompte(d), c.per || 1);
       for (let i = 0; i < 40 && n < B.auj; i++) n = avance(n, c.per || 1);
+      if (c.fin && n > c.fin) continue;               // 1.3.4 : rien après la fin du contrat
       ajoute(n, c.montant, c.label, 'contrat', c.sc, c.poste ? c.poste.slice(2) : null);
     }
     // récurrents : même compte, mêmes premiers mots, au moins 2 des 3 derniers mois, montants proches
@@ -916,7 +954,7 @@
       const mts = L.map(r => -r.m), md = median(mts);
       if (mts.some(v => Math.abs(v - md) > Math.max(500, md * 0.15))) continue;
       const last = L[L.length - 1], sc = last.role === 'commun' ? 'commun' : 'perso';
-      if (motifsContrats.some(([s, m]) => s === sc && fold(last.label).indexOf(m) >= 0)) continue;
+      if (contratDe(B, sc, last.label)) continue;
       const n = avance(dateCompte(last), 1);
       if (n < plusJours(B.auj, -3)) continue;
       ajoute(n < B.auj ? B.auj : n, md, natureDe(B, last.cat) === 'fixe' ? last.sub : last.cat, 'recurrent', sc);
@@ -946,6 +984,13 @@
       }
       let prochaine = null;
       if (d) { prochaine = avance(dateCompte(d), c.per || 1); for (let i = 0; i < 40 && prochaine < B.auj; i++) prochaine = avance(prochaine, c.per || 1); }
+      // 1.3.4 : fin du contrat : prélevé après → « non prévu » ; avant la fin, plus d'échéance au-delà
+      if (c.fin) {
+        const apres = B.rows.filter(r => B.np && B.np.get(r.id) === c);
+        if (apres.length) etat = { niveau: 'bad', texte: apres.length > 1 ? apres.length + ' prélèvements après la fin' : 'prélevé après la fin' };
+        else if (c.fin >= B.auj) etat = { niveau: 'info', texte: 'fin le ' + c.fin.slice(8, 10) + '/' + c.fin.slice(5, 7) };
+        if (prochaine && prochaine > c.fin) prochaine = null;
+      }
       return Object.assign({}, c, { mensuel: c.montant / (c.per || 1), dernier: d ? { date: d.date, montant: -d.m } : null, etat, prochaine,
         poste: c.poste, posteLabel: c.poste ? c.poste.slice(2) : '', budget: a ? (a.on ? a.amt : 0) : null });
     });
@@ -1064,8 +1109,12 @@
     const x = {
       id: c.id || 'u' + Date.now().toString(36), sc, label: String(c.label || 'Contrat').trim().slice(0, 80) || 'Contrat',
       montant: Math.max(0, Math.round(+c.montant || 0)), per: PER.indexOf(+c.per) >= 0 ? +c.per : 1, motif: String(c.motif || '').trim().slice(0, 200),
-      poste: typeof c.poste === 'string' ? c.poste : '', src: String(c.src || '').trim().slice(0, 120), note: String(c.note || '').trim().slice(0, 200)
+      poste: typeof c.poste === 'string' ? c.poste : '', src: String(c.src || '').trim().slice(0, 120), note: String(c.note || '').trim().slice(0, 200),
+      // 1.3.4 : numéro de contrat (reconnu dans le libellé) et date de fin (résiliation), facultatifs
+      num: String(c.num || '').replace(/\s+/g, '').slice(0, 40), fin: typeof c.fin === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.fin) ? c.fin : ''
     };
+    if (!x.num) delete x.num;
+    if (!x.fin) delete x.fin;
     if (x.poste === '__nouveau') {
       x.poste = 'f|' + x.label.slice(0, 40);
       const pl = D.plan[sc] || (D.plan[sc] = {});
@@ -1076,6 +1125,27 @@
     const i = D.contrats.findIndex(y => y.id === x.id);
     if (i >= 0) D.contrats[i] = Object.assign({}, D.contrats[i], x); else D.contrats.push(x);
     return snap;
+  }
+  // 1.3.4 : numéros de contrat trouvés dans les prélèvements reconnus par le mot du contrat (12 derniers mois) : lettres
+  // puis chiffres (« AB1234567 »), sans les références de prélèvement (RUM, « RMS… », longues suites de chiffres).
+  // → [{ num, n, montant (dernier, centimes > 0), date, autre (déjà pris par un autre contrat : libellé) }], les plus
+  // fréquents d'abord.
+  function numerosProposes(B, c) {
+    const mots = K().motifs(c && c.motif);
+    if (!mots.length) return [];
+    const dep = plusJours(B.auj, -366), vus = new Map();
+    for (const r of B.rows) {
+      if (r.m >= 0 || r.ecart || r.date < dep || !dansScope(B, c.sc, r) || !mots.some(m => fold(r.label).indexOf(m) >= 0)) continue;
+      for (const t of new Set(fold(r.label).split(/[^A-Z0-9]+/))) {
+        if (!/^[A-Z]{1,4}\d{5,12}$/.test(t) || /^RMS/.test(t) || /^(FR|RUM|ICS)\d/.test(t)) continue;
+        const x = vus.get(t) || { num: t, n: 0, montant: 0, date: '' };
+        x.n++; if (r.date >= x.date) { x.date = r.date; x.montant = -r.m; }
+        vus.set(t, x);
+      }
+    }
+    const autres = (B.D.contrats || []).filter(y => isObj(y) && y !== c && y.id !== c.id && numContrat(y));
+    return [...vus.values()].map(x => { const o = autres.find(y => numContrat(y) === x.num); return o ? Object.assign(x, { autre: o.label }) : x; })
+      .sort((a, b) => b.n - a.n || (a.date < b.date ? 1 : -1)).slice(0, 6);
   }
   function retirerContrat(S, id) {
     const D = donnees(S);
@@ -1296,6 +1366,6 @@
     complement, surcharger, cycleCourant, debuts, cyclePasse, periode, fenetre, postes, parts, partDe, revenusAttendus, stats, suivi, soldes,
     echeances, contrats, contratsParPoste, tendance, reserveCommun, moisProchaineEcheance, jourAttendu, modifier, ajouter, retirer, annuler, ajoutables,
     devinerPoste, enregistrerContrat, retirerContrat, annulerContrat, versPrevu, moisReference, choisirReference, annulerReference, alignerTout, annulerAlignement, journalPoste,
-    shift, finMois, nomMois, eur, dernierDebit, tendanceMois, TENDANCE_JOURS, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median, planCarnet
+    numerosProposes, numContrat, appartient, contratDe, apresFin, APRES_FIN, shift, finMois, nomMois, eur, dernierDebit, tendanceMois, TENDANCE_JOURS, carburant, calculCarburant, reglerCarburant, annulerCarburant, detailPoste, CARBURANT, dernierDebitPoste, contratsDe, cleDe, natureDe, racine, plusJours, dDiff, median, planCarnet
   };
 })(typeof window !== 'undefined' ? window : globalThis);
