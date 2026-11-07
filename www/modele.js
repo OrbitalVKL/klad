@@ -420,14 +420,16 @@
       statut: o.statut, dateValeur: !!o.dateValeur };
   }
   const MOTIFS_JOURNAL = { 'en-cours': 'en cours devenue comptabilisée', relue: 'relue par la banque', 'plus-renvoyee': 'plus renvoyée par la banque', 'en-cours-absente': 'en cours plus renvoyée' };
+  const ACTIONS_JOURNAL = { fusion: ['opération fusionnée', 'remplacée'], retrait: ['opération retirée', 'retirée'], garde: ['opération gardée, à vérifier', 'gardée'] };
   const ID_JOURNAL = { 'reference-date': 'référence en forme de date', reference: 'référence', 'en-cours': 'en cours', empreinte: 'empreinte' };
   // Ligne de journal (anonyme) : « fusion (relue par la banque) · renvoyée : status oui, … · remplacée : … ».
   function texteForme(d) {
     const oui = b => (b ? 'oui' : 'non');
     const eb = f => CHAMPS_EB.map(k => k + ' ' + oui(f[k]) + (k === 'transaction_id' && f.idDate ? ' (forme date)' : '')).join(', ');
     const kl = f => 'identifiant ' + ID_JOURNAL[f.id] + ', ' + (f.statut === 'en_cours' ? 'en cours' : 'comptabilisée') + ', date de valeur ' + oui(f.dateValeur);
-    return (d.action === 'fusion' ? 'opération fusionnée' : 'opération retirée') + ' (' + MOTIFS_JOURNAL[d.motif] + ')' +
-      (d.renvoyee ? ' · champs renvoyés : ' + eb(d.renvoyee) : ' · pas de champs renvoyés') + ' · ' + (d.action === 'fusion' ? 'remplacée' : 'retirée') + ' : ' + kl(d.ancienne);
+    const A = ACTIONS_JOURNAL[d.action] || ACTIONS_JOURNAL.retrait;
+    return A[0] + ' (' + MOTIFS_JOURNAL[d.motif] + ')' +
+      (d.renvoyee ? ' · champs renvoyés : ' + eb(d.renvoyee) : ' · pas de champs renvoyés') + ' · ' + A[1] + ' : ' + kl(d.ancienne);
   }
 
   // opts (1.1.2) : { depuis } : début de la période demandée à la banque (null : tout l'historique accepté).
@@ -435,7 +437,7 @@
     const c = compte(S, cid);
     const jour = jourLocal(now);
     const front = (c && c.frontiere) || '';
-    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, ignorees: 0, reprises: 0, ecartees: 0, details: [] };
+    const st = { lues: (raw || []).length, nouvelles: 0, maj: 0, fusionnees: 0, retirees: 0, gardees: 0, ignorees: 0, reprises: 0, ecartees: 0, details: [] };
     const cands = [], bruts = new Map();
     for (const t of raw || []) {
       const x = depuisEB(t);
@@ -458,6 +460,7 @@
       if (o) {
         if (poser(o, x)) st.maj++;
         delete o.absente;
+        delete o.nonRenvoyee;
       } else if (front && x.date === front && dejaReprise(list, x, pris)) {
         st.ignorees++; st.reprises++;
       } else if (!absorbees.has(x.id)) {
@@ -470,7 +473,9 @@
     st.fusionnees = rapprocher(list, (p, b) => noter('fusion', 'en-cours', p, b));
     // 1.1.2 : opération comptabilisée lue auparavant et que la banque ne renvoie plus sur la même période (elle l'a
     // relue à une autre date, souvent avec une référence ajoutée au libellé) : fusionnée dans la version renvoyée
-    // (même montant, 5 jours au plus, même libellé de base ; ce qui a été fait à la main la suit), sinon retirée.
+    // (même montant, 5 jours au plus, même libellé de base ; ce qui a été fait à la main la suit). 1.3.2 : sinon, plus
+    // jamais retirée : gardée et comptée ; à plus de 5 jours du début de la période relue, remise « non vue » pour
+    // vérification (o.nonRenvoyee), retrait possible à la main ; au bord de la période, gardée sans signalement.
     // Deux opérations identiques renvoyées toutes les deux ne sont jamais touchées. Rien n'est retiré si la banque
     // ne renvoie rien. Saisies à la main et reprise : jamais concernées.
     if (cands.length) {
@@ -490,9 +495,12 @@
           const e = Math.abs(ecart(d.date, r.date));
           if (e < bd) { best = r; bd = e; }
         }
-        if (best) { reprendreEtat(S, d, best); prises.add(best.id); st.fusionnees++; noter('fusion', 'relue', d, best); }
-        else { st.retirees++; noter('retrait', 'plus-renvoyee', d, null); }
-        retirer.add(d.id);
+        if (best) { reprendreEtat(S, d, best); prises.add(best.id); st.fusionnees++; noter('fusion', 'relue', d, best); retirer.add(d.id); }
+        else if (d.date >= plusJours(debut, DOUBLON_JOURS) && !d.nonRenvoyee) {
+          // 1.3.2 : jamais retirée (la banque ne renvoie pas toujours une opération au bord de la période relue, ex. date
+          // de valeur avant la date demandée) : gardée, comptée, remise « non vue » pour vérification ; retrait à la main
+          d.nonRenvoyee = jour; d.vue = 0; st.gardees++; noter('garde', 'plus-renvoyee', d, null);
+        }
       }
       if (retirer.size) for (let i = list.length - 1; i >= 0; i--) if (retirer.has(list[i].id)) list.splice(i, 1);
     }

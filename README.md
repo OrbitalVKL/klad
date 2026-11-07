@@ -401,6 +401,14 @@ Résumé v1 (palier du Lot 4), montants en euros, dates `AAAA-MM-JJ`, instants e
   graduée (0.9) : `crit` si le compte commun passe sous zéro dans les 31 jours, `caut` plus tard dans les 12 mois
   (« COMPTE COMMUN · JJ/MM », premier jour sous zéro). 1.1.2 : la date est celle de la trésorerie (jour par jour,
   virements attendus et en route compris), plus « solde − prélèvements à venir » quand la trésorerie existe.
+- `commun.unplanned` (1.3.2, seulement s'il y a au moins un débit imprévu) : `{ "n": 2, "amount": 184.30, "unseen": 1,
+  "last": "2026-11-05" }` — débits (montant négatif) du compte commun au statut « imprévu » (statut de la 1.3.0, corrections
+  à la main comprises) dans le mois de comptage en cours (celui de la fiche du mois). `n` : nombre ; `amount` : leur somme,
+  en positif et en euros ; `unseen` : ceux pas encore « vus » dans Klad (omis si zéro) ; `last` : date du plus récent. Les
+  virements ponctuels reçus (crédits) et les écarts ne comptent pas. Alerte `COMMUN_UNPLANNED` (1.3.2, `crit`, seulement
+  si `unseen` > 0) : « 1 DÉBIT IMPRÉVU · COMMUN » ou « n DÉBITS IMPRÉVUS · COMMUN » (n : débits imprévus non vus), sans
+  montant ; elle disparaît dès que tous ont été vus, `commun.unplanned` reste. Le résumé est réécrit quand une opération
+  est vue ou que son statut est corrigé à la main. Format v1 inchangé (champ en plus).
 
 ## Lecture des courriels (plugin `KladMail`)
 

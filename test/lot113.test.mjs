@@ -119,10 +119,10 @@ test('journal : forme des champs de la banque à chaque fusion ou retrait, jamai
   assert.equal(t, 'opération fusionnée (relue par la banque) · champs renvoyés : status oui, entry_reference oui, transaction_id oui (forme date), ' +
     'booking_date oui, value_date oui · remplacée : identifiant référence en forme de date, comptabilisée, date de valeur non');
   for (const interdit of ['500', 'VIR', 'COMMUN', '7300', 'REF-FICTIVE', '2026', '30/10', '31/10']) assert.ok(!t.includes(interdit), interdit);
-  // plus renvoyée sur la période relue, sans équivalent : retirée
+  // plus renvoyée sur la période relue, sans équivalent : 1.3.2, gardée et signalée (plus jamais retirée)
   const st2 = M.integrer(S, cid, [eb('2026-10-29', -1234, 'CARTE 29/10 AUTRE ACHAT', '2026-10-29T00:00:00-1')], now('2026-11-01'), { depuis: '2026-10-25' });
-  assert.equal(st2.retirees, 1);
-  assert.equal(M.texteForme(st2.details[0]), 'opération retirée (plus renvoyée par la banque) · pas de champs renvoyés · retirée : identifiant référence, comptabilisée, date de valeur non');
+  assert.deepEqual([st2.retirees, st2.gardees], [0, 1]);
+  assert.equal(M.texteForme(st2.details[0]), 'opération gardée, à vérifier (plus renvoyée par la banque) · pas de champs renvoyés · gardée : identifiant référence, comptabilisée, date de valeur non');
   // en cours devenue comptabilisée
   const st3 = M.integrer(S, cid, [eb('2026-11-02', -2000, 'CARTE BOULANGERIE FICTIVE', 'P-1', { status: 'PDNG', transaction_id: undefined })], now('2026-11-02'), { depuis: '2026-11-02' });
   assert.equal(st3.details.length, 0);

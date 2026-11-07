@@ -85,15 +85,26 @@ test('contre-épreuve : deux vraies opérations identiques (même jour, même mo
   assert.deepEqual(json(MG.doublons(S2, J1)), { n: 0 });
 });
 
-test('opération plus renvoyée sur la même période, sans remplaçante : retirée ; hors période ou banque muette : gardée', () => {
+test('opération plus renvoyée sur la même période, sans remplaçante : gardée (1.3.2), à vérifier si elle est loin du bord ; jamais retirée', () => {
   const { S, c } = etat();
   M.integrer(S, c.id, autres.concat([eb('2026-10-29', -4200, 'PRLV ANNULE FICTIF', 1, { transaction_id: 'REF-X' }), eb('2026-10-10', -1000, 'CB ANCIENNE FICTIVE', 1, { transaction_id: 'REF-Y' })]), J0, { depuis: '2026-10-01' });
   S.ops[c.id].push({ id: c.id + ':m:1', compte: c.id, date: '2026-10-29', montant: -700, libelle: 'SAISIE A LA MAIN', source: 'manuel', statut: 'comptabilisee' });
   assert.equal(M.integrer(S, c.id, [], J1, { depuis: '2026-10-25' }).retirees, 0, 'aucune opération renvoyée : rien n\'est retiré');
   const st = M.integrer(S, c.id, autres, J1, { depuis: '2026-10-25' });
-  assert.equal(st.retirees, 1);
+  assert.equal(st.retirees, 0, '1.3.2 : plus jamais retirée');
+  assert.equal(st.gardees, 0, 'au bord de la période relue (moins de 5 jours après son début) : gardée sans signalement');
   const libs = S.ops[c.id].map(o => o.libelle);
-  assert.ok(!libs.includes('PRLV ANNULE FICTIF'));
+  const pa = S.ops[c.id].find(o => o.libelle === 'PRLV ANNULE FICTIF');
+  assert.ok(pa && !pa.nonRenvoyee, 'gardée');
+  // relue depuis plus tôt : à plus de 5 jours du début, gardée, remise non vue et signalée ; une seule fois
+  const st2 = M.integrer(S, c.id, autres, J1, { depuis: '2026-10-20' });
+  assert.deepEqual([st2.retirees, st2.gardees], [0, 1]);
+  assert.equal(pa.nonRenvoyee, M.jourLocal(J1));
+  assert.equal(pa.vue, 0);
+  assert.equal(M.integrer(S, c.id, autres, J1, { depuis: '2026-10-20' }).gardees, 0, 'signalée une fois');
+  // renvoyée de nouveau par la banque : plus signalée
+  M.integrer(S, c.id, autres.concat([eb('2026-10-29', -4200, 'PRLV ANNULE FICTIF', 1, { transaction_id: 'REF-X' })]), J1, { depuis: '2026-10-20' });
+  assert.equal(S.ops[c.id].find(o => o.libelle === 'PRLV ANNULE FICTIF').nonRenvoyee, undefined);
   assert.ok(libs.includes('CB ANCIENNE FICTIVE'), 'avant la période relue : gardée');
   assert.ok(libs.includes('SAISIE A LA MAIN'), 'saisie à la main : gardée');
 });

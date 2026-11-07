@@ -79,7 +79,7 @@
         c.sync = { lu: new Date(t).toISOString(), erreur: null };
         res.nouvelles += st.nouvelles; res.fusionnees += st.fusionnees; res.retirees += st.retirees;
         deps.log('ok', nom + ' : ' + st.lues + ' lue(s) depuis ' + (from ? 'le ' + from.split('-').reverse().join('/') : 'le plus tôt possible') +
-          ', ' + st.nouvelles + ' nouvelle(s), ' + st.maj + ' mise(s) à jour, ' + st.fusionnees + ' fusion(s), ' + st.retirees + ' retirée(s), ' +
+          ', ' + st.nouvelles + ' nouvelle(s), ' + st.maj + ' mise(s) à jour, ' + st.fusionnees + ' fusion(s), ' + st.retirees + ' retirée(s), ' + (st.gardees ? st.gardees + ' gardée(s) à vérifier (plus renvoyées), ' : '') +
           st.ignorees + ' ignorée(s)' + (st.reprises ? ' dont ' + st.reprises + ' déjà dans la reprise' : '') + (Object.keys(h).length ? '' : ', sans en-têtes utilisateur'));
         // 1.1.3 : une ligne par fusion ou retrait (forme des champs de la banque, jamais leurs valeurs), 10 au plus
         const det = st.details || [];

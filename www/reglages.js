@@ -41,7 +41,10 @@
       { k: 'commun.motifAutre', ou: 'r', t: 'motif', l: 'Motif des virements de l\'autre personne', aide: 'Expression reconnue dans le libellé des virements reçus sur le compte commun.' },
       // 1.3.0 : seuil sous lequel la trésorerie prévue du commun ne doit pas descendre (renflouement proposé sinon)
       { k: 'commun.reserveFixe', ou: 'r', t: 'nombre', l: 'Réserve fixe du compte commun (€)', defaut: 0, borne: [0, 100000],
-        aide: 'La trésorerie prévue du compte commun ne doit pas descendre sous ce montant. Sinon, Klad propose un renflouement partagé selon les parts des postes en cause. 0 : seulement pour éviter le découvert.' }
+        aide: 'La trésorerie prévue du compte commun ne doit pas descendre sous ce montant. Sinon, Klad propose un renflouement partagé selon les parts des postes en cause. 0 : seulement pour éviter le découvert.' },
+      // 1.3.2 : avant cette date, les virements ponctuels gardent leur classement d'origine dans l'équilibre
+      { k: 'commun.debutAvances', ou: 'r', t: 'date', l: 'Début du suivi des avances au commun',
+        aide: 'Les avances au commun comptent dans l\'équilibre de l\'appartement à partir de cette date. Avant, chaque virement garde son classement d\'origine (seule l\'enveloppe Impôts s\'applique). Vide : depuis toujours.' }
     ] },
     // 1.1.1 : tolérance des charges (charges fixes et postes du commun) : le plus grand du minimum et de la part du
     // budget, sans dépasser le plafond ; au-delà, le poste est dépassé.

@@ -6,6 +6,14 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.3.2** — correctif (retour du propriétaire, 07/11 ; développé et publié par l'architecte) : (1) une opération
+comptabilisée que la banque ne renvoie plus n'est plus jamais retirée à la synchro (cause probable : virements perso → commun
+au bord de la période relue, disparus des dépenses perso, reste à vivre faussé dans les deux colonnes) ; relecture unique de
+l'historique bancaire ; (2) suivi des avances au commun à partir d'une date (réglage, posée au 01/10/2026 pour un coffre
+passé par la 1.3.0) : avant, chaque virement ponctuel garde son classement d'origine dans l'équilibre (affectations
+gardées, non comptées ; seule l'enveloppe Impôts s'applique) ; déblocage de prêt jamais proposé comme virement ponctuel ;
+(3) résumé Grafit : `commun.unplanned` et alerte `COMMUN_UNPLANNED` (débits imprévus du commun du mois en cours) ; (4) journal : « Vider » confirmé (second appui) et annulable.
+
 **1.3.1** — correctif de la 1.3.0 (retour du propriétaire, 06/11 ; développé et publié par l'architecte) : carte
 « Provisions en cours » du commun lisible (ancienne « Réserve pour échéances », qui affichait « [object Object] ») ;
 sous-vue Commun › Plan retirée (redondante avec le budget du commun et « Virements à mettre en place »), détail par poste
@@ -60,6 +68,33 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.3.2 — détails techniques
+- Synchro (`modele.js:integrer`) : une opération comptabilisée lue auparavant, plus renvoyée sur la période relue et sans
+  version relue (`memeOperation`) n'est plus retirée. À 5 jours ou plus du début de la période relue : gardée, `o.nonRenvoyee`
+  (date), `o.vue = 0` (« à vérifier » par les non vues), journal « opération gardée, à vérifier » (`st.gardees`) ; une fois
+  par opération ; effacé si la banque la renvoie. Au bord de la période : gardée sans signalement. Détail de l'opération :
+  note et bouton « Retirer (opération en double) » (`data-a="retirerop"`, confirmé, annulable). Fusion des opérations
+  relues : inchangée. Migration `relecture132` (`migrations.js:relecture`) : `c.sync.relire` sur chaque compte Enable
+  Banking, une fois (relecture depuis la frontière de reprise à la synchro suivante).
+- Équilibre (`commun.js`) : `affEff(B, r)` = affectation qui compte : celle de l'opération, sauf avant
+  `B.R.commun.debutAvances` (réglage `commun.debutAvances`, AAAA-MM-JJ, null : depuis toujours ; Réglages › Personnes du
+  commun) où seule `impots` compte. Utilisée par `liensEquilibre`, `ponctuels` (et donc `avances`, `enveloppes`, plan /
+  renflouement) et `statuts` (crédit ponctuel antérieur : `avant: true`, « avant le suivi des avances (classement
+  d'origine) », pas compté « à affecter » dans la fiche). `ponctuels` : depuis le plus tardif de 12 mois glissants et du
+  début du suivi ; crédits classés `dp` (déblocage) dans l'équilibre exclus (`deblocages`). Les affectations restent
+  enregistrées (`o.commun.aff`) : vider le réglage les fait compter de nouveau. Migration `avances`
+  (`migrations.js:debutAvances`) : pose `2026-10-01` si au moins un virement du commun est affecté et qu'aucun réglage
+  n'existe, une fois.
+- Grafit (`commun.js:imprevusMois`, `resume.js`) : `commun.unplanned` { n, amount (euros, positif), unseen (omis si 0), last }
+  = débits du commun au statut `imprevu` (corrections à la main comprises) dont la date de comptage est dans le mois en
+  cours ; alerte `COMMUN_UNPLANNED` (`crit`) si `unseen` > 0, texte « n DÉBIT(S) IMPRÉVU(S) · COMMUN » (n = non vus). Résumé
+  réécrit par `M.signaler('vu')` et `changed('classement')` (déjà en place). Jeux fictifs : un débit imprévu non vu.
+- Journal (`app.js`, #btnClearLog) : `confirmInline` puis `toastAnnuler` (journal d'avant remis devant les lignes ajoutées depuis).
+- Tests : `test/lot132.test.mjs` (Grafit vu / non vu, correction prévu ↔ imprévu, crédit et mois précédent exclus, jeu de
+  démonstration ; suivi des avances ; déblocage ; migrations ; détail « Retirer ») ; `doublons.test.mjs` et
+  `lot113.test.mjs` : retrait → gardée. Références `test/references/releve-*-1.3.2.json` : seuls
+  `grafit.calcule.commun.unplanned` et l'alerte `COMMUN_UNPLANNED` changent depuis la 1.3.0.
 
 ### 1.3.1 — détails techniques
 - `vues.js:rangee` (cartes du commun) : `provisionsTexte(f.reserveDet)` — `reserveDet` (budget.js `reserveCommun`) est une
