@@ -73,3 +73,37 @@ test('Chromium : Tendance repliable dans Commun › Trésorerie, sous-sections d
     assert.deepEqual(B.erreurs, [], 'aucune erreur JavaScript');
   } finally { await B.fin(); }
 });
+
+// Virement reçu sur le commun écarté des propositions (ici classé « déblocage » dans l'équilibre ; même chose pour un
+// virement interne) puis affecté à la main : le choix compte, et le détail le dit (plus de « Confirmer » qui ne fait rien).
+test('affectation à la main d\'un virement écarté des propositions : comptée ; détail clair (état, effet, proposition)', async () => {
+  const X = outils(['ui.js', 'vues.js', 'vbudget.js', 'vcommun.js']);
+  const { KladClasse: K, KladBudget: KB, KladCommun: KC, KladVues: Vu } = X;
+  const r = repriseFictive(FIN);
+  r.carnet.klad.equilibre.regles.unshift(['DEBLOCAGE', 'dp', 'credit']);
+  r.transactions.push({ account: 'r2', date: '2026-10-20', amount: 10000, label: 'VIR COMPTE PERSO DEBLOCAGE FICTIF', status: 'comptabilisee' });
+  r.transactions.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const S = await etatDepuisReprise(X, r, NOW);
+  const ctx = () => KB.contexte(S, NOW, K.contexte(S, NOW));
+  const c = S.modele.comptes.find(x => x.role === 'commun'), o = S.ops[c.id].find(x => x.montant === 10000 && x.date === '2026-10-20');
+  let B = ctx();
+  assert.ok(!KC.ponctuels(B).some(x => x.r.id === o.id), 'pas proposé');
+  let h = Vu.detail(S, o, K.contexte(S, NOW), B);
+  assert.match(h, /Affectation de ce virement[\s\S]*Pas encore affecté\.[\s\S]*Proposition : Avance au commun \(renflouement\)/);
+  assert.match(h, /data-k="proposee"[^>]*>Accepter la proposition</);
+  assert.equal(KC.propositionOp(B, o.id).k, 'avance', 'la proposition existe même hors liste');
+  // affecté « Avance au commun » à la main : compté dans les avances et l'équilibre
+  KC.affecter(o, KC.propositionOp(B, o.id));
+  B = ctx();
+  const A = KC.avances(B);
+  assert.ok(A.lignes.some(l => l.r.id === o.id && l.faveur === 5000), 'moitié en faveur de celui qui avance');
+  h = Vu.detail(S, o, K.contexte(S, NOW), B);
+  assert.match(h, /Affecté : Avance au commun \(renflouement\)/);
+  assert.match(h, /50,00\s€ comptés en faveur de Personne A dans l(?:'|&#39;)équilibre/);
+  assert.doesNotMatch(h, /data-k="proposee"/, 'plus de bouton de proposition une fois affecté');
+  assert.match(h, /Changer l'affectation :/);
+  // Réserve : sans effet, dit comme tel
+  KC.affecter(o, { k: 'reserve' });
+  h = Vu.detail(S, o, K.contexte(S, NOW), ctx());
+  assert.match(h, /Affecté : Réserve[\s\S]*aucun effet sur l(?:'|&#39;)équilibre/);
+});

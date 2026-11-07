@@ -642,14 +642,18 @@
     if (B.memo.ponct) return B.memo.ponct;
     const V = virementsVus(B), d12 = debutAff(B), deb = d12 > debutAv(B) ? d12 : debutAv(B), DP = deblocages(B), out = [];
     for (const r of opsCommun(B)) {
-      if (r.m <= 0 || V.has(r.id) || r.type === 'interne' || DP.has(r.date + '|' + Math.round(r.m))) continue;
+      if (r.m <= 0 || V.has(r.id)) continue;
       const c = etatOp(r.o), aff = affEff(B, r);
+      // virement interne ou déblocage de prêt : pas proposé ; 1.3.3 : sauf s'il a été affecté à la main (le choix compte)
+      if (!aff && (r.type === 'interne' || DP.has(r.date + '|' + Math.round(r.m)))) continue;
       if (c && c.statut === 'prevu' && !aff) continue;          // reconnu à la main comme virement prévu
       if (!aff && r.date < deb) continue;
       out.push({ r, aff, prop: proposition(B, r) });
     }
     return (B.memo.ponct = out);
   }
+  // 1.3.3 : proposition pour un crédit du commun, même s'il n'est pas dans la liste (virement interne, déblocage).
+  function propositionOp(B, id) { const r = opsCommun(B).find(x => x.id === id); return r && r.m > 0 ? proposition(B, r) : null; }
   // Affectation d'un virement ponctuel (null : à affecter de nouveau). → valeur d'avant (annulation).
   function affecter(o, aff) {
     const avant = o.commun ? JSON.stringify(o.commun) : null;
@@ -977,7 +981,7 @@
     return { appels: Object.keys(D.appels || {}).filter(k => isObj(D.appels[k]) && Array.isArray(D.appels[k].items)).length, equipements: (eq.items || []).length };
   }
 
-  g.KladCommun = { imprevusMois, ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
+  g.KladCommun = { propositionOp, imprevusMois, ROUTE_JOURS, joursOuvres, ferie, paques, departDe, enRoute, enRouteMois, USAGES, SORTES, usageDe, reglages, virementVu, somme, impots, tresorerie, origine, plan, finDeMois, margeReelle, appels,
     sorteDe, mouvements, versementsMoyens, serieEquilibre, equipements, equilibre, simuler, basculerEquipement, ajouterEquipement, equipementDeOp, retirerEquipement, annulerEquilibre, risqueDecouvert, resume, importer,
     AFFECTATIONS, STATUTS, virementsVus, proposition, ponctuels, affecter, corriger, restaurer, texteAff, enveloppes, statuts, avances, decomposition,
     enveloppesDetournees, partsEnCause, renflouement, renflouementFait, annulerRenflouement, fiche, planPostes };

@@ -423,12 +423,27 @@
       // 1.3.2 : avant le début du suivi des avances, le classement d'origine de l'équilibre s'applique
       h += '<p class="muted small">Virement antérieur au suivi des avances (' + esc(B.R.commun.debutAvances.split('-').reverse().join('/')) + ') : il garde son classement d\'origine dans l\'équilibre de l\'appartement.</p>';
     } else if (o.montant > 0 && s.sorte === 'ponctuel') {
+      // 1.3.3 : état de l'affectation d'abord (ce qu'elle fait dans l'équilibre), puis la proposition, puis les choix
       const x = KCo.ponctuels(B).find(y => y.r.id === o.id);
-      const aff = x && x.aff, prop = x ? x.prop : { k: 'avance' }, cur = aff || prop;
+      const aff = s.aff || (x && x.aff) || null;
+      const prop = (x && x.prop) || (KCo.propositionOp && KCo.propositionOp(B, o.id)) || { k: 'avance', pour: 'renflouement' }, cur = aff || prop;
       const an = cur.k === 'impots' && cur.an ? +cur.an : new Date(B.auj).getFullYear() - 1;
       const postes = KB2().postes(B, 'commun').lignes.filter(a => a.on);
-      h += '<p class="muted small">' + (aff ? 'Affectation : ' + esc(KCo.texteAff(B, aff)) : 'À affecter · proposé : ' + esc(KCo.texteAff(B, prop))) + '</p>' +
-        (!aff ? '<div class="row">' + bt('affecter', 'data-k="proposee"', 'Confirmer : ' + KCo.texteAff(B, prop), true) + '</div>' : '') +
+      const Rc = B.R.commun || {}, nomDe = q => q === 'autre' ? (Rc.autre || 'l\'autre personne') : (Rc.moi || 'vous');
+      const effet = a => {
+        if (a.k === 'impots') return 'hors de l\'équilibre de l\'appartement ; l\'enveloppe ne paie que les prélèvements d\'impôt';
+        if (a.k === 'avance') {
+          const l = aff === a ? KCo.avances(B).lignes.find(y => y.r.id === o.id) : null;
+          return l ? F().montant(l.faveur) + ' comptés en faveur de ' + nomDe(l.qui) + ' dans l\'équilibre (la part de l\'autre personne)'
+            : 'la part de l\'autre personne sera comptée en faveur de celui ou celle qui avance, dans l\'équilibre';
+        }
+        return 'aucun effet sur l\'équilibre de l\'appartement';
+      };
+      h += '<h4 class="cm-aff-t">Affectation de ce virement</h4>' +
+        (aff ? '<p class="cm-aff-etat"><b>Affecté : ' + esc(KCo.texteAff(B, aff)) + '</b><br><span class="muted small">' + esc(effet(aff)) + '</span></p>'
+          : '<p class="cm-aff-etat"><b>Pas encore affecté.</b> Proposition : ' + esc(KCo.texteAff(B, prop)) + '<br><span class="muted small">' + esc(effet(prop)) + '</span></p>' +
+            '<div class="row">' + bt('affecter', 'data-k="proposee"', 'Accepter la proposition', true) + '</div>') +
+        '<p class="muted small">' + (aff ? 'Changer l\'affectation :' : 'Ou choisir :') + '</p>' +
         '<div class="row cm-aff" role="group" aria-label="Affectation du virement">' +
         bt('affecter', 'data-k="impots"', 'Impôts', aff && aff.k === 'impots') +
         '<label class="ctl" for="cmAn">année <select id="cmAn">' + [an - 1, an, an + 1].map(y => '<option' + (y === an ? ' selected' : '') + '>' + y + '</option>').join('') + '</select></label>' +
@@ -440,7 +455,7 @@
         '<label class="ctl" for="cmTxt">autre <input id="cmTxt" maxlength="60" autocomplete="off" value="' + esc(aff && aff.k === 'autre' ? aff.txt || '' : '') + '"></label>' +
         bt('affecter', 'data-k="autre"', 'Autre', aff && aff.k === 'autre') +
         (aff ? bt('affecter', 'data-k=""', 'À affecter de nouveau', false) : '') + '</div>' +
-        '<p class="muted small">Impôts : enveloppe qui ne paie que les prélèvements d\'impôt. Avance au commun : la part de l\'autre personne est comptée en faveur de celle qui avance dans l\'équilibre. Les autres affectations ne changent pas l\'équilibre.</p>';
+        '<p class="muted small">Impôts : argent mis de côté pour l\'impôt, hors équilibre. Avance au commun : vous renflouez seul le commun ; la part de l\'autre personne compte en votre faveur. Réserve, Remboursement, Autre : sans effet sur l\'équilibre.</p>';
     }
     if (o.montant < 0) {
       const EN = KCo.enveloppes(B), lie = EN.parOp.get(o.id);

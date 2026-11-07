@@ -2058,3 +2058,5 @@ html.etroit .sousvues.patri{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ctr-sub:not([open]) > summary::before{transform:rotate(-45deg);margin-bottom:0}
 .ctr-sub > summary .obs-h3{margin:0}
 .ctr-sub > summary .subs{min-width:0;overflow-wrap:anywhere}
+.cm-aff-t{margin:10px 0 4px;font-size:1rem}
+.cm-aff-etat{margin:4px 0 8px}

@@ -10,6 +10,10 @@ Correctif d'affichage (retour du propriétaire, 07/11).
 - **Contrats** : les sous-sections (liste des contrats, prévu du poste et contrats, échéances des 31 prochains jours) se
   replient d'un appui ; leur état est gardé sur le téléphone.
 - **Journal** : « Confirmer ? » s'affiche en rouge avant de vider le journal.
+- **Virements reçus sur le commun** : un virement venu d'un de vos comptes, affecté à la main (par exemple « Avance au
+  commun »), compte maintenant dans l'équilibre ; avant, l'affectation était gardée mais ignorée. Le détail du virement
+  dit clairement son affectation et son effet (par exemple « 50 € comptés en faveur de … dans l'équilibre »), puis
+  propose « Accepter la proposition » ou un autre choix.
 
 ## 1.3.2
 

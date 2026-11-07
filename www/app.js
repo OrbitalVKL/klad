@@ -906,7 +906,7 @@
       if (b.dataset.a === 'affecter') {
         const k = b.dataset.k;
         let aff = null;
-        if (k === 'proposee') { const x = KCo.ponctuels(budget()).find(y => y.r.id === o.id); aff = x ? x.prop : null; }
+        if (k === 'proposee') { const x = KCo.ponctuels(budget()).find(y => y.r.id === o.id); aff = x ? x.prop : (KCo.propositionOp ? KCo.propositionOp(budget(), o.id) : null); }
         else if (k === 'impots') aff = { k, an: $('cmAn') ? $('cmAn').value : null };
         else if (k === 'avance') aff = { k, pour: $('cmPour') ? $('cmPour').value : 'renflouement' };
         else if (k === 'autre') aff = { k, txt: $('cmTxt') ? $('cmTxt').value.trim() : '' };

@@ -8,7 +8,9 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 **1.3.3** — correctif d'affichage (retour du propriétaire, 07/11 ; développé et publié par l'architecte) : Tendance
 repliable dans Commun › Trésorerie ; sous-sections des contrats (liste, prévu du poste, échéances) repliables, état gardé
-sur le téléphone ; « Confirmer ? » du journal en rouge.
+sur le téléphone ; « Confirmer ? » du journal en rouge ; un virement reçu sur le commun et classé virement interne ou
+déblocage, affecté à la main, compte enfin (son affectation était ignorée et « Confirmer » ne faisait rien) ; détail
+d'un virement ponctuel réécrit (état, effet sur l'équilibre, proposition, choix).
 
 **1.3.2** — correctif (retour du propriétaire, 07/11 ; développé et publié par l'architecte) : (1) une opération
 comptabilisée que la banque ne renvoie plus n'est plus jamais retirée à la synchro (cause probable : virements perso → commun
@@ -81,6 +83,11 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   ouvertes sauf repliées sur ce téléphone (`U.replie`) ; liste toujours ouverte en modification ; résumé dans le titre
   (nombre de contrats et à vérifier, postes à aligner, échéances). `style.css` : `.ctr-sub` (résumé ≥ 48 px).
 - `app.js` (#btnClearLog) : classe `danger` pendant « Confirmer ? ».
+- `commun.js:ponctuels` : virement interne ou crédit `dp` exclu seulement s'il n'est pas affecté (l'affectation à la main
+  compte) ; `propositionOp(B, id)` (proposition hors liste), utilisée par l'action « proposee » (`app.js`) et le détail.
+  `vues.js:detailCommun` : affectation lue dans le statut (`s.aff`) ; « Affectation de ce virement » : « Affecté : … » et
+  son effet (montant en faveur de qui pour une avance, hors équilibre pour Impôts, sans effet sinon), ou « Pas encore
+  affecté » + proposition + « Accepter la proposition » ; puis « Changer l'affectation » / « Ou choisir ».
 - Tests : `test/lot133.test.mjs` (rendu, plis, Chromium : Commun › Trésorerie et Budget › Tendance), ajouté à l'étape
   Chromium du workflow. Relevé de contrôle et résumé Grafit inchangés (références 1.3.2).
 
