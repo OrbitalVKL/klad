@@ -13,7 +13,8 @@ Correctif d'affichage (retour du propriétaire, 07/11).
 - **Virements reçus sur le commun** : un virement venu d'un de vos comptes, affecté à la main (par exemple « Avance au
   commun »), compte maintenant dans l'équilibre ; avant, l'affectation était gardée mais ignorée. Le détail du virement
   dit clairement son affectation et son effet (par exemple « 50 € comptés en faveur de … dans l'équilibre »), puis
-  propose « Accepter la proposition » ou un autre choix.
+  propose « Accepter la proposition » ou un autre choix : une carte par choix, avec son effet et son champ (poste,
+  année, précision) dans la même carte. Une fois affecté, la pastille devient « imprévu · affecté » (vert).
 
 ## 1.3.2
 

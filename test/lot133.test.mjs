@@ -102,6 +102,11 @@ test('affectation à la main d\'un virement écarté des propositions : comptée
   assert.match(h, /50,00\s€ comptés en faveur de Personne A dans l(?:'|&#39;)équilibre/);
   assert.doesNotMatch(h, /data-k="proposee"/, 'plus de bouton de proposition une fois affecté');
   assert.match(h, /Changer l'affectation :/);
+  // une carte par choix : bouton (choix actuel coché), effet, champ du choix dans la même carte ; pastille « affecté »
+  assert.match(h, /<div class="cm-ch on"><button type="button" class="cm-ch-b" data-a="affecter" data-k="avance" aria-pressed="true">[\s\S]*?<\/button><div class="cm-ch-f"><label class="ctl" for="cmPour">/);
+  assert.match(h, /data-k="impots" aria-pressed="false">[\s\S]*?<\/button><div class="cm-ch-f"><label class="ctl" for="cmAn">/);
+  assert.match(h, /data-k="autre" aria-pressed="false">[\s\S]*?<\/button><div class="cm-ch-f"><label class="ctl" for="cmTxt">/);
+  assert.match(h, /tx-tag st-ok[^>]*><span class="st-dot" aria-hidden="true"><\/span>imprévu · affecté/);
   // Réserve : sans effet, dit comme tel
   KC.affecter(o, { k: 'reserve' });
   h = Vu.detail(S, o, K.contexte(S, NOW), ctx());

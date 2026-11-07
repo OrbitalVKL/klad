@@ -88,6 +88,10 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   `vues.js:detailCommun` : affectation lue dans le statut (`s.aff`) ; « Affectation de ce virement » : « Affecté : … » et
   son effet (montant en faveur de qui pour une avance, hors équilibre pour Impôts, sans effet sinon), ou « Pas encore
   affecté » + proposition + « Accepter la proposition » ; puis « Changer l'affectation » / « Ou choisir ».
+  Choix en cartes (`.cm-choix` / `.cm-ch`) : bouton du choix (rond coché pour le choix actuel, `aria-pressed`), effet en
+  une phrase, champ propre au choix dans la même carte (poste pour Avance, année pour Impôts, précision pour Autre) ;
+  un champ modifié sur le choix actuel le réapplique (`app.js`, écouteur `change`). « Remettre à affecter ». Pastille
+  « imprévu · affecté » (vert) pour un virement ponctuel affecté ou antérieur au suivi des avances.
 - Tests : `test/lot133.test.mjs` (rendu, plis, Chromium : Commun › Trésorerie et Budget › Tendance), ajouté à l'étape
   Chromium du workflow. Relevé de contrôle et résumé Grafit inchangés (références 1.3.2).
 

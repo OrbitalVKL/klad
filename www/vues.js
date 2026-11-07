@@ -297,6 +297,9 @@
   // 1.3.0 : pastille « prévu » (vert), « écart » (orange), « imprévu » (rouge) d'un mouvement du compte commun.
   const ST_CLS = { prevu: 'st-ok', ecart: 'st-ecart', imprevu: 'st-imp' }, ST_LIB = { prevu: 'prévu', ecart: 'écart', imprevu: 'imprévu' };
   function pastilleStatut(s) {
+    // 1.3.3 : virement ponctuel affecté (ou antérieur au suivi des avances) : « imprévu · affecté », en vert (rien à faire)
+    if (s.statut === 'imprevu' && s.sorte === 'ponctuel' && (s.aff || s.avant))
+      return '<span class="tx-tag st-ok" title="' + esc(s.quoi || '') + '"><span class="st-dot" aria-hidden="true"></span>' + ST_LIB.imprevu + ' · affecté</span>';
     return '<span class="tx-tag ' + ST_CLS[s.statut] + '" title="' + esc(s.ecart || s.quoi || '') + '"><span class="st-dot" aria-hidden="true"></span>' + ST_LIB[s.statut] + '</span>';
   }
 
@@ -423,19 +426,22 @@
       // 1.3.2 : avant le début du suivi des avances, le classement d'origine de l'équilibre s'applique
       h += '<p class="muted small">Virement antérieur au suivi des avances (' + esc(B.R.commun.debutAvances.split('-').reverse().join('/')) + ') : il garde son classement d\'origine dans l\'équilibre de l\'appartement.</p>';
     } else if (o.montant > 0 && s.sorte === 'ponctuel') {
-      // 1.3.3 : état de l'affectation d'abord (ce qu'elle fait dans l'équilibre), puis la proposition, puis les choix
+      // 1.3.3 : état de l'affectation d'abord (ce qu'elle fait dans l'équilibre), puis la proposition, puis une carte par
+      // choix (bouton, effet en une phrase, champ propre au choix dans la même carte)
       const x = KCo.ponctuels(B).find(y => y.r.id === o.id);
       const aff = s.aff || (x && x.aff) || null;
       const prop = (x && x.prop) || (KCo.propositionOp && KCo.propositionOp(B, o.id)) || { k: 'avance', pour: 'renflouement' }, cur = aff || prop;
       const an = cur.k === 'impots' && cur.an ? +cur.an : new Date(B.auj).getFullYear() - 1;
       const postes = KB2().postes(B, 'commun').lignes.filter(a => a.on);
-      const Rc = B.R.commun || {}, nomDe = q => q === 'autre' ? (Rc.autre || 'l\'autre personne') : (Rc.moi || 'vous');
+      const Rc = B.R.commun || {}, qui = (cur.k === 'avance' && cur.qui) || 'moi';
+      const autreNom = qui === 'autre' ? (Rc.moi || 'l\'autre personne') : (Rc.autre || 'l\'autre personne');
       const effet = a => {
         if (a.k === 'impots') return 'hors de l\'équilibre de l\'appartement ; l\'enveloppe ne paie que les prélèvements d\'impôt';
         if (a.k === 'avance') {
           const l = aff === a ? KCo.avances(B).lignes.find(y => y.r.id === o.id) : null;
-          return l ? F().montant(l.faveur) + ' comptés en faveur de ' + nomDe(l.qui) + ' dans l\'équilibre (la part de l\'autre personne)'
-            : 'la part de l\'autre personne sera comptée en faveur de celui ou celle qui avance, dans l\'équilibre';
+          const pour = l && l.qui === 'autre' ? (Rc.autre || 'l\'autre personne') : (Rc.moi || 'vous');
+          return l ? F().montant(l.faveur) + ' comptés en faveur de ' + pour + ' dans l\'équilibre (la part de l\'autre personne)'
+            : 'la part de ' + autreNom + ' sera comptée en faveur de celui ou celle qui a versé, dans l\'équilibre';
         }
         return 'aucun effet sur l\'équilibre de l\'appartement';
       };
@@ -443,19 +449,24 @@
         (aff ? '<p class="cm-aff-etat"><b>Affecté : ' + esc(KCo.texteAff(B, aff)) + '</b><br><span class="muted small">' + esc(effet(aff)) + '</span></p>'
           : '<p class="cm-aff-etat"><b>Pas encore affecté.</b> Proposition : ' + esc(KCo.texteAff(B, prop)) + '<br><span class="muted small">' + esc(effet(prop)) + '</span></p>' +
             '<div class="row">' + bt('affecter', 'data-k="proposee"', 'Accepter la proposition', true) + '</div>') +
-        '<p class="muted small">' + (aff ? 'Changer l\'affectation :' : 'Ou choisir :') + '</p>' +
-        '<div class="row cm-aff" role="group" aria-label="Affectation du virement">' +
-        bt('affecter', 'data-k="impots"', 'Impôts', aff && aff.k === 'impots') +
-        '<label class="ctl" for="cmAn">année <select id="cmAn">' + [an - 1, an, an + 1].map(y => '<option' + (y === an ? ' selected' : '') + '>' + y + '</option>').join('') + '</select></label>' +
-        bt('affecter', 'data-k="avance"', 'Avance au commun', aff && aff.k === 'avance') +
-        '<label class="ctl" for="cmPour">pour <select id="cmPour"><option value="renflouement">renflouer le commun</option>' +
-          postes.map(a => '<option value="' + esc(a.key) + '"' + (cur.k === 'avance' && cur.pour === a.key ? ' selected' : '') + '>' + esc(a.label) + '</option>').join('') + '</select></label>' +
-        bt('affecter', 'data-k="reserve"', 'Réserve', aff && aff.k === 'reserve') +
-        bt('affecter', 'data-k="remb"', 'Remboursement', aff && aff.k === 'remb') +
-        '<label class="ctl" for="cmTxt">autre <input id="cmTxt" maxlength="60" autocomplete="off" value="' + esc(aff && aff.k === 'autre' ? aff.txt || '' : '') + '"></label>' +
-        bt('affecter', 'data-k="autre"', 'Autre', aff && aff.k === 'autre') +
-        (aff ? bt('affecter', 'data-k=""', 'À affecter de nouveau', false) : '') + '</div>' +
-        '<p class="muted small">Impôts : argent mis de côté pour l\'impôt, hors équilibre. Avance au commun : vous renflouez seul le commun ; la part de l\'autre personne compte en votre faveur. Réserve, Remboursement, Autre : sans effet sur l\'équilibre.</p>';
+        '<p class="muted small cm-ch-l">' + (aff ? 'Changer l\'affectation :' : 'Ou choisir :') + '</p>';
+      const choix = (k, titre, texte, champ) => {
+        const on = !!(aff && aff.k === k);
+        return '<div class="cm-ch' + (on ? ' on' : '') + '"><button type="button" class="cm-ch-b" data-a="affecter" data-k="' + k + '" aria-pressed="' + on + '">' +
+          '<span class="cm-ch-r" aria-hidden="true"></span><span class="cm-ch-t"><b>' + esc(titre) + '</b><span class="subs">' + esc(texte) + '</span></span></button>' +
+          (champ ? '<div class="cm-ch-f">' + champ + '</div>' : '') + '</div>';
+      };
+      h += '<div class="cm-choix" role="group" aria-label="Affectation du virement">' +
+        choix('avance', 'Avance au commun', 'Versé seul pour renflouer le commun : la part de ' + autreNom + ' compte en faveur de celui ou celle qui a versé.',
+          '<label class="ctl" for="cmPour">pour <select id="cmPour"><option value="renflouement">renflouer le commun</option>' +
+          postes.map(a => '<option value="' + esc(a.key) + '"' + (cur.k === 'avance' && cur.pour === a.key ? ' selected' : '') + '>' + esc(a.label) + '</option>').join('') + '</select></label>') +
+        choix('impots', 'Impôts', 'Mis de côté pour l\'impôt : hors équilibre, ne paie que les prélèvements d\'impôt.',
+          '<label class="ctl" for="cmAn">année <select id="cmAn">' + [an - 1, an, an + 1].map(y => '<option' + (y === an ? ' selected' : '') + '>' + y + '</option>').join('') + '</select></label>') +
+        choix('reserve', 'Réserve', 'Mis de côté sur le commun : aucun effet sur l\'équilibre.') +
+        choix('remb', 'Remboursement', 'Argent rendu (trop-perçu, remboursement) : aucun effet sur l\'équilibre.') +
+        choix('autre', 'Autre', 'À préciser : aucun effet sur l\'équilibre.',
+          '<label class="ctl" for="cmTxt">précision <input id="cmTxt" maxlength="60" autocomplete="off" value="' + esc(aff && aff.k === 'autre' ? aff.txt || '' : '') + '"></label>') +
+        '</div>' + (aff ? '<div class="row">' + bt('affecter', 'data-k=""', 'Remettre à affecter', false) + '</div>' : '');
     }
     if (o.montant < 0) {
       const EN = KCo.enveloppes(B), lie = EN.parOp.get(o.id);

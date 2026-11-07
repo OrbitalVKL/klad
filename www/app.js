@@ -863,6 +863,14 @@
   }
   // depuis le détail, une action qui remet l'opération dans la liste ramène à la liste
   const versListe = () => { if (vue === 'operation') montrer(retourDe.operation || 'operations', { force: true }); };
+  // 1.3.3 : champ d'un choix d'affectation (année, poste, précision) modifié alors que ce choix est le choix actuel :
+  // l'affectation est mise à jour (même chemin qu'un appui sur le choix, annulable)
+  $('opDetail').addEventListener('change', ev => {
+    const t = ev.target;
+    if (!t || ['cmAn', 'cmPour', 'cmTxt'].indexOf(t.id) < 0) return;
+    const c = t.closest('.cm-ch'), b = c && c.querySelector('.cm-ch-b[aria-pressed="true"]');
+    if (b) b.click();
+  });
   $('opDetail').addEventListener('click', ev => {
     const b = ev.target.closest('[data-a]');
     if (!b || !opCourante) return;
