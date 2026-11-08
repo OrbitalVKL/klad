@@ -121,16 +121,26 @@
     }
     const HB = res.horsBudget && res.horsBudget.lignes || [];
     if (HB.length) h += '<div class="ap-nat"><div class="ap-nh"><span>Hors budget</span><b class="num">' + e0(res.horsBudget.c) + '</b></div><ul class="ap-pl">' + HB.map(a => ligne(Object.assign({}, a, { pm: 0 }), 'hb')).join('') + '</ul></div>';
-    // totaux : budget, réel, projection (à partir du 7e jour)
+    // bilan du budget : mêmes lignes que les natures (montant aligné à droite), sur fond teinté = la conclusion de la carte.
+    // Total dépensé (barre), réel à ce jour, projection (à partir du 7e jour).
     const o = res.solde || {};
-    const tot = res.total || {};
-    h += '<div class="ap-tot"><span><small>Dépenses</small><b class="num' + (tot.C - tot.P > DEMI ? ' bad-t' : '') + '">' + e0(tot.C) + '</b><small>sur ' + e0(tot.P) + '</small></span>' +
-      '<span><small>' + (scope === 'commun' ? 'Variation réelle' : 'Réel à ce jour') + '</small>' + sgB(scope === 'commun' ? o.variation : o.bal) + '</span>' +
-      '<span><small>Projeté fin de période</small>' + (res.jour < 7 ? '<b class="ap-mu">dès le 7e jour</b>' : sgB(o.pj)) + '</span></div>';
+    const tot = res.total || {}, overT = tot.C - tot.P > DEMI;
+    const fin = scope === 'commun' ? 'fin de mois' : res.per && res.per.cyc && res.per.cyc.end ? 'au ' + U().jjmm(res.per.cyc.end) : 'fin de période';
+    h += '<div class="ap-bilan" role="group" aria-label="Bilan">' +
+      '<div class="ap-br"><span>Total dépensé</span><b class="num' + (overT ? ' bad-t' : '') + '">' + e0(tot.C) + '<small> / ' + e0(tot.P) + '</small></b></div>' +
+      '<div class="ap-nb"><i style="width:' + Math.min(100, tot.P > DEMI ? tot.C / tot.P * 100 : 0).toFixed(1) + '%" class="' + (overT ? 'bad' : '') + '"></i></div>' +
+      '<div class="ap-br"><span>' + (scope === 'commun' ? 'Variation réelle' : 'Réel à ce jour') + '</span>' + sgB(scope === 'commun' ? o.variation : o.bal) + '</div>' +
+      '<div class="ap-br"><span>Projeté ' + esc(fin) + '</span>' + (res.jour < 7 ? '<span class="ap-mu">dès le 7e jour</span>' : sgB(o.pj)) + '</div></div>';
     return h;
   }
-  // montant d'un solde : « +1 378 € » en vert, ou « 402 € » en rouge avec « déficit » dessous (jamais de signe moins)
-  const sgB = v => v == null ? '<b>—</b>' : v < -DEMI ? '<b class="num bad-t">' + esc(e0(-v)) + '<small>déficit</small></b>' : '<b class="num pos-t">' + esc((v > DEMI ? '+' : '') + e0(Math.max(0, v))) + '</b>';
+  // solde du bilan : pastille (excédent / déficit / à l'équilibre) puis le montant, toujours sans signe moins
+  const sgB = v => v == null ? '<b>—</b>' : '<span class="ap-sv">' +
+    (v < -DEMI ? '<em class="ap-pill bad">déficit</em><b class="num bad-t">' + esc(e0(-v)) + '</b>'
+      : v > DEMI ? '<em class="ap-pill good">excédent</em><b class="num pos-t">' + esc(e0(v)) + '</b>'
+        : '<em class="ap-pill">à l\'équilibre</em><b class="num">' + esc(e0(v)) + '</b>') + '</span>';
+  // accès aux écrans détaillés : grille de boutons encadrés (icône + nom), 2 par ligne ; le dernier prend toute la largeur s'il est seul
+  const actions = L => '<nav class="ap-act" aria-label="Écrans détaillés">' + L.filter(Boolean).map(([attr, t, ic]) =>
+    '<button type="button" class="ap-ab" ' + attr + '>' + (g.KladIcones ? g.KladIcones.svg(ic, 18) : '') + '<span>' + esc(t) + '</span></button>').join('') + '</nav>';
 
   // ------------------------------------------------------------ observations (les « à faire » en clair, le reste en un appui)
   function observations(B, scope) {
@@ -162,9 +172,10 @@
     const L = Vu().lignesAVerifier(d.S, d.now, d.ext);
     h += VA().aVerifier(L);
     h += VA().soldes(d.S, d.now, { dettes: d.dettes, livrets: d.livrets });
-    if (B) h += carte('Prochains jours', '', filJours(d.ech, B.auj, 'perso', paie(res)), ' data-mesure="jours"');
     if (res) h += carte('Budget du cycle', esc(res.per && res.per.cyc ? U().jjmm(res.per.cyc.start) + ' → ' + U().jjmm(res.per.cyc.end) : ''), budget(res, B, 'perso') +
-      '<div class="ap-liens">' + lien('data-aller="budget"', 'Tout le budget') + lien('data-aller="tendance"', 'Tendance') + lien('data-aller="contrats-perso"', 'Contrats') + (VA().bilan(res) ? lien('data-av="bilan"', 'Bilan du cycle précédent') : '') + '</div>', ' data-mesure="budget-perso"');
+      actions([['data-aller="budget"', 'Tout le budget', 'list'], ['data-aller="tendance"', 'Tendance', 'trending-up'], ['data-aller="contrats-perso"', 'Contrats', 'file-text'],
+        VA().bilan(res) ? ['data-av="bilan"', 'Dernier bilan', 'calendar-check'] : null]), ' data-mesure="budget-perso"');
+    if (B) h += carte('Prochains jours', '', filJours(d.ech, B.auj, 'perso', paie(res)), ' data-mesure="jours"');
     h += observations(B, 'perso');
     return h;
   }
@@ -243,9 +254,9 @@
         '<div class="ap-mleg">' + P2.map(p => '<span><i class="m-' + (p[2] < 0 ? 'dep' : p[0]) + '"></i><b class="num' + (p[2] < 0 ? ' bad-t' : '') + '">' + e0(p[2]) + '</b><small>' + esc(p[2] < 0 ? p[1] + ' (manque)' : p[1]) + '</small></span>').join('') + '</div>' +
         lien('data-aller="commun"', 'Fiche du mois, enveloppes, renflouement'), ' data-mesure="repartition"', 'data-aller="commun"');
     }
-    h += carte('Prochains jours', '', filJours(d.ech, B.auj, 'commun', ''), ' data-mesure="jours-commun"');
     if (res) h += carte('Budget du commun', esc(res.per ? U().mLong(res.per.pm0) : ''), budget(res, B, 'commun') +
-      '<div class="ap-liens">' + lien('data-aller="commun"', 'Tout le commun') + lien('data-aller="tresorerie"', 'Trésorerie') + lien('data-aller="equilibre"', 'Équilibre') + lien('data-aller="contrats-commun"', 'Contrats') + '</div>', ' data-mesure="budget-commun"');
+      actions([['data-aller="commun"', 'Tout le commun', 'list'], ['data-aller="tresorerie"', 'Trésorerie', 'chart-line'], ['data-aller="equilibre"', 'Équilibre', 'scale'], ['data-aller="contrats-commun"', 'Contrats', 'file-text']]), ' data-mesure="budget-commun"');
+    h += carte('Prochains jours', '', filJours(d.ech, B.auj, 'commun', ''), ' data-mesure="jours-commun"');
     h += observations(B, 'commun');
     return h;
   }
