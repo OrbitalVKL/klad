@@ -214,14 +214,16 @@
     for (const x of (pl && pl.recus) || []) {
       const ok = !!x.vu, st = ok ? 'good' : x.route ? 'route' : x.retard ? 'bad' : 'attente';
       const sous = ok ? 'reçu le ' + U().jjmm(x.vu.date) : x.route ? 'en route · parti le ' + U().jjmm(x.route.depart.date) : x.retard ? 'en retard' : 'attendu vers le ' + (x.v.jour || 1);
-      v += '<li><span class="ap-av ' + (x.v.qui === 'moi' ? 'moi' : 'nous') + '" aria-hidden="true">' + ini(x.v.qui) + '</span><span class="t">' + esc(x.v.label || 'Virement') + '<small>' + esc(nom(x.v.qui) + ' · ' + sous) + '</small></span>' +
-        '<b class="num' + (ok ? ' pos-t' : '') + '">' + esc((ok ? '+' : '') + F().montant(ok ? x.vu.m : x.v.montant)) + '</b><span class="ap-st ' + st + '" aria-hidden="true">' + (ok ? '✓' : x.route ? '⇢' : x.retard ? '!' : '…') + '</span></li>';
+      // état du virement en pastille sur l'avatar (✓ reçu, ⇢ en route, ! en retard, … attendu) ; en clair dans le sous-titre
+      v += '<li><span class="ap-av ' + (x.v.qui === 'moi' ? 'moi' : 'nous') + '" aria-hidden="true">' + ini(x.v.qui) + '<span class="ap-st ' + st + '">' + (ok ? '✓' : x.route ? '⇢' : x.retard ? '!' : '…') + '</span></span>' +
+        '<span class="t">' + esc(x.v.label || 'Virement') + '<small>' + esc(nom(x.v.qui) + ' · ' + sous) + '</small></span>' +
+        '<b class="num' + (ok ? ' pos-t' : '') + '">' + esc((ok ? '+' : '') + F().montant(ok ? x.vu.m : x.v.montant)) + '</b></li>';
     }
     const parQui = {};
     for (const x of (pl && pl.changes) || []) { const q = parQui[x.qui] || (parQui[x.qui] = { n: 0, have: 0, want: 0 }); q.n++; q.have += +x.have || 0; q.want += +x.want || 0; }
     for (const q of Object.keys(parQui)) {
       const x = parQui[q];
-      v += '<li class="chg"><span class="ap-av ' + (q === 'moi' ? 'moi' : 'nous') + '" aria-hidden="true">' + ini(q) + '</span><span class="t">À mettre en place<small>' + esc(nom(q) + ' : ' + (x.n > 1 ? x.n + ' virements, ' : '') + 'de ' + e0(x.have) + ' à ' + e0(x.want) + ' par mois') + '</small></span><span class="ap-st warn" aria-hidden="true">✎</span></li>';
+      v += '<li class="chg"><span class="ap-av ' + (q === 'moi' ? 'moi' : 'nous') + '" aria-hidden="true">' + ini(q) + '<span class="ap-st warn">✎</span></span><span class="t">À mettre en place<small>' + esc(nom(q) + ' : ' + (x.n > 1 ? x.n + ' virements, ' : '') + 'de ' + e0(x.have) + ' à ' + e0(x.want) + ' par mois') + '</small></span></li>';
     }
     if (v) h += carte('Virements du mois', '', '<ul class="ap-vir">' + v + '</ul>' + lien('data-aller="commun"', 'Virements à mettre en place, fiche du mois'), ' data-mesure="virements"');
     // équilibre et trésorerie
