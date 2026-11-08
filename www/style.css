@@ -1354,7 +1354,7 @@ html.appm .txr.sw-back > div:not(.sw-act){transition:transform .2s ease}
 .sh-x{all:unset;cursor:pointer;flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--surface-2);color:var(--ink-2);font-size:18px}
 .sh-lab{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
 .cat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.cat-t{all:unset;box-sizing:border-box;cursor:pointer;min-height:72px;padding:6px 4px;border-radius:14px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;font:600 12px/1.2 var(--display);color:var(--ink-2);overflow-wrap:anywhere}
+.cat-t{all:unset;box-sizing:border-box;cursor:pointer;min-height:72px;padding:6px 4px;border-radius:14px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;font:600 12px/1.2 var(--display);color:var(--ink-2);overflow-wrap:anywhere;hyphens:auto;-webkit-hyphens:auto}
 .cat-t .cico{width:28px;height:28px;font-size:15px;margin:0}
 .cat-t[aria-checked="true"]{border:2px solid var(--good);background:var(--good-soft);color:var(--ink);font-weight:750}
 .cat-t.more{border-style:dashed}
@@ -2080,3 +2080,9 @@ html.etroit .sousvues.patri{grid-template-columns:repeat(2,minmax(0,1fr))}
 
 /* ============================================================ 1.3.5 : opération en cours que la banque ne renvoie plus (pas comptée) */
 .txr.absente .tl{text-decoration:line-through}
+
+/* ============================================================ 1.3.6 : Accueil — un seul raccourci */
+.ac-quick.ac-seul{grid-template-columns:1fr}
+.ctr-pp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px}
+/* 1.3.6 : la hauteur suit le graphique (le graphique cumulé de l'Équilibre fait 300 px : à 240 px, son axe sortait de la carte) */
+.chartbox{height:auto;min-height:240px}

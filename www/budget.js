@@ -409,13 +409,34 @@
     if (!last) for (let i = B.rows.length - 1; i >= 0; i--) { const r = B.rows[i]; if (estSalaire(B, r)) { last = r; break; } }
     let c = null;
     if (last) {
-      const [y, m, d] = last.date.split('-').map(Number);
-      const e = new Date(Date.UTC(y, m, d)); e.setUTCDate(e.getUTCDate() - 1);
-      let end = e.toISOString().slice(0, 10);
+      // 1.3.6 : fin = veille du prochain jour de paie attendu (jour habituel, avancé au jour ouvré précédent) ; avant : même
+      // jour le mois suivant − 1 (un salaire versé en avance, en décembre, raccourcissait le cycle puis l'allongeait jour après jour)
+      const attendu = salaireAttendu(B, last);
+      let end = plusJours(attendu, -1);
       if (end < B.auj) end = B.auj;
-      c = { start: last.date, end, src: last };
+      c = { start: last.date, end, src: last, attendu };
     }
     return (B.memo.cyc = c);
+  }
+
+  // 1.3.6 : jour de paie habituel = jour du mois le plus fréquent parmi les 6 derniers salaires (à égalité, le plus tardif :
+  // un salaire avancé avant un week-end ou les fêtes ne le change pas). Prochain salaire attendu : ce jour le mois suivant
+  // (le mois d'après s'il tombe moins de 20 jours après le dernier), avancé au jour ouvré précédent (week-end, férié).
+  function jourDePaie(B, last) {
+    let L = B.rows.filter(r => estSalaireRef(B, r));
+    if (!L.length) L = B.rows.filter(r => estSalaire(B, r));
+    const n = {};
+    for (const r of L.slice(-6)) { const j = +r.date.slice(8, 10); n[j] = (n[j] || 0) + 1; }
+    const js = Object.keys(n).map(Number);
+    return js.length ? js.sort((a, b) => (n[b] - n[a]) || (b - a))[0] : +last.date.slice(8, 10);
+  }
+  const ouvre = d => { const w = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay(); const KCm = g.KladCommun; return w !== 0 && w !== 6 && !(KCm && KCm.ferie && KCm.ferie(d)); };
+  function salaireAttendu(B, last) {
+    const j = jourDePaie(B, last), le = (m) => m + '-' + String(Math.min(j, joursMois(m))).padStart(2, '0');
+    let d = le(shift(last.date.slice(0, 7), 1));
+    if (dDiff(last.date, d) < 20) d = le(shift(last.date.slice(0, 7), 2));
+    for (let i = 0; i < 7 && !ouvre(d); i++) d = plusJours(d, -1);
+    return d;
   }
 
   // Débuts de cycle : un salaire ouvre un cycle s'il arrive au moins « ecart » jours après le précédent.

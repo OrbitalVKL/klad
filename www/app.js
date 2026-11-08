@@ -660,7 +660,9 @@
       const eca = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__eca' }), cx).length : null;
       $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, imp, eca, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
       // « Trier une à une » : avec le filtre Non vues ou Non classées
-      const nTri = filtre.nonVues || filtre.cat === '__nc' ? opsListe.filter(o => filtre.nonVues ? !KC.vue(S, o) : true).length : 0;
+      // 1.3.6 : aussi avec « À vérifier » (ouvert depuis l'Accueil) : non vues puis non classées, en une seule file
+      const nTri = filtre.nonVues || filtre.cat === '__nc' ? opsListe.filter(o => filtre.nonVues ? !KC.vue(S, o) : true).length
+        : filtre.cat === '__av' ? opsListe.filter(aTrier).length : 0;
       $('ops-tri').hidden = !nTri;
       $('ops-tri').innerHTML = nTri ? '<button type="button" class="btn primary" data-tri="1">' + (filtre.cat === '__nc' ? 'Classer une à une' : 'Trier une à une') + ' (' + nTri + ')</button>' : '';
       $('ops-perso').hidden = perOps.k !== 'perso';

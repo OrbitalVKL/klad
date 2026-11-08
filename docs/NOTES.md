@@ -2,6 +2,23 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.6
+
+Écrans allégés (analyse complète de l'appli par l'architecte, 08/11).
+- **Accueil** : le cycle n'est plus rappelé trois fois (en-tête sans « jour N sur T », « Ce cycle-ci » sans les jours
+  restants) ; « Bilan du cycle précédent » passe dans « Ce cycle-ci » ; un seul raccourci en bas (Verrouiller) ;
+  « À mettre en place » : une ligne par personne avec le total de ses virements à modifier.
+- **À vérifier** : depuis l'Accueil, la liste propose « Trier une à une » (non vues puis non classées, en une file).
+- **Commun › Ce mois** : le solde n'est plus répété : la carte « Le compte commun ce mois-ci » montre sa répartition,
+  le bas du budget les mouvements du mois (variation réelle).
+- **Cycle de salaire** : il se termine la veille du prochain jour de paie habituel (jour ouvré) ; un salaire versé en
+  avance (fêtes) ne raccourcit plus le cycle. Observation « Salaire attendu le …, pas encore arrivé » trois jours après.
+- **Contrats** : « prélèvement absent » pour tous les contrats (perso aussi, toutes périodicités), avec un conseil si
+  l'organisme a changé de libellé ou de numéro ; « Prévu du poste » lisible sur un petit écran.
+- **Projeté fin de mois** : affiché à partir du 7e jour (avant, deux jours de dépenses donnaient un chiffre inquiétant).
+- **Affichage** : « Alimentation » coupé proprement dans « Classer » ; graphiques sans axe hors de la carte ;
+  « 12 prochains mois » dans Commun › Trésorerie ; Impôts : « À régler et à suivre », « Points à suivre ».
+
 ## 1.3.5
 
 Correctif (analyse complète de l'appli par l'architecte, 08/11).

@@ -483,7 +483,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#app-tb [data-tab="accueil"]').click();
     assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
     const acc = await page.locator('#view-accueil').innerText();
-    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*jour \d+\/\d+[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/i);
+    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*jour \d+\/\d+[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Verrouiller/i);
     assert.doesNotMatch(acc, SANS_SIGNE);
     await page.locator('#view-accueil [data-aller="rav"]').click();
     assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
@@ -551,7 +551,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.match(b, /Solde du compte commun/);
     // 0.10.4 : sous-vues Ce mois · Trésorerie · Équilibre ; plus de sélecteur Perso / Commun, ni de catégories en bas
     assert.match(b, /Ce mois[\s\S]*Trésorerie[\s\S]*Équilibre[\s\S]*Marge (réelle|prévue) du commun[\s\S]*Virements à mettre en place[\s\S]*Budget mensuel/);
-    assert.doesNotMatch(b, /Trésorerie · 12 mois|Règles de classement/);
+    assert.doesNotMatch(b, /12 prochains mois|Règles de classement/);
     assert.equal(await page.locator('#view-budget [data-scope="perso"]').isVisible(), false);
     assert.match(await page.locator('#bal-panel').innerText(), /Fin de mois estimée/i);
     assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
@@ -568,7 +568,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.virements[0].montant), 80000);
     // Commun › Trésorerie : 12 mois, appels de fonds, d'où vient le solde (ouverts)
     await page.locator('#view-budget [data-sousvue="tresorerie"]').click();
-    assert.match(await page.locator('#cm-tres').innerText(), /Trésorerie · 12 mois/);
+    assert.match(await page.locator('#cm-tres').innerText(), /12 prochains mois/);
     assert.equal(await page.locator('#cm-plan').isVisible(), false);
     // Commun › Équilibre : reste à combler, simulation
     await page.locator('#view-budget [data-sousvue="equilibre"]').click();

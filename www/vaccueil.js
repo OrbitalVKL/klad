@@ -117,6 +117,8 @@
   }
 
   // ------------------------------------------------------------ 4. ce cycle-ci (4 postes : dépassés et à surveiller d'abord)
+  // 1.3.6 : plus de « N jours restants » (déjà dans la carte du reste à vivre) ; « Bilan du cycle précédent » en lien ici
+  // (et non plus dans « À vérifier ») les 5 premiers jours d'un cycle.
   function cycle(B, res) {
     if (!res) return '';
     const lignes = [];
@@ -133,8 +135,9 @@
         '<span class="bar" aria-hidden="true"><i class="' + cls + '" style="width:' + Math.min(100, Math.round(r * 100)) + '%"></i></span>' +
         '<span class="l3 ' + cls + '">' + esc(etat) + '</span></button>';
     }).join('');
-    const restants = Math.max(0, res.nbJours - res.jour);
-    return carte('ac-cy', 'Ce cycle-ci', pluriel(restants, 'jour') + ' restant' + (restants > 1 ? 's' : ''), corps +
+    const bl = bilan(res);
+    return carte('ac-cy', 'Ce cycle-ci', 'dépenses courantes et optionnelles', corps +
+      (bl ? '<button type="button" class="ac-lien" data-av="bilan">' + esc(bl.texte) + ' ›</button>' : '') +
       '<button type="button" class="ac-lien" data-aller="budget">Tout le budget ›</button>');
   }
 
@@ -152,8 +155,12 @@
       corps += li('<span class="dot ' + (ok ? 'good' : x.retard ? 'warn' : '') + '" aria-hidden="true"></span>', 'Virement de ' + nom(x.v.qui), sous, 'data-aller="commun"',
         '<span class="num' + (ok ? ' pos-t' : '') + '">' + esc((ok ? '+' : '') + F().montant(ok ? x.vu.m : x.v.montant)) + '</span>');
     }
-    for (const x of (pl && pl.changes) || []) {
-      corps += li('<span class="dot warn" aria-hidden="true"></span>', 'À mettre en place', nom(x.qui) + ' : passer de ' + KB().eur(x.have) + ' à ' + KB().eur(x.want) + ' par mois', 'data-aller="commun"');
+    // 1.3.6 : une ligne par personne (total de ses ordres à modifier), et non plus une par ordre
+    const parQui = {};
+    for (const x of (pl && pl.changes) || []) { const q = parQui[x.qui] || (parQui[x.qui] = { n: 0, have: 0, want: 0 }); q.n++; q.have += +x.have || 0; q.want += +x.want || 0; }
+    for (const q of Object.keys(parQui)) {
+      const x = parQui[q];
+      corps += li('<span class="dot warn" aria-hidden="true"></span>', 'À mettre en place', nom(q) + ' : ' + (x.n > 1 ? x.n + ' virements à modifier, ' : '') + 'passer de ' + KB().eur(x.have) + ' à ' + KB().eur(x.want) + ' par mois' + (x.n > 1 ? ' au total' : ''), 'data-aller="commun"');
     }
     return carte('ac-cm', 'Commun', 'mois ' + (/^[aeiou]/.test(U().MOIS_L[+auj.slice(5, 7) - 1]) ? 'd\'' : 'de ') + U().MOIS_L[+auj.slice(5, 7) - 1], corps +
       '<button type="button" class="ac-lien" data-aller="commun">Tout le commun ›</button>');
@@ -171,8 +178,9 @@
   // ------------------------------------------------------------ 7. actions rapides
   function actions() {
     const b = (act, ic, t) => '<button type="button" class="ac-act" data-act="' + act + '"><span aria-hidden="true">' + ic + '</span>' + t + '</button>';
-    return '<section class="ac-quick" aria-label="Actions rapides">' + b('sync', '↻', 'Synchroniser') + b('trier', '✓', 'Trier les opérations') +
-      b('sauvegarde', '⤓', 'Sauvegarder') + b('verrou', '🔒', 'Verrouiller') + '</section>';
+    // 1.3.6 : « Verrouiller » seul ; « Synchroniser » est dans l'en-tête de chaque écran, « Trier » est la ligne « à vérifier »,
+    // « Sauvegarder » la ligne de la sauvegarde (quand elle est due) et Plus › Sauvegarde
+    return '<section class="ac-quick ac-seul" aria-label="Actions rapides">' + b('verrou', '🔒', 'Verrouiller') + '</section>';
   }
 
   // Ligne « Bilan du cycle précédent » : les 5 premiers jours d'un cycle de salaire.
@@ -184,8 +192,6 @@
   // Écran complet. d : { S, B, now, ext (KladApp.extras), res, dettes, livrets, fdm, plan, R, ech }.
   function ecran(d) {
     const L = Vu().lignesAVerifier(d.S, d.now, d.ext);
-    const bl = bilan(d.res);
-    if (bl) L.push(bl);
     return reste(d.res, KB().baseRav(d.S)) + aVerifier(L) + soldes(d.S, d.now, { dettes: d.dettes, livrets: d.livrets }) + cycle(d.B, d.res) +
       commun(d.fdm, d.plan, d.R || {}, M().jourLocal(d.now)) + echeances(d.ech) + actions();
   }
@@ -193,7 +199,7 @@
   function surTitre(res) {
     if (!res || !res.per) return '';
     const p = res.per;
-    return (p.cyc ? 'Cycle du ' + U().jjmm(p.cyc.start) + ' au ' + U().jjmm(p.cyc.end) : U().mLong(p.pm0)) + ' · jour ' + res.jour + ' sur ' + res.nbJours;
+    return p.cyc ? 'Cycle du ' + U().jjmm(p.cyc.start) + ' au ' + U().jjmm(p.cyc.end) : U().mLong(p.pm0);      // 1.3.6 : sans « jour N sur T »
   }
 
   g.KladVuesAccueil = { ecran, reste, barreCycle, aVerifier, soldes, cycle, commun, echeances, actions, bilan, surTitre };

@@ -6,6 +6,12 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.3.6** — écrans allégés (analyse de l'architecte, 08/11 ; développé et publié par l'architecte) : Accueil (cycle
+une fois, bilan dans « Ce cycle-ci », un seul raccourci, « À mettre en place » par personne) ; « Trier une à une » depuis
+« À vérifier » ; Commun › Ce mois sans le solde répété ; fin de cycle au prochain jour de paie habituel et observation
+« Salaire attendu » ; « prélèvement absent » pour tous les contrats ; projection à partir du 7e jour ; affichage à
+390 px (Classer, contrats, graphiques, titres).
+
 **1.3.5** — correctif (analyse complète de l'appli par l'architecte, 08/11 ; développé et publié par l'architecte) :
 reste à vivre « comptes courants » sans la somme due sur les cartes à débit différé ; projection de fin de période avec
 les charges fixes réelles ; opération en cours plus renvoyée par la banque : plus comptée ; relecture bancaire de 30 jours
@@ -86,6 +92,28 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.3.6 — détails techniques
+- Cycle (`budget.js:cycleCourant`) : `attendu = salaireAttendu(B, last)`, `end = attendu − 1` (prolongé à aujourd'hui
+  comme avant). `jourDePaie` : jour du mois le plus fréquent des 6 derniers salaires (à égalité, le plus tardif) ;
+  `salaireAttendu` : ce jour le mois suivant (le mois d'après si moins de 20 jours), avancé au jour ouvré précédent
+  (week-end, `KladCommun.ferie` si chargé). Cycles passés (`debuts`, `cyclePasse`) inchangés. Relevés des jeux fictifs
+  inchangés (salaire le 27).
+- Observations (`observations.js`) : « Salaire » : `cycleCourant().attendu` dépassé de plus de 2 jours sans salaire →
+  « Salaire attendu le …, pas encore arrivé (dernier le …) » (sinon règle des 38 jours) ; « <contrat> : prélèvement
+  absent » : tout contrat avec montant, sans fin passée, dernier prélèvement à plus de `per × 31 + 14` jours (avant :
+  commun, mensuel, 45 jours).
+- Accueil (`vaccueil.js`) : `surTitre` sans le jour ; `cycle` : sous-titre « dépenses courantes et optionnelles », lien
+  `data-av="bilan"` (5 premiers jours) ; `bilan` n'est plus ajouté à « À vérifier » ; `commun` : « À mettre en place »
+  regroupé par personne ; `actions` : Verrouiller seul (`.ac-quick.ac-seul`).
+- Opérations (`app.js:renderOps`) : bouton « Trier une à une » aussi avec le filtre `__av` (`opsListe.filter(aTrier)`).
+- Commun : `vcommun.js:mois` sans la ligne « Solde » (titre « répartition du solde ») ; `vbudget.js:soldeBar` (commun,
+  mois en cours) : « Mouvements du mois », variation réelle en avant, provisions. `vbudget.js` : `projete(s)` (« à
+  partir du 7e jour » si `s.jour < 7`). Contrats : `.ctr-pp` (pastille et bouton sous le texte). `vfisc.js` : « À régler et
+  à suivre », « Points à suivre ». `vcommun.js` : « 12 prochains mois » (ancien « Trésorerie · 12 mois »).
+- CSS : `.cat-t` `hyphens:auto` ; `.chartbox{height:auto;min-height:240px}` (graphiques de 300 px dans une boîte de
+  240 px à moins de 520 px de large).
+- Tests : `test/lot136.test.mjs` ; `accueil`, `parcours`, `commun`, `lot130` adaptés.
 
 ### 1.3.5 — détails techniques
 - Reste à vivre (`budget.js:resteAVivre`, `detteCartes(B)`) : colonne comptes `cartes` = somme des `KladClasse.dette`

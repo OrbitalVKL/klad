@@ -161,7 +161,12 @@
       if (!c.montant && d) {
         if (jours(B, d.date) <= 40) add('bad', c.sc, c.label + ' encore prélevé', e2(-d.m) + ' prélevés le ' + dfr(d.date) + '. Résiliation demandée : si un prélèvement passe encore le mois prochain, relancez l\'organisme.');
         else add('good', c.sc, c.label + ' arrêté', 'Plus de prélèvement depuis le ' + dfr(d.date) + '.');
-      } else if (c.sc === 'commun' && c.montant && (c.per || 1) === 1 && d && jours(B, d.date) > 45) add('warn', 'commun', c.label + ' : prélèvement absent', 'Dernier prélèvement le ' + dfr(d.date) + '. Vérifiez la mensualisation.');
+      } else if (c.montant && d && !(c.fin && c.fin < B.auj) && jours(B, d.date) > (c.per || 1) * 31 + 14) {
+        // 1.3.6 : tous les contrats (perso et commun, toutes périodicités ; avant : commun mensuel seulement) ; un organisme
+        // qui change de libellé ou de numéro laissait des échéances annoncées sans prélèvement
+        add('warn', c.sc === 'commun' ? 'commun' : 'perso', c.label + ' : prélèvement absent', 'Dernier prélèvement le ' + dfr(d.date) + ((c.per || 1) > 1 ? ' (attendu tous les ' + c.per + ' mois)' : '') +
+          '. Si l\'organisme a changé de libellé ou de numéro de contrat, modifiez le contrat (Budget › Contrats) ; sinon vérifiez la mensualisation.');
+      }
     }
     // appels de fonds
     if (KC()) {
@@ -284,7 +289,10 @@
     }
     // salaire
     const sal = B.rows.filter(r => ['courant', 'carte_differee', 'paiement_en_ligne'].indexOf(r.role) >= 0 && r.type === 'revenu' && r.m > RO.salaireMin);
-    if (sal.length) { const s = sal[sal.length - 1]; if (jours(B, s.date) > 38) add('warn', 'perso', 'Salaire', 'Aucun salaire reçu depuis le ' + dfr(s.date) + '.'); else add('info', 'perso', 'Dernier salaire', e2(s.m) + ' le ' + dfr(s.date) + ' (' + s.label.split(/\s+/).slice(0, 3).join(' ') + ').'); }
+    // 1.3.6 : salaire attendu (jour de paie habituel, jour ouvré) et pas arrivé 3 jours après
+    const cc = KB().cycleCourant ? KB().cycleCourant(B) : null, att = cc && cc.attendu;
+    if (sal.length) { const s = sal[sal.length - 1]; if (att && B.auj > M().plusJours(att, 2) && s.date < att) add('warn', 'perso', 'Salaire', 'Salaire attendu le ' + dfr(att) + ', pas encore arrivé (dernier le ' + dfr(s.date) + ').');
+      else if (jours(B, s.date) > 38) add('warn', 'perso', 'Salaire', 'Aucun salaire reçu depuis le ' + dfr(s.date) + '.'); else add('info', 'perso', 'Dernier salaire', e2(s.m) + ' le ' + dfr(s.date) + ' (' + s.label.split(/\s+/).slice(0, 3).join(' ') + ').'); }
     return (B.memo.audit = A);
   }
 
