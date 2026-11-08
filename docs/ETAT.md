@@ -6,6 +6,9 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.0.1** — correctif (retour du propriétaire, 08/11) : compteurs de l'écran Opérations à jour dès qu'une opération est
+vue (glissement, détail). Lot suivant : 2.1.0, budget fusionné dans l'Aperçu (maquettes validées le 08/11).
+
 **2.0.0** — nouvelle interface (demande du propriétaire, 08/11 : « trop de texte », navigation intuitive, puis « conserver
 toutes les infos, trouver un entre-deux » ; maquettes et prototype en artefact validés au fil de la journée ; « travaille
 directement sur la nouvelle version »). Barre du bas Aperçu · Opérations · Trier · Patrimoine · Plus ; Aperçu en deux pages
@@ -98,6 +101,12 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.0.1 — détails techniques
+- `app.js` : `compteursListe()` (pastilles `#ops-scope`, badge, filtres `#app-chips`, `#ops-tri`) extrait de
+  `renderOps(true)` et appelé aussi par `basculerVue` (glissement à droite, bouton « vue » du détail) : avant, seul
+  `renderHaut` (badge, Aperçu) suivait. La liste n'est pas reconstruite (ligne et position gardées).
+- Test : `test/lot201.test.mjs` (glissement tactile simulé dans Chromium, aller-retour vue / non vue).
 
 ### 2.0.0 — détails techniques
 - Navigation (`index.html`, `app.js`) : `#app-tb` = `accueil` (« Aperçu »), `operations`, `trier` (bouton central

@@ -672,14 +672,34 @@
       return out;
     } catch (e) { return null; }
   }
+  // Compteurs de l'écran Opérations : pastilles du périmètre (Perso · Commun · Tout), filtres (Non vues, Non classées,
+  // Internes, Imprévus, Écarts) et « Trier une à une (N) ». 2.0.1 : recalculés aussi seuls, sans reconstruire la liste
+  // (opération marquée vue d'un glissement ou depuis son détail : tous les nombres changent tout de suite).
+  function compteursListe() {
+    const cx = ctx();
+    avMemo = null;
+    $('ops-scope').innerHTML = Vu.perimetre(perimOps, compteursAV());
+    afficherBadge();
+    const base = Object.assign({}, filtre, { cat: '', nonVues: false });
+    const unseen = Vu.filtrer(S, Object.assign({}, base, { nonVues: true }), cx).length;
+    const nc = Vu.filtrer(S, Object.assign({}, base, { cat: '__nc' }), cx).length;
+    const int = Vu.filtrer(S, Object.assign({}, base, { cat: '__int' }), cx).length;
+    // 1.3.0 : imprévus et écarts du compte commun (périmètres Commun et Tout)
+    const imp = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__imp' }), cx).length : null;
+    const eca = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__eca' }), cx).length : null;
+    $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, imp, eca, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
+    // « Trier une à une » : avec le filtre Non vues ou Non classées
+    // 1.3.6 : aussi avec « À vérifier » (ouvert depuis l'Accueil) : non vues puis non classées, en une seule file
+    const nTri = filtre.nonVues || filtre.cat === '__nc' ? opsListe.filter(o => filtre.nonVues ? !KC.vue(S, o) : true).length
+      : filtre.cat === '__av' ? opsListe.filter(aTrier).length : 0;
+    $('ops-tri').hidden = !nTri;
+    $('ops-tri').innerHTML = nTri ? '<button type="button" class="btn primary" data-tri="1">' + (filtre.cat === '__nc' ? 'Classer une à une' : 'Trier une à une') + ' (' + nTri + ')</button>' : '';
+  }
   function renderOps(reset) {
     if (!S) return;
     if (reset) {
       const cx = ctx();
       filtre.q = $('q').value.trim(); filtre.scope = perimOps;
-      avMemo = null;
-      $('ops-scope').innerHTML = Vu.perimetre(perimOps, compteursAV());
-      afficherBadge();
       if (filtre.compte && !M.compte(S, filtre.compte)) filtre.compte = '';
       if (filtre.cat && filtre.cat[0] !== '_' && !cx.C.categories[filtre.cat]) filtre.cat = '';
       const bp = bornesOps();
@@ -687,20 +707,7 @@
       filtre.statuts = statutsCommun();
       opsListe = Vu.ordonner(Vu.filtrer(S, filtre, cx), filtre.ordre, cx);
       opsFin = 0;
-      const base = Object.assign({}, filtre, { cat: '', nonVues: false });
-      const unseen = Vu.filtrer(S, Object.assign({}, base, { nonVues: true }), cx).length;
-      const nc = Vu.filtrer(S, Object.assign({}, base, { cat: '__nc' }), cx).length;
-      const int = Vu.filtrer(S, Object.assign({}, base, { cat: '__int' }), cx).length;
-      // 1.3.0 : imprévus et écarts du compte commun (périmètres Commun et Tout)
-      const imp = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__imp' }), cx).length : null;
-      const eca = perimOps !== 'perso' ? Vu.filtrer(S, Object.assign({}, base, { cat: '__eca' }), cx).length : null;
-      $('app-chips').innerHTML = Vu.filtres(S, filtre, cx, { unseen, nc, int, imp, eca, visiblesNonVues: opsListe.some(o => !KC.vue(S, o)) });
-      // « Trier une à une » : avec le filtre Non vues ou Non classées
-      // 1.3.6 : aussi avec « À vérifier » (ouvert depuis l'Accueil) : non vues puis non classées, en une seule file
-      const nTri = filtre.nonVues || filtre.cat === '__nc' ? opsListe.filter(o => filtre.nonVues ? !KC.vue(S, o) : true).length
-        : filtre.cat === '__av' ? opsListe.filter(aTrier).length : 0;
-      $('ops-tri').hidden = !nTri;
-      $('ops-tri').innerHTML = nTri ? '<button type="button" class="btn primary" data-tri="1">' + (filtre.cat === '__nc' ? 'Classer une à une' : 'Trier une à une') + ' (' + nTri + ')</button>' : '';
+      compteursListe();
       $('ops-perso').hidden = perOps.k !== 'perso';
       if (perOps.k === 'perso') { $('opsDu').value = perOps.du; $('opsAu').value = perOps.au; }
       $('ops-pastille').hidden = perOps.k === 'tout';
@@ -889,6 +896,7 @@
     const tr = document.querySelector('#tx div.txr[data-op="' + CSS.escape(id) + '"]');
     if (tr) tr.classList.toggle('unseen', !on);
     save(); M.signaler('vu'); renderHaut();
+    compteursListe();            // 2.0.1 : pastilles, filtres et « Trier une à une » à jour tout de suite
     toastAnnuler(on ? 'Opération marquée vue.' : 'Opération remise en non vue.', () => { KC.annulerVues(avant); changed('vu'); });
   }
 

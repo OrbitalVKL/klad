@@ -2,6 +2,12 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.0.1
+
+Correctif (retour du propriétaire, 08/11) : une opération marquée vue d'un glissement, ou depuis son détail, met à jour
+tout de suite les nombres de l'écran Opérations (pastilles Perso · Commun · Tout, filtre « Non vues », « Trier une à
+une ») ; avant, seul le bouton Trier changeait, le reste attendait qu'on quitte la liste. La liste ne bouge pas.
+
 ## 2.0.0
 
 Nouvelle interface (demande du propriétaire, 08/11 : moins de texte, une navigation qui se comprend sans explication, sans
