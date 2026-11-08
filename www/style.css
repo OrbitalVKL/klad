@@ -2168,20 +2168,19 @@ html.etroit .sousvues.patri{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ap-ring .ic .cico svg{width:19px;height:19px}
 .ap-alerte{position:absolute;top:-3px;right:-3px;width:17px;height:17px;border-radius:50%;background:var(--bad);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:900;border:2px solid var(--surface)}
 .warn-t{color:var(--warn)!important}
-.ap-bilan{display:grid;gap:2px;margin-top:8px;padding:8px 12px 6px;border-radius:14px;background:var(--surface-2)}
-.ap-br{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:34px}
+.ap-bilan{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;margin-top:8px;padding:8px 12px 6px;border-radius:14px;background:var(--surface-2)}
+.ap-br{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 10px;min-height:34px} .ap-br>:last-child{margin-left:auto}
 .ap-br>span:first-child{min-width:0;font-weight:700;font-size:14px;color:var(--ink-2)}
-.ap-br b{font-size:15px;white-space:nowrap} .ap-br b small{font-size:12px;font-weight:500;color:var(--muted)}
+.ap-br b{font-size:15px;text-align:right} .ap-br b small{font-size:12px;font-weight:500;color:var(--muted)}
 .ap-bilan .ap-nb{margin:0 0 4px;background:var(--surface)}
-.ap-sv{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.ap-sv{display:inline-flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:4px 8px;min-width:0}
 .ap-pill{font-style:normal;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--surface);color:var(--muted)}
 .ap-pill.bad{background:var(--bad-soft);color:var(--bad)} .ap-pill.good{background:var(--good-soft);color:var(--good)}
-.ap-mu{font-size:12.5px;font-weight:600;color:var(--muted)}
-.ap-act{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
-.ap-ab{all:unset;box-sizing:border-box;cursor:pointer;min-width:0;min-height:46px;padding:6px 11px;display:flex;align-items:center;gap:9px;border-radius:12px;border:1px solid var(--line);font-weight:650;font-size:14px;color:var(--ink)}
-.ap-ab .lu{flex:none;color:var(--accent)} .ap-ab span{flex:1;min-width:0;line-height:1.2;overflow-wrap:anywhere}
+.ap-mu{font-size:12.5px;font-weight:600;color:var(--muted);text-align:right}
+.ap-act{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.ap-ab{all:unset;box-sizing:border-box;cursor:pointer;flex:1 1 calc(50% - 4px);max-width:100%;min-height:46px;padding:6px 11px;display:flex;align-items:center;gap:9px;border-radius:12px;border:1px solid var(--line);font-weight:650;font-size:14px;color:var(--ink)}
+.ap-ab .lu{flex:none;color:var(--accent)} .ap-ab span{flex:1;line-height:1.2;overflow-wrap:break-word}
 .ap-ab:active{background:var(--surface-2)} .ap-ab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.ap-ab:last-child:nth-child(odd){grid-column:1/-1}
 .ap-liens{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px}
 .ap-lien{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;font-weight:700;font-size:14px;color:var(--accent)}
 .ap-obs{list-style:none;margin:0;padding:0}

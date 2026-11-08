@@ -138,7 +138,7 @@
     (v < -DEMI ? '<em class="ap-pill bad">déficit</em><b class="num bad-t">' + esc(e0(-v)) + '</b>'
       : v > DEMI ? '<em class="ap-pill good">excédent</em><b class="num pos-t">' + esc(e0(v)) + '</b>'
         : '<em class="ap-pill">à l\'équilibre</em><b class="num">' + esc(e0(v)) + '</b>') + '</span>';
-  // accès aux écrans détaillés : grille de boutons encadrés (icône + nom), 2 par ligne ; le dernier prend toute la largeur s'il est seul
+  // accès aux écrans détaillés : boutons encadrés (icône + nom), 2 par ligne ; seul sur sa ligne (pleine largeur) quand son nom ne tient pas
   const actions = L => '<nav class="ap-act" aria-label="Écrans détaillés">' + L.filter(Boolean).map(([attr, t, ic]) =>
     '<button type="button" class="ap-ab" ' + attr + '>' + (g.KladIcones ? g.KladIcones.svg(ic, 18) : '') + '<span>' + esc(t) + '</span></button>').join('') + '</nav>';
 
