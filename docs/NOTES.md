@@ -2,6 +2,25 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.0.0
+
+Nouvelle interface (demande du propriétaire, 08/11 : moins de texte, une navigation qui se comprend sans explication, sans
+perdre aucune information). Aucun calcul ne change. Comprend aussi les corrections de la 1.3.5 et de la 1.3.6 ci-dessous.
+- **Barre du bas** : Aperçu · Opérations · **Trier** (bouton du milieu, avec le nombre d'opérations à vérifier) ·
+  Patrimoine · Plus. Budget, Commun et Équilibre s'ouvrent depuis l'Aperçu (le bouton Retour y ramène).
+- **Aperçu, page Moi** : un cadran donne le reste à vivre (au centre), le temps écoulé du cycle (cercle fin et point) et
+  la part du budget variable déjà dépensée (cercle épais, vert / orange / rouge selon le rythme) ; « Où va l'argent »
+  découpe le salaire ou les comptes en couleurs ; puis à vérifier, soldes, le budget du cycle **poste par poste** (un
+  anneau par poste, « reste », « dépassé de », « à venir », « prélevé ») avec son bilan (total dépensé, réel à ce jour,
+  projeté, pastilles « excédent » / « déficit ») et quatre boutons vers les écrans détaillés (Tout le budget, Tendance,
+  Contrats, Dernier bilan), les 7 prochains jours (échéances et paie, liste complète en dépliant), les points à faire et
+  Verrouiller.
+- **Aperçu, page Nous** (glisser vers la gauche ou toucher « Nous ») : fin de mois estimée et solde du commun, virements
+  de chacun (reçu, en route, à mettre en place), équilibre (balançoire : qui doit encore investir, date d'équilibre),
+  12 prochains mois (point bas, plancher de la réserve), répartition du solde, budget du commun avec son bilan et ses
+  boutons (Tout le commun, Trésorerie, Équilibre, Contrats), prochains jours du commun, points à faire.
+- **Lisible partout** : petit écran (320 px) et texte agrandi jusqu'à 200 % sans rien de coupé ; cibles de 48 dp.
+
 ## 1.3.6
 
 Écrans allégés (analyse complète de l'appli par l'architecte, 08/11).

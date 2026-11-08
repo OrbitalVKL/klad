@@ -193,7 +193,7 @@
     impots: 'Patrimoine', epargne: 'Patrimoine', crypto: 'Patrimoine', donnees: 'Relevés des comptes', sauvegarde: 'Sauvegarde' };
   // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient
   // (par défaut : la liste des opérations, Plus).
-  const RETOUR = { operation: 'operations', donnees: 'plus', sauvegarde: 'plus', budget: 'accueil', commun: 'accueil', appartement: 'accueil' };      // 2.0 (test) : retour vers l'Aperçu
+  const RETOUR = { operation: 'operations', donnees: 'plus', sauvegarde: 'plus', budget: 'accueil', commun: 'accueil', appartement: 'accueil' };      // 2.0 : retour vers l'Aperçu
   let retourDe = {};
   const pos = {};                    // position de défilement de chaque écran
   let vue = 'accueil', scope = 'perso';
@@ -218,7 +218,7 @@
   }
   // En-tête : titre, ligne du dessus (période), pastille de synchro, recherche (opérations), thème.
   function chrome() {
-    // 2.0 (test) : Budget, Commun et Équilibre s'ouvrent depuis l'Aperçu (plus d'onglet à eux)
+    // 2.0 : Budget, Commun et Équilibre s'ouvrent depuis l'Aperçu (plus d'onglet à eux)
     const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue === 'appartement' || vue === 'budget' || vue === 'commun' ? 'accueil' : PATRIMOINE.indexOf(vue) >= 0 ? 'patrimoine' : vue;
     $('ah-back').hidden = !RETOUR[vue];
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -251,7 +251,7 @@
     if (!b || !S) return;
     const k = b.dataset.tab;
     if (k === 'plus') { montrer('plus', { force: true, haut: true }); return; }
-    if (k === 'trier') { trier('nv', 'tout'); return; }            // 2.0 (test) : bouton central
+    if (k === 'trier') { trier('nv', 'tout'); return; }            // 2.0 : bouton central
     if (k === 'patrimoine') {
       if (PATRIMOINE.indexOf(vue) >= 0) { window.scrollTo({ top: 0, behavior: 'auto' }); return; }
       montrer(window.KladEcranFisc ? window.KladEcranFisc.vuePatrimoine() : 'impots', { force: true, haut: true }); return;
@@ -510,17 +510,17 @@
       try { R = window.KladCommun ? window.KladCommun.reglages(B) : {}; } catch (e) { R = {}; }
       try { ech = window.KladBudget.echeances(B, 31); } catch (e) { ech = []; }
     }
-    // 2.0 (test) : Aperçu en deux pages, Moi et Nous (on glisse de l'une à l'autre)
+    // 2.0 : Aperçu en deux pages, Moi et Nous (on glisse de l'une à l'autre)
     const dA = { S, B, now, ext: ex, res, dettes, livrets, fdm, plan: pl, R, ech };
     try { el.innerHTML = window.KladVuesApercu ? window.KladVuesApercu.ecran(dA, coteApercu()) : window.KladVuesAccueil.ecran(dA); }
     catch (e) { el.innerHTML = '<p class="muted">Affichage impossible.</p>'; log('err', 'Accueil : ' + (e.message || e)); }
   }
-  // 2.0 (test) : page de l'Aperçu affichée (« moi » ou « nous »), gardée sur ce téléphone
-  function coteApercu() { try { return localStorage.getItem('klad.apercu') === 'nous' ? 'nous' : 'moi'; } catch (e) { return apCote || 'moi'; } }
+  // 2.0 : page de l'Aperçu affichée (« moi » ou « nous »), en mémoire seulement (rien en clair sur le téléphone) :
+  // l'Aperçu rouvre sur « Moi » à chaque déverrouillage
   let apCote = 'moi';
+  const coteApercu = () => apCote;
   function choisirCote(c) {
     apCote = c === 'nous' ? 'nous' : 'moi';
-    try { localStorage.setItem('klad.apercu', apCote); } catch (e) { /* mémoire seule */ }
     renderAccueilEcran(Date.now(), extras(Date.now()), dettesDe(Date.now()), {});
     window.scrollTo(0, 0);
   }
@@ -569,7 +569,7 @@
       const k = a.dataset.aller;
       if (k === 'rav') ouvrirVolet('secRav');
       else if (k === 'tendance' || k === 'tresorerie') {
-        // 2.0 (test) : sous-vues ouvertes depuis l'Aperçu (Budget › Tendance, Commun › Trésorerie)
+        // 2.0 : sous-vues ouvertes depuis l'Aperçu (Budget › Tendance, Commun › Trésorerie)
         const EB = window.KladEcranBudget;
         if (EB) EB.ui.sv[k === 'tendance' ? 'perso' : 'commun'] = k;
         montrer(k === 'tendance' ? 'budget' : 'commun', { force: true, haut: true });
@@ -588,7 +588,7 @@
     else if (act.dataset.act === 'trier') trier('nv', 'tout');
     else if (act.dataset.act === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
   });
-  // 2.0 (test) : glisser horizontalement sur l'Aperçu : Moi ⇄ Nous
+  // 2.0 : glisser horizontalement sur l'Aperçu : Moi ⇄ Nous
   (() => {
     let x0 = null, y0 = 0, t0 = 0;
     const el = $('view-accueil');
@@ -1587,7 +1587,7 @@
     // nettoie les autorisations restées en suspens plus d'une heure
     Object.keys(S.modele.pending).forEach(k => { if (Date.now() - (S.modele.pending[k].ts || 0) > 3600e3) delete S.modele.pending[k]; });
     save();
-    vue = 'accueil'; scope = 'perso';
+    vue = 'accueil'; scope = 'perso'; apCote = 'moi';
     montrer('accueil', { rendre: false, haut: true });
     // 0.10.6 : l'Accueil est dessiné d'abord ; le reste (autres écrans, résumé Grafit, reprise, synchro) après le premier affichage
     renderHaut();

@@ -74,7 +74,7 @@ if (!args['sans-perf']) {
     await pause(1500);
   }
   await ralentir(4);
-  for (const t of B.onglets.slice(1).concat(B.onglets[0])) {
+  for (const t of B.barre.slice(1).concat(B.barre[0])) {      // 2.0 : onglets de la barre du bas seulement
     await B.fermer();
     perf.onglets[t] = await page.evaluate(t => new Promise(r => { const t0 = performance.now(); document.querySelector('#app-tb [data-tab="' + t + '"]').click(); requestAnimationFrame(() => requestAnimationFrame(() => r(Math.round(performance.now() - t0)))); }), t);
     await pause(400);

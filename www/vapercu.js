@@ -1,4 +1,4 @@
-// Klad — Aperçu (2.0, version de test) : l'Accueil devient un tableau de bord en deux pages qu'on fait glisser,
+// Klad — Aperçu (2.0) : l'Accueil devient un tableau de bord en deux pages qu'on fait glisser,
 // « Moi » (perso) et « Nous » (compte commun). En haut un cadran (un chiffre, le temps qui passe, ce qui est consommé),
 // puis des blocs denses : rien n'est retiré par rapport aux écrans d'avant, chaque bloc renvoie à l'écran détaillé.
 // Aucun calcul propre : KladBudget.suivi, ravChoisi, echeances ; KladCommun.finDeMois, plan, decomposition, equilibre,
@@ -70,6 +70,8 @@
     return '<div class="ap-mtete"><span>' + (comptes ? 'Comptes courants' : 'Salaire' + (c.date ? ' du ' + U().jjmm(c.date) : '')) + '</span><b class="num">' + e0(c.base) + '</b></div>' + bar + leg;
   }
 
+  // montant court d'une case du fil des jours : « 950 € », « 1,3 k€ » (le montant exact est dans la liste dépliée)
+  const court = c => { const v = Math.abs(Math.round(+c || 0)) / 100; return v < 999.5 ? e0(c) : (Math.round(v / 100) / 10).toLocaleString('fr-FR') + '\u202fk€'; };
   // ------------------------------------------------------------ fil des jours : 7 jours, échéances en pastilles, puis la liste
   function filJours(ech, auj, scope, suite) {
     const L = (ech || []).filter(e => scope === 'tout' || e.scope === scope || (scope === 'perso' && e.sorte === 'carte'));
@@ -80,7 +82,7 @@
       const d = plusJours(auj, i), wd = new Date(d + 'T12:00:00Z').getUTCDay(), E = parJour[d] || [];
       const tot = E.reduce((t, e) => t + e.montant, 0);
       cases += '<span class="ap-day' + (i === 0 ? ' auj' : '') + '"><span class="w">' + JOURS[wd] + '</span><span class="n num">' + +d.slice(8, 10) + '</span>' +
-        (E.length ? '<span class="ev ' + (E[0].scope === 'commun' ? 'nous' : 'moi') + '">' + E.length + '</span><span class="a num">' + e0(tot) + '</span>' : '<span class="vide"></span><span class="a"></span>') + '</span>';
+        (E.length ? '<span class="ev ' + (E[0].scope === 'commun' ? 'nous' : 'moi') + '">' + E.length + '</span><span class="a num" aria-label="' + esc(e0(tot)) + '">' + esc(court(tot)) + '</span>' : '<span class="vide"></span><span class="a"></span>') + '</span>';
     }
     const apres = L.filter(e => e.date >= plusJours(auj, 7));
     if (suite) cases += '<span class="ap-suite">' + suite + '</span>';
@@ -101,21 +103,21 @@
       const reste = nk === 'hb' ? 'sans budget' : over ? 'dépassé de ' + e0(a.cur - a.pm) : nk === 'fixe' ? (a.cur >= a.pm - DEMI ? 'prélevé' : 'à venir ' + e0(a.pm - a.cur)) : 'reste ' + e0(Math.max(0, a.pm - a.cur));
       return '<li><button type="button" class="ap-po" data-aller="' + (scope === 'commun' ? 'commun' : 'budget') + '" aria-label="' + esc(a.label + ' : ' + e0(a.cur) + ' sur ' + e0(a.pm) + ', ' + reste) + '">' +
         anneau(fr, et, '<span class="ic">' + U().icoPoste(C, a) + '</span>') + '<span class="t">' + esc(a.label) + '<small class="' + (over ? 'bad-t' : et === 'warn' ? 'warn-t' : '') + '">' + esc(reste) + '</small></span>' +
-        '<span class="v num">' + esc(e0(a.cur)) + (nk === 'hb' ? '' : '<small> / ' + esc(e0(a.pm)) + '</small>') + '</span></button></li>';
+        '<span class="v num">' + esc(e0(a.cur)) + (nk === 'hb' ? '' : ' <small>/\u00a0' + esc(e0(a.pm)) + '</small>') + '</span></button></li>';
     };
     let h = '';
     // revenus
     const RV = (res.revenus && res.revenus.lignes) || [];
     if (RV.length) {
       const att = Math.max(0, res.revenus.p - res.revenus.c);
-      h += '<div class="ap-nat"><div class="ap-nh"><span>Revenus</span><b class="num">' + e0(res.revenus.c) + '<small> / ' + e0(res.revenus.p) + '</small></b></div>' +
+      h += '<div class="ap-nat"><div class="ap-nh"><span>Revenus</span><b class="num">' + e0(res.revenus.c) + ' <small>/\u00a0' + e0(res.revenus.p) + '</small></b></div>' +
         (att > DEMI ? '<p class="ap-note">attendu encore ' + e0(att) + '</p>' : '') + '</div>';
     }
     for (const [nk, nom] of NATS) {
       const S = res.sections[nk];
       if (!S || !S.lignes.length) continue;
       const over = S.c - S.p > DEMI;
-      h += '<div class="ap-nat"><div class="ap-nh"><span>' + nom + (S.nbDepasses ? ' <b class="ap-chip bad">' + S.nbDepasses + ' dépassé' + (S.nbDepasses > 1 ? 's' : '') + '</b>' : '') + '</span><b class="num' + (over ? ' bad-t' : '') + '">' + e0(S.c) + '<small> / ' + e0(S.p) + '</small></b></div>' +
+      h += '<div class="ap-nat"><div class="ap-nh"><span>' + nom + (S.nbDepasses ? ' <b class="ap-chip bad">' + S.nbDepasses + ' dépassé' + (S.nbDepasses > 1 ? 's' : '') + '</b>' : '') + '</span><b class="num' + (over ? ' bad-t' : '') + '">' + e0(S.c) + ' <small>/\u00a0' + e0(S.p) + '</small></b></div>' +
         '<div class="ap-nb"><i style="width:' + Math.min(100, S.p > DEMI ? S.c / S.p * 100 : 0).toFixed(1) + '%" class="' + (over ? 'bad' : '') + '"></i></div>' +
         '<ul class="ap-pl">' + S.lignes.map(a => ligne(a, nk)).join('') + '</ul></div>';
     }
@@ -127,7 +129,7 @@
     const tot = res.total || {}, overT = tot.C - tot.P > DEMI;
     const fin = scope === 'commun' ? 'fin de mois' : res.per && res.per.cyc && res.per.cyc.end ? 'au ' + U().jjmm(res.per.cyc.end) : 'fin de période';
     h += '<div class="ap-bilan" role="group" aria-label="Bilan">' +
-      '<div class="ap-br"><span>Total dépensé</span><b class="num' + (overT ? ' bad-t' : '') + '">' + e0(tot.C) + '<small> / ' + e0(tot.P) + '</small></b></div>' +
+      '<div class="ap-br"><span>Total dépensé</span><b class="num' + (overT ? ' bad-t' : '') + '">' + e0(tot.C) + ' <small>/\u00a0' + e0(tot.P) + '</small></b></div>' +
       '<div class="ap-nb"><i style="width:' + Math.min(100, tot.P > DEMI ? tot.C / tot.P * 100 : 0).toFixed(1) + '%" class="' + (overT ? 'bad' : '') + '"></i></div>' +
       '<div class="ap-br"><span>' + (scope === 'commun' ? 'Variation réelle' : 'Réel à ce jour') + '</span>' + sgB(scope === 'commun' ? o.variation : o.bal) + '</div>' +
       '<div class="ap-br"><span>Projeté ' + esc(fin) + '</span>' + (res.jour < 7 ? '<span class="ap-mu">dès le 7e jour</span>' : sgB(o.pj)) + '</div></div>';
@@ -163,13 +165,14 @@
       const V = res.T.courante, O = res.T.optionnelle, bud = V.p + O.p, conso = bud > DEMI ? (V.c + O.c) / bud : 0;
       const temps = Math.min(1, res.jour / (res.nbJours || 1)), et = c.reste < -DEMI ? 'bad' : etat(conso, temps);
       const nom = 'Reste à vivre ' + e0(c.reste) + (c.reste < -DEMI ? ' en dépassement' : '') + ' jusqu\'au ' + U().jjmm(rav.fin) + ', jour ' + res.jour + ' sur ' + res.nbJours + ', budget variable consommé à ' + Math.round(conso * 100) + ' %';
-      h += '<div class="ap-hero">' + cadran(temps, conso, et, '<span class="lbl">Reste à vivre</span><span class="v num' + (c.reste < -DEMI ? ' bad-t' : '') + '">' + esc(e0(c.reste)) + '</span>' +
+      h += '<div class="ap-hero">' + cadran(temps, conso, et, '<span class="lbl">Reste à vivre</span><span class="v num' + (c.reste < -DEMI ? ' bad-t' : '') + '">' + esc(e0(c.reste)) + (c.reste < -DEMI ? '<small> dépassé</small>' : '') + '</span>' +
         '<span class="s">jusqu\'au ' + esc(jm(rav.fin)) + '</span><span class="j num">jour ' + res.jour + '/' + res.nbJours + '</span>', nom) +
         '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>variable dépensé ' + Math.round(conso * 100) + ' %</span></div>' +
         U().interrupteurRav(x.choix, !!rav.comptes) + '</div>';
       h += carte('Où va l\'argent', '', barreArgent(x), ' data-mesure="argent"', 'data-aller="rav"');
     } else h += VA().reste(res, KB().baseRav(d.S));
-    const L = Vu().lignesAVerifier(d.S, d.now, d.ext);
+    // la ligne « N observations à faire » n'est pas répétée : la carte « À faire » (en bas) les montre déjà
+    const L = Vu().lignesAVerifier(d.S, d.now, d.ext).filter(l => l.cle !== 'observations');
     h += VA().aVerifier(L);
     h += VA().soldes(d.S, d.now, { dettes: d.dettes, livrets: d.livrets });
     if (res) h += carte('Budget du cycle', esc(res.per && res.per.cyc ? U().jjmm(res.per.cyc.start) + ' → ' + U().jjmm(res.per.cyc.end) : ''), budget(res, B, 'perso') +
@@ -194,7 +197,9 @@
     let res = null;
     try { res = KB().suivi(B, 'commun', null); } catch (e) { res = null; }
     const nom = q => (q === 'moi' ? R.moi : R.autre) || (q === 'moi' ? 'Moi' : 'L\'autre personne');
-    const ini = q => esc(String(nom(q)).trim().charAt(0).toUpperCase() || '?');
+    // initiale de chaque personne ; en mode démo « A » / « B » (le masquage du mode démo ne touche pas une lettre seule)
+    const AF = g.KladAffichage, demo = !!(AF && AF.demoActif && AF.demoActif());
+    const ini = q => esc(demo ? (q === 'moi' ? 'A' : 'B') : String(nom(q)).trim().charAt(0).toUpperCase() || '?');
     let h = '';
     const temps = res ? Math.min(1, res.jour / (res.nbJours || 1)) : 0;
     const P = res ? NATS.reduce((t, [k]) => t + res.sections[k].p, 0) : 0, Cn = res ? NATS.reduce((t, [k]) => t + res.sections[k].c, 0) : 0;
@@ -266,7 +271,7 @@
     const c = cote === 'nous' ? 'nous' : 'moi';
     return '<div class="ap-seg" role="tablist" aria-label="Aperçu"><button type="button" role="tab" data-apcote="moi" aria-selected="' + (c === 'moi') + '"><i class="moi"></i>Moi</button>' +
       '<button type="button" role="tab" data-apcote="nous" aria-selected="' + (c === 'nous') + '"><i class="nous"></i>Nous</button></div>' +
-      '<div class="ap-page" data-cote="' + c + '">' + (c === 'nous' ? nous(d) : moi(d)) + '</div>' +
+      '<div class="ap-page" data-cote="' + c + '">' + (c === 'nous' ? nous(d) : moi(d)) + VA().actions() + '</div>' +
       '<div class="ap-dots" aria-hidden="true"><i class="' + (c === 'moi' ? 'on' : '') + '"></i><i class="' + (c === 'nous' ? 'on' : '') + '"></i></div>';
   }
 

@@ -69,15 +69,37 @@ export async function ouvrir(o) {
   await page.waitForSelector('#appli:not([hidden])');
   await pause(1200);
 
-  const onglets = await page.$$eval('#app-tb [data-tab]', bs => bs.map(b => b.dataset.tab));
+  // 2.0 : barre du bas Aperçu · Opérations · Trier · Patrimoine · Plus ; Budget et Commun ne sont plus des onglets, on les
+  // ouvre depuis l'Aperçu comme le ferait l'utilisateur (Moi › « Tout le budget », Nous › « Tout le commun ») ; « nous » est
+  // la page Nous de l'Aperçu. onglets : barre du bas puis ces écrans (parcours de tous les écrans principaux).
+  const barre = await page.$$eval('#app-tb [data-tab]', bs => bs.map(b => b.dataset.tab));
+  const DEPUIS_APERCU = { nous: ['nous', null], budget: ['moi', 'budget'], commun: ['nous', 'commun'] };
+  const onglets = barre.concat(Object.keys(DEPUIS_APERCU).filter(t => barre.indexOf(t) < 0));
   async function fermer() {
     await page.evaluate(() => { if (window.KladApp.fermerVolet) window.KladApp.fermerVolet(true); });
     await pause(50);
   }
+  // page de l'Aperçu (« moi » / « nous ») : appui sur la pastille si l'Aperçu est affiché et sur l'autre page
+  async function cote(c) {
+    await page.waitForSelector('#view-accueil [data-apcote="' + c + '"]', { state: 'visible', timeout: 5000 }).catch(() => {});
+    const ok = await page.evaluate(c => {
+      const b = document.querySelector('#view-accueil [data-apcote="' + c + '"]');
+      if (!b || !b.getClientRects().length || b.getAttribute('aria-selected') === 'true') return false;
+      b.click(); return true;
+    }, c);
+    if (ok) await pause(250);
+  }
   async function onglet(t) {
     await fermer();
-    await page.locator('#app-tb [data-tab="' + t + '"]').click();
+    const via = barre.indexOf(t) < 0 && DEPUIS_APERCU[t];
+    await page.locator('#app-tb [data-tab="' + (via ? 'accueil' : t) + '"]').click();
     await pause(350);
+    if (via || t === 'accueil') await cote(via ? via[0] : 'moi');
+    if (via && via[1]) {
+      const b = page.locator('#view-accueil .ap-ab[data-aller="' + via[1] + '"]');
+      await (await b.count() ? b : page.locator('#view-accueil [data-aller="' + via[1] + '"]')).first().click();
+      await pause(350);
+    }
     await page.evaluate(() => window.scrollTo(0, 0));
   }
   // Opérations du périmètre perso (même liste qu'en 0.9.4, où l'onglet suivait le dernier périmètre de Budget / Commun).
@@ -175,5 +197,5 @@ export async function ouvrir(o) {
     await pause(60);
   }
   async function fin() { await browser.close(); srv.close(); }
-  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, ecransPrincipaux, ecransPlus, theme, texte, fin, phrase: groupes.join('-') };
+  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, barre, ecransPrincipaux, ecransPlus, theme, texte, fin, phrase: groupes.join('-') };
 }

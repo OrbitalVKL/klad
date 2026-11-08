@@ -6,6 +6,12 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.0.0** — nouvelle interface (demande du propriétaire, 08/11 : « trop de texte », navigation intuitive, puis « conserver
+toutes les infos, trouver un entre-deux » ; maquettes et prototype en artefact validés au fil de la journée ; « travaille
+directement sur la nouvelle version »). Barre du bas Aperçu · Opérations · Trier · Patrimoine · Plus ; Aperçu en deux pages
+(Moi, Nous) qui remplace l'Accueil sans rien retirer ; Budget, Commun et Équilibre ouverts depuis l'Aperçu. Aucun calcul
+changé. Publiée avec les corrections 1.3.5 et 1.3.6 (jamais publiées seules).
+
 **1.3.6** — écrans allégés (analyse de l'architecte, 08/11 ; développé et publié par l'architecte) : Accueil (cycle
 une fois, bilan dans « Ce cycle-ci », un seul raccourci, « À mettre en place » par personne) ; « Trier une à une » depuis
 « À vérifier » ; Commun › Ce mois sans le solde répété ; fin de cycle au prochain jour de paie habituel et observation
@@ -92,6 +98,36 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.0.0 — détails techniques
+- Navigation (`index.html`, `app.js`) : `#app-tb` = `accueil` (« Aperçu »), `operations`, `trier` (bouton central
+  `.tb-fab`, porte `#tb-badge` ; appui = `trier('nv','tout')`), `patrimoine`, `plus`. `chrome()` rattache `budget`,
+  `commun`, `appartement` à l'onglet `accueil` ; `RETOUR` les ramène à l'Aperçu (`#ah-back`). Liens de l'Aperçu :
+  `data-aller` = `budget`, `commun`, `contrats-perso`, `contrats-commun`, `tendance` (Budget › Tendance), `tresorerie`
+  (Commun › Trésorerie), `equilibre` (`appartement`), `rav` (volet) ; `data-av="bilan"`, `data-av="observations"`.
+- Aperçu (`www/vapercu.js`, `KladVuesApercu`) : `ecran(d, cote)` (mêmes données que `KladVuesAccueil.ecran`), `moi`,
+  `nous`, `cadran`, `barreArgent`, `filJours`, `budget`, `etat`. Aucun calcul propre : `KladBudget.suivi`, `ravChoisi`,
+  `echeances` ; `KladCommun.finDeMois`, `plan`, `decomposition`, `equilibre`, `tresorerie` ; `KladObservations`.
+  Réutilise `KladVuesAccueil.aVerifier`, `soldes`, `bilan`, `reste` (repli sans reste à vivre) et `actions` (Verrouiller).
+  Montants arrondis à l'euro (`e0`), jamais de signe moins (pastilles « excédent » / « déficit » / « à l'équilibre »,
+  « débiteur »). Ordre Moi : cadran, où va l'argent, à vérifier, soldes, budget du cycle (bilan + boutons `.ap-ab`),
+  prochains jours, à faire, Verrouiller. Ordre Nous : cadran, virements, tuiles équilibre / 12 mois, répartition du solde,
+  budget du commun, prochains jours, à faire, Verrouiller.
+- Côté affiché (`app.js`) : `apCote` en mémoire seulement (remis à « moi » à chaque déverrouillage, `open()`), jamais dans
+  le stockage local (test « aucune donnée en clair dans localStorage ») ; glisser horizontal sur `#view-accueil`.
+- Détails : « À vérifier » de l'Aperçu sans la ligne « N observations à faire » (la carte « À faire » les montre) ;
+  cadran : « dépassé » sous un reste à vivre négatif ; fil des jours : montant court (« 1,3 k€ ») dès 1 000 €, montant
+  exact dans la liste et le nom accessible ; mode démo : initiales « A » / « B » (le masquage ne touche pas une lettre seule) ;
+  « montant / budget » coupable avant la barre oblique (`/\u00a0`).
+- CSS : bloc « 2.0 : Aperçu Moi / Nous » en fin de `style.css` (classes `.ap-*`, jetons `--ap-moi`, `--ap-nous`, …) ;
+  `.ap-page .ap-card` en une colonne bornée (`minmax(0,1fr)`) : rien ne sort d'une carte à 320 px et texte à 200 % ;
+  textes de 12 px au moins, cibles de 48 dp (pastilles Moi / Nous, boutons `.ap-ab`, liens `.ap-lien`) ; barre du bas en
+  5 colonnes (`html.appm nav.app-tb`).
+- Banc (`tools/mesures/banc.mjs`) : `barre` (onglets réels) et `onglets` = barre + `nous`, `budget`, `commun` ouverts
+  depuis l'Aperçu (`onglet()`) ; `mesurer.mjs` chronomètre la barre seule. Tests adaptés : `parcours` (helper `ecran`),
+  `ux` (chiffres de l'Aperçu = calculs, arrondis à l'euro ; échéances dans « Prochains jours »).
+- Outils (hors appli) : `tools/artefact/prototype.mjs` (page unique sur le jeu fictif, pour itérer sur l'interface sans
+  APK) et `tools/artefact/construire.mjs` (copie web de l'appli avec données fictives, usage local).
 
 ### 1.3.6 — détails techniques
 - Cycle (`budget.js:cycleCourant`) : `attendu = salaireAttendu(B, last)`, `end = attendu − 1` (prolongé à aujourd'hui
@@ -692,6 +728,8 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Correctif : tolérance plafonnée et réglable, écart de rapprochement, mode démo des nouveautés | 1.1.1 | fait |
 | — | Correctif : doublons de la banque, échéances réglées d'avance, virements en route et marge prévue du commun, découvert | 1.1.2 | fait |
 | — | Retours du relevé 1.1.2 : en route en jours ouvrés, retards du commun, période du dépassement, journal, mode démo | 1.1.3 | fait |
+| — | Nouvelle interface : Aperçu Moi / Nous, barre à 5 entrées avec Trier (inclut 1.3.5 et 1.3.6) | 2.0.0 | fait |
+| — | Échéances ponctuelles (impôt estimé, taxe foncière, provisions) | 1.4.0 → 2.1 | à faire |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -767,6 +805,12 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- 2.0.0 (propriétaire, 08/11) : barre du bas Aperçu · Opérations · Trier · Patrimoine · Plus (noms validés) ; aucune
+  information de l'ancien Accueil ni des écrans Budget / Commun retirée (les écrans détaillés restent, ouverts depuis
+  l'Aperçu) ; budget avant les prochains jours sur Moi (et, par défaut, sur Nous : même ordre des deux côtés, à confirmer) ;
+  1.3.5 et 1.3.6 publiées dans la 2.0.0 (« travaille directement sur la nouvelle version »). Itérations d'interface :
+  prototype en artefact (`tools/artefact/prototype.mjs`) avant l'APK.
 
 - 1.3.5 (propriétaire, 08/11, recommandations de l'architecte retenues) : le reste à vivre « comptes courants » retire
   toute la somme due sur les cartes à débit différé (pas seulement les achats du cycle) ; une seule notion « à vérifier »
@@ -938,6 +982,15 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 2.0.0
+- Prototype : `node tools/artefact/prototype.mjs sortie.html` (Aperçu produit par le vrai code sur le jeu fictif au
+  28/10/2026, Opérations et Trier simulés) ; à republier dans l'artefact du propriétaire pour chaque itération d'interface.
+- Pistes déjà montrées dans le prototype et non livrées : **Trier en cartes** (glisser à droite = c'est bon, à gauche =
+  changer de catégorie, vers le haut = plus tard) et filtres Moi / Nous des Opérations. Dans la 2.0.0, Trier ouvre la
+  file « à vérifier » existante.
+- Lot suivant prévu : échéances ponctuelles (ancien 1.4.0). Toute nouvelle donnée de l'Accueil va dans `vapercu.js`
+  (page Moi ou Nous), avec un accès à l'écran détaillé.
 
 ## Points d'appui laissés par la 1.3.0
 

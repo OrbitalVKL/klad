@@ -30,30 +30,41 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
       const fdm = KC.finDeMois(Bc);
       const postes = [];
       for (const nk of ['courante', 'optionnelle']) for (const a of res.sections[nk].lignes) if (a.on && a.pm > 50) postes.push([a.label, KB.eur(a.cur), KB.eur(a.pm)]);
-      return { rav: [F.montant(Math.abs(rav.budget.reste)), F.montant(Math.abs(rav.comptes.reste))], soldes, ech, fdm: [F.montant(Math.abs(fdm.solde)), F.montant(Math.abs(fdm.end))], postes };
+      // 2.0 : l'Aperçu arrondit à l'euro (cadran, postes, commun) ; le détail du reste à vivre garde les centimes
+      const e0 = c => KB.eur(Math.abs(Math.round(c)));
+      return { rav: [F.montant(Math.abs(rav.budget.reste)), F.montant(Math.abs(rav.comptes.reste))], rav0: e0(rav.budget.reste), soldes, ech,
+        fdm: [e0(fdm.solde), e0(fdm.end)], fdmC: [F.montant(Math.abs(fdm.solde)), F.montant(Math.abs(fdm.end))], postes };
     });
-    // Accueil
+    // Aperçu, page Moi
     await B.onglet('accueil');
     // 1.1 : l'encart montre la base choisie (dernier salaire par défaut) ; les deux colonnes sont dans le détail
-    const rav = await texte('[data-mesure="rav"]');
-    assert.ok(rav.includes(norm(attendu.rav[0])), 'reste à vivre ' + attendu.rav[0] + ' dans « ' + rav + ' »');
-    await page.locator('[data-mesure="rav"] [data-aller="rav"]').click();
+    // 2.0 : cadran de l'Aperçu ; détail par le « ? » de « Où va l'argent »
+    const rav = await texte('.ap-hero');
+    assert.ok(rav.includes(norm(attendu.rav0)), 'reste à vivre ' + attendu.rav0 + ' dans « ' + rav + ' »');
+    await page.locator('[data-mesure="argent"] [data-aller="rav"]').click();
     await B.pause(200);
     const det = await texte('#ravCorps');
     for (const v of attendu.rav) assert.ok(det.includes(norm(v)), 'reste à vivre ' + v + ' dans le détail « ' + det + ' »');
     await B.fermer();
     const sold = await texte('[data-mesure="soldes"]');
     for (const [lib, v] of attendu.soldes) { assert.ok(sold.includes(lib), lib); assert.ok(sold.includes(norm(v)), 'solde ' + lib + ' ' + v); }
-    const cyc = await texte('#ac-cy + *, section[aria-labelledby="ac-cy"]');
+    // 2.0 : budget du cycle complet (tous les postes, montant / budget)
+    const cyc = await texte('[data-mesure="budget-perso"]');
     const vus = attendu.postes.filter(([lib]) => cyc.includes(lib));
-    assert.ok(vus.length >= 1, 'postes du cycle sur l\'accueil');
-    for (const [lib, cur, pm] of vus) assert.ok(cyc.includes(lib + ' ' + norm(cur) + ' / ' + norm(pm)), 'poste ' + lib);
-    const cm = await texte('section[aria-labelledby="ac-cm"]');
+    assert.equal(vus.length, attendu.postes.length, 'postes du cycle sur l\'Aperçu');
+    for (const [lib, cur, pm] of vus) assert.ok(cyc.includes(norm(cur) + ' / ' + norm(pm)), 'poste ' + lib);
+    // prochains jours : liste dépliée, échéances perso (et cartes) sur Moi, celles du commun sur Nous
+    const ech = async (mesure, sc) => {
+      await page.locator('[data-mesure="' + mesure + '"] details.ap-plis > summary').click();
+      const ec = await texte('[data-mesure="' + mesure + '"]');
+      for (const [lib, , v] of attendu.ech.filter(e => e[1] === sc)) assert.ok(ec.includes(lib) && ec.includes(norm(v)), 'échéance ' + sc + ' ' + lib);
+    };
+    if (attendu.ech.some(e => e[1] === 'perso')) await ech('jours', 'perso');
+    // Aperçu, page Nous : fin de mois estimée et solde du commun
+    await B.onglet('nous');
+    const cm = await texte('.ap-hero');
     for (const v of attendu.fdm) assert.ok(cm.includes(norm(v)), 'commun ' + v);
-    const ec = await texte('section[aria-labelledby="ac-ec"]');
-    const premieres = attendu.ech.filter(([lib]) => ec.includes(lib));
-    assert.ok(premieres.length >= Math.min(4, attendu.ech.length), 'échéances sur l\'accueil');
-    for (const [lib, , v] of premieres) assert.ok(ec.includes(lib) && ec.includes(norm(v)), 'échéance ' + lib);
+    if (attendu.ech.some(e => e[1] === 'commun')) await ech('jours-commun', 'commun');
     // Écrans d'origine : reste à vivre de Budget, postes du budget, fin de mois et solde de Commun, contrats
     await B.onglet('budget');
     const rb = await texte('#rav-m');
@@ -72,7 +83,7 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
     const svm = page.locator('#view-budget [data-sousvue="mois"]');
     if (await svm.count()) { await svm.click(); await B.pause(200); }
     const bc = await texte('#bal-panel');
-    for (const v of attendu.fdm) assert.ok(bc.includes(norm(v)), 'Commun › fin de mois ' + v);
+    for (const v of attendu.fdmC) assert.ok(bc.includes(norm(v)), 'Commun › fin de mois ' + v);
     assert.deepEqual(B.erreurs, []);
   } finally { await B.fin(); }
 });
