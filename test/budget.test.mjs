@@ -131,8 +131,10 @@ test('reste à vivre : deux colonnes (dernier salaire, comptes courants)', () =>
   const { S } = etat();
   const r = KB.suivi(ctx(S), 'perso', null).rav;
   assert.deepEqual(json(r.budget), { base: 200000, fixes: 0, marge: 200000, variable: 12000, reste: 188000, date: '2026-10-27' });
-  assert.deepEqual(json(r.comptes), { base: 150000, fixes: 5000, marge: 145000, variable: 17000, reste: 128000 });
-  assert.deepEqual([r.base, r.valeur, r.fin], ['accounts', 128000, '2026-11-26']);
+  // 1.3.5 : la somme due sur la carte à débit différé (40 €, prélevée sur le compte courant) est retirée de la base
+  assert.deepEqual(json(r.comptes), { base: 150000, cartes: 4000, fixes: 5000, marge: 141000, variable: 17000, reste: 124000 });
+  assert.deepEqual([r.base, r.valeur, r.fin], ['accounts', 124000, '2026-11-26']);
+  assert.match(VB.detailRav(r, 'comptes').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '), /− Carte à débit différé .*somme à prélever — 40,00 €/);
   // sans solde connu : colonne « dernier salaire » seulement
   for (const c of S.modele.comptes) delete c.solde;
   const r2 = KB.suivi(ctx(S), 'perso', null).rav;
@@ -196,7 +198,7 @@ test('résumé Grafit : month, left_to_live, upcoming, BUDGET_OVER ; aucun motif
   KB.choisirBaseRav(S, 'comptes');
   assert.deepEqual(json(S.budget.reglages).rav, 'comptes');
   const r2 = json(R.construire(S, NOW, {}));
-  assert.deepEqual([r2.month.left_to_live, r2.month.left_to_live_basis], [1280, 'accounts']);
+  assert.deepEqual([r2.month.left_to_live, r2.month.left_to_live_basis], [1240, 'accounts']);
   // sans solde connu, la colonne « comptes courants » n'existe pas : dernier salaire
   const soldes = S.modele.comptes.map(c => c.solde);
   for (const c of S.modele.comptes) delete c.solde;

@@ -74,7 +74,11 @@ test('accueil : « À vérifier » (lignes et écrans), carte à débit différ�
   const cx = K.contexte(S, NOW);
   const ext = { attention: K.attention(cx, NOW), sauvegarde: { jours: 45 }, maj: '9.9.9', ctx: cx };
   const L = json(Vu.lignesAVerifier(S, NOW, ext)).map(x => x.cle);
-  assert.ok(L.includes('nonvues'));
+  // 1.3.5 : une seule ligne « à vérifier » (même nombre que la pastille « Tout »), le détail en sous-ligne
+  assert.ok(L.includes('averifier') && !L.includes('nonvues') && !L.includes('nonclassees'));
+  const lav = Vu.lignesAVerifier(S, NOW, ext).find(x => x.cle === 'averifier');
+  assert.equal(+lav.texte.split(' ')[0], Vu.compteursAVerifier(S, cx).tout);
+  assert.match(lav.sous, /non vues/);
   const v = Vu.aVerifier(S, NOW, ext), tv = texte(v);
   assert.doesNotMatch(v, /data-av="nonvues"/);          // les opérations à voir ont leur propre ligne
   assert.match(v, /data-av="sauvegarde"/);

@@ -148,9 +148,12 @@ test('frontière dans le passé : avant ignorées, jour même accepté sans repr
   assert.equal(st.ignorees, 1);                                   // veille de la frontière
   assert.deepEqual(resume(S, c), [['2026-10-11', -300, 'comptabilisee', 'C'], ['2026-10-10', -200, 'comptabilisee', 'B'], ['2026-10-10', -50, 'en_cours', 'D']]);
   M.integrer(S, c.id, [eb('2026-10-25', -300, 'E')], NOW);
+  // 1.3.5 : relecture large (30 jours, jamais avant la frontière) tant qu'aucune n'a été faite depuis 7 jours
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-10', ramenee: false, large: true });
+  c.sync = { large: '2026-10-27' };
   assert.equal(M.debutRecuperation(S, c, NOW), '2026-10-20');    // dernière comptabilisée − 5 jours
   c.frontiere = '2026-10-22';
-  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-22', ramenee: false });
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-22', ramenee: false, large: false });
   assert.equal(M.appliquerFrontiere(S, c.id), 2);                 // B et C (D, en cours disparue, déjà retirée)
   assert.deepEqual(resume(S, c), [['2026-10-25', -300, 'comptabilisee', 'E']]);
 });
@@ -158,12 +161,13 @@ test('frontière dans le passé : avant ignorées, jour même accepté sans repr
 test('frontière = aujourd\'hui : début de récupération jamais dans le futur', () => {
   const { S, c } = etat();
   c.frontiere = '2026-10-28';                                     // reprise exportée le jour même (NOW)
-  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: false });
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: false, large: true });
   c.frontiere = '2026-10-29';                                     // date de la reprise en avance (fuseau, horloge)
-  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: true });
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: true, large: false });
   c.frontiere = '';
   M.integrer(S, c.id, [eb('2026-11-10', -300, 'DATE FUTURE')], NOW);   // banque datant une opération dans le futur
-  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: true });
+  c.sync = { large: '2026-10-25' };                               // relecture large faite il y a 3 jours
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: '2026-10-28', ramenee: true, large: false });
 });
 
 test('jour de la frontière : dédoublonnage contre les opérations de reprise du même jour', () => {

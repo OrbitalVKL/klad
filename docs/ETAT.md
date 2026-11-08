@@ -6,6 +6,13 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**1.3.5** — correctif (analyse complète de l'appli par l'architecte, 08/11 ; développé et publié par l'architecte) :
+reste à vivre « comptes courants » sans la somme due sur les cartes à débit différé ; projection de fin de période avec
+les charges fixes réelles ; opération en cours plus renvoyée par la banque : plus comptée ; relecture bancaire de 30 jours
+une fois par semaine ; deux opérations identiques déjà connues jamais fusionnées ; une seule ligne « à vérifier » sur
+l'Accueil (même nombre que la pastille « Tout ») ; observation « Opérations à classer » sur 3 mois ; recherche par
+montant ; enregistrement du coffre plus sûr (échec, arrière-plan) ; date locale du fichier de sauvegarde.
+
 **1.3.4** — contrats : numéro de contrat (prélèvement reconnu par son numéro avant le mot du libellé ; plusieurs contrats
 chez le même organisme ; numéros proposés d'après les prélèvements) et fin du contrat (résiliation) : un prélèvement après
 la fin est « non prévu » (compté à part du poste, pastille, observation, alerte Grafit `CANCELLED_CONTRACT_DEBIT` CAUT
@@ -79,6 +86,35 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 1.3.5 — détails techniques
+- Reste à vivre (`budget.js:resteAVivre`, `detteCartes(B)`) : colonne comptes `cartes` = somme des `KladClasse.dette`
+  des `carte_differee` visibles en euros dont le compte de prélèvement est un courant (ou non choisi) ; `marge` et `reste`
+  la retirent. `vbudget.js:detailRav` : ligne « − Carte à débit différé » (colonne comptes seule) si > 0. Relevé de
+  contrôle (`controle.js:colonne`) : `cartes` seulement s'il est > 0 (références des jeux fictifs inchangées : dette nulle
+  au 28/10). Grafit `left_to_live` (base comptes) suit.
+- Projection (`budget.js:suivi`) : `t.proj` aussi pour le fixe (`max(a.proj, a.cur)`, `a.proj = max(cur, pm)`) ;
+  `Dp = T.fixe.proj + T.courante.proj + T.optionnelle.proj` (avant : `T.fixe.p`).
+- Opérations en cours plus renvoyées (`o.absente`) : exclues de `B.rows` (`budget.js:contexte`) et de
+  `KladClasse.dette` ; liste : classe `absente` (libellé barré), étiquette « en cours · plus renvoyée » ; détail : ligne
+  « État ». Retrait inchangé (10 jours après la date, `PURGE_JOURS`).
+- Synchro : `modele.js:bornesRecuperation` → `{ from, ramenee, large }` ; relecture large (`RELIRE_JOURS` = 30) si
+  `c.sync.large` (AAAA-MM-JJ) date de `RELIRE_TOUS` (7) jours ou plus ; `large: true` aussi pour la première lecture et
+  la relecture complète ; `sync.js` garde `c.sync.large` (journal : « relecture des 30 derniers jours »). Fusion des
+  opérations relues (`integrer`) : un candidat déjà connu (`connues`) de même date et même libellé normalisé est écarté
+  (deux achats identiques réels) ; le cas 1.1.2 (autre date ou référence ajoutée) fusionne toujours.
+- À vérifier (`vues.js:lignesAVerifier`) : avec le contexte (`ext.ctx`), une ligne `averifier` = `compteursAVerifier().tout`
+  (sous-ligne : non vues, non classées, à rapprocher) à la place de `nonvues` / `nonclassees` / `rapprocher` (gardées
+  sans contexte) ; `app.js` : `averifier` → `versOps({ cat: '__av', perimetre: 'tout' })`. `observations.js` :
+  « Opérations à classer » = `KladClasse.attention().unclassified` (3 mois, tous comptes visibles ; avant 60 jours,
+  dépenses).
+- Recherche (`vues.js:montantCherche`, `filtrer`) : texte en forme de montant (séparateur décimal ou « € ») → égalité
+  sur `|o.montant|` ; un entier sans « € » reste une recherche de libellé.
+- Coffre (`verrou.js:flush`) : sur échec d'écriture, les blocs de l'échec et suivants sont retirés d'`ecrits` et remis
+  dans `dirty` (`*`, `journal` ou `sauvegarde`) ; `setActive(false)` appelle `flush()` ; nom du fichier de sauvegarde
+  par `KladModele.jourLocal`.
+- Tests : `test/lot135.test.mjs` ; `budget.test.mjs` (colonne comptes, `left_to_live` 1 240 au lieu de 1 280 : dette
+  de 40 € du jeu), `modele.test.mjs` (bornes avec `large`), `vues.test.mjs` (ligne `averifier`).
 
 ### 1.3.4 — détails techniques
 - `budget.js` : `numContrat(c)` (c.num sans espaces), `appartient(B, c, libellé)` (numéro, sinon mot et aucun numéro d'un
@@ -703,6 +739,11 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- 1.3.5 (propriétaire, 08/11, recommandations de l'architecte retenues) : le reste à vivre « comptes courants » retire
+  toute la somme due sur les cartes à débit différé (pas seulement les achats du cycle) ; une seule notion « à vérifier »
+  (non vue, ou non classée depuis 3 mois, ou à rapprocher) pour l'Accueil, les pastilles et l'onglet ; correctif 1.3.5
+  avant le lot de désencombrement 1.3.6, puis le lot 1.4.0 (échéances ponctuelles).
 
 - Thème : valeur gardée `auto` / `clair` / `sombre` (clé `klad.theme`), attribut de la page `data-theme="light"` /
   `"dark"` (absent en automatique) ; tests sur la couleur réellement affichée, téléphone en thème sombre puis clair.

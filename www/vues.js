@@ -49,9 +49,18 @@
     const e = ext || {};
     const a = e.attention || {};
     const L = [];
-    if (a.unseen) L.push({ cle: 'nonvues', texte: pluriel(a.unseen, 'opération') + ' à voir', niveau: 'info' });
-    if (a.unclassified) L.push({ cle: 'nonclassees', texte: pluriel(a.unclassified, 'opération non classée', 'opérations non classées') + ' (3 derniers mois)', niveau: 'info' });
-    if (a.toMatch) L.push({ cle: 'rapprocher', texte: pluriel(a.toMatch, 'prélèvement') + ' de portefeuille à rapprocher', niveau: 'info' });
+    // 1.3.5 : une seule ligne « à vérifier » (même nombre que la pastille « Tout » et l'onglet Opérations : non vue, ou non
+    // classée depuis 3 mois, ou à rapprocher, comptée une fois) ; le détail en sous-ligne. Sans contexte : lignes d'avant.
+    const nAv = e.ctx ? compteursAVerifier(S, e.ctx).tout : 0;
+    if (nAv) {
+      const det = [a.unseen ? a.unseen + ' non vue' + (a.unseen > 1 ? 's' : '') : '', a.unclassified ? a.unclassified + ' non classée' + (a.unclassified > 1 ? 's' : '') : '',
+        a.toMatch ? a.toMatch + ' à rapprocher' : ''].filter(Boolean).join(' · ');
+      L.push({ cle: 'averifier', texte: pluriel(nAv, 'opération') + ' à vérifier', sous: det, niveau: 'info' });
+    } else if (!e.ctx) {
+      if (a.unseen) L.push({ cle: 'nonvues', texte: pluriel(a.unseen, 'opération') + ' à voir', niveau: 'info' });
+      if (a.unclassified) L.push({ cle: 'nonclassees', texte: pluriel(a.unclassified, 'opération non classée', 'opérations non classées') + ' (3 derniers mois)', niveau: 'info' });
+      if (a.toMatch) L.push({ cle: 'rapprocher', texte: pluriel(a.toMatch, 'prélèvement') + ' de portefeuille à rapprocher', niveau: 'info' });
+    }
     if (a.gaps) L.push({ cle: 'ecarts', texte: pluriel(a.gaps, 'écart') + ' de rapprochement à vérifier', niveau: 'info' });
     if (e.observations) L.push({ cle: 'observations', texte: pluriel(e.observations, 'observation') + ' à faire', niveau: 'caut' });
     if (a.accountsToCheck) L.push({ cle: 'comptes', texte: pluriel(a.accountsToCheck, 'compte') + ' à vérifier ou à réassocier', niveau: 'caut' });
@@ -67,6 +76,15 @@
     if (sv && (sv.jours == null || sv.jours >= 30)) L.push({ cle: 'sauvegarde', texte: sv.jours == null ? (sv.exportee ? 'Sauvegarde exportée, à vérifier' : 'Aucune sauvegarde vérifiée') : 'Dernière sauvegarde vérifiée il y a ' + sv.jours + ' jours', niveau: 'info' });
     if (e.maj) L.push({ cle: 'maj', texte: 'Mise à jour : Klad ' + e.maj + ' est disponible', niveau: 'info' });
     return L;
+  }
+
+  // 1.3.5 : recherche d'un montant : « 34,65 », « 34.65 », « 34,65 € », « 1 234,56 », « 12 € » → centimes ; un nombre
+  // entier sans « € » ni décimales (« 2025 », « 17 ») reste une recherche de libellé (références, années, numéros).
+  function montantCherche(q) {
+    const t = String(q).trim();
+    if (!/^\d[\d\s\u00a0\u202f]*([.,]\d{1,2})?\s*€?$/.test(t) || !/[.,€]/.test(t)) return null;
+    const v = F().saisie(t.replace(/\./g, ','));
+    return v == null ? null : v;
   }
 
   // Comptes d'un périmètre (perso : tous les comptes visibles ; commun : comptes communs).
@@ -186,7 +204,7 @@
 
   // Autres points « À vérifier » (même apparence que « à voir ») ; les opérations à voir et les observations ont déjà leur place.
   function aVerifier(S, now, ext) {
-    const L = lignesAVerifier(S, now, ext).filter(l => l.cle !== 'nonvues' && l.cle !== 'observations');
+    const L = lignesAVerifier(S, now, ext).filter(l => l.cle !== 'nonvues' && l.cle !== 'averifier' && l.cle !== 'observations');
     return L.map(l => '<button type="button" class="app-seen av ' + l.niveau + '" data-av="' + esc(l.cle) + '"><span class="dot" aria-hidden="true"></span><span class="tx"><b>' +
       esc(l.texte) + '</b></span><span class="chev" aria-hidden="true">›</span></button>').join('');
   }
@@ -199,6 +217,7 @@
   function filtrer(S, f, ctx) {
     const ids = f.compte ? [f.compte] : comptesDe(S, f.scope || 'perso').filter(c => f.scope ? opsDuScope(S, f.scope, c) : true).map(c => c.id);
     const k = f.q ? M().cleLibelle(f.q) : '';
+    const mq = f.q ? montantCherche(f.q) : null;
     const limNc = f.cat === '__nc' && ctx ? M().plusJours(M().jourLocal(ctx.now), -K().NC_JOURS) : '';
     const rap = f.cat === '__rap' && ctx, gap = f.cat === '__ecart' && ctx;
     const av = f.cat === '__av' && ctx ? K().limiteNC(ctx) : '';
@@ -210,8 +229,10 @@
         if ((f.du || f.depuis) && o.date < (f.du || f.depuis)) continue;
         if (f.au && o.date > f.au) continue;
         if (limNc && o.date < limNc) continue;
-        // recherche : libellé (ou contrepartie), sinon catégorie et sous-catégorie (0.10.2)
-        if (k && M().cleLibelle(o.libelle + ' ' + (o.contrepartie || '')).indexOf(k) < 0) {
+        // recherche : libellé (ou contrepartie), sinon catégorie et sous-catégorie (0.10.2) ; 1.3.5 : un montant
+        // (« 34,65 », « 34.65 », « 34,65 € », « 1 234,56 ») trouve les opérations de ce montant, débit ou crédit
+        if (mq != null) { if (Math.abs(o.montant) !== mq) continue; }
+        else if (k && M().cleLibelle(o.libelle + ' ' + (o.contrepartie || '')).indexOf(k) < 0) {
           const r = ctx ? K().classer(ctx, o) : null;
           if (!r || M().cleLibelle(r.cat + ' ' + (r.sub || '')).indexOf(k) < 0) continue;
         }
@@ -276,17 +297,17 @@
     const nc = r.type === 'interne' ? '<span class="tx-tag int" title="virement entre vos comptes ou règlement déjà détaillé : pas compté dans le budget">interne' + (K().interneManuel(o) ? ' (à la main)' : '') + '</span>'
       : !COMPTEE(r.type) ? '<span class="tx-tag" title="' + (r.type === 'epargne' ? 'versement d\'épargne' : 'hors budget') + ' : pas compté dans les dépenses">non comptée</span>' : '';
     const cat = esc(r.cat) + (r.sub && r.sub !== r.cat && r.sub !== 'Non classé' ? ' · ' + esc(r.sub) : '');
-    const cls = 'txr' + (vue ? '' : ' unseen') + (o.statut === 'en_cours' ? ' encours' : '');
+    const cls = 'txr' + (vue ? '' : ' unseen') + (o.statut === 'en_cours' ? ' encours' + (o.absente ? ' absente' : '') : '');
     // ligne = bouton nommé (lecteur d'écran, clavier) : libellé, sens et montant, date, compte, catégorie, état
     const nom = libelleCourt(o.libelle) + ', ' + (o.montant < 0 ? 'débit ' : 'crédit ') + F().montant(Math.abs(o.montant), cur) + ', ' + jjmm(o.date) +
-      (c ? ', ' + c.libelle : '') + ', ' + r.cat + (r.type === 'interne' ? ', interne' : '') + (o.statut === 'en_cours' ? ', en cours' : '') + (vue ? '' : ', non vue');
+      (c ? ', ' + c.libelle : '') + ', ' + r.cat + (r.type === 'interne' ? ', interne' : '') + (o.statut === 'en_cours' ? (o.absente ? ', en cours, plus renvoyée par la banque, pas comptée' : ', en cours') : '') + (vue ? '' : ', non vue');
     return '<div class="' + cls + '" data-op="' + esc(o.id) + '" data-c="' + esc(o.compte) + '" role="button" tabindex="0" aria-label="' + esc(nom) + '"><div class="ic">' + U().icoOp(C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '</div>' +
       '<div class="lab"><div class="tl">' + (vue ? '' : '<span class="sr">Non vue. </span>') + esc(libelleCourt(o.libelle)) + '</div><div class="tm">' +
       (opt && opt.date ? '<span class="num">' + jjmm(o.date) + '</span> · ' : '') +
       '<span class="acct">' + esc(c ? c.libelle : '') + '</span> <span class="tx-cat">' + cat + '</span>' +
       (r.src === 'regle' ? '<span class="tx-tag" title="Classée par une de vos règles">règle</span>' : '') + nc +
       (g.KladCommun && g.KladCommun.equipementDeOp(S, o.id) ? '<span class="tx-tag eq" title="Ajoutée à l\'équilibre des apports">équilibre</span>' : '') +
-      (o.statut === 'en_cours' ? '<span class="tx-tag">en cours</span>' : '') +
+      (o.statut === 'en_cours' ? (o.absente ? '<span class="tx-tag" title="la banque ne la renvoie plus : pas comptée">en cours · plus renvoyée</span>' : '<span class="tx-tag">en cours</span>') : '') +
       // 1.3.0 : statut d'un mouvement du compte commun (couleur et libellé)
       (opt && opt.statuts && opt.statuts.get(o.id) ? pastilleStatut(opt.statuts.get(o.id)) : '') +
       // 1.1.2 : opération comptée pour l'échéance qu'elle règle (date réelle gardée)
@@ -516,6 +537,8 @@
     const lignes = [
       ['Libellé', o.libelle],
       ['Date', F().jour(o.date) + (o.statut === 'en_cours' ? ' (en cours)' : '')],
+      // 1.3.5 : opération en cours que la banque ne renvoie plus (pré-autorisation levée, montant final différent)
+      o.statut === 'en_cours' && o.absente ? ['État', 'Plus renvoyée par la banque depuis le ' + F().date(o.absente) + ' : elle ne compte plus dans le budget ni le reste à vivre et disparaîtra 10 jours après sa date.'] : null,
       dd && dd !== o.date ? ['Payée le', F().jour(dd)] : null,
       o.dateValeur ? ['Date de valeur', F().date(o.dateValeur)] : null,
       ['Compte', c ? c.libelle : '—'],
@@ -681,5 +704,5 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { montantCherche, releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

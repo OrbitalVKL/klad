@@ -2,6 +2,23 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 1.3.5
+
+Correctif (analyse complète de l'appli par l'architecte, 08/11).
+- **Reste à vivre « comptes courants »** : la somme due sur la carte à débit différé est retirée (ligne « Carte à débit
+  différé » dans le détail). Avant, un achat à la carte faisait monter ce reste à vivre jusqu'au prélèvement de la carte.
+- **Projeté fin de mois** (Budget › Suivi) : une charge fixe plus chère que son budget, ou sans budget, est comptée.
+- **Opération en cours abandonnée** (pré-autorisation d'une station ou d'un hôtel, remplacée par un autre montant) : dès
+  que la banque ne la renvoie plus, elle ne compte plus ; elle reste visible, barrée, « en cours · plus renvoyée ».
+- **Synchro** : une fois par semaine, les 30 derniers jours sont relus (opération passée en retard avec une date
+  ancienne) ; deux achats identiques le même jour ne sont plus jamais fusionnés.
+- **À vérifier** : une seule ligne sur l'Accueil, avec le même nombre que la pastille « Tout » des Opérations (non vues,
+  non classées depuis 3 mois, à rapprocher : chacune comptée une fois) ; un appui ouvre cette liste. L'observation
+  « Opérations à classer » compte les mêmes 3 mois.
+- **Recherche par montant** : « 34,65 » (ou « 34.65 », « 34,65 € ») trouve les opérations de ce montant.
+- **Enregistrement** : après un enregistrement impossible, tout ce qui n'a pas été écrit est réécrit ensuite ; écriture
+  immédiate quand Klad passe en arrière-plan ; le fichier de sauvegarde porte la date du téléphone.
+
 ## 1.3.4
 
 Contrats (demande du propriétaire, 07/11).

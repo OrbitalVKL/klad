@@ -193,8 +193,9 @@
         else add('good', 'perso', w.libelle + ' détaillé', 'Détail du ' + dfr(cv.min) + ' au ' + dfr(cv.max) + (reste.length ? ' ; ' + reste.length + ' prélèvements plus anciens restent sans détail.' : '.'));
       }
     }
-    const lim60 = M().plusJours(B.auj, -60), nc = B.rows.filter(r => r.date >= lim60 && K().classer(B.cx, r.o).nc && r.type === 'depense');
-    if (nc.length) add('info', 'all', 'Opérations à classer', nc.length + ' opération(s) des 60 derniers jours ne sont pas classées : classez-en une dans la liste des opérations, une règle rangera les suivantes.');
+    // 1.3.5 : même nombre et même délai (3 mois) que « À vérifier » de l'Accueil et le filtre « Non classées » (avant : 60 jours, dépenses seules)
+    const nNc = K().attention(B.cx, B.now).unclassified;
+    if (nNc) add('info', 'all', 'Opérations à classer', nNc + ' opération(s) des 3 derniers mois ne sont pas classées : classez-en une dans la liste des opérations, une règle rangera les suivantes.');
     // contrats au-dessus du budget
     const ctrOver = {};
     for (const sc of ['perso', 'commun']) {

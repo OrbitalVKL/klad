@@ -215,6 +215,7 @@
     const cover = {};
     for (const c of comptes) {
       for (const o of S.ops[c.id] || []) {
+        if (o.statut === 'en_cours' && o.absente) continue;       // 1.3.5 : en cours que la banque ne renvoie plus : plus comptée
         const r = K().classer(cx, o);
         const dd = K().dateDepense(o);
         rows.push({ o, id: o.id, cid: c.id, role: c.role, date: o.date, od: dd || o.date, m: o.montant, label: o.libelle || '', type: r.type, cat: r.cat, sub: r.sub });
@@ -846,7 +847,8 @@
         if (a.debit === undefined && hors > DEMI) CAUSES.push({ a, v: hors, hb: !a.on || a.pm <= DEMI });
       });
       const t = T[nk];
-      grp.forEach(a => { t.p += a.pm; t.c += a.cur; t.left += Math.max(0, a.left); t.out += Math.max(0, a.cur - Math.max(0, a.pm)); if (nk !== 'fixe') t.proj += Math.max(a.proj, a.cur); });
+      // 1.3.5 : projection des charges fixes aussi (le plus grand du budget et du réel, poste par poste ; avant : budget seul)
+      grp.forEach(a => { t.p += a.pm; t.c += a.cur; t.left += Math.max(0, a.left); t.out += Math.max(0, a.cur - Math.max(0, a.pm)); t.proj += Math.max(a.proj, a.cur); });
       const montre = [];
       for (const a of grp) {
         Object.assign(a, etatDe(a, nk));
@@ -861,7 +863,7 @@
     const P = T.fixe.p + T.courante.p + T.optionnelle.p, C = T.fixe.c + T.courante.c + T.optionnelle.c;
     const OUT = T.fixe.out + T.courante.out + T.optionnelle.out, IN = C - OUT;
     const bal = RT.c - C, balP = RT.p - P;
-    const Rp = Math.max(RT.c, RT.p), Dp = T.fixe.p + T.courante.proj + T.optionnelle.proj;
+    const Rp = Math.max(RT.c, RT.p), Dp = T.fixe.proj + T.courante.proj + T.optionnelle.proj;
     const solde = { bal, balP, pj: Rp - Dp, ecart: bal - balP, revenus: RT.c, depenses: C };
     if (scope === 'commun' && !past) {
       const bc = soldes(B, ['commun']);
@@ -889,9 +891,24 @@
     return n ? { v, n } : null;
   }
 
+  // 1.3.5 : somme due sur les cartes à débit différé visibles, en euros, prélevées sur un compte courant (ou sans compte
+  // de prélèvement choisi) : ce qui sortira des comptes courants au prochain prélèvement de chaque carte (centimes).
+  function detteCartes(B) {
+    let t = 0;
+    for (const c of B.comptes) {
+      if (c.role !== 'carte_differee' || (c.devise || 'EUR') !== 'EUR') continue;
+      const p = c.prelevement && c.prelevement.compte && B.comptes.find(x => x.id === c.prelevement.compte);
+      if (p && p.role !== 'courant') continue;
+      const d = K().dette(B.S, c, B.now);
+      if (d && d.centimes > 0) t += d.centimes;
+    }
+    return t;
+  }
+
   // Reste à vivre (perso, cycle en cours) : deux colonnes.
   //   budget   : Base = salaire du cycle (sinon dernier salaire) − charges fixes prélevées = marge − variable dépensé ;
-  //   comptes  : Base = soldes des comptes courants − charges fixes encore à venir = marge − reste du budget variable.
+  //   comptes  : Base = soldes des comptes courants − somme due sur les cartes (1.3.5) − charges fixes encore à venir
+  //              = marge − reste du budget variable.
   function resteAVivre(B, res, inPer) {
     const T = res.T;
     const salRows = B.rows.filter(r => estSalaire(B, r) && inPer(r.date)), salGot = salRows.reduce((t, r) => t + r.m, 0);
@@ -901,7 +918,10 @@
     const fixLeft = T.fixe.left, varLeft = T.courante.left + T.optionnelle.left;
     const budget = { base: sal, fixes: fixSp, marge: sal - fixSp, variable: varSp, reste: sal - fixSp - varSp, date: salDate };
     const Bs = soldes(B, ['courant']);
-    const comptes = Bs ? { base: Bs.v, fixes: fixLeft, marge: Bs.v - fixLeft, variable: varLeft, reste: Bs.v - fixLeft - varLeft } : null;
+    // 1.3.5 : somme due sur les cartes à débit différé, pas encore prélevée sur un compte courant : retirée de la base
+    // (un achat à la carte compte déjà dans le variable dépensé ; avant, il faisait monter cette colonne).
+    const cartes = Bs ? detteCartes(B) : 0;
+    const comptes = Bs ? { base: Bs.v, cartes, fixes: fixLeft, marge: Bs.v - cartes - fixLeft, variable: varLeft, reste: Bs.v - cartes - fixLeft - varLeft } : null;
     return { budget, comptes, fin: res.per.end, base: comptes ? 'accounts' : 'budget', valeur: comptes ? comptes.reste : budget.reste };
   }
 

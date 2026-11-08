@@ -191,8 +191,8 @@ d'employeur, de personne ou de banque dans le code : ce sont des données (carne
   commun : apports attendus de chaque personne selon la répartition des postes (`klad.commun` : `moi`, `autre`).
   Le poste perso *Contribution compte commun* vaut ma part du budget commun.
 - **Reste à vivre** (perso, cycle en cours) : colonne *dernier salaire* = salaire du cycle − charges fixes prélevées −
-  variable dépensé ; colonne *comptes courants* = soldes des comptes courants − charges fixes encore à venir − reste du
-  budget variable.
+  variable dépensé ; colonne *comptes courants* = soldes des comptes courants − somme due sur les cartes à débit différé
+  prélevées sur un compte courant (1.3.5) − charges fixes encore à venir − reste du budget variable.
 - **Contrats** : montant du document, périodicité, dernier prélèvement trouvé (motif), écart, prochaine échéance.
   **Échéances sur 31 jours** : contrats, prélèvements récurrents détectés (même compte, mêmes premiers mots, au moins 2 des
   3 derniers mois, montants proches), dette des cartes au jour du prélèvement.

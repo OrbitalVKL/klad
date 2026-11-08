@@ -2077,3 +2077,6 @@ html.etroit .sousvues.patri{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ct-nums{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}
 .ct-nums .puce{min-height:44px;text-align:left}
 .ct-nums .puce .subs{display:block;font-size:12px}
+
+/* ============================================================ 1.3.5 : opération en cours que la banque ne renvoie plus (pas comptée) */
+.txr.absente .tl{text-decoration:line-through}

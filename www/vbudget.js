@@ -623,12 +623,14 @@
     const L = (lab, sub, x, y, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><th>' + lab + (sub ? '<span class="subs"> ' + sub + '</span>' : '') + '</th>' + cel(x) + cel(y) + '</tr>';
     return '<p class="rav-tete">Affiché sur l\'Accueil et dans Grafit :</p>' + U().interrupteurRav(x.choix, !!c) +
       '<div class="tablewrap"><table class="rav-t rav-' + x.choix + '"><thead><tr><th></th><th' + on('salaire') + '>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th' + on('comptes') + '>Comptes courants</th></tr></thead><tbody>' +
-      L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') + L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
+      L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') +
+      (c && c.cartes > 0 ? L('− Carte à débit différé', 'déjà comptée dans le dépensé / somme à prélever', null, c.cartes, 'b') : '') +
+      L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
       L('= Marge', '', b.marge, c && c.marge, 'mg') + L('− Variable', 'dépensé / reste du budget', b.variable, c && c.variable, 'b') +
       L('= Reste à vivre', '', b.reste, c && c.reste, 'rv') +
       '</tbody></table></div>' +
       '<p class="muted small">Jusqu\'au ' + esc(jjmmaa(rav.fin)) + '. Colonne « dernier salaire » : le salaire du cycle moins ce qui est déjà dépensé. ' +
-      'Colonne « comptes courants » : les soldes des comptes courants moins les charges fixes pas encore prélevées et le reste du budget variable.</p>';
+      'Colonne « comptes courants » : les soldes des comptes courants moins la somme due sur la carte à débit différé, les charges fixes pas encore prélevées et le reste du budget variable.</p>';
   }
   // Ancienne carte « Reste à vivre » (lue par le résumé Grafit et les tests) : texte simple.
   function carteRav(rav) {

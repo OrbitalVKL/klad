@@ -534,6 +534,7 @@
     if (av) {
       const k = av.dataset.av;
       if (k === 'nonvues') versOps({ nonVues: true });
+      else if (k === 'averifier') versOps({ cat: '__av', perimetre: 'tout' });      // 1.3.5 : la liste du même nombre
       else if (k === 'nonclassees' || k === 'rapprocher' || k === 'ecarts') versOps({ cat: k === 'nonclassees' ? '__nc' : k === 'ecarts' ? '__ecart' : '__rap' });
       else if (k === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
       else if (k === 'bilan') { if (window.KladEcranBudget) window.KladEcranBudget.ui.sv.perso = 'suivi'; montrer('budget', { force: true, haut: true }); if (window.KladEcranBudget && window.KladEcranBudget.cyclePrecedent) window.KladEcranBudget.cyclePrecedent(); }
