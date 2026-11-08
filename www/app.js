@@ -189,11 +189,11 @@
     appartement: 'view-appart', impots: 'view-impots', epargne: 'view-epargne', crypto: 'view-crypto', donnees: 'view-data', sauvegarde: 'view-save' };
   // 1.1 : onglet Patrimoine (Impôts, Foncier, Épargne, Crypto : écrans de ecranfisc.js)
   const PATRIMOINE = ['impots', 'epargne', 'crypto'];
-  const TITRES = { accueil: 'Accueil', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', plus: 'Plus', appartement: 'Commun',
+  const TITRES = { accueil: 'Aperçu', budget: 'Budget', commun: 'Commun', operations: 'Opérations', operation: 'Opération', plus: 'Plus', appartement: 'Commun',
     impots: 'Patrimoine', epargne: 'Patrimoine', crypto: 'Patrimoine', donnees: 'Relevés des comptes', sauvegarde: 'Sauvegarde' };
   // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient
   // (par défaut : la liste des opérations, Plus).
-  const RETOUR = { operation: 'operations', donnees: 'plus', sauvegarde: 'plus' };
+  const RETOUR = { operation: 'operations', donnees: 'plus', sauvegarde: 'plus', budget: 'accueil', commun: 'accueil', appartement: 'accueil' };      // 2.0 (test) : retour vers l'Aperçu
   let retourDe = {};
   const pos = {};                    // position de défilement de chaque écran
   let vue = 'accueil', scope = 'perso';
@@ -218,7 +218,8 @@
   }
   // En-tête : titre, ligne du dessus (période), pastille de synchro, recherche (opérations), thème.
   function chrome() {
-    const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue === 'appartement' ? 'commun' : PATRIMOINE.indexOf(vue) >= 0 ? 'patrimoine' : vue;
+    // 2.0 (test) : Budget, Commun et Équilibre s'ouvrent depuis l'Aperçu (plus d'onglet à eux)
+    const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue === 'appartement' || vue === 'budget' || vue === 'commun' ? 'accueil' : PATRIMOINE.indexOf(vue) >= 0 ? 'patrimoine' : vue;
     $('ah-back').hidden = !RETOUR[vue];
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('ah-title').textContent = TITRES[vue] || 'Accueil';
@@ -250,6 +251,7 @@
     if (!b || !S) return;
     const k = b.dataset.tab;
     if (k === 'plus') { montrer('plus', { force: true, haut: true }); return; }
+    if (k === 'trier') { trier('nv', 'tout'); return; }            // 2.0 (test) : bouton central
     if (k === 'patrimoine') {
       if (PATRIMOINE.indexOf(vue) >= 0) { window.scrollTo({ top: 0, behavior: 'auto' }); return; }
       montrer(window.KladEcranFisc ? window.KladEcranFisc.vuePatrimoine() : 'impots', { force: true, haut: true }); return;
@@ -462,7 +464,7 @@
   function renderBadge() { avMemo = null; afficherBadge(); }
   function afficherBadge() {
     // 1.1 : six onglets ; onglet étroit (petit écran, texte agrandi) : « 9+ » pour ne toucher ni l'icône voisine ni le libellé
-    const n = compteursAV().tout, b = $('tb-badge'), etroit = b.parentElement && b.parentElement.offsetWidth > 0 && b.parentElement.offsetWidth < 64;
+    const n = compteursAV().tout, b = $('tb-badge'), etroit = b.parentElement && b.parentElement.dataset.tab !== 'trier' && b.parentElement.offsetWidth > 0 && b.parentElement.offsetWidth < 64;
     const t = n > 99 ? (etroit ? '9+' : '99+') : n > 9 && etroit ? '9+' : String(n);
     if (b.textContent !== t && b.textContent !== '' && !b.classList.contains('point')) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
     b.classList.remove('point');
@@ -470,7 +472,7 @@
     b.setAttribute('aria-label', n + ' à vérifier');
     // place insuffisante à droite de l'icône (texte très agrandi) : simple point, le nombre reste lu (aria-label)
     const bt = b.parentElement;
-    if (n && bt && bt.offsetWidth && b.offsetWidth > bt.offsetWidth / 2 - 12 + 4) { b.classList.add('point'); b.textContent = ''; }
+    if (n && bt && bt.dataset.tab !== 'trier' && bt.offsetWidth && b.offsetWidth > bt.offsetWidth / 2 - 12 + 4) { b.classList.add('point'); b.textContent = ''; }
   }
   // Haut de l'onglet Budget : grande carte, cartes des comptes, « à voir », « À vérifier ».
   function renderHaut() {
@@ -508,9 +510,21 @@
       try { R = window.KladCommun ? window.KladCommun.reglages(B) : {}; } catch (e) { R = {}; }
       try { ech = window.KladBudget.echeances(B, 31); } catch (e) { ech = []; }
     }
-    try { el.innerHTML = window.KladVuesAccueil.ecran({ S, B, now, ext: ex, res, dettes, livrets, fdm, plan: pl, R, ech }); }
+    // 2.0 (test) : Aperçu en deux pages, Moi et Nous (on glisse de l'une à l'autre)
+    const dA = { S, B, now, ext: ex, res, dettes, livrets, fdm, plan: pl, R, ech };
+    try { el.innerHTML = window.KladVuesApercu ? window.KladVuesApercu.ecran(dA, coteApercu()) : window.KladVuesAccueil.ecran(dA); }
     catch (e) { el.innerHTML = '<p class="muted">Affichage impossible.</p>'; log('err', 'Accueil : ' + (e.message || e)); }
   }
+  // 2.0 (test) : page de l'Aperçu affichée (« moi » ou « nous »), gardée sur ce téléphone
+  function coteApercu() { try { return localStorage.getItem('klad.apercu') === 'nous' ? 'nous' : 'moi'; } catch (e) { return apCote || 'moi'; } }
+  let apCote = 'moi';
+  function choisirCote(c) {
+    apCote = c === 'nous' ? 'nous' : 'moi';
+    try { localStorage.setItem('klad.apercu', apCote); } catch (e) { /* mémoire seule */ }
+    renderAccueilEcran(Date.now(), extras(Date.now()), dettesDe(Date.now()), {});
+    window.scrollTo(0, 0);
+  }
+  function dettesDe(now) { const d = {}; for (const c of S.modele.comptes) if (c.role === 'carte_differee') d[c.id] = KC.dette(S, c, now); return d; }
   function rendre() {
     if (!S) return;
     CTX = null; BCTX = null;
@@ -530,6 +544,8 @@
   // Accueil : lignes « À vérifier », comptes, raccourcis vers les onglets, actions rapides.
   $('view-accueil').addEventListener('click', ev => {
     if (!S) return;
+    const ap = ev.target.closest('[data-apcote]');
+    if (ap) { if (ap.getAttribute('aria-selected') !== 'true') choisirCote(ap.dataset.apcote); return; }
     const av = ev.target.closest('[data-av]');
     if (av) {
       const k = av.dataset.av;
@@ -552,6 +568,12 @@
     if (a) {
       const k = a.dataset.aller;
       if (k === 'rav') ouvrirVolet('secRav');
+      else if (k === 'tendance' || k === 'tresorerie') {
+        // 2.0 (test) : sous-vues ouvertes depuis l'Aperçu (Budget › Tendance, Commun › Trésorerie)
+        const EB = window.KladEcranBudget;
+        if (EB) EB.ui.sv[k === 'tendance' ? 'perso' : 'commun'] = k;
+        montrer(k === 'tendance' ? 'budget' : 'commun', { force: true, haut: true });
+      } else if (k === 'equilibre') montrer('appartement', { force: true, haut: true });
       else if (k === 'budget' || k === 'commun' || k === 'contrats-perso' || k === 'contrats-commun') {
         // sous-vue : Budget › Suivi, Commun › Ce mois, Budget › Contrats, Commun › Trésorerie (contrats du commun)
         const EB = window.KladEcranBudget, perso = k === 'budget' || k === 'contrats-perso';
@@ -566,6 +588,20 @@
     else if (act.dataset.act === 'trier') trier('nv', 'tout');
     else if (act.dataset.act === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
   });
+  // 2.0 (test) : glisser horizontalement sur l'Aperçu : Moi ⇄ Nous
+  (() => {
+    let x0 = null, y0 = 0, t0 = 0;
+    const el = $('view-accueil');
+    el.addEventListener('touchstart', e => { const t = e.touches[0]; if (e.target.closest('input, select, textarea, .ap-days')) { x0 = null; return; } x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); }, { passive: true });
+    el.addEventListener('touchend', e => {
+      if (x0 == null || !S) return;
+      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.6 || Date.now() - t0 > 800) return;
+      const c = coteApercu();
+      if (dx < 0 && c === 'moi') choisirCote('nous'); else if (dx > 0 && c === 'nous') choisirCote('moi');
+    }, { passive: true });
+  })();
   preparer.secRav = () => {
     let rav = null;
     try {
