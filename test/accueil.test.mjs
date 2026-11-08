@@ -30,7 +30,9 @@ test('accueil : blocs dans l\'ordre, chiffres des fonctions de calcul, aucun mon
   const h = VA.ecran({ S, B, now: NOW, ext: { attention: K.attention(cx, NOW), sauvegarde: { jours: null } }, res, dettes, livrets: {}, fdm,
     plan: KC.plan(B), R: KC.reglages(B), ech });
   const t = texteVisible(h).replace(/\s+/g, ' ');
-  assert.match(t, /Reste à vivre [\d\s ]+,\d\d € jusqu'au \d\d\/\d\d · jour \d+\/\d+[\s\S]*À vérifier[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Synchroniser[\s\S]*Verrouiller/);
+  assert.match(t, /Reste à vivre [\d\s ]+,\d\d € jusqu'au \d\d\/\d\d · jour \d+\/\d+[\s\S]*À vérifier[\s\S]*Soldes[\s\S]*Ce cycle-ci[\s\S]*Commun[\s\S]*Prochaines échéances[\s\S]*Verrouiller/);
+  // 1.3.6 : un seul raccourci (Verrouiller) ; plus de « jours restants » dans « Ce cycle-ci »
+  assert.doesNotMatch(t, /Trier les opérations|Sauvegarder|jours? restants?/);
   assert.ok(t.includes(F.montant(Math.abs(res.rav.budget.reste)).replace(/\s/g, ' ')) || t.replace(/\s/g, '').includes(F.montant(Math.abs(res.rav.budget.reste)).replace(/\s/g, '')));
   assert.ok(t.replace(/\s/g, '').includes(F.montant(Math.abs(fdm.end)).replace(/\s/g, '')), 'fin de mois du commun');
   assert.ok(ech.slice(0, 1).every(e => t.includes(e.label)), 'première échéance');
@@ -50,5 +52,6 @@ test('accueil : « Bilan du cycle précédent » les 5 premiers jours d\'un cycl
   assert.equal(VA.bilan({ per, jour: 2 }).cle, 'bilan');
   assert.equal(VA.bilan({ per, jour: 6 }), null);
   assert.equal(VA.bilan({ per: Object.assign({}, per, { past: true }), jour: 2 }), null);
-  assert.equal(VA.surTitre({ per, jour: 2, nbJours: 31 }), 'Cycle du 27/10 au 26/11 · jour 2 sur 31');
+  // 1.3.6 : sans « jour N sur T » (donné par la carte du reste à vivre)
+  assert.equal(VA.surTitre({ per, jour: 2, nbJours: 31 }), 'Cycle du 27/10 au 26/11');
 });

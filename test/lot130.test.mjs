@@ -237,7 +237,7 @@ test('fiche du mois, détail par poste (1.3.1, sous « Virements à mettre en pl
   assert.match(di, /id="cmLien"/);
   // Ce mois : décomposition, fiche, enveloppes et avances
   const h = texteVisible(VC.mois(B, { ficheM: '2026-09' })).replace(/\s+/g, ' ');
-  assert.match(h, /Solde [\d\s ]+,\d\d € Disponible/);
+  assert.match(h, /répartition du solde Disponible [\d\s ]+,\d\d €/);
   assert.match(h, /Enveloppes 173,00 €/);
   assert.match(h, /Fiche de septembre 2026/);
   assert.match(h, /Écarts/);

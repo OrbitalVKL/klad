@@ -37,12 +37,13 @@ test('lot 1.1 : clavier du Budget, reste à vivre, Patrimoine et crypto, carbura
     await page.setViewportSize({ width: 412, height: 915 });
     await B.pause(400);
 
-    // 2. Accueil : encart du reste à vivre réduit à l'essentiel (1.2.0 : « jour N/T » à la place du montant par jour)
+    // 2. Accueil : encart du reste à vivre réduit à l'essentiel (1.2.0 : « jour N/T » à la place du montant par jour) ;
+    // 2.0 : cadran de l'Aperçu (montant à l'euro), détail par le « ? » de « Où va l'argent »
     await B.onglet('accueil');
-    const hero = await page.locator('#view-accueil [data-aller="rav"]').innerText();
-    assert.match(hero.replace(/\s+/g, ' '), /^RESTE À VIVRE [\d\s  ]+,\d\d € (dépassé )?jusqu'au \d\d\/\d\d · jour \d+\/\d+$/i);
+    const hero = await page.locator('#view-accueil .ap-dial').innerText();
+    assert.match(hero.replace(/\s+/g, ' '), /^RESTE À VIVRE [\d\s  ]+ €( dépassé)? jusqu'au \d+ \S+ jour \d+\/\d+$/i);
     assert.doesNotMatch(hero, /cycle écoulé|budget utilisé|sur le dernier salaire/);
-    await page.locator('#view-accueil [data-aller="rav"]').click();
+    await page.locator('#view-accueil [data-mesure="argent"] [data-aller="rav"]').click();
     assert.doesNotMatch(await page.locator('#ravCorps').innerText(), /Par jour/);
     await B.fermer();
 

@@ -6,6 +6,25 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.0.0** — nouvelle interface (demande du propriétaire, 08/11 : « trop de texte », navigation intuitive, puis « conserver
+toutes les infos, trouver un entre-deux » ; maquettes et prototype en artefact validés au fil de la journée ; « travaille
+directement sur la nouvelle version »). Barre du bas Aperçu · Opérations · Trier · Patrimoine · Plus ; Aperçu en deux pages
+(Moi, Nous) qui remplace l'Accueil sans rien retirer ; Budget, Commun et Équilibre ouverts depuis l'Aperçu. Aucun calcul
+changé. Publiée avec les corrections 1.3.5 et 1.3.6 (jamais publiées seules).
+
+**1.3.6** — écrans allégés (analyse de l'architecte, 08/11 ; développé et publié par l'architecte) : Accueil (cycle
+une fois, bilan dans « Ce cycle-ci », un seul raccourci, « À mettre en place » par personne) ; « Trier une à une » depuis
+« À vérifier » ; Commun › Ce mois sans le solde répété ; fin de cycle au prochain jour de paie habituel et observation
+« Salaire attendu » ; « prélèvement absent » pour tous les contrats ; projection à partir du 7e jour ; affichage à
+390 px (Classer, contrats, graphiques, titres).
+
+**1.3.5** — correctif (analyse complète de l'appli par l'architecte, 08/11 ; développé et publié par l'architecte) :
+reste à vivre « comptes courants » sans la somme due sur les cartes à débit différé ; projection de fin de période avec
+les charges fixes réelles ; opération en cours plus renvoyée par la banque : plus comptée ; relecture bancaire de 30 jours
+une fois par semaine ; deux opérations identiques déjà connues jamais fusionnées ; une seule ligne « à vérifier » sur
+l'Accueil (même nombre que la pastille « Tout ») ; observation « Opérations à classer » sur 3 mois ; recherche par
+montant ; enregistrement du coffre plus sûr (échec, arrière-plan) ; date locale du fichier de sauvegarde.
+
 **1.3.4** — contrats : numéro de contrat (prélèvement reconnu par son numéro avant le mot du libellé ; plusieurs contrats
 chez le même organisme ; numéros proposés d'après les prélèvements) et fin du contrat (résiliation) : un prélèvement après
 la fin est « non prévu » (compté à part du poste, pastille, observation, alerte Grafit `CANCELLED_CONTRACT_DEBIT` CAUT
@@ -79,6 +98,87 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.0.0 — détails techniques
+- Navigation (`index.html`, `app.js`) : `#app-tb` = `accueil` (« Aperçu »), `operations`, `trier` (bouton central
+  `.tb-fab`, porte `#tb-badge` ; appui = `trier('nv','tout')`), `patrimoine`, `plus`. `chrome()` rattache `budget`,
+  `commun`, `appartement` à l'onglet `accueil` ; `RETOUR` les ramène à l'Aperçu (`#ah-back`). Liens de l'Aperçu :
+  `data-aller` = `budget`, `commun`, `contrats-perso`, `contrats-commun`, `tendance` (Budget › Tendance), `tresorerie`
+  (Commun › Trésorerie), `equilibre` (`appartement`), `rav` (volet) ; `data-av="bilan"`, `data-av="observations"`.
+- Aperçu (`www/vapercu.js`, `KladVuesApercu`) : `ecran(d, cote)` (mêmes données que `KladVuesAccueil.ecran`), `moi`,
+  `nous`, `cadran`, `barreArgent`, `filJours`, `budget`, `etat`. Aucun calcul propre : `KladBudget.suivi`, `ravChoisi`,
+  `echeances` ; `KladCommun.finDeMois`, `plan`, `decomposition`, `equilibre`, `tresorerie` ; `KladObservations`.
+  Réutilise `KladVuesAccueil.aVerifier`, `soldes`, `bilan`, `reste` (repli sans reste à vivre) et `actions` (Verrouiller).
+  Montants arrondis à l'euro (`e0`), jamais de signe moins (pastilles « excédent » / « déficit » / « à l'équilibre »,
+  « débiteur »). Ordre Moi : cadran, où va l'argent, à vérifier, soldes, budget du cycle (bilan + boutons `.ap-ab`),
+  prochains jours, à faire, Verrouiller. Ordre Nous : cadran, virements, tuiles équilibre / 12 mois, répartition du solde,
+  budget du commun, prochains jours, à faire, Verrouiller.
+- Côté affiché (`app.js`) : `apCote` en mémoire seulement (remis à « moi » à chaque déverrouillage, `open()`), jamais dans
+  le stockage local (test « aucune donnée en clair dans localStorage ») ; glisser horizontal sur `#view-accueil`.
+- Détails : « À vérifier » de l'Aperçu sans la ligne « N observations à faire » (la carte « À faire » les montre) ;
+  cadran : « dépassé » sous un reste à vivre négatif ; fil des jours : montant court (« 1,3 k€ ») dès 1 000 €, montant
+  exact dans la liste et le nom accessible ; mode démo : initiales « A » / « B » (le masquage ne touche pas une lettre seule) ;
+  « montant / budget » coupable avant la barre oblique (`/\u00a0`).
+- CSS : bloc « 2.0 : Aperçu Moi / Nous » en fin de `style.css` (classes `.ap-*`, jetons `--ap-moi`, `--ap-nous`, …) ;
+  `.ap-page .ap-card` en une colonne bornée (`minmax(0,1fr)`) : rien ne sort d'une carte à 320 px et texte à 200 % ;
+  textes de 12 px au moins, cibles de 48 dp (pastilles Moi / Nous, boutons `.ap-ab`, liens `.ap-lien`) ; barre du bas en
+  5 colonnes (`html.appm nav.app-tb`).
+- Banc (`tools/mesures/banc.mjs`) : `barre` (onglets réels) et `onglets` = barre + `nous`, `budget`, `commun` ouverts
+  depuis l'Aperçu (`onglet()`) ; `mesurer.mjs` chronomètre la barre seule. Tests adaptés : `parcours` (helper `ecran`),
+  `ux` (chiffres de l'Aperçu = calculs, arrondis à l'euro ; échéances dans « Prochains jours »).
+- Outils (hors appli) : `tools/artefact/prototype.mjs` (page unique sur le jeu fictif, pour itérer sur l'interface sans
+  APK) et `tools/artefact/construire.mjs` (copie web de l'appli avec données fictives, usage local).
+
+### 1.3.6 — détails techniques
+- Cycle (`budget.js:cycleCourant`) : `attendu = salaireAttendu(B, last)`, `end = attendu − 1` (prolongé à aujourd'hui
+  comme avant). `jourDePaie` : jour du mois le plus fréquent des 6 derniers salaires (à égalité, le plus tardif) ;
+  `salaireAttendu` : ce jour le mois suivant (le mois d'après si moins de 20 jours), avancé au jour ouvré précédent
+  (week-end, `KladCommun.ferie` si chargé). Cycles passés (`debuts`, `cyclePasse`) inchangés. Relevés des jeux fictifs
+  inchangés (salaire le 27).
+- Observations (`observations.js`) : « Salaire » : `cycleCourant().attendu` dépassé de plus de 2 jours sans salaire →
+  « Salaire attendu le …, pas encore arrivé (dernier le …) » (sinon règle des 38 jours) ; « <contrat> : prélèvement
+  absent » : tout contrat avec montant, sans fin passée, dernier prélèvement à plus de `per × 31 + 14` jours (avant :
+  commun, mensuel, 45 jours).
+- Accueil (`vaccueil.js`) : `surTitre` sans le jour ; `cycle` : sous-titre « dépenses courantes et optionnelles », lien
+  `data-av="bilan"` (5 premiers jours) ; `bilan` n'est plus ajouté à « À vérifier » ; `commun` : « À mettre en place »
+  regroupé par personne ; `actions` : Verrouiller seul (`.ac-quick.ac-seul`).
+- Opérations (`app.js:renderOps`) : bouton « Trier une à une » aussi avec le filtre `__av` (`opsListe.filter(aTrier)`).
+- Commun : `vcommun.js:mois` sans la ligne « Solde » (titre « répartition du solde ») ; `vbudget.js:soldeBar` (commun,
+  mois en cours) : « Mouvements du mois », variation réelle en avant, provisions. `vbudget.js` : `projete(s)` (« à
+  partir du 7e jour » si `s.jour < 7`). Contrats : `.ctr-pp` (pastille et bouton sous le texte). `vfisc.js` : « À régler et
+  à suivre », « Points à suivre ». `vcommun.js` : « 12 prochains mois » (ancien « Trésorerie · 12 mois »).
+- CSS : `.cat-t` `hyphens:auto` ; `.chartbox{height:auto;min-height:240px}` (graphiques de 300 px dans une boîte de
+  240 px à moins de 520 px de large).
+- Tests : `test/lot136.test.mjs` ; `accueil`, `parcours`, `commun`, `lot130` adaptés.
+
+### 1.3.5 — détails techniques
+- Reste à vivre (`budget.js:resteAVivre`, `detteCartes(B)`) : colonne comptes `cartes` = somme des `KladClasse.dette`
+  des `carte_differee` visibles en euros dont le compte de prélèvement est un courant (ou non choisi) ; `marge` et `reste`
+  la retirent. `vbudget.js:detailRav` : ligne « − Carte à débit différé » (colonne comptes seule) si > 0. Relevé de
+  contrôle (`controle.js:colonne`) : `cartes` seulement s'il est > 0 (références des jeux fictifs inchangées : dette nulle
+  au 28/10). Grafit `left_to_live` (base comptes) suit.
+- Projection (`budget.js:suivi`) : `t.proj` aussi pour le fixe (`max(a.proj, a.cur)`, `a.proj = max(cur, pm)`) ;
+  `Dp = T.fixe.proj + T.courante.proj + T.optionnelle.proj` (avant : `T.fixe.p`).
+- Opérations en cours plus renvoyées (`o.absente`) : exclues de `B.rows` (`budget.js:contexte`) et de
+  `KladClasse.dette` ; liste : classe `absente` (libellé barré), étiquette « en cours · plus renvoyée » ; détail : ligne
+  « État ». Retrait inchangé (10 jours après la date, `PURGE_JOURS`).
+- Synchro : `modele.js:bornesRecuperation` → `{ from, ramenee, large }` ; relecture large (`RELIRE_JOURS` = 30) si
+  `c.sync.large` (AAAA-MM-JJ) date de `RELIRE_TOUS` (7) jours ou plus ; `large: true` aussi pour la première lecture et
+  la relecture complète ; `sync.js` garde `c.sync.large` (journal : « relecture des 30 derniers jours »). Fusion des
+  opérations relues (`integrer`) : un candidat déjà connu (`connues`) de même date et même libellé normalisé est écarté
+  (deux achats identiques réels) ; le cas 1.1.2 (autre date ou référence ajoutée) fusionne toujours.
+- À vérifier (`vues.js:lignesAVerifier`) : avec le contexte (`ext.ctx`), une ligne `averifier` = `compteursAVerifier().tout`
+  (sous-ligne : non vues, non classées, à rapprocher) à la place de `nonvues` / `nonclassees` / `rapprocher` (gardées
+  sans contexte) ; `app.js` : `averifier` → `versOps({ cat: '__av', perimetre: 'tout' })`. `observations.js` :
+  « Opérations à classer » = `KladClasse.attention().unclassified` (3 mois, tous comptes visibles ; avant 60 jours,
+  dépenses).
+- Recherche (`vues.js:montantCherche`, `filtrer`) : texte en forme de montant (séparateur décimal ou « € ») → égalité
+  sur `|o.montant|` ; un entier sans « € » reste une recherche de libellé.
+- Coffre (`verrou.js:flush`) : sur échec d'écriture, les blocs de l'échec et suivants sont retirés d'`ecrits` et remis
+  dans `dirty` (`*`, `journal` ou `sauvegarde`) ; `setActive(false)` appelle `flush()` ; nom du fichier de sauvegarde
+  par `KladModele.jourLocal`.
+- Tests : `test/lot135.test.mjs` ; `budget.test.mjs` (colonne comptes, `left_to_live` 1 240 au lieu de 1 280 : dette
+  de 40 € du jeu), `modele.test.mjs` (bornes avec `large`), `vues.test.mjs` (ligne `averifier`).
 
 ### 1.3.4 — détails techniques
 - `budget.js` : `numContrat(c)` (c.num sans espaces), `appartient(B, c, libellé)` (numéro, sinon mot et aucun numéro d'un
@@ -628,6 +728,8 @@ Opérations, Plus en page, Budget et Commun en sous-vues, Impôts et Épargne ; 
 | — | Correctif : tolérance plafonnée et réglable, écart de rapprochement, mode démo des nouveautés | 1.1.1 | fait |
 | — | Correctif : doublons de la banque, échéances réglées d'avance, virements en route et marge prévue du commun, découvert | 1.1.2 | fait |
 | — | Retours du relevé 1.1.2 : en route en jours ouvrés, retards du commun, période du dépassement, journal, mode démo | 1.1.3 | fait |
+| — | Nouvelle interface : Aperçu Moi / Nous, barre à 5 entrées avec Trier (inclut 1.3.5 et 1.3.6) | 2.0.0 | fait |
+| — | Échéances ponctuelles (impôt estimé, taxe foncière, provisions) | 1.4.0 → 2.1 | à faire |
 
 ## Série UX (0.10.0 → 0.10.6, faite)
 
@@ -703,6 +805,17 @@ en test ; choix gardé et appliqué dès le démarrage, sans flash ; le résumé
   portefeuille à rapprocher (« À vérifier », marquer interne), résumé Grafit enrichi.
 
 ## Décisions en vigueur
+
+- 2.0.0 (propriétaire, 08/11) : barre du bas Aperçu · Opérations · Trier · Patrimoine · Plus (noms validés) ; aucune
+  information de l'ancien Accueil ni des écrans Budget / Commun retirée (les écrans détaillés restent, ouverts depuis
+  l'Aperçu) ; budget avant les prochains jours sur Moi (et, par défaut, sur Nous : même ordre des deux côtés, à confirmer) ;
+  1.3.5 et 1.3.6 publiées dans la 2.0.0 (« travaille directement sur la nouvelle version »). Itérations d'interface :
+  prototype en artefact (`tools/artefact/prototype.mjs`) avant l'APK.
+
+- 1.3.5 (propriétaire, 08/11, recommandations de l'architecte retenues) : le reste à vivre « comptes courants » retire
+  toute la somme due sur les cartes à débit différé (pas seulement les achats du cycle) ; une seule notion « à vérifier »
+  (non vue, ou non classée depuis 3 mois, ou à rapprocher) pour l'Accueil, les pastilles et l'onglet ; correctif 1.3.5
+  avant le lot de désencombrement 1.3.6, puis le lot 1.4.0 (échéances ponctuelles).
 
 - Thème : valeur gardée `auto` / `clair` / `sombre` (clé `klad.theme`), attribut de la page `data-theme="light"` /
   `"dark"` (absent en automatique) ; tests sur la couleur réellement affichée, téléphone en thème sombre puis clair.
@@ -869,6 +982,15 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 2.0.0
+- Prototype : `node tools/artefact/prototype.mjs sortie.html` (Aperçu produit par le vrai code sur le jeu fictif au
+  28/10/2026, Opérations et Trier simulés) ; à republier dans l'artefact du propriétaire pour chaque itération d'interface.
+- Pistes déjà montrées dans le prototype et non livrées : **Trier en cartes** (glisser à droite = c'est bon, à gauche =
+  changer de catégorie, vers le haut = plus tard) et filtres Moi / Nous des Opérations. Dans la 2.0.0, Trier ouvre la
+  file « à vérifier » existante.
+- Lot suivant prévu : échéances ponctuelles (ancien 1.4.0). Toute nouvelle donnée de l'Accueil va dans `vapercu.js`
+  (page Moi ou Nous), avec un accès à l'écran détaillé.
 
 ## Points d'appui laissés par la 1.3.0
 

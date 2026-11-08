@@ -12,3 +12,4 @@ www/vendor/
 *.key
 klad-signature*
 .env
+dist/

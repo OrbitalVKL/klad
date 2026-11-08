@@ -205,22 +205,29 @@
     const mini = (lab, v, tip) => '<span class="sb-m" title="' + esc(tip) + '"><span class="sb-l">' + lab + '</span> <b class="num" style="color:' + cl(v) + '">' + sg(v) + '</b></span>';
     if (s.scope === 'commun' && !per.past && o.compte != null) {
       const lu = B.comptes.filter(c => c.role === 'commun').map(c => c.sync && c.sync.lu).filter(Boolean).sort().pop();
-      return '<div class="solbar"><div class="sb-t"><b>Solde du compte commun</b><span class="subs">' + (lu ? 'relevé bancaire du ' + esc(new Date(lu).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })) : 'solde du compte') + '</span></div>' +
-        '<div class="sb-hero"><b class="num sb-v" style="color:' + cl(o.compte) + '">' + esc(e2(Math.abs(o.compte))) + '</b><span class="sb-p">' + (o.compte < 0 ? 'débiteur' : 'sur le compte') + '</span></div>' +
-        '<div class="sb-sec"><span class="sb-cap">Ce mois-ci</span>' + mini('Variation réelle', o.variation, 'entrées − sorties réelles du compte commun depuis le début du mois') +
-        (o.provisions > DEMI ? '<span class="sb-m" title="part mensuelle des charges trimestrielles : comptée dans le budget, mais rien n\'est sorti du compte"><span class="sb-l">Provisions du mois</span> <b class="num">' + e0(o.provisions) + '</b></span>' : '') + '</div></div>';
+      // 1.3.6 : le solde est en tête de l'écran ; ici, ce que le mois a changé (variation réelle) et les provisions
+      return '<div class="solbar"><div class="sb-t"><b>Mouvements du mois</b><span class="subs">entrées − sorties réelles depuis le début du mois' + (lu ? ' · relevé bancaire du ' + esc(new Date(lu).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })) : '') + '</span></div>' +
+        '<div class="sb-hero"><b class="num sb-v" style="color:' + cl(o.variation) + '">' + sg(o.variation) + '</b><span class="sb-p">variation réelle</span></div>' +
+        (o.provisions > DEMI ? '<div class="sb-sec"><span class="sb-m" title="part mensuelle des charges trimestrielles : comptée dans le budget, mais rien n\'est sorti du compte"><span class="sb-l">Provisions du mois</span> <b class="num">' + e0(o.provisions) + '</b></span></div>' : '') + '</div>';
     }
     if (s.scope === 'perso' && !per.past) {
       return '<div class="solbar"><div class="sb-t"><b>Solde prévu par le budget</b><span class="subs">revenus prévus ' + e0(s.revenus.p) + ' − budget ' + e0(s.total.P) + '</span></div>' +
         '<div class="sb-hero"><b class="num sb-v" style="color:' + cl(o.balP) + '">' + sg(o.balP) + '</b><span class="sb-p">' + (per.cyc ? 'prévu sur le cycle' : 'prévu sur le mois') + '</span></div>' +
-        '<div class="sb-sec"><span class="sb-cap">Réel</span>' + mini('À ce jour', o.bal, 'revenus ' + e0(o.revenus) + ' − dépenses ' + e0(o.depenses)) + mini('Projeté fin de mois', o.pj, 'revenus − dépenses projetées selon le rythme actuel') + '</div></div>';
+        '<div class="sb-sec"><span class="sb-cap">Réel</span>' + mini('À ce jour', o.bal, 'revenus ' + e0(o.revenus) + ' − dépenses ' + e0(o.depenses)) + projete(s) + '</div></div>';
     }
     const hero = o.bal >= -DEMI ? (per.past ? 'resté' : 'restant') + ' sur les revenus' + (per.past ? '' : ' à ce jour') : 'dépensés au-delà des revenus';
     return '<div class="solbar"><div class="sb-t"><b>Solde ' + (per.past ? 'de la période' : 'du mois') + '</b><span class="subs">revenus ' + e0(o.revenus) + ' − dépenses ' + e0(o.depenses) + '</span></div>' +
       '<div class="sb-hero"><b class="num sb-v" style="color:' + cl(o.bal) + '">' + (o.bal < -DEMI ? e0(-o.bal) : sg(o.bal)) + '</b><span class="sb-p">' + hero + '</span></div>' +
       '<div class="sb-sec"><span class="sb-cap">Par rapport au budget</span>' + mini('Prévu', o.balP, 'revenus prévus − budget') +
       (per.past ? '<span class="sb-m"><span class="sb-l">Écart</span> <b class="num" style="color:' + cl(o.ecart) + '">' + (o.ecart < -DEMI ? e0(-o.ecart) + ' moins bien' : e0(Math.max(0, o.ecart)) + ' mieux') + '</b></span>'
-        : mini('Projeté fin de mois', o.pj, 'revenus − dépenses projetées selon le rythme actuel')) + '</div></div>';
+        : projete(s)) + '</div></div>';
+  }
+  // 1.3.6 : projection affichée à partir du 7e jour (avant, quelques jours de dépenses donnaient un chiffre inquiétant sans raison)
+  const PROJ_JOUR = 7;
+  function projete(s) {
+    if (s.jour < PROJ_JOUR) return '<span class="sb-m"><span class="sb-l">Projeté fin de mois</span> <span class="subs">à partir du ' + PROJ_JOUR + 'e jour</span></span>';
+    const v = s.solde.pj;
+    return '<span class="sb-m" title="revenus − dépenses projetées selon le rythme actuel"><span class="sb-l">Projeté fin de mois</span> <b class="num" style="color:' + cl(v) + '">' + sg(v) + '</b></span>';
   }
 
   // Total des dépenses : une barre (dans le budget / hors budget) et un repère au niveau du budget.
@@ -542,8 +549,9 @@
     if (PP.length) {
       const ecarts = PP.filter(x => x.etat.texte !== 'aligné').length;
       h += sous('postes', 'Prévu du poste et contrats', ecarts ? ecarts + ' poste' + (ecarts > 1 ? 's' : '') + ' à aligner' : 'tout est aligné', '<ul class="list">' + PP.map(x => '<li><div class="grow">' + esc(x.label) +
-        '<small>' + (x.budget == null ? 'poste absent du budget' : 'prévu ' + e2(x.budget) + ' par mois') + ' · contrats ' + e2(x.contrats) + ' par mois' + (x.n > 1 ? ' (' + x.n + ')' : '') + '</small></div>' +
-        chip(x.etat) + (x.etat.texte !== 'aligné' ? ' <button class="linkbtn" type="button" data-versprevu="' + esc(x.poste) + '">→ prévu</button>' : '') + '</li>').join('') + '</ul>');
+        '<small>' + (x.budget == null ? 'poste absent du budget' : 'prévu ' + e2(x.budget) + ' par mois') + ' · contrats ' + e2(x.contrats) + ' par mois' + (x.n > 1 ? ' (' + x.n + ')' : '') + '</small>' +
+        // 1.3.6 : pastille et bouton sous le texte (à 390 px, le texte tenait dans une colonne de 70 px)
+        '<div class="ctr-pp">' + chip(x.etat) + (x.etat.texte !== 'aligné' ? ' <button class="linkbtn" type="button" data-versprevu="' + esc(x.poste) + '">→ prévu</button>' : '') + '</div></div></li>').join('') + '</ul>');
     }
     const E = KB().echeances(B, 31).filter(x => x.scope === scope || x.sorte === 'carte');
     h += sous('echeances', 'Échéances des 31 prochains jours', E.length ? E.length + ' échéance' + (E.length > 1 ? 's' : '') : 'aucune', (E.length ? '<ul class="list">' + E.map(x => '<li><div class="grow">' + esc(x.label) +
@@ -623,12 +631,14 @@
     const L = (lab, sub, x, y, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><th>' + lab + (sub ? '<span class="subs"> ' + sub + '</span>' : '') + '</th>' + cel(x) + cel(y) + '</tr>';
     return '<p class="rav-tete">Affiché sur l\'Accueil et dans Grafit :</p>' + U().interrupteurRav(x.choix, !!c) +
       '<div class="tablewrap"><table class="rav-t rav-' + x.choix + '"><thead><tr><th></th><th' + on('salaire') + '>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th' + on('comptes') + '>Comptes courants</th></tr></thead><tbody>' +
-      L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') + L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
+      L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') +
+      (c && c.cartes > 0 ? L('− Carte à débit différé', 'déjà comptée dans le dépensé / somme à prélever', null, c.cartes, 'b') : '') +
+      L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
       L('= Marge', '', b.marge, c && c.marge, 'mg') + L('− Variable', 'dépensé / reste du budget', b.variable, c && c.variable, 'b') +
       L('= Reste à vivre', '', b.reste, c && c.reste, 'rv') +
       '</tbody></table></div>' +
       '<p class="muted small">Jusqu\'au ' + esc(jjmmaa(rav.fin)) + '. Colonne « dernier salaire » : le salaire du cycle moins ce qui est déjà dépensé. ' +
-      'Colonne « comptes courants » : les soldes des comptes courants moins les charges fixes pas encore prélevées et le reste du budget variable.</p>';
+      'Colonne « comptes courants » : les soldes des comptes courants moins la somme due sur la carte à débit différé, les charges fixes pas encore prélevées et le reste du budget variable.</p>';
   }
   // Ancienne carte « Reste à vivre » (lue par le résumé Grafit et les tests) : texte simple.
   function carteRav(rav) {

@@ -215,6 +215,7 @@
     const cover = {};
     for (const c of comptes) {
       for (const o of S.ops[c.id] || []) {
+        if (o.statut === 'en_cours' && o.absente) continue;       // 1.3.5 : en cours que la banque ne renvoie plus : plus comptée
         const r = K().classer(cx, o);
         const dd = K().dateDepense(o);
         rows.push({ o, id: o.id, cid: c.id, role: c.role, date: o.date, od: dd || o.date, m: o.montant, label: o.libelle || '', type: r.type, cat: r.cat, sub: r.sub });
@@ -408,13 +409,34 @@
     if (!last) for (let i = B.rows.length - 1; i >= 0; i--) { const r = B.rows[i]; if (estSalaire(B, r)) { last = r; break; } }
     let c = null;
     if (last) {
-      const [y, m, d] = last.date.split('-').map(Number);
-      const e = new Date(Date.UTC(y, m, d)); e.setUTCDate(e.getUTCDate() - 1);
-      let end = e.toISOString().slice(0, 10);
+      // 1.3.6 : fin = veille du prochain jour de paie attendu (jour habituel, avancé au jour ouvré précédent) ; avant : même
+      // jour le mois suivant − 1 (un salaire versé en avance, en décembre, raccourcissait le cycle puis l'allongeait jour après jour)
+      const attendu = salaireAttendu(B, last);
+      let end = plusJours(attendu, -1);
       if (end < B.auj) end = B.auj;
-      c = { start: last.date, end, src: last };
+      c = { start: last.date, end, src: last, attendu };
     }
     return (B.memo.cyc = c);
+  }
+
+  // 1.3.6 : jour de paie habituel = jour du mois le plus fréquent parmi les 6 derniers salaires (à égalité, le plus tardif :
+  // un salaire avancé avant un week-end ou les fêtes ne le change pas). Prochain salaire attendu : ce jour le mois suivant
+  // (le mois d'après s'il tombe moins de 20 jours après le dernier), avancé au jour ouvré précédent (week-end, férié).
+  function jourDePaie(B, last) {
+    let L = B.rows.filter(r => estSalaireRef(B, r));
+    if (!L.length) L = B.rows.filter(r => estSalaire(B, r));
+    const n = {};
+    for (const r of L.slice(-6)) { const j = +r.date.slice(8, 10); n[j] = (n[j] || 0) + 1; }
+    const js = Object.keys(n).map(Number);
+    return js.length ? js.sort((a, b) => (n[b] - n[a]) || (b - a))[0] : +last.date.slice(8, 10);
+  }
+  const ouvre = d => { const w = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay(); const KCm = g.KladCommun; return w !== 0 && w !== 6 && !(KCm && KCm.ferie && KCm.ferie(d)); };
+  function salaireAttendu(B, last) {
+    const j = jourDePaie(B, last), le = (m) => m + '-' + String(Math.min(j, joursMois(m))).padStart(2, '0');
+    let d = le(shift(last.date.slice(0, 7), 1));
+    if (dDiff(last.date, d) < 20) d = le(shift(last.date.slice(0, 7), 2));
+    for (let i = 0; i < 7 && !ouvre(d); i++) d = plusJours(d, -1);
+    return d;
   }
 
   // Débuts de cycle : un salaire ouvre un cycle s'il arrive au moins « ecart » jours après le précédent.
@@ -846,7 +868,8 @@
         if (a.debit === undefined && hors > DEMI) CAUSES.push({ a, v: hors, hb: !a.on || a.pm <= DEMI });
       });
       const t = T[nk];
-      grp.forEach(a => { t.p += a.pm; t.c += a.cur; t.left += Math.max(0, a.left); t.out += Math.max(0, a.cur - Math.max(0, a.pm)); if (nk !== 'fixe') t.proj += Math.max(a.proj, a.cur); });
+      // 1.3.5 : projection des charges fixes aussi (le plus grand du budget et du réel, poste par poste ; avant : budget seul)
+      grp.forEach(a => { t.p += a.pm; t.c += a.cur; t.left += Math.max(0, a.left); t.out += Math.max(0, a.cur - Math.max(0, a.pm)); t.proj += Math.max(a.proj, a.cur); });
       const montre = [];
       for (const a of grp) {
         Object.assign(a, etatDe(a, nk));
@@ -861,7 +884,7 @@
     const P = T.fixe.p + T.courante.p + T.optionnelle.p, C = T.fixe.c + T.courante.c + T.optionnelle.c;
     const OUT = T.fixe.out + T.courante.out + T.optionnelle.out, IN = C - OUT;
     const bal = RT.c - C, balP = RT.p - P;
-    const Rp = Math.max(RT.c, RT.p), Dp = T.fixe.p + T.courante.proj + T.optionnelle.proj;
+    const Rp = Math.max(RT.c, RT.p), Dp = T.fixe.proj + T.courante.proj + T.optionnelle.proj;
     const solde = { bal, balP, pj: Rp - Dp, ecart: bal - balP, revenus: RT.c, depenses: C };
     if (scope === 'commun' && !past) {
       const bc = soldes(B, ['commun']);
@@ -889,9 +912,24 @@
     return n ? { v, n } : null;
   }
 
+  // 1.3.5 : somme due sur les cartes à débit différé visibles, en euros, prélevées sur un compte courant (ou sans compte
+  // de prélèvement choisi) : ce qui sortira des comptes courants au prochain prélèvement de chaque carte (centimes).
+  function detteCartes(B) {
+    let t = 0;
+    for (const c of B.comptes) {
+      if (c.role !== 'carte_differee' || (c.devise || 'EUR') !== 'EUR') continue;
+      const p = c.prelevement && c.prelevement.compte && B.comptes.find(x => x.id === c.prelevement.compte);
+      if (p && p.role !== 'courant') continue;
+      const d = K().dette(B.S, c, B.now);
+      if (d && d.centimes > 0) t += d.centimes;
+    }
+    return t;
+  }
+
   // Reste à vivre (perso, cycle en cours) : deux colonnes.
   //   budget   : Base = salaire du cycle (sinon dernier salaire) − charges fixes prélevées = marge − variable dépensé ;
-  //   comptes  : Base = soldes des comptes courants − charges fixes encore à venir = marge − reste du budget variable.
+  //   comptes  : Base = soldes des comptes courants − somme due sur les cartes (1.3.5) − charges fixes encore à venir
+  //              = marge − reste du budget variable.
   function resteAVivre(B, res, inPer) {
     const T = res.T;
     const salRows = B.rows.filter(r => estSalaire(B, r) && inPer(r.date)), salGot = salRows.reduce((t, r) => t + r.m, 0);
@@ -901,7 +939,10 @@
     const fixLeft = T.fixe.left, varLeft = T.courante.left + T.optionnelle.left;
     const budget = { base: sal, fixes: fixSp, marge: sal - fixSp, variable: varSp, reste: sal - fixSp - varSp, date: salDate };
     const Bs = soldes(B, ['courant']);
-    const comptes = Bs ? { base: Bs.v, fixes: fixLeft, marge: Bs.v - fixLeft, variable: varLeft, reste: Bs.v - fixLeft - varLeft } : null;
+    // 1.3.5 : somme due sur les cartes à débit différé, pas encore prélevée sur un compte courant : retirée de la base
+    // (un achat à la carte compte déjà dans le variable dépensé ; avant, il faisait monter cette colonne).
+    const cartes = Bs ? detteCartes(B) : 0;
+    const comptes = Bs ? { base: Bs.v, cartes, fixes: fixLeft, marge: Bs.v - cartes - fixLeft, variable: varLeft, reste: Bs.v - cartes - fixLeft - varLeft } : null;
     return { budget, comptes, fin: res.per.end, base: comptes ? 'accounts' : 'budget', valeur: comptes ? comptes.reste : budget.reste };
   }
 

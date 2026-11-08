@@ -172,5 +172,5 @@ test('réimport qui ignore un compte déjà repris : signalé avant confirmation
   assert.equal(st.relire, 1);                         // seul un compte bancaire peut relire son historique
   assert.equal(c.sync.relire, true);
   assert.equal(c.frontiere, undefined);
-  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: null, ramenee: false });
+  assert.deepEqual(json(M.bornesRecuperation(S, c, NOW)), { from: null, ramenee: false, large: true });
 });

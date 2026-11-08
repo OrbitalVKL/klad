@@ -548,6 +548,7 @@
     let v = 0, n = 0;
     for (const o of S.ops[k.id] || []) {
       if (depuis && o.date <= depuis) continue;
+      if (o.statut === 'en_cours' && o.absente) continue;        // 1.3.5 : en cours plus renvoyée par la banque
       if (remb.length && contient(fold(o.libelle), remb)) continue;
       v -= o.montant; n++;
     }

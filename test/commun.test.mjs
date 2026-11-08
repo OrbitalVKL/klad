@@ -90,7 +90,7 @@ test('rendu du périmètre Commun et résumé Grafit « commun » ; import du ca
   const { S } = etat();
   const B = ctx(S);
   const h = VB.ravM(B, 'commun', {}) + VC.plan(B, { cartes: new Set(['cm|cash', 'cm|why']) }) + VB.suivi(B, 'commun', {}).html;
-  assert.match(h, /Marge réelle du commun[\s\S]*Virements à mettre en place[\s\S]*Appels de fonds[\s\S]*Trésorerie · 12 mois[\s\S]*D'où vient le solde/);
+  assert.match(h, /Marge réelle du commun[\s\S]*Virements à mettre en place[\s\S]*Appels de fonds[\s\S]*12 prochains mois[\s\S]*D'où vient le solde/);
   assert.ok(!montantSigne(h), 'aucun montant signé');
   // nom de la résidence et du syndic : données du complément seulement
   S.carnet.klad.appels.titre = 'Résidence fictive'; S.carnet.klad.appels.syndic = 'Syndic fictif';

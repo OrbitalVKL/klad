@@ -35,7 +35,8 @@
   }
 
   // ------------------------------------------------------------ 2. reste à vivre
-  const colonne = c => c && { base: ent(c.base), fixes: ent(c.fixes), marge: ent(c.marge), variable: ent(c.variable), reste: ent(c.reste) };
+  // 1.3.5 : « cartes » (somme due sur les cartes à débit différé, colonne comptes) seulement si elle n'est pas nulle
+  const colonne = c => c && Object.assign({ base: ent(c.base) }, c.cartes > 0 ? { cartes: ent(c.cartes) } : {}, { fixes: ent(c.fixes), marge: ent(c.marge), variable: ent(c.variable), reste: ent(c.reste) });
   function resteAVivre(B) {
     const r = KB().suivi(B, 'perso', null).rav;
     if (!r) return null;

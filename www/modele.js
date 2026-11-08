@@ -15,6 +15,8 @@
   const PURGE_JOURS = 10;                        // opération en cours disparue : retirée 10 jours après sa date
   const RAPPROCHE_JOURS = 5;                     // en cours → comptabilisée : dates à 5 jours au plus (4 jusqu'à la 1.1.1)
   const DOUBLON_JOURS = 5;                       // 1.1.2 : même opération relue à une autre date : 5 jours au plus
+  const RELIRE_JOURS = 30;                       // 1.3.5 : relecture large (opérations comptabilisées en retard)…
+  const RELIRE_TOUS = 7;                         // … une fois tous les 7 jours au plus
   const HISTO_MAX = 1500;                        // historique quotidien des soldes : jours gardés par compte
   const SOLDES_PREF = ['CLBD', 'ITAV', 'CLAV', 'XPCD', 'ITBD', 'OPBD', 'PRCD', 'INFO', 'OTHR'];
 
@@ -451,6 +453,7 @@
     const noter = (action, motif, ancienne, gardee) => st.details.push({ action, motif, renvoyee: gardee ? formes.get(gardee.id) || null : null, ancienne: formeKlad(ancienne) });
     const list = opsDe(S, cid);
     const parId = new Map(list.map(o => [o.id, o]));
+    const connues = new Set(parId.keys());          // 1.3.5 : opérations déjà connues avant cette lecture
     const absorbees = new Set(list.map(o => o.exEnCours).filter(Boolean));
     const vues = new Set();
     const pris = new Set();
@@ -492,6 +495,8 @@
         let best = null, bd = Infinity;
         for (const r of list) {
           if (r === d || r.source !== 'eb' || r.statut !== 'comptabilisee' || !lus.has(r.id) || prises.has(r.id) || !memeOperation(d, r)) continue;
+          // 1.3.5 : deux opérations déjà connues, même jour et même libellé (deux achats identiques réels) : jamais fusionnées
+          if (connues.has(r.id) && r.date === d.date && cleLibelle(r.libelle) === cleLibelle(d.libelle)) continue;
           const e = Math.abs(ecart(d.date, r.date));
           if (e < bd) { best = r; bd = e; }
         }
@@ -516,15 +521,25 @@
   // frontière de reprise (le jour même est relu, dédoublonné contre la reprise), jamais après aujourd'hui (la banque
   // refuse une date future : erreur 422). from null → la plus longue période acceptée par la banque.
   // → { from, ramenee } ; ramenee : la date calculée était dans le futur.
+  // 1.3.5 : une fois tous les RELIRE_TOUS jours (c.sync.large : date de la dernière), relecture des RELIRE_JOURS derniers
+  // jours au moins (opération comptabilisée en retard avec une date ancienne, qui tombait avant la date de début).
+  // → large: true quand la lecture couvre au moins ces RELIRE_JOURS jours (ou tout l'historique accepté) : date à noter.
   function bornesRecuperation(S, c, now) {
-    if (c.sync && c.sync.relire) return { from: c.frontiere || null, ramenee: false };     // relecture de tout l'historique
+    if (c.sync && c.sync.relire) return { from: c.frontiere || null, ramenee: false, large: true };     // relecture de tout l'historique
     let max = '';
     for (const o of S.ops[c.id] || []) if (o.source === 'eb' && o.statut === 'comptabilisee' && o.date > max) max = o.date;
     let from = max ? plusJours(max, -5) : null;
-    if (c.frontiere && (!from || from < c.frontiere)) from = c.frontiere;
     const auj = jourLocal(now == null ? Date.now() : now);
-    if (from && from > auj) return { from: auj, ramenee: true };
-    return { from, ramenee: false };
+    const der = c.sync && dateValide(c.sync.large) ? c.sync.large : '';
+    let large = !from;                                                    // la plus longue période acceptée
+    if (from && (!der || ecart(auj, der) >= RELIRE_TOUS)) {
+      const f = plusJours(auj, -RELIRE_JOURS);
+      if (f < from) from = f;
+      large = true;
+    }
+    if (c.frontiere && (!from || from < c.frontiere)) from = c.frontiere;
+    if (from && from > auj) return { from: auj, ramenee: true, large: false };
+    return { from, ramenee: false, large };
   }
   const debutRecuperation = (S, c, now) => bornesRecuperation(S, c, now).from;
 
@@ -744,7 +759,7 @@
   }
 
   g.KladModele = {
-    V, ROLES, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId, baseLibelle, avecReference, memeOperation, reprendreEtat, annulerRenvois, DOUBLON_JOURS,
+    V, ROLES, RELIRE_JOURS, RELIRE_TOUS, centimes, plusJours, jourLocal, dateValide, cleLibelle, references, compatibles, hash, nouvelId, baseLibelle, avecReference, memeOperation, reprendreEtat, annulerRenvois, DOUBLON_JOURS,
     vide, nouveauModele, compte, comptesTries, comptesDe, opsDe, roleDefaut, nouveauCompte, compteEB, empreinte,
     associerSession, supprimerCompte, remplacerCompte, reassocier, disponibles, depuisEB, doterIds, nouvelleOp, rapprocher, integrer, formeEB, formeKlad, texteForme, bornesRecuperation, debutRecuperation,
     appliquerFrontiere, creditDeReglement, soldePrefere, soldesLus, soldeAffiche, totalCourants, totalPerso, ROLES_TOTAL_PERSO, etatAcces, alerteCompte,

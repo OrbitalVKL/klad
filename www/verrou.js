@@ -78,9 +78,15 @@
     }
     if (!ecrire.length && !effacer.length) return chain;
     chain = chain.then(async () => {
-      for (const [n, j] of ecrire) {
+      for (let i = 0; i < ecrire.length; i++) {
+        const [n, j] = ecrire[i];
         try { await V.writeBlob({ name: n, data: C.toB64(await C.seal(k, n, JSON.parse(j))) }); }
-        catch (e) { if (ecrits[n] === j) delete ecrits[n]; throw e; }        // réécrit au prochain enregistrement
+        catch (e) {
+          // 1.3.5 : ce bloc et tous ceux qui n'ont pas encore été écrits sont réécrits au prochain enregistrement
+          // (avant : seul le bloc en échec ; les suivants passaient pour écrits et pouvaient manquer au redémarrage)
+          for (const [m, jm] of ecrire.slice(i)) if (ecrits[m] === jm) { delete ecrits[m]; dirty.add(m === 'journal' || m === 'sauvegarde' ? m : '*'); }
+          throw e;
+        }
       }
       for (const n of effacer) await V.deleteBlob({ name: n });
     }).catch(e => toast('Enregistrement impossible : ' + (e.message || e), true));
@@ -621,7 +627,7 @@
   async function exportNow() {
     await flush();
     const s = S, bk = B;
-    const name = 'klad-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.klad';
+    const name = 'klad-sauvegarde-' + KladModele.jourLocal(Date.now()) + '.klad';      // 1.3.5 : date du téléphone
     action('export de la sauvegarde');
     toast('Préparation de la sauvegarde…');
     let r;
@@ -777,6 +783,8 @@
       active = false;
       $('masque').hidden = false;
       hiddenAt = Date.now();
+      // 1.3.5 : écriture immédiate de ce qui attend (sans attendre 400 ms : Android peut arrêter l'appli en arrière-plan)
+      if (key && dirty.size) { try { flush(); } catch (e) { /* signalé par flush */ } }
       clearTimeout(lockTimer);
       if (key) lockTimer = setTimeout(lock, LOCK_MS);
       return;

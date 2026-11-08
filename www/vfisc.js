@@ -61,10 +61,10 @@
       '<div class="tx-meta">' + (P.st === 'projet' ? chip('warn', 'barème en projet') : chip('good', 'barème voté')) + '<span>' + esc(P.lab) + '</span><span>· déclaration commune (PACS), 2 parts</span><span>· tranche marginale ' + Fo.B.tmi + ' %</span>' + (Fo.B.dec ? '<span>· décote ' + eu(Fo.B.dec) + '</span>' : '') + '</div></section>';
     // observations et régularisations
     const RG = KF().regularisations(X), AL = KF().alertes(X, R), nW = AL.filter(a => a.lvl === 'warn').length;
-    h += '<section class="panel obs-panel" id="tx-obs">' + tete('Observations', '<span class="muted" id="tx-obs-n">' + (nW ? nW + ' point(s) à suivre' : 'rien d\'urgent') + '</span>') +
+    h += '<section class="panel obs-panel" id="tx-obs">' + tete('À régler et à suivre', '<span class="muted" id="tx-obs-n">' + (nW ? nW + ' point(s) à suivre' : 'rien d\'urgent') + '</span>') +
       '<div id="tx-regul" class="tx-regul"><h3 class="obs-h3">À régulariser entre vous</h3>' + RG.map(r => '<div class="cr-r"><span class="cr-l">' + esc(r.per) + '<span class="subs">' + esc(r.kind === 'avis' ? (r.done ? 'Rien à régulariser.' : 'Partage : ' + KF().PART_RULES[FI.hyp.partage || 'seul'][0].toLowerCase() + '.') : r.txt) + '</span></span><b>' +
         (r.kind === 'avis' ? (r.done ? 'à jour' : esc(W[r.from]) + ' verse ' + eu(r.amt) + ' à ' + esc(W[r.to])) : (r.solde >= 0 ? 'solde ≈ ' + eu(r.solde) : 'remboursement ≈ ' + eu(r.solde))) + '</b></div>').join('') + '</div>' +
-      '<h3 class="obs-h3">Observations</h3><ul class="alerts" id="tx-alerts">' + AL.map(li).join('') + '</ul>' +
+      '<h3 class="obs-h3">Points à suivre</h3><ul class="alerts" id="tx-alerts">' + AL.map(li).join('') + '</ul>' +
       (o.analyse ? '<div class="row obs-act"><button class="btn" type="button" data-analyseimpots="1">Analyse de Claude</button></div>' : '') +
       (o.texteAnalyse ? '<div class="ai-out" aria-live="polite">' + esc(o.texteAnalyse) + '</div>' : '') + '</section>';
     // prélèvement à la source

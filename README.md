@@ -2,7 +2,7 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 1.0.0 (maintenance) — version complète : tous les réglages du complément se font dans Klad, sauvegarde vérifiée, nouvelle organisation de l'interface (Accueil, Opérations, Budget, Commun, Plus ; palettes Klad et Grafit), parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`), mode démo. Notes de version : `docs/NOTES.md`.** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 1.0.0 (maintenance) — version complète : tous les réglages du complément se font dans Klad, sauvegarde vérifiée, organisation de l'interface (2.0 : Aperçu Moi / Nous, Opérations, Trier, Patrimoine, Plus ; Budget et Commun ouverts depuis l'Aperçu ; palettes Klad et Grafit), parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`), mode démo. Notes de version : `docs/NOTES.md`.** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
@@ -191,8 +191,8 @@ d'employeur, de personne ou de banque dans le code : ce sont des données (carne
   commun : apports attendus de chaque personne selon la répartition des postes (`klad.commun` : `moi`, `autre`).
   Le poste perso *Contribution compte commun* vaut ma part du budget commun.
 - **Reste à vivre** (perso, cycle en cours) : colonne *dernier salaire* = salaire du cycle − charges fixes prélevées −
-  variable dépensé ; colonne *comptes courants* = soldes des comptes courants − charges fixes encore à venir − reste du
-  budget variable.
+  variable dépensé ; colonne *comptes courants* = soldes des comptes courants − somme due sur les cartes à débit différé
+  prélevées sur un compte courant (1.3.5) − charges fixes encore à venir − reste du budget variable.
 - **Contrats** : montant du document, périodicité, dernier prélèvement trouvé (motif), écart, prochaine échéance.
   **Échéances sur 31 jours** : contrats, prélèvements récurrents détectés (même compte, mêmes premiers mots, au moins 2 des
   3 derniers mois, montants proches), dette des cartes au jour du prélèvement.
@@ -491,9 +491,14 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 8. *Plus › Sauvegarde* et *Plus › Verrou* : exporter ou restaurer une sauvegarde, changer le code, activer ou désactiver l'empreinte, tout effacer.
 9. *Plus › Modules › Lien Grafit* : partager le résumé avec Grafit (désactivé par défaut).
 10. *Opérations* : appui = détail ; glisser à droite = vue / non vue, à gauche = « Classer » ; filtres non vues, non classées, catégorie. *Plus › Classement* : catégories (nature, icône), règles, reprise du carnet.
-11. *Budget* : Perso / Commun, ◀ ▶ entre cycles ; un appui sur un poste montre ses opérations, « Modifier le budget » ouvre
-   le volet d'édition (annulable) ; *Contrats* et *Tendance* en haut. Accueil : carte « Reste à vivre » (détail au toucher).
-   *Commun* : marge réelle, fin de mois, virements (ordres permanents modifiables), trésorerie, appels de fonds, d'où vient
+11. *Aperçu* (2.0) : deux pages qu'on fait glisser. *Moi* : cadran du reste à vivre (temps du cycle, budget variable
+   consommé), où va l'argent, à vérifier, soldes, budget du cycle poste par poste avec son bilan et l'accès aux écrans
+   détaillés (Tout le budget, Tendance, Contrats, Dernier bilan), prochains jours, à faire, Verrouiller. *Nous* : fin de
+   mois estimée, virements de chacun, équilibre, 12 prochains mois, répartition du solde, budget du commun (Tout le commun,
+   Trésorerie, Équilibre, Contrats), prochains jours, à faire. *Trier* (bouton central) : les opérations à vérifier une à une.
+   *Budget* (depuis l'Aperçu) : ◀ ▶ entre cycles ; un appui sur un poste montre ses opérations, « Modifier le budget » ouvre
+   le volet d'édition (annulable) ; *Contrats* et *Tendance* en haut. Aperçu : cadran du reste à vivre (détail par « ? »).
+   *Commun* (depuis l'Aperçu, page Nous) : marge réelle, fin de mois, virements (ordres permanents modifiables), trésorerie, appels de fonds, d'où vient
    le solde ; bouton *Équilibre*. *Résultats* : bilan de la période précédente et répartition des dépenses.
 12. *Plus › Observations, Impôts, Épargne* : points à faire, impôt du foyer et taxe foncière, livret et plan d'épargne.
 

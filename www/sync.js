@@ -58,6 +58,7 @@
         const b = M().bornesRecuperation(S, c, now);
         const from = b.from;
         if (b.ramenee) deps.log('info', nom + ' : date de début ramenée à aujourd\'hui');
+        if (b.large) deps.log('info', nom + ' : relecture des ' + M().RELIRE_JOURS + ' derniers jours (une fois par semaine)');
         let h = entetesPSU(cx.psu, dispo);
         const lire = async hh => ({
           bal: await cl.balances(c.source.uid, hh),
@@ -76,7 +77,9 @@
         const t = deps.now ? deps.now() : Date.now();
         M().soldesLus(S, c.id, r.bal, t);
         const st = M().integrer(S, c.id, r.txs, t, { depuis: from });
-        c.sync = { lu: new Date(t).toISOString(), erreur: null };
+        // 1.3.5 : date de la dernière relecture large gardée (une par semaine au plus)
+        const large = b.large ? M().jourLocal(t) : c.sync && c.sync.large;
+        c.sync = Object.assign({ lu: new Date(t).toISOString(), erreur: null }, large ? { large } : {});
         res.nouvelles += st.nouvelles; res.fusionnees += st.fusionnees; res.retirees += st.retirees;
         deps.log('ok', nom + ' : ' + st.lues + ' lue(s) depuis ' + (from ? 'le ' + from.split('-').reverse().join('/') : 'le plus tôt possible') +
           ', ' + st.nouvelles + ' nouvelle(s), ' + st.maj + ' mise(s) à jour, ' + st.fusionnees + ' fusion(s), ' + st.retirees + ' retirée(s), ' + (st.gardees ? st.gardees + ' gardée(s) à vérifier (plus renvoyées), ' : '') +

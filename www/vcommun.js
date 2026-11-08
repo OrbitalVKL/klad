@@ -100,8 +100,8 @@
     if (partie === 'tresorerie') h = '<div class="panel-h"><h2>Trésorerie du compte commun</h2></div>';
     const def = partie === 'tresorerie';
     h += appels(B, ouv, def);
-    if (C) h += cmSub(ouv, 'cash', 'Trésorerie · 12 mois', '<span class="' + (C.min < 0 ? 'bad-t' : '') + '">plus bas <b class="num">' + s2(C.min) + '</b> le ' + jjmm(C.minAt) + '</span>', tresorerie(B, D, R), def);
-    else h += cmSub(ouv, 'cash', 'Trésorerie · 12 mois', '', '<p class="note">Trésorerie indisponible : pas encore de solde pour le compte commun.</p>', false);
+    if (C) h += cmSub(ouv, 'cash', '12 prochains mois', '<span class="' + (C.min < 0 ? 'bad-t' : '') + '">plus bas <b class="num">' + s2(C.min) + '</b> le ' + jjmm(C.minAt) + '</span>', tresorerie(B, D, R), def);
+    else h += cmSub(ouv, 'cash', '12 prochains mois', '', '<p class="note">Trésorerie indisponible : pas encore de solde pour le compte commun.</p>', false);
     if (D.W) h += origine(B, D, ouv, def);
     return h;
   }
@@ -338,10 +338,11 @@
     const D = KC().decomposition(B);
     if (!D) return '';
     const R = KC().reglages(B), u = ui || {};
-    let h = '<div class="panel-h"><h2>Le compte commun ce mois-ci</h2></div>';
+    let h = '<div class="panel-h"><h2>Le compte commun ce mois-ci</h2><span class="muted">répartition du solde</span></div>';
     // décomposition du solde
     const part = (lab, v, sub, cls) => '<div class="cd-p' + (cls ? ' ' + cls : '') + '"><span class="sb-l">' + esc(lab) + '</span><b class="num">' + s2(v) + '</b>' + (sub ? '<span class="subs">' + esc(sub) + '</span>' : '') + '</div>';
-    h += '<div class="cm-decomp" aria-label="Décomposition du solde du compte commun"><div class="cd-tot"><span class="sb-l">Solde</span><b class="num">' + s2(D.solde) + '</b></div><div class="cd-parts">' +
+    // 1.3.6 : plus de ligne « Solde » (déjà en tête de l'écran) : les quatre parts seulement
+    h += '<div class="cm-decomp" aria-label="Répartition du solde du compte commun (' + esc(s2(D.solde)) + ')"><div class="cd-parts">' +
       part('Disponible', D.disponible, D.disponible < -0.5 ? 'pris sur les enveloppes et la réserve' : 'pour les dépenses du mois', D.disponible < -0.5 ? 'neg' : '') +
       part('Réserve fixe', D.reserve, D.reserve ? 'plancher de la trésorerie' : 'à régler dans Réglages › Budget') +
       part('Provisions en cours', D.provisions, D.provisionsDet.length ? D.provisionsDet.map(x => x.label + ' ' + e0(x.montant)).join(', ') : 'charges non mensuelles') +

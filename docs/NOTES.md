@@ -2,6 +2,59 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.0.0
+
+Nouvelle interface (demande du propriétaire, 08/11 : moins de texte, une navigation qui se comprend sans explication, sans
+perdre aucune information). Aucun calcul ne change. Comprend aussi les corrections de la 1.3.5 et de la 1.3.6 ci-dessous.
+- **Barre du bas** : Aperçu · Opérations · **Trier** (bouton du milieu, avec le nombre d'opérations à vérifier) ·
+  Patrimoine · Plus. Budget, Commun et Équilibre s'ouvrent depuis l'Aperçu (le bouton Retour y ramène).
+- **Aperçu, page Moi** : un cadran donne le reste à vivre (au centre), le temps écoulé du cycle (cercle fin et point) et
+  la part du budget variable déjà dépensée (cercle épais, vert / orange / rouge selon le rythme) ; « Où va l'argent »
+  découpe le salaire ou les comptes en couleurs ; puis à vérifier, soldes, le budget du cycle **poste par poste** (un
+  anneau par poste, « reste », « dépassé de », « à venir », « prélevé ») avec son bilan (total dépensé, réel à ce jour,
+  projeté, pastilles « excédent » / « déficit ») et quatre boutons vers les écrans détaillés (Tout le budget, Tendance,
+  Contrats, Dernier bilan), les 7 prochains jours (échéances et paie, liste complète en dépliant), les points à faire et
+  Verrouiller.
+- **Aperçu, page Nous** (glisser vers la gauche ou toucher « Nous ») : fin de mois estimée et solde du commun, virements
+  de chacun (reçu, en route, à mettre en place), équilibre (balançoire : qui doit encore investir, date d'équilibre),
+  12 prochains mois (point bas, plancher de la réserve), répartition du solde, budget du commun avec son bilan et ses
+  boutons (Tout le commun, Trésorerie, Équilibre, Contrats), prochains jours du commun, points à faire.
+- **Lisible partout** : petit écran (320 px) et texte agrandi jusqu'à 200 % sans rien de coupé ; cibles de 48 dp.
+
+## 1.3.6
+
+Écrans allégés (analyse complète de l'appli par l'architecte, 08/11).
+- **Accueil** : le cycle n'est plus rappelé trois fois (en-tête sans « jour N sur T », « Ce cycle-ci » sans les jours
+  restants) ; « Bilan du cycle précédent » passe dans « Ce cycle-ci » ; un seul raccourci en bas (Verrouiller) ;
+  « À mettre en place » : une ligne par personne avec le total de ses virements à modifier.
+- **À vérifier** : depuis l'Accueil, la liste propose « Trier une à une » (non vues puis non classées, en une file).
+- **Commun › Ce mois** : le solde n'est plus répété : la carte « Le compte commun ce mois-ci » montre sa répartition,
+  le bas du budget les mouvements du mois (variation réelle).
+- **Cycle de salaire** : il se termine la veille du prochain jour de paie habituel (jour ouvré) ; un salaire versé en
+  avance (fêtes) ne raccourcit plus le cycle. Observation « Salaire attendu le …, pas encore arrivé » trois jours après.
+- **Contrats** : « prélèvement absent » pour tous les contrats (perso aussi, toutes périodicités), avec un conseil si
+  l'organisme a changé de libellé ou de numéro ; « Prévu du poste » lisible sur un petit écran.
+- **Projeté fin de mois** : affiché à partir du 7e jour (avant, deux jours de dépenses donnaient un chiffre inquiétant).
+- **Affichage** : « Alimentation » coupé proprement dans « Classer » ; graphiques sans axe hors de la carte ;
+  « 12 prochains mois » dans Commun › Trésorerie ; Impôts : « À régler et à suivre », « Points à suivre ».
+
+## 1.3.5
+
+Correctif (analyse complète de l'appli par l'architecte, 08/11).
+- **Reste à vivre « comptes courants »** : la somme due sur la carte à débit différé est retirée (ligne « Carte à débit
+  différé » dans le détail). Avant, un achat à la carte faisait monter ce reste à vivre jusqu'au prélèvement de la carte.
+- **Projeté fin de mois** (Budget › Suivi) : une charge fixe plus chère que son budget, ou sans budget, est comptée.
+- **Opération en cours abandonnée** (pré-autorisation d'une station ou d'un hôtel, remplacée par un autre montant) : dès
+  que la banque ne la renvoie plus, elle ne compte plus ; elle reste visible, barrée, « en cours · plus renvoyée ».
+- **Synchro** : une fois par semaine, les 30 derniers jours sont relus (opération passée en retard avec une date
+  ancienne) ; deux achats identiques le même jour ne sont plus jamais fusionnés.
+- **À vérifier** : une seule ligne sur l'Accueil, avec le même nombre que la pastille « Tout » des Opérations (non vues,
+  non classées depuis 3 mois, à rapprocher : chacune comptée une fois) ; un appui ouvre cette liste. L'observation
+  « Opérations à classer » compte les mêmes 3 mois.
+- **Recherche par montant** : « 34,65 » (ou « 34.65 », « 34,65 € ») trouve les opérations de ce montant.
+- **Enregistrement** : après un enregistrement impossible, tout ce qui n'a pas été écrit est réécrit ensuite ; écriture
+  immédiate quand Klad passe en arrière-plan ; le fichier de sauvegarde porte la date du téléphone.
+
 ## 1.3.4
 
 Contrats (demande du propriétaire, 07/11).
