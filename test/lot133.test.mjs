@@ -51,23 +51,23 @@ test('Chromium : Tendance repliable dans Commun › Trésorerie, sous-sections d
   const { page } = B;
   try {
     await B.onglet('commun');
-    await page.locator('[data-sousvue="tresorerie"]:visible').first().click(); await B.pause(400);
+    await page.locator('#budget-main [data-aller="tresorerie"]').click(); await B.pause(400);      // 2.1 : depuis la carte du budget
     await page.locator('#tend-panel h2.fold').first().click(); await B.pause(300);
     assert.equal(await page.evaluate(() => document.getElementById('tend-panel').classList.contains('collapsed')), true, 'Tendance repliée');
     const n = await page.locator('#p-contrats details.ctr-sub').count();
     assert.ok(n >= 2, n + ' sous-sections');
     await page.locator('#p-contrats details.ctr-sub > summary').first().click(); await B.pause(200);
     await page.locator('[data-sousvue="mois"]:visible').first().click(); await B.pause(300);
-    await page.locator('[data-sousvue="tresorerie"]:visible').first().click(); await B.pause(300);
+    await page.locator('#budget-main [data-aller="tresorerie"]').click(); await B.pause(300);
     assert.deepEqual(await page.$$eval('#p-contrats details.ctr-sub', ds => ds.map(d => d.open)).then(o => o[0]), false, 'liste toujours repliée au retour');
     assert.equal(await page.evaluate(() => document.getElementById('tend-panel').classList.contains('collapsed')), true, 'Tendance toujours repliée');
     // Budget › Tendance : seule, jamais repliée
     await B.onglet('budget');
-    await page.locator('[data-sousvue="tendance"]:visible').first().click(); await B.pause(300);
+    await page.locator('#budget-main [data-aller="tendance"]').click(); await B.pause(300);
     assert.equal(await page.evaluate(() => document.getElementById('tend-panel').classList.contains('collapsed')), false);
     // résumé des sous-sections : cible d'au moins 48 px
     await B.onglet('commun');
-    await page.locator('[data-sousvue="tresorerie"]:visible').first().click(); await B.pause(300);
+    await page.locator('#budget-main [data-aller="tresorerie"]').click(); await B.pause(300);
     const hs = await page.$$eval('#p-contrats details.ctr-sub > summary', ss => ss.map(s => s.getBoundingClientRect().height));
     assert.ok(hs.every(h => h >= 47.5), JSON.stringify(hs));
     assert.deepEqual(B.erreurs, [], 'aucune erreur JavaScript');

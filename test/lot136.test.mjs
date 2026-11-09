@@ -100,7 +100,7 @@ test('projection : affichée à partir du 7e jour de la période', async () => {
   const n8 = Date.parse('2026-11-02T10:00:00Z');
   const s8 = KB.suivi(ctxDe(S, n8), 'perso', null);
   assert.equal(s8.jour, 7);
-  assert.match(t(VB.suivi(ctxDe(S, n8), 'perso', {}).html), /Projeté fin de mois (déficit )?[+\d]/);
+  assert.match(t(VB.suivi(ctxDe(S, n8), 'perso', {}).html), /Projeté fin de mois (excédent|déficit|à l'équilibre) \d/);      // 2.1 : pastille puis montant
 });
 
 test('affichage : contrats (pastille sous le texte), Impôts (titres), graphiques sans hauteur figée, « Classer » sans coupure, tri depuis « À vérifier »', () => {

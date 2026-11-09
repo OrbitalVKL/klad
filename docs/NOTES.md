@@ -2,6 +2,31 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.1.0
+
+Budget fusionné dans l'Aperçu (retour du propriétaire, 08/11 : l'Aperçu 2.0 répétait le budget au lieu de le
+remplacer ; maquettes validées). Aucun calcul ne change, aucune information n'est retirée.
+- **Un seul écran par côté** : l'Aperçu *Moi* est le budget perso, l'Aperçu *Nous* le budget du commun. Plus de résumé
+  du budget suivi d'un bouton « Tout le budget » : le budget est là, en entier, entre le haut (cadran, où va l'argent,
+  à vérifier, soldes) et le bas (à faire, prochains jours, Verrouiller).
+- **Budget en sections repliables** : Revenus, Charges fixes, Dépenses courantes, Dépenses optionnelles, Hors budget
+  (dépenses ouvertes, revenus et hors budget repliés au départ). Chaque poste : anneau de consommation, état
+  (« conforme », « à venir · le 05/11 », « dépassé »…), montant / budget ; un appui déplie ses opérations (« Classer »),
+  ses contrats, la projection, « Modifier le budget ». Période précédente / suivante dans la carte (‹ ›).
+- **Régler le budget dans la même carte** (bouton « Régler le budget ») : une ligne par poste avec le réel habituel
+  comparé au budget (deux barres), le montant, la périodicité, « = » pour aligner ; sections repliables ; au commun,
+  la part de chacun et l'équilibre ; « Tout aligner » et « Réglages du budget » en tête.
+- **Bilan** : total des dépenses (dans le budget, hors budget, reste), causes d'un dépassement, solde prévu, réel à ce
+  jour, projeté (pastilles « excédent » / « déficit »), au commun mouvements du mois et provisions ; puis les plus gros
+  écarts, la répartition des dépenses et les boutons Tendance, Contrats, Dernier bilan (Moi) ou Trésorerie, Équilibre,
+  Contrats (Nous), qui ouvrent l'écran détaillé (titre de l'écran, retour en haut à gauche).
+- **Nous** : fin de mois estimée avec son calcul (solde, prélèvements à venir, provisions), opérations du commun à
+  vérifier, équilibre et 12 prochains mois, « Où va l'argent du commun » (marge réelle en barre et en détail), virements à
+  mettre en place, le compte commun ce mois-ci, puis le budget du commun.
+- **À faire** en bas : les points du côté affiché (Moi : perso et général ; Nous : commun et général), « c'est fait » ;
+  tous les points et les observations dans « Toutes les observations ».
+- Reste à vivre : les deux bases (dernier salaire, comptes courants) montrent chacune leur montant.
+
 ## 2.0.1
 
 Correctif (retour du propriétaire, 08/11) : une opération marquée vue d'un glissement, ou depuis son détail, met à jour

@@ -73,18 +73,19 @@ export async function ouvrir(o) {
   // ouvre depuis l'Aperçu comme le ferait l'utilisateur (Moi › « Tout le budget », Nous › « Tout le commun ») ; « nous » est
   // la page Nous de l'Aperçu. onglets : barre du bas puis ces écrans (parcours de tous les écrans principaux).
   const barre = await page.$$eval('#app-tb [data-tab]', bs => bs.map(b => b.dataset.tab));
-  const DEPUIS_APERCU = { nous: ['nous', null], budget: ['moi', 'budget'], commun: ['nous', 'commun'] };
-  const onglets = barre.concat(Object.keys(DEPUIS_APERCU).filter(t => barre.indexOf(t) < 0));
+  // 2.1 : le budget perso est l'Aperçu Moi, le commun l'Aperçu Nous (budget et commun : mêmes écrans)
+  const DEPUIS_APERCU = { nous: ['nous', null], budget: ['moi', null], commun: ['nous', null] };
+  const onglets = barre.concat(['nous']);
   async function fermer() {
     await page.evaluate(() => { if (window.KladApp.fermerVolet) window.KladApp.fermerVolet(true); });
     await pause(50);
   }
   // page de l'Aperçu (« moi » / « nous ») : appui sur la pastille si l'Aperçu est affiché et sur l'autre page
   async function cote(c) {
-    await page.waitForSelector('#view-accueil [data-apcote="' + c + '"]', { state: 'visible', timeout: 5000 }).catch(() => {});
+    await page.waitForSelector('[data-apcote="' + c + '"]:visible', { timeout: 5000 }).catch(() => {});
     const ok = await page.evaluate(c => {
-      const b = document.querySelector('#view-accueil [data-apcote="' + c + '"]');
-      if (!b || !b.getClientRects().length || b.getAttribute('aria-selected') === 'true') return false;
+      const b = [...document.querySelectorAll('[data-apcote="' + c + '"]')].find(x => x.getClientRects().length);
+      if (!b || b.getAttribute('aria-selected') === 'true') return false;
       b.click(); return true;
     }, c);
     if (ok) await pause(250);
@@ -96,8 +97,7 @@ export async function ouvrir(o) {
     await pause(350);
     if (via || t === 'accueil') await cote(via ? via[0] : 'moi');
     if (via && via[1]) {
-      const b = page.locator('#view-accueil .ap-ab[data-aller="' + via[1] + '"]');
-      await (await b.count() ? b : page.locator('#view-accueil [data-aller="' + via[1] + '"]')).first().click();
+      await page.locator('[data-aller="' + via[1] + '"]:visible').first().click();
       await pause(350);
     }
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -116,6 +116,15 @@ export async function ouvrir(o) {
   const sousVues = () => page.$$eval('[data-sousvue]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.sousvue))]);
   async function avecSousVues(nom, f) {
     await f(nom, await portee());
+    // 2.1 : écrans ouverts depuis la carte du budget de l'Aperçu (Tendance, Contrats, Trésorerie, Équilibre), puis retour
+    const acces = await page.$$eval('#budget-main [data-aller]', bs => bs.filter(b => b.offsetParent !== null).map(b => b.dataset.aller));
+    for (const k of acces) {
+      await page.locator('#budget-main [data-aller="' + k + '"]').first().click();
+      await pause(300);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await f(nom + '›' + k, await portee());
+      if (await page.locator('#ah-back').isVisible()) { await page.locator('#ah-back').click(); await pause(300); }
+    }
     for (const s of await sousVues()) {
       await page.locator('[data-sousvue="' + s + '"]:visible').first().click();
       await pause(250);

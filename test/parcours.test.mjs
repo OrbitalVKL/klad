@@ -135,9 +135,10 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.waitForSelector('.pad');
     await code();
     await synchroFinie();
-    assert.equal(await page.locator('#view-accueil [data-compte]').count(), 2);
-    assert.match(await page.locator('#view-accueil [data-mesure="soldes"]').innerText(), /42,50\s€\s*débiteur/);
-    assert.match(await page.locator('#view-accueil').innerText(), /2\s+comptes à vérifier ou à réassocier/);
+    // 2.1 : dès qu'un compte existe, l'Aperçu est l'écran du budget (haut : soldes, à vérifier)
+    assert.equal(await page.locator('#ap-haut [data-compte]').count(), 2);
+    assert.match(await page.locator('#ap-haut [data-mesure="soldes"]').innerText(), /42,50\s€\s*débiteur/);
+    assert.match(await page.locator('#ap-haut').innerText(), /2\s+comptes à vérifier ou à réassocier/);
 
     // import de la reprise : association proposée par la fin d'IBAN, livret manuel créé, frontière
     const ouvrirReprise = async () => {
@@ -221,8 +222,8 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
 
     // accueil : grande carte, cartes de comptes ; aucun montant signé
     await page.locator('#app-tb [data-tab="accueil"]').click();
-    assert.equal(await page.locator('#view-accueil [data-compte]').count(), 4);
-    const accueil = await page.locator('#view-accueil').innerText();
+    assert.equal(await page.locator('#ap-haut [data-compte]').count(), 4);
+    const accueil = await page.locator('#ap-haut').innerText();
     assert.match(accueil, /LIVRET A[\s\S]*5\s000,00\s€/);
     assert.doesNotMatch(accueil, SANS_SIGNE);
     await capture(page, '1-accueil');
@@ -415,7 +416,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await code();
     await page.waitForSelector('#appli:not([hidden])');
     assert.equal(await nbOps(), n1);
-    assert.equal(await page.locator('#view-accueil [data-compte]').count(), 4);
+    assert.equal(await page.locator('#ap-haut [data-compte]').count(), 4);
 
     // désactivé → résumé effacé
     await page.locator('#app-tb [data-tab="plus"]').click();
@@ -468,12 +469,12 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
       await page.locator('#app-tb [data-tab="patrimoine"]').click();
       await page.locator('.vue:not([hidden]) [data-patri="' + partie + '"]').click();
     };
-    // 2.0 : Budget et Commun ne sont plus dans la barre du bas : Aperçu › Moi › « Tout le budget », Aperçu › Nous › « Tout le commun »
+    // 2.1 : le budget perso est l'Aperçu › Moi, le commun l'Aperçu › Nous (onglet Aperçu, puis Moi ou Nous)
     const ecran = async e => {
       await page.locator('#app-tb [data-tab="accueil"]').click();
-      const c = page.locator('#view-accueil [data-apcote="' + (e === 'commun' ? 'nous' : 'moi') + '"]');
+      const c = page.locator('#ap-haut [data-apcote="' + (e === 'commun' ? 'nous' : 'moi') + '"]');
       if (await c.getAttribute('aria-selected') !== 'true') await c.click();
-      await page.locator('#view-accueil .ap-ab[data-aller="' + e + '"]').click();
+      await page.waitForFunction(v => window.KladApp.vue() === v, e === 'commun' ? 'commun' : 'budget');
     };
     const auj = await page.evaluate(() => window.KladModele.jourLocal(Date.now()));
     await plusVers('secReprise');
@@ -485,49 +486,56 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#volet [data-fermer]').last().click();
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
 
-    // 0.10.1 : Accueil en tête ; 2.0 : Aperçu en deux pages. Moi : reste à vivre (cadran), où va l'argent, À vérifier,
-    // soldes, budget du cycle (bilan, accès aux écrans), prochains jours, à faire, Verrouiller. Nous : fin de mois estimée,
-    // budget du commun, Verrouiller. Le reste à vivre ouvre son détail ; le haut de l'onglet Budget n'y est plus.
+    // 0.10.1 : Accueil en tête ; 2.0 : Aperçu en deux pages ; 2.1 : l'Aperçu est l'écran du budget. Moi : reste à vivre
+    // (cadran), où va l'argent, À vérifier, soldes, budget du cycle en entier (sections, bilan, accès aux écrans), à faire,
+    // prochains jours, Verrouiller. Nous : fin de mois estimée, marge du commun, virements, budget du commun.
     await page.locator('#app-tb [data-tab="accueil"]').click();
     assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
-    const acc = await page.locator('#view-accueil').innerText();
-    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*jour \d+\/\d+[\s\S]*Où va l'argent[\s\S]*Soldes[\s\S]*Budget du cycle[\s\S]*Total dépensé[\s\S]*Tout le budget[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
+    assert.equal(await page.evaluate(() => window.KladApp.vue()), 'budget');
+    assert.equal(await page.locator('#ah-title').textContent(), 'Aperçu');
+    assert.equal(await page.locator('#ah-back').isVisible(), false);
+    assert.equal(await page.locator('#view-accueil').isVisible(), false);
+    const acc = await page.locator('#view-budget').innerText();
+    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*jour \d+\/\d+[\s\S]*Où va l'argent[\s\S]*Soldes[\s\S]*Budget du cycle[\s\S]*Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Total des dépenses[\s\S]*Solde prévu par le budget[\s\S]*Tendance[\s\S]*À faire[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
+    assert.doesNotMatch(acc, /Tout le budget|Total dépensé/);      // plus de résumé du budget en double
     assert.doesNotMatch(acc, SANS_SIGNE);
-    await page.locator('#view-accueil [data-apcote="nous"]').click();
-    const accN = await page.locator('#view-accueil').innerText();
-    assert.match(accN, /Fin de mois estimée[\s\S]*Budget du commun[\s\S]*Tout le commun[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
+    assert.doesNotMatch(acc, /[−-]\s?\d[\d\s  ]* €/);
+    await page.locator('#ap-haut [data-apcote="nous"]').click();
+    assert.equal(await page.evaluate(() => window.KladApp.vue()), 'commun');
+    const accN = await page.locator('#view-budget').innerText();
+    assert.match(accN, /Fin de mois estimée[\s\S]*solde[\s\S]*prélèvements à venir[\s\S]*Où va l'argent du commun[\s\S]*Marge (réelle|prévue) du commun[\s\S]*Virements à mettre en place[\s\S]*Budget du commun[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
     assert.doesNotMatch(accN, SANS_SIGNE);
-    await page.locator('#view-accueil [data-apcote="moi"]').click();
-    await page.locator('#view-accueil [data-aller="rav"]').click();
+    await page.locator('#ap-haut [data-apcote="moi"]').click();
+    await page.locator('#ap-haut [data-aller="rav"]').first().click();
     assert.match(await page.locator('#ravCorps').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
     assert.doesNotMatch(await page.locator('#ravCorps').innerText(), /Par jour/);
     await page.locator('#volet [data-fermer]').last().click();
+    // les deux bases du reste à vivre, chacune avec sa valeur
+    assert.match(await page.locator('#ap-haut .rav-base').innerText(), /Dernier salaire\s*[\d\s]+€[\s\S]*Comptes courants\s*[\d\s]+€/);
     await capture(page, '12-accueil');
-    await page.locator('#view-accueil [data-aller="budget"]').first().click();
-    assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');      // 2.0 : écran ouvert depuis l'Aperçu
-    assert.equal(await page.locator('#ah-back').isVisible(), true);
     assert.equal(await page.locator('#app-hero').isVisible(), false);
-    // Budget : « Reste à vivre » (deux colonnes), détail en dépliant
-    await ecran('budget');
-    const rav = await page.locator('#rav-m').innerText();
-    assert.match(rav, /Reste à vivre jusqu'au[\s\S]*sur le dernier salaire[\s\S]*sur les comptes courants/);
-    await page.locator('#rav-m summary').click();
-    assert.match(await page.locator('#rav-m').innerText(), /Base[\s\S]*Charges fixes[\s\S]*Marge[\s\S]*Variable[\s\S]*Reste à vivre/);
-    await capture(page, '12-reste-a-vivre');
+    assert.equal(await page.locator('#rav-m').isVisible(), false);      // perso : le reste à vivre est le cadran
 
-    // budget mensuel : sections, cycle de salaire, aucun montant signé
-    let b = await page.locator('#view-budget').innerText();
+    // budget du cycle : sections, cycle de salaire, aucun montant signé
+    await ecran('budget');
+    let b = await page.locator('#budget-main').innerText();
     assert.match(b, /Cycle en cours · du \d\d\/\d\d au/);
     assert.match(b, /Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Solde prévu par le budget/i);
     assert.doesNotMatch(b, SANS_SIGNE);
-    assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]* €/);
+    assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]* €/);
     await capture(page, '13-budget');
-    // section dépliée ; montant d'un poste modifié en mode Budget, annulation
-    await page.locator('#budget-main [data-sec="courante"]').first().click();
-    assert.ok(await page.locator('#budget-main tr', { hasText: 'Alimentation' }).count() >= 1);
+    // sections : dépenses ouvertes par défaut, se replient et se rouvrent ; revenus repliés
+    const secC = page.locator('#budget-main [data-sec="courante"]');
+    assert.equal(await secC.getAttribute('aria-expanded'), 'true');
+    assert.ok(await page.locator('#budget-main .bg-po', { hasText: 'Alimentation' }).count() >= 1);
+    await secC.dispatchEvent('click');      // (la barre du bas peut couvrir l'en-tête de la section à l'écran)
+    assert.equal(await page.locator('#budget-main [data-sec="courante"]').getAttribute('aria-expanded'), 'false');
+    assert.equal(await page.locator('#budget-main .poste-nom[data-poste="c|Alimentation"]').count(), 0);
+    await page.locator('#budget-main [data-sec="courante"]').dispatchEvent('click');
+    assert.equal(await page.locator('#budget-main [data-sec="rev"]').getAttribute('aria-expanded'), 'false');
     // 0.10.7 : toucher le nom d'un poste déplie ses opérations (exactement celles comptées dans « utilisé ») ;
     // un poste sans opération (début de cycle) affiche « Aucune opération sur cette période »
-    const nDet = () => page.locator('#budget-main tr.det [data-op]').count();
+    const nDet = () => page.locator('#budget-main .det [data-op]').count();
     const postesOps = await page.evaluate(() => { const s = window.KladBudget.suivi(window.KladApp.budget(), 'perso', null); return ['courante', 'optionnelle'].flatMap(k => s.sections[k].lignes).map(a => [a.key, a.ops.length]); });
     for (const [cle, nOps] of postesOps) {
       const sec = page.locator('#budget-main button.sec-tog[aria-expanded="false"]');
@@ -537,11 +545,13 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
       await nom.click();
       assert.equal(await nom.getAttribute('aria-expanded'), 'true', cle);
       assert.equal(await nDet() - d0, nOps, cle);
-      if (!nOps) assert.ok(await page.locator('#budget-main tr.det', { hasText: 'Aucune opération sur cette période' }).count() >= 1, cle);
+      if (!nOps) assert.ok(await page.locator('#budget-main .det', { hasText: 'Aucune opération sur cette période' }).count() >= 1, cle);
       await nom.click();
       assert.equal(await nDet(), d0, cle);
     }
     await page.locator('#budget-main [data-bmode="plan"]').click();
+    // 2.1 : régler le budget dans la même carte (sections repliables, réel habituel comparé au budget)
+    assert.match(await page.locator('#budget-main').innerText(), /Régler le budget[\s\S]*Base de calcul depuis[\s\S]*Revenus[\s\S]*habituel[\s\S]*Charges fixes[\s\S]*= Reste \/ mois/i);
     await page.locator('#budget-main [data-pamt="c|Alimentation"]').fill('250');
     await page.locator('#budget-main [data-pamt="c|Alimentation"]').press('Tab');
     await page.waitForSelector('#toast.show.action');
@@ -549,25 +559,32 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.plan.perso['c|Alimentation'].amt), 16000);
+    await page.locator('#budget-main [data-psec="courante"]').dispatchEvent('click');
+    assert.equal(await page.locator('#budget-main [data-pamt="c|Alimentation"]').count(), 0);
+    await page.locator('#budget-main [data-psec="courante"]').dispatchEvent('click');
+    assert.equal(await page.locator('#budget-main [data-pamt="c|Alimentation"]').count(), 1);
+    await capture(page, '13-budget-reglage');
     await page.locator('#budget-main [data-bmode="suivi"]').click();
     // cycle précédent (période clôturée), retour au cycle en cours
     await page.locator('#budget-main [data-nav="prev"]').click();
     b = await page.locator('#view-budget').innerText();
     assert.match(b, /Période clôturée/);
     assert.match(b, /Cycle du \d\d\/\d\d au \d\d\/\d\d\/\d\d/);
-    await page.locator('#cyc-nav [data-nav="now"]').click();
-    assert.match(await page.locator('#view-budget').innerText(), /Cycle en cours/);
+    await page.locator('#budget-main .bg-now[data-nav="now"]').click();
+    assert.match(await page.locator('#budget-main').innerText(), /Cycle en cours/);
     // Commun : mois civil, apports attendus selon la répartition ; virements, trésorerie, appels de fonds ; marge réelle
     await ecran('commun');
     b = await page.locator('#view-budget').innerText();
     assert.match(b, /Mois en cours/);
     assert.match(b, /Personne A[\s\S]*Personne B/);
     assert.match(b, /Solde du compte commun/);
-    // 0.10.4 : sous-vues Ce mois · Trésorerie · Équilibre ; plus de sélecteur Perso / Commun, ni de catégories en bas
-    assert.match(b, /Ce mois[\s\S]*Trésorerie[\s\S]*Équilibre[\s\S]*Marge (réelle|prévue) du commun[\s\S]*Virements à mettre en place[\s\S]*Budget mensuel/);
-    assert.doesNotMatch(b, /12 prochains mois|Règles de classement/);
+    // 2.1 : Nous = l'Aperçu du commun : fin de mois, marge, virements, ce mois, budget du commun ; les écrans détaillés
+    // (Trésorerie, Équilibre, Contrats) s'ouvrent depuis la carte du budget
+    assert.match(b, /Fin de mois estimée[\s\S]*Marge (réelle|prévue) du commun[\s\S]*Virements à mettre en place[\s\S]*Le compte commun ce mois-ci[\s\S]*Budget du commun[\s\S]*Trésorerie[\s\S]*Équilibre[\s\S]*Contrats/i);
+    assert.doesNotMatch(b, /Règles de classement/);
     assert.equal(await page.locator('#view-budget [data-scope="perso"]').isVisible(), false);
-    assert.match(await page.locator('#bal-panel').innerText(), /Fin de mois estimée/i);
+    assert.equal(await page.locator('#sv-bar').isVisible(), false);
+    assert.match(await page.locator('#ap-haut').innerText(), /Fin de mois estimée[\s\S]*prélèvements à venir/i);
     assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
     await capture(page, '14-budget-commun');
     // ordres permanents (annulable)
@@ -580,10 +597,13 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.virements[0].montant), 80000);
-    // Commun › Trésorerie : 12 mois, appels de fonds, d'où vient le solde (ouverts)
-    await page.locator('#view-budget [data-sousvue="tresorerie"]').click();
+    // Commun › Trésorerie : 12 mois, appels de fonds, d'où vient le solde (ouverts) ; titre de l'écran, retour
+    await page.locator('#budget-main [data-aller="tresorerie"]').click();
     assert.match(await page.locator('#cm-tres').innerText(), /12 prochains mois/);
     assert.equal(await page.locator('#cm-plan').isVisible(), false);
+    assert.equal(await page.locator('#ap-haut').isVisible(), false);
+    assert.equal(await page.locator('#ah-title').textContent(), 'Trésorerie');
+    assert.equal(await page.locator('#ah-back').isVisible(), true);
     // Commun › Équilibre : reste à combler, simulation
     await page.locator('#view-budget [data-sousvue="equilibre"]').click();
     assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
@@ -598,8 +618,9 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.equal(await page.locator('#app-tb [data-tab="accueil"]').getAttribute('aria-current'), 'page');
     assert.match(await page.locator('#p-contrats').innerText(), /Prêt immobilier fictif[\s\S]*Échéances des 31 prochains jours/i);
     await ecran('budget');
-    await page.locator('#view-budget [data-sousvue="tendance"]').click();
+    await page.locator('#budget-main [data-aller="tendance"]').click();
     assert.equal(await page.locator('#budget-main').isVisible(), false);
+    assert.equal(await page.locator('#ah-title').textContent(), 'Tendance');
     assert.ok(await page.locator('#tend-panel svg rect').count() >= 3);
     await page.selectOption('#tend-mode', 'cat:Alimentation');
     await page.waitForTimeout(150);
@@ -621,7 +642,8 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#toast button').click();
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.contrats.length), 4);
-    await page.locator('#view-budget [data-sousvue="suivi"]').click();
+    await page.locator('#ah-back').click();      // 2.1 : retour à l'Aperçu
+    assert.equal(await page.locator('#ah-title').textContent(), 'Aperçu');
     await page.locator('#budget-main [data-bmode="plan"]').click();
     const refAvant = await page.evaluate(() => window.KladApp.etat().budget.ref);
     const opts = await page.locator('#bref option').evaluateAll(o => o.map(x => x.value));
@@ -687,12 +709,12 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#affichageCorps [data-theme-choix="auto"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme || 'auto'), 'auto');
     await page.emulateMedia({ colorScheme: 'light' });
-    const tot0 = await page.locator('#budget-main tr.g-fixe .gsum').first().textContent();
+    const tot0 = await page.locator('#budget-main .bg-sec.fixe .bg-sh .v').first().textContent();
     await page.locator('#affichageCorps [data-demo="on"]').click();
     await ecran('budget');
     await page.waitForTimeout(150);
     assert.ok(await page.locator('#demoBar').isVisible());
-    assert.notEqual(await page.locator('#budget-main tr.g-fixe .gsum').first().textContent(), tot0);
+    assert.notEqual(await page.locator('#budget-main .bg-sec.fixe .bg-sh .v').first().textContent(), tot0);
     await capture(page, '21-mode-demo');
     await page.locator('#demoBar button').click();
     assert.ok(!(await page.locator('#demoBar').isVisible()));
@@ -722,7 +744,7 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     await page.locator('#volet [data-fermer]').last().click();
     // 0.10.3 : les observations s'ouvrent depuis l'Accueil, plus depuis Plus ; 2.0 : carte « À faire » de l'Aperçu
     await page.locator('#app-tb [data-tab="accueil"]').click();
-    await page.locator('#view-accueil [data-av="observations"]').click();
+    await page.locator('#actions [data-ouvrir="secObs"]').click();
     assert.match(await page.locator('#obsCorps').innerText(), /À faire/i);
     await page.locator('#volet [data-fermer]').last().click();
     await patrimoine('impots');
@@ -932,8 +954,8 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     // 0.10.7 : base du reste à vivre choisie sur l'Accueil → le résumé Grafit suit (comptes courants)
     await page.evaluate(() => window.KladApp.fermerVolet(true));
     await page.locator('#app-tb [data-tab="accueil"]').click();
-    await page.locator('#view-accueil [data-ravbase="comptes"]').click();
-    assert.equal(await page.locator('#view-accueil [data-ravbase="comptes"]').getAttribute('aria-pressed'), 'true');
+    await page.locator('#ap-haut [data-ravbase="comptes"]').click();
+    assert.equal(await page.locator('#ap-haut [data-ravbase="comptes"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await page.evaluate(() => window.KladApp.etat().budget.reglages.rav), 'comptes');
     await page.waitForFunction(() => JSON.parse(window.KladLienGrafit.demo()).month.left_to_live_basis === 'accounts');
     const r2 = JSON.parse(await page.evaluate(() => window.KladLienGrafit.demo()));

@@ -6,6 +6,12 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.1.0** — budget fusionné dans l'Aperçu (retour du propriétaire, 08/11 : « l'Aperçu est une surcouche redondante, on
+devait juste améliorer l'interface », « la nouvelle interface doit suivre pour le réglage du budget, ne perdre aucune
+information » ; maquettes validées puis « go »). Aperçu Moi = écran Budget, Aperçu Nous = écran Commun ; budget en
+sections et postes repliables, réglage du budget dans la même carte, sous-vues ouvertes depuis la carte. Aucun calcul
+changé.
+
 **2.0.1** — correctif (retour du propriétaire, 08/11) : compteurs de l'écran Opérations à jour dès qu'une opération est
 vue (glissement, détail). Lot suivant : 2.1.0, budget fusionné dans l'Aperçu (maquettes validées le 08/11).
 
@@ -101,6 +107,44 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.1.0 — détails techniques
+- Navigation (`app.js`) : `montrer('accueil')` ouvre `budget` (côté Moi) ou `commun` (côté Nous) sur leur page
+  principale (`EB.ui.sv` = `suivi` / `mois`) dès qu'un compte existe (`apercuBudget()`) ; sans compte, l'ancien écran
+  Accueil (`#view-accueil`, « Connectez une banque ») ; `rendre()` bascule dès l'arrivée du premier compte. `apCote`
+  suit `budget` / `commun` ; `choisirCote` et le glisser horizontal (page principale seulement) changent d'écran.
+  `chrome()` : titre « Aperçu » sur la page principale, nom de la sous-vue sinon ; `retourPossible()` / `retourEcran()` :
+  sous-vue → page principale, Équilibre (`appartement`) → Nous. Un appui sur l'onglet Aperçu déjà ouvert remonte en haut.
+- `index.html` (`#view-budget`) : `#ap-haut` (seg Moi / Nous, cadran, …), `#rav-m`, `#cm-plan`, `#cm-com`, `#cm-tres`,
+  `#budget-main`, `#an-zone`, `#ctr-zone`, `#actions` (« À faire »), `#ap-bas` (prochains jours), `#ap-fin`
+  (Verrouiller). `.controls.stick` (Perso / Commun, `#cyc-nav`) masqué ; `#sv-bar` vide et masqué sur la page
+  principale, affiché dans les sous-vues ; `#app-hero`, `#bal-panel`, `#app-seen` toujours masqués (leur contenu est dans
+  `#ap-haut` : soldes, calcul de la fin de mois, provisions, opérations à voir du commun).
+- `vapercu.js` : `haut(d, scope)` (Moi : cadran + interrupteur des bases avec leurs valeurs, où va l'argent, à vérifier,
+  soldes ; Nous : cadran, calcul de la fin de mois, à vérifier du commun `data-av="averifier-commun"` → Opérations
+  périmètre Commun filtre à vérifier, tuiles), `bas(d, scope)` (prochains jours), `tuiles`. `ecran()` reste pour
+  l'Accueil sans compte et les tests.
+- `vbudget.js` : `teteBudget` (titre, jour, ‹ › `data-nav`, « Revenir au cycle en cours », seg `data-bmode`
+  Suivi / Régler le budget ; en réglage : `#bref`, `data-alignertout`, `data-ouvrir="secReglBudget"`) ; `suivi` en
+  `div` : sections `.bg-sec` (bouton `.bg-sh.sec-tog[data-sec]`, ouvertes par défaut sauf `rev` et `hb` ; `ui.ouverts`
+  `m|<k>` ouverte / `f|<k>` repliée), postes `.bg-po` (bouton `.poste-nom.bg-pb[data-poste]`, anneau `anneau()`,
+  pastille d'état, opérations `.det` avec `data-op` / `data-classer`, contrats, projection, `data-editer`, `data-fuel`,
+  cause et `data-aligner`, répartition `lk|split`) ; `bilan()` remplace `totBar` / `soldeBar` dans le suivi (gardés
+  exportés) ; accès `data-aller` (tendance, contrats-perso / tresorerie, equilibre, contrats-commun) et `data-av="bilan"`
+  (5 premiers jours du cycle). `plan` en `div` : `.bg-rg` par poste (`data-pon`, `data-pdet`, `data-fuel`,
+  `data-pretirer`, barres réel habituel / budget, `data-pmois`, `data-pamt`, `data-pper`, `data-paligner`, au commun
+  `data-ppg`, `data-pelig`), sections `data-psec` (`ui.ouvertsPlan` `ps|<k>` = repliée), `#share-box` inchangé.
+  `ravM` commun : carte « Où va l'argent du commun » (barre + calcul de la marge). `observations` : carte « À faire »
+  (points du périmètre + général, `data-ouvrir="secObs"` pour tout, `data-reafficher`, audit, analyse).
+- `ecranbudget.js` : bandeau des postes dépassés `.bg-dep` ; `data-psec` ; `#rav-m` seulement au commun.
+- `ui.js` : `interrupteurRav(base, avecComptes, valeurs)` ; `#actions` ouvert par défaut. `vues.js` : `nomsAVoir`,
+  `provisionsTexte` exportés.
+- CSS : bloc « 2.1 » en fin de `style.css` (`.bg-*`). Piège : `all:unset` remet `position` à `static` ; les classes
+  anciennes à zone d'appui élargie (`.poste-nom::after`, `.linkbtn::after`) doivent garder `position:relative` (sinon
+  la zone couvre l'écran).
+- Banc : `onglets` = barre + `nous` ; `budget` / `commun` = Aperçu Moi / Nous ; `avecSousVues` visite aussi les accès
+  `#budget-main [data-aller]` (retour par `#ah-back`). Tests adaptés : `parcours`, `ux`, `lot11`, `lot133`, `champs`,
+  `demo-outils`, `budget`, `budgetdetail`, `lot136`, `vues`.
 
 ### 2.0.1 — détails techniques
 - `app.js` : `compteursListe()` (pastilles `#ops-scope`, badge, filtres `#app-chips`, `#ops-tri`) extrait de
@@ -991,6 +1035,12 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 2.1.0
+- Toute nouvelle donnée du budget va dans la carte du budget (`vbudget.js`, `suivi` / `plan` / `bilan`) ; du haut de
+  l'Aperçu dans `vapercu.js` (`haut`). L'écran Accueil (`#view-accueil`) ne sert plus qu'avant le premier compte.
+- Pistes non livrées : Trier en cartes ; « Virements à mettre en place » et « Le compte commun ce mois-ci » gardent leur
+  présentation (même contenu, cartes de l'Aperçu autour).
 
 ## Points d'appui laissés par la 2.0.0
 - Prototype : `node tools/artefact/prototype.mjs sortie.html` (Aperçu produit par le vrai code sur le jeu fictif au

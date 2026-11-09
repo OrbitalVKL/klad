@@ -704,5 +704,14 @@
       '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">Les comptes bancaires sont lus automatiquement par Enable Banking (à l\'ouverture de Klad si la dernière lecture a plus de 2 heures, avec la pastille de l\'en-tête ou en tirant l\'écran vers le bas). Un compte manuel (livret, carte non connectée…) se met à jour par l\'import d\'un relevé CSV, Excel (.xlsx) ou JSON : les opérations déjà présentes sont ignorées, l\'import est annulable.</p></details>';
   }
 
-  g.KladVues = { montantCherche, releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
+  // 2.1 : noms des opérations à voir d'un périmètre (les quatre plus récentes), pour la ligne « à vérifier » de l'Aperçu Nous
+  function nomsAVoir(S, scope) {
+    const U2 = [];
+    for (const c of comptesDe(S, scope)) { if (!opsDuScope(S, scope, c)) continue; for (const o of S.ops[c.id] || []) if (!K().vue(S, o)) U2.push(o); }
+    U2.sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+    const nm = [];
+    for (const o of U2) { const l = libelleCourt(o.libelle); if (nm.indexOf(l) < 0) nm.push(l); if (nm.length >= 4) break; }
+    return { n: U2.length, noms: nm };
+  }
+  g.KladVues = { montantCherche, releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, nomsAVoir, provisionsTexte, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

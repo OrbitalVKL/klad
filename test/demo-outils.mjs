@@ -99,9 +99,10 @@ export async function parcoursComplet(B, f) {
   await B.ecransPlus(f);
   for (const t of ['budget', 'commun']) {
     await B.onglet(t);
-    const sv = await page.$$eval('[data-sousvue]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.sousvue))]);
+    // 2.1 : écrans détaillés ouverts depuis la carte du budget de l'Aperçu (Tendance, Contrats, Trésorerie, Équilibre)
+    const sv = await page.$$eval('#budget-main [data-aller]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.aller))]);
     for (const s of [null, ...sv]) {
-      if (s) { await page.locator('[data-sousvue="' + s + '"]:visible').first().click(); await B.pause(250); }
+      if (s) { await B.onglet(t); await page.locator('#budget-main [data-aller="' + s + '"]').first().click(); await B.pause(250); }
       // chaque poste déplié (le rendu est refait à chaque appui)
       for (let i = 0; i < 40; i++) {
         const k = await page.evaluate(i => { const b = [...document.querySelectorAll('#appli .poste-nom[data-poste][aria-expanded="false"]')].filter(x => x.offsetParent !== null)[0]; return b ? b.dataset.poste : null; }, i);

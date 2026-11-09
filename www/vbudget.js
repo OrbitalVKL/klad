@@ -46,159 +46,223 @@
       (per.past ? '<button type="button" class="cn-btn cn-now" data-nav="now">Cycle en cours</button>' : '');
   }
 
-  // ------------------------------------------------------------ Budget mensuel : en-tête du panneau
+  // ------------------------------------------------------------ 2.1 : carte du budget (en-tête, suivi, bilan) dans l'Aperçu
+  // Mêmes chiffres et mêmes actions qu'avant (KladBudget.suivi) ; présentation en sections repliables, un poste par ligne
+  // (anneau, état, montant), ses opérations et ses actions en dépliant le poste. Aucun montant affiché avec un signe moins.
+  const COUL = { good: 'var(--good)', warn: 'var(--warn)', bad: 'var(--bad)', hb: 'var(--hb)', info: 'var(--accent)', muted: 'var(--muted)' };
+  function anneau(frac, et, icone, sz) {
+    const S = sz || 40, w = 5, r = (S - w) / 2, C = 2 * Math.PI * r, f = Math.max(0, Math.min(1, frac));
+    return '<span class="ap-ring" style="width:' + S + 'px;height:' + S + 'px"><svg viewBox="0 0 ' + S + ' ' + S + '" aria-hidden="true" focusable="false"><g transform="rotate(-90 ' + S / 2 + ' ' + S / 2 + ')">' +
+      '<circle cx="' + S / 2 + '" cy="' + S / 2 + '" r="' + r + '" class="ap-c0" stroke-width="' + w + '"/>' +
+      (f > 0 ? '<circle cx="' + S / 2 + '" cy="' + S / 2 + '" r="' + r + '" fill="none" stroke="' + (COUL[et] || COUL.good) + '" stroke-width="' + w + '" stroke-linecap="round" stroke-dasharray="' + (C * f).toFixed(1) + ' ' + C.toFixed(1) + '"/>' : '') +
+      '</g></svg>' + icone + (et === 'bad' ? '<b class="ap-alerte" aria-hidden="true">!</b>' : '') + '</span>';
+  }
+  // pastille d'état (« conforme », « à venir · le 05/11 », « dépassé »…)
+  const pastille = st => !st || !st.texte ? '' : '<em class="ap-pill ' + esc(st.niveau === 'muted' ? '' : st.niveau || 'info') + '">' + esc(st.texte) + '</em>';
+  // solde : pastille (excédent / déficit / à l'équilibre) puis le montant, toujours sans signe moins
+  const solde = v => '<span class="ap-sv">' + (v < -DEMI ? '<em class="ap-pill bad">déficit</em><b class="num bad-t">' + esc(e0(-v)) + '</b>'
+    : v > DEMI ? '<em class="ap-pill good">excédent</em><b class="num pos-t">' + esc(e0(v)) + '</b>' : '<em class="ap-pill">à l\'équilibre</em><b class="num">' + esc(e0(v)) + '</b>') + '</span>';
+  const ico = (n, t) => g.KladIcones ? g.KladIcones.svg(n, t || 18) : '';
+  const titreBudget = (B, scope, per) => scope === 'commun' ? 'Budget du commun' : per.cyc ? 'Budget du cycle' : 'Budget du mois';
+
+  // ------------------------------------------------------------ en-tête : titre, période ‹ ›, Suivi / Régler le budget
   function teteBudget(B, scope, ui) {
-    const W = KB().fenetre(B), plan = ui.mode === 'plan';
-    const L = KB().moisReference(B);
-    return '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Budget mensuel</h2><div class="row">' +
-      (plan ? '<label class="ctl plan-only" for="bref">Base de calcul depuis <select id="bref">' + L.map(m => '<option value="' + m + '"' + (m === W.start ? ' selected' : '') + '>' + esc(mLabel(m)) + '</option>').join('') + '</select></label>' +
-        '<button class="btn plan-only" type="button" data-alignertout="' + esc(scope) + '">Tout aligner sur le réel habituel</button>' : '') +
-      '<button class="btn sm" type="button" data-nav="prev"' + (KB().periode(B, scope, ui.nav).prev ? '' : ' disabled') + '>◀ ' + (KB().periode(B, scope, ui.nav).salaire || (scope === 'perso' && B.R.cycle !== 'mois') ? 'Cycle précédent' : 'Mois précédent') + '</button>' +
-      '<div class="seg" role="group" aria-label="Affichage du budget"><button type="button" data-bmode="suivi" aria-pressed="' + !plan + '">Suivi</button><button type="button" data-bmode="plan" aria-pressed="' + plan + '">Budget</button></div>' +
-      '</div></div>';
+    const plan = ui.mode === 'plan', per = KB().periode(B, scope, ui.nav);
+    let droite = '';
+    if (!plan && !per.past) { try { const s = KB().suivi(B, scope, ui.nav); droite = 'jour ' + s.jour + '/' + s.nbJours; } catch (e) { droite = ''; } }
+    const lab = libellePeriode(per), i = lab.indexOf(' · ');
+    let h = '<div class="panel-h bg-tete"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">' + esc(titreBudget(B, scope, per)) + '</h2>' + (droite ? '<span class="bg-jour num">' + esc(droite) + '</span>' : '') + '</div>';
+    if (!plan) {
+      const prev = per.salaire || (scope === 'perso' && B.R.cycle !== 'mois') ? 'Cycle précédent' : 'Mois précédent';
+      h += '<div class="bg-nav"><button type="button" class="bg-nb" data-nav="prev" aria-label="' + prev + '"' + (per.prev ? '' : ' disabled') + '>‹</button>' +
+        '<span class="bg-per"><b>' + esc(i > 0 ? lab.slice(0, i) : lab) + '</b>' + (i > 0 ? ' <span>· ' + esc(lab.slice(i + 3)) + '</span>' : '') + '</span>' +
+        '<button type="button" class="bg-nb" data-nav="next" aria-label="Période suivante"' + (per.past ? '' : ' disabled') + '>›</button></div>' +
+        (per.past ? '<button type="button" class="bg-now" data-nav="now">Revenir au ' + (per.cyc ? 'cycle' : 'mois') + ' en cours</button>' : '');
+    }
+    h += '<div class="seg bg-mode" role="group" aria-label="Affichage du budget"><button type="button" data-bmode="suivi" aria-pressed="' + !plan + '">' + ico('list', 16) + 'Suivi</button>' +
+      '<button type="button" data-bmode="plan" aria-pressed="' + plan + '">' + ico('scale', 16) + 'Régler le budget</button></div>';
+    if (plan) {
+      const W = KB().fenetre(B), L = KB().moisReference(B);
+      h += '<label class="ctl bg-base" for="bref">Base de calcul depuis <select id="bref">' + L.map(m => '<option value="' + m + '"' + (m === W.start ? ' selected' : '') + '>' + esc(mLabel(m)) + '</option>').join('') + '</select></label>' +
+        '<div class="bg-boutons"><button class="ap-ab" type="button" data-alignertout="' + esc(scope) + '">' + ico('wand-sparkles') + '<span>Tout aligner sur le réel habituel</span></button>' +
+        '<button class="ap-ab" type="button" data-ouvrir="secReglBudget">' + ico('wrench') + '<span>Réglages du budget</span></button></div>' +
+        '<p class="bg-leg2"><span><i class="hab"></i>réel habituel : ce que vous dépensez d\'ordinaire</span><span><i class="bud"></i>budget : votre montant</span></p>';
+    }
+    return h;
   }
 
   // ------------------------------------------------------------ Suivi
-  // ui : { nav, mode, ouverts: Set (postes et sections dépliés : 'm|<section>', clé du poste, 'lk|split') }.
+  // ui : { nav, ouverts: Set (postes dépliés : clé du poste, 'lk|split' ; sections : 'm|<section>' ouverte, 'f|<section>'
+  // repliée, sinon l'état par défaut) }. Sections ouvertes par défaut : les dépenses ; repliées : revenus, hors budget.
+  const SEC_OUVERTE = { rev: false, fixe: true, courante: true, optionnelle: true, hb: false };
   function suivi(B, scope, ui) {
     const S0 = B.S, C = B.cx.C;
     const s = KB().suivi(B, scope, ui.nav);
     const per = s.per, past = per.past;
     const ouv = ui.ouverts || new Set();
-    const secOpen = k => ouv.has('m|' + k);
-    const secBtn = (k, n) => ' <button class="linkbtn more sec-tog" type="button" data-sec="' + k + '" aria-expanded="' + secOpen(k) + '">' + (secOpen(k) ? 'replier ▴' : 'voir les ' + n + ' ▾') + '</button>';
-    // nom du poste : touchable (déplie ses opérations et ses contrats, ou « aucune opération »), comme « N op. ▾ »
-    const nomPoste = (k, html, op) => '<button class="poste-nom" type="button" data-poste="' + esc(k) + '" aria-expanded="' + op + '">' + html + '</button>';
-    const more = (k, n, op) => ' <button class="linkbtn more" type="button" data-poste="' + esc(k) + '" aria-expanded="' + op + '">' + (op ? 'masquer ▴' : n + ' op. ▾') + '</button>';
+    const secOpen = k => ouv.has('m|' + k) ? true : ouv.has('f|' + k) ? false : SEC_OUVERTE[k];
     const lab = libellePeriode(per);
-    const HL = past ? ['', 'Budget', 'Consommé', 'Écart', ''] : ['', 'Budget', '', 'projection', ''];
-    const td = (i, cls, html, extra) => '<td' + (cls ? ' class="' + cls + '"' : '') + (HL[i] ? ' data-l="' + HL[i] + '"' : '') + (extra || '') + '>' + html + '</td>';
     const fmt = e0;
     // écart (période terminée) : budget − consommé, ou reçu − budget pour les revenus ; sans signe
     const ecMot = (d, rev) => d < 0 ? (rev ? fmt(-d) + ' de moins' : 'dépassé de ' + fmt(-d)) : d > 0 ? (rev ? fmt(d) + ' de plus' : 'économie ' + fmt(d)) : 'tenu';
-    const ecCell = (p, c, rev) => { let d = rev ? c - p : p - c; if (Math.abs(d) < DEMI) d = 0; return td(3, 'r num ec-c', ecMot(d, rev), ' style="color:' + (d < 0 ? 'var(--bad)' : d > 0 ? 'var(--good)' : 'inherit') + '"'); };
-    const ecTxt = (p, c) => { let d = p - c; if (Math.abs(d) < DEMI) d = 0; return '<span class="cs-r ec-m ' + (d < 0 ? 'neg' : 'pos') + '">' + ecMot(d) + '</span>'; };
-    const conso = (c, p, cls, noMark) => {
-      if (cls === 'prov') return td(2, 'conso', '<div class="cs-t"><b class="num">' + fmt(p) + '</b><span class="subs"> provisionnés ce mois</span><span class="cs-r" style="color:var(--muted)">réserve</span></div><div class="tbar"><i class="prov" style="width:100%"></i></div>');
-      const left = p - c;
-      const rs = past && p > DEMI ? ecTxt(p, c) : p > DEMI ? (left >= -DEMI ? '<span class="cs-r pos">reste ' + fmt(Math.max(0, left)) + '</span>' : '<span class="cs-r neg">dépassé de ' + fmt(-left) + '</span>') : (c > DEMI ? '<span class="cs-r hb">hors budget</span>' : '');
-      const pct = p > 0 ? c / p : (c > 0 ? 2 : 0);
-      return td(2, 'conso', '<div class="cs-t"><b class="num">' + (Math.abs(c) > DEMI ? fmt(c) : '0 €') + '</b>' + rs + '</div>' +
-        '<div class="tbar"><i class="' + esc(cls || '') + '" style="width:' + Math.max(0, Math.min(100, Math.round(pct * 100))) + '%"></i>' +
-        (noMark || past ? '' : '<span style="left:' + Math.round(Math.min(1, s.frac) * 100) + '%" title="aujourd\'hui : jour ' + s.jour + ' sur ' + s.nbJours + '"></span>') + '</div>');
-    };
-    const gBud = p => '<td class="r num gsum" data-l=""><span class="gl">Budget</span> ' + (p > DEMI ? fmt(p) : '—') + '</td>';
-    const gUse = (c, p, rev) => {
-      const left = p - c;
-      return '<td class="conso gsum" data-l=""><div class="cs-t"><span class="gl">' + (rev ? 'Reçu' : 'Utilisé') + '</span> <b class="num' + (rev ? ' pos-t' : '') + '">' + (Math.abs(c) > DEMI ? fmt(c) : '0 €') + '</b>' +
-        (p > DEMI ? (rev ? (c >= p - DEMI ? '<span class="cs-r pos">reçu en totalité</span>' : '<span class="cs-r"><span class="gl">Attendu</span> ' + fmt(p - c) + '</span>')
-          : (left >= -DEMI ? '<span class="cs-r pos"><span class="gl">Reste</span> ' + fmt(Math.max(0, left)) + '</span>' : '<span class="cs-r neg"><span class="gl">Dépassé de</span> ' + fmt(-left) + '</span>'))
-          : (c > DEMI && !rev ? '<span class="cs-r hb">sans budget</span>' : '')) + '</div></td>';
+    const ecart = (p, c, rev) => { let d = rev ? c - p : p - c; if (Math.abs(d) < DEMI) d = 0; return '<span class="' + (d < 0 ? 'bad-t' : d > 0 ? 'pos-t' : '') + '">' + ecMot(d, rev) + '</span>'; };
+    const ici = past ? '' : '<span class="bg-ici" style="left:' + Math.round(Math.min(1, s.frac) * 100) + '%" title="aujourd\'hui : jour ' + s.jour + ' sur ' + s.nbJours + '"></span>';
+    const barre = (fr, cls) => '<div class="bg-bar"><i class="' + (cls || '') + '" style="width:' + Math.max(0, Math.min(100, Math.round(fr * 100))) + '%"></i>' + ici + '</div>';
+    const sect = (k, cls, titre, chips, droite, fr, bcls, resume, corps) => {
+      const o = secOpen(k);
+      return '<div class="bg-sec ' + cls + (o ? ' ouvert' : '') + '"><button type="button" class="bg-sh sec-tog" data-sec="' + k + '" aria-expanded="' + o + '"><i class="dot" aria-hidden="true"></i>' +
+        '<span class="t">' + titre + chips + '</span><span class="v num">' + droite + '</span><span class="chev" aria-hidden="true"></span></button>' +
+        barre(fr, bcls) + '<p class="bg-ss">' + resume + '</p>' + (o ? corps : '') + '</div>';
     };
     const cpt = id => B.comptes.find(x => x.id === id);
     // 1.0 : pastille « récurrent » sur une charge récurrente du compte secondaire (réglé dans Plus › Réglages › Budget)
     const RS = g.KladReglages ? g.KladReglages.recurrentsSecondaire(B) : null;
     const recSec = r => RS && r.m < 0 && r.cid === RS.compte.id && RS.montants.has(-r.m)
       ? ' <span class="chip warn" title="' + esc('Charge récurrente sur le ' + RS.compte.libelle + ' : à basculer sur ' + (RS.principal ? RS.principal.libelle : 'le compte courant principal')) + '">récurrent sur ' + esc(RS.compte.libelle) + '</span>' : '';
-    const detRow = (labHtml, amt, r, cls) => '<tr class="det' + (cls ? ' ' + cls : '') + '"><td class="subs" style="padding-left:34px">' + (r ? U().bico(S0, cpt(r.cid), true) + ' ' : '') + labHtml + (r ? recSec(r) : '') +
-      (r && !r.ecart ? ' <button class="linkbtn cls-op" type="button" data-op="' + esc(r.id) + '" data-c="' + esc(r.cid) + '" data-classer="1">classer ▾</button>' : '') + '</td><td></td><td class="r num subs cs-det">' + amt + '</td><td class="hide-s"></td><td></td></tr>';
+    // une ligne dépliée : opération (avec « Classer »), contrat, part du commun, ligne vide
+    const opLi = (d, labHtml, amt, r, cls) => '<li class="det' + (cls ? ' ' + cls : '') + '"><span class="d num">' + esc(d) + '</span><span class="l">' + (r ? U().bico(S0, cpt(r.cid), true) + ' ' : '') + labHtml + (r ? recSec(r) : '') + '</span>' +
+      '<b class="num">' + amt + '</b>' + (r && !r.ecart ? '<button class="bg-cl" type="button" data-op="' + esc(r.id) + '" data-c="' + esc(r.cid) + '" data-classer="1">Classer</button>' : '') + '</li>';
+    const vide = cls => '<li class="det vide' + (cls ? ' ' + cls : '') + '"><span class="l muted">Aucune opération sur cette période.</span></li>';
+    // poste : bouton (anneau, nom, état, montant) qui déplie ses opérations ; dessous, cause d'un écart et répartition
+    const poste = (k, ico0, label, st, et, fr, val, sous, apres, corps, extra) => {
+      const op = ouv.has(k);
+      return '<div class="bg-po' + (op ? ' ouvert' : '') + (extra || '') + '"><button class="poste-nom bg-pb" type="button" data-poste="' + esc(k) + '" aria-expanded="' + op + '">' +
+        anneau(fr, et, '<span class="ic">' + ico0 + '</span>') + '<span class="t"><span class="n">' + esc(label) + '</span><span class="bg-sub">' + pastille(st) + (sous ? '<small class="' + (et === 'bad' ? 'bad-t' : '') + '">' + sous + '</small>' : '') + '</span></span>' +
+        '<span class="v num">' + val + '</span><span class="chev" aria-hidden="true"></span></button>' + (apres || '') + (op ? '<ul class="bg-ops">' + corps + '</ul>' : '') + '</div>';
+    };
 
     // revenus
     const R = s.revenus;
-    let rev = '<tr class="grp rev"><td><span class="nat rev"></span>Revenus <span class="muted rv-cap">budget · reçu</span>' + (R.lignes.length ? secBtn('rev', R.lignes.length) : '') + '</td>' +
-      gBud(R.p) + gUse(R.c, R.p, true) + (past ? ecCell(R.p, R.c, true) : '<td class="hide-s"></td>') + '<td></td></tr>';
-    if (secOpen('rev')) {
-      for (const x of R.lignes) {
-        const k = 'rev|' + x.key, op = ouv.has(k);
-        rev += '<tr class="cat n-rev"><td>' + nomPoste(k, U().cico(C, scope === 'commun' ? KB().APPORTS : x.key) + ' ' + esc(x.key), op) + (x.ops.length ? more(k, x.ops.length, op) : '') + '</td>' +
-          td(1, 'r num', x.pm ? fmt(x.pm) : '—') + '<td class="conso" data-l="reçu"><div class="cs-t"><b class="num pos-t">' + (x.got ? '+' + fmt(x.got) : '—') + '</b>' + (x.got ? '<span class="subs"> reçu</span>' : '') + (past && x.pm > DEMI ? ecTxt(x.got, x.pm) : '') + '</div></td>' +
-          (past ? ecCell(x.pm, x.got, true) : '<td class="hide-s"></td>') + '<td>' + chip(x.etat) + '</td></tr>';
-        if (op) for (const o of x.ops.slice().reverse()) rev += detRow(esc(jjmm(o.date) + ' · ' + g.KladVues.libelleCourt(o.label)), esc('+' + e2(o.m)), o, 'n-rev');
-        if (op && !x.ops.length) rev += detRow('<span class="muted">Aucune opération sur cette période.</span>', '', null, 'vide n-rev');
-        if (op && scope === 'perso' && !past) rev += '<tr class="det n-rev"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-editer="r|' + esc(x.key) + '">Modifier le revenu attendu</button></td></tr>';
-      }
+    let rv = '';
+    for (const x of R.lignes) {
+      const k = 'rev|' + x.key;
+      let corps = x.ops.slice().reverse().map(o => opLi(jjmm(o.date), esc(g.KladVues.libelleCourt(o.label)), esc('+' + e2(o.m)), o, 'n-rev')).join('');
+      if (!x.ops.length) corps += vide('n-rev');
+      if (scope === 'perso' && !past) corps += '<li class="det bg-act"><button class="ap-lien" type="button" data-editer="r|' + esc(x.key) + '">' + ico('pencil', 16) + ' Modifier le revenu attendu</button></li>';
+      const recu = x.pm > DEMI && x.got >= x.pm - DEMI;
+      const st = x.etat || (x.got > DEMI ? { niveau: 'good', texte: 'reçu' } : null);
+      rv += poste(k, U().cico(C, scope === 'commun' ? KB().APPORTS : x.key), x.key, st, recu || !x.pm ? 'good' : st && st.niveau === 'warn' ? 'warn' : 'info', x.pm > DEMI ? x.got / x.pm : x.got > DEMI ? 1 : 0,
+        '<span class="pos-t">' + (x.got ? '+' + fmt(x.got) : '0 €') + '</span> <small>/ ' + (x.pm ? fmt(x.pm) : '—') + '</small>',
+        past && x.pm > DEMI ? ecart(x.pm, x.got, true) : x.ops.length ? x.ops.length + ' op.' : '', '', corps, ' n-rev');
     }
+    const attendu = R.p - R.c;
+    let h = sect('rev', 'rev', 'Revenus', '', '<span class="pos-t">' + fmt(R.c) + '</span> <small>/ ' + (R.p > DEMI ? fmt(R.p) : '—') + '</small>', R.p > DEMI ? R.c / R.p : 0, 'rev',
+      past ? 'écart : ' + ecart(R.p, R.c, true) : R.p > DEMI ? (attendu > DEMI ? 'attendu encore ' + fmt(attendu) : 'reçu en totalité') : R.lignes.length ? '' : 'aucun revenu attendu', rv || '<p class="ap-note">Aucun revenu sur cette période.</p>');
 
-    // sections de dépenses
-    let body = '';
-    const lk = B.R.commun.contribution;
+    // postes de dépenses
     const ligne = (a, nk, sec) => {
-      const op = ouv.has(a.key), nOps = (a.ops || []).length, cs = a.contrats || [];
+      const nOps = (a.ops || []).length, cs = a.contrats || [];
       const isLk = scope === 'perso' && a.lie, lkOp = isLk && ouv.has('lk|split');
-      let h = '<tr class="cat n-' + (sec || nk) + (a.on ? '' : ' off') + '"><td>' + nomPoste(a.key, U().icoPoste(C, a) + ' ' + esc(a.label), op) +
-        (isLk ? ' <button class="linkbtn more lk-tog" type="button" data-poste="lk|split" aria-expanded="' + lkOp + '">' + (lkOp ? 'répartition ▴' : 'répartition ▾') + '</button>' : '') +
-        (nOps ? more(a.key, nOps, op) : cs.length ? ' <button class="linkbtn more" type="button" data-poste="' + esc(a.key) + '" aria-expanded="' + op + '">' + (op ? 'masquer ▴' : (cs.length > 1 ? cs.length + ' contrats' : 'contrat') + ' ▾') + '</button>' : '') +
-        (a.per > 1 ? ' <span class="subs">· échéance ' + fmt(a.ech) + '</span>' : '') + '</td>' +
-        td(1, 'r num', a.pm ? fmt(a.pm) : '—') + conso(a.cur, a.pm, a.cls, nk === 'fixe') +
-        (past ? ecCell(a.pm, a.cur) : td(3, 'r num hide-s', nk === 'fixe' ? '' : fmt(a.proj))) + td(4, '', chip(a.etat)) + '</tr>';
-      const c2 = ' n-' + (sec || nk);
+      const st = a.etat || null, prov = a.cls === 'prov';
+      const et = a.cls === 'over' ? 'bad' : a.cls === 'warn' ? 'warn' : a.cls === 'hb' ? 'hb' : st && st.niveau === 'bad' ? 'bad' : st && st.niveau === 'warn' ? 'warn' : st && st.niveau === 'info' && nk === 'fixe' ? 'info' : 'good';
+      const fr = prov ? 1 : a.pm > DEMI ? a.cur / a.pm : a.cur > DEMI ? 1 : 0;
+      const left = a.pm - a.cur;
+      const sous = (past && a.pm > DEMI ? ecart(a.pm, a.cur) : prov ? 'provisionnés ce mois · réserve' : a.pm > DEMI ? (left >= -DEMI ? 'reste ' + fmt(Math.max(0, left)) : 'dépassé de ' + fmt(-left)) : a.cur > DEMI ? 'hors budget' : '') +
+        (a.per > 1 ? ' · échéance ' + fmt(a.ech) : '');
+      const val = prov ? fmt(a.pm) + ' <small>provisionnés</small>' : (Math.abs(a.cur) > DEMI ? fmt(a.cur) : '0 €') + ' <small>/ ' + (a.pm ? fmt(a.pm) : '—') + '</small>';
+      // repères sous le poste replié : contrats, répartition (contribution au commun)
+      let tags = '';
+      if (cs.length) tags += '<span class="bg-tag">' + ico('file-text', 13) + (cs.length > 1 ? cs.length + ' contrats' : 'contrat') + '</span>';
+      if (nOps && !ouv.has(a.key)) tags += '<span class="bg-tag">' + nOps + ' op.</span>';
+      if (isLk) tags += '<button class="bg-tag lk-tog" type="button" data-poste="lk|split" aria-expanded="' + lkOp + '">' + ico('users', 13) + 'répartition ' + (lkOp ? '▴' : '▾') + '</button>';
+      if (a.key === 'c|Carburant' && scope === 'perso' && !past) tags += '<button class="bg-tag" type="button" data-fuel="1">' + ico('fuel', 13) + 'calculateur</button>';
+      let apres = tags ? '<div class="bg-tags">' + tags + '</div>' : '';
+      const c2 = 'n-' + (sec || nk);
       if (lkOp) {
         const parts = KB().postes(B, 'commun').lignes.filter(c => c.on && c.amt > DEMI).map(c => { const pg = KB().partDe(B, c.key).pg; return { c, pg, g: c.amt * pg / 100 }; }).sort((x, y) => y.g - x.g);
-        h += detRow('<b>Ma part du compte commun</b> · poste × ma part', '', null, 'lk-det lk-h' + c2);
-        for (const p of parts) h += detRow(esc(p.c.label) + ' <span class="muted">' + fmt(p.c.amt) + (p.c.per > 1 ? ' / mois (échéance ' + fmt(p.c.ech) + ')' : '') + ' × ' + p.pg + ' %</span>', e2(p.g), null, 'lk-det' + c2);
-        h += detRow('<b>Total de ma contribution</b>', '<b>' + e2(parts.reduce((t, p) => t + p.g, 0)) + '</b>', null, 'lk-det lk-t' + c2);
+        apres += '<ul class="bg-ops lk"><li class="det lk-det lk-h ' + c2 + '"><span class="l"><b>Ma part du compte commun</b> · poste × ma part</span></li>' +
+          parts.map(p => '<li class="det lk-det ' + c2 + '"><span class="l">' + esc(p.c.label) + ' <span class="muted">' + fmt(p.c.amt) + (p.c.per > 1 ? ' / mois (échéance ' + fmt(p.c.ech) + ')' : '') + ' × ' + p.pg + ' %</span></span><b class="num">' + e2(p.g) + '</b></li>').join('') +
+          '<li class="det lk-det lk-t ' + c2 + '"><span class="l"><b>Total de ma contribution</b></span><b class="num">' + e2(parts.reduce((t, p) => t + p.g, 0)) + '</b></li></ul>';
       }
-      if (op) {
-        for (const c of cs) h += '<tr class="det ctr-det' + c2 + '"><td class="subs" style="padding-left:34px">📄 <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + esc(PERLAB[c.per || 1]) + (c.src ? ' · ' + esc(c.src) : '') + '</td><td></td><td class="r num subs">' + e2(c.montant) + '</td><td class="hide-s"></td><td></td></tr>';
-        // 1.1.1 : écart de rapprochement (prélèvement ≠ achat), sans montant négatif affiché
-        for (const r of a.ops || []) h += r.ecart ? detRow(esc(jjmm(r.od) + ' · écart de rapprochement' + (r.m > 0 ? ' (prélèvement plus petit, compté en moins)' : '')), esc(e2(Math.abs(r.m))), r, c2.trim())
-          : detRow(esc(jjmm(r.od) + ' · ' + g.KladVues.libelleCourt(r.label)), esc(e2(-r.m)), r, c2.trim());
-        if (!nOps && !cs.length) h += detRow('<span class="muted">Aucune opération sur cette période.</span>', '', null, 'vide' + c2);
-        if (!past && !a.lie) h += '<tr class="det' + c2 + '"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-editer="' + esc(a.key) + '">Modifier le budget</button>' +
-          (a.key === 'c|Carburant' && scope === 'perso' ? ' <button class="linkbtn" type="button" data-fuel="1">Calculateur carburant</button>' : '') + '</td></tr>';
-      }
-      if (a.cause) h += '<tr class="det cause' + (a.cause.sorte === 'tol' ? ' tol' : '') + c2 + '"><td colspan="5" class="subs"><span class="cz">' + (a.cause.sorte === 'tol' ? 'Écart' : '⚠ Cause') + '</span> ' + esc(a.cause.texte) +
-        (a.cause.aligner && !past && !a.lie ? ' <button class="linkbtn cz-fix" type="button" data-aligner="' + esc(a.key) + '" data-v="' + Math.round(a.cause.aligner) + '">aligner le budget sur le prélevé (' + e2(a.cause.aligner) + ')</button>' : '') + '</td></tr>';
-      return h;
+      if (a.cause) apres += '<p class="bg-cause' + (a.cause.sorte === 'tol' ? ' tol' : '') + '"><span class="cz">' + (a.cause.sorte === 'tol' ? 'Écart' : '⚠ Cause') + '</span> ' + esc(a.cause.texte) +
+        (a.cause.aligner && !past && !a.lie ? ' <button class="linkbtn cz-fix" type="button" data-aligner="' + esc(a.key) + '" data-v="' + Math.round(a.cause.aligner) + '">aligner le budget sur le prélevé (' + e2(a.cause.aligner) + ')</button>' : '') + '</p>';
+      let corps = cs.map(c => '<li class="det ctr-det ' + c2 + '"><span class="l">' + ico('file-text', 14) + ' <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + esc(PERLAB[c.per || 1]) + (c.src ? ' · ' + esc(c.src) : '') + '</span><b class="num">' + e2(c.montant) + '</b></li>').join('');
+      // 1.1.1 : écart de rapprochement (prélèvement ≠ achat), sans montant négatif affiché
+      for (const r of a.ops || []) corps += r.ecart ? opLi(jjmm(r.od), esc('écart de rapprochement' + (r.m > 0 ? ' (prélèvement plus petit, compté en moins)' : '')), esc(e2(Math.abs(r.m))), r, c2)
+        : opLi(jjmm(r.od), esc(g.KladVues.libelleCourt(r.label)), esc(e2(-r.m)), r, c2);
+      if (!nOps && !cs.length) corps += vide(c2);
+      if (!past && nk !== 'fixe' && a.proj) corps += '<li class="det bg-proj ' + c2 + '"><span class="l muted">Projection fin de période</span><b class="num">' + fmt(a.proj) + '</b></li>';
+      if (!past && !a.lie) corps += '<li class="det bg-act ' + c2 + '"><button class="ap-lien" type="button" data-editer="' + esc(a.key) + '">' + ico('pencil', 16) + ' Modifier le budget</button>' +
+        (a.key === 'c|Carburant' && scope === 'perso' ? '<button class="ap-lien" type="button" data-fuel="1">' + ico('fuel', 16) + ' Calculateur carburant</button>' : '') + '</li>';
+      return poste(a.key, U().icoPoste(C, a), a.label, st, et, fr, val, sous, apres, corps, ' ' + c2 + (a.on ? '' : ' off'));
     };
     for (const nk of KB().NATS) {
-      const Sx = s.sections[nk], shown = Sx.lignes;
-      const nb = Sx.nbDepasses, nw = Sx.nbAVoir;
-      if (body) body += '<tr class="gsp"><td colspan="5"></td></tr>';
-      body += '<tr class="grp g-' + nk + '"><td><span class="nat ' + nk + '"></span>' + NAT_LABEL[nk] + (shown.length ? secBtn(nk, shown.length) : '') +
-        (!secOpen(nk) ? (nb ? ' <button type="button" class="chip bad sec-tog" data-sec="' + nk + '">' + nb + ' dépassé' + (nb > 1 ? 's' : '') + '</button>' : '') +
-          (nw ? ' <button type="button" class="chip warn sec-tog" data-sec="' + nk + '">' + nw + ' ' + (nk === 'fixe' ? 'à vérifier' : 'à surveiller') + '</button>' : '') : '') + '</td>' +
-        gBud(Sx.p) + gUse(Sx.c, Sx.p, false) + (past ? ecCell(Sx.p, Sx.c) : '<td class="r num hide-s">' + (nk === 'fixe' ? '' : fmt(Sx.proj)) + '</td>') + '<td></td></tr>';
-      if (secOpen(nk)) for (const a of shown) body += ligne(a, nk);
-      if (secOpen(nk) && !past) body += '<tr class="det n-' + nk + '"><td colspan="5" class="subs" style="padding-left:34px"><button class="linkbtn" type="button" data-ajout="' + nk + '">+ Ajouter un poste</button></td></tr>';
+      const Sx = s.sections[nk], L = Sx.lignes, nb = Sx.nbDepasses, nw = Sx.nbAVoir;
+      const over = Sx.c - Sx.p > DEMI && Sx.p > DEMI;
+      const chips = (nb ? ' <b class="ap-chip bad">' + nb + ' dépassé' + (nb > 1 ? 's' : '') + '</b>' : '') + (nw ? ' <b class="ap-chip warn">' + nw + ' ' + (nk === 'fixe' ? 'à vérifier' : 'à surveiller') + '</b>' : '');
+      const resume = past ? 'écart : ' + ecart(Sx.p, Sx.c) + ' · ' + pluriel(L.length, 'poste')
+        : (nk === 'fixe' ? (Sx.c > DEMI ? 'prélevé ' + fmt(Sx.c) + ' · ' : '') + 'à venir ' + fmt(Math.max(0, Sx.p - Sx.c))
+          : (over ? '<span class="bad-t">dépassé de ' + fmt(Sx.c - Sx.p) + '</span>' : 'reste ' + fmt(Math.max(0, Sx.p - Sx.c))) + ' · projection ' + fmt(Sx.proj)) + ' · ' + pluriel(L.length, 'poste');
+      h += sect(nk, nk, NAT_LABEL[nk], chips, '<span class="' + (over ? 'bad-t' : '') + '">' + (Math.abs(Sx.c) > DEMI ? fmt(Sx.c) : '0 €') + '</span> <small>/ ' + (Sx.p > DEMI ? fmt(Sx.p) : '—') + '</small>',
+        Sx.p > DEMI ? Sx.c / Sx.p : 0, over ? 'bad' : '', resume,
+        L.map(a => ligne(a, nk)).join('') + (past ? '' : '<button class="bg-add" type="button" data-ajout="' + nk + '">+ Ajouter un poste</button>'));
     }
     const HB = s.horsBudget;
-    if (HB.lignes.length) {
-      body += '<tr class="gsp"><td colspan="5"></td></tr><tr class="grp hbgrp"><td><span class="nat hb"></span>Hors budget' + secBtn('hb', HB.lignes.length) + '</td>' + gBud(0) +
-        '<td class="conso gsum" data-l=""><div class="cs-t"><span class="gl">Utilisé</span> <b class="num">' + fmt(HB.c) + '</b><span class="cs-r hb">postes sans budget</span></div></td>' +
-        (past ? ecCell(0, HB.c) : '<td class="r num hide-s">' + fmt(HB.proj) + '</td>') + '<td></td></tr>';
-      if (secOpen('hb')) for (const a of HB.lignes) body += ligne(a, a.nat, 'hb');
-    }
-    // total des dépenses
-    const t = s.total;
-    let tot = totBar(t.C, t.P, t.IN, t.OUT, past ? '' : 'jour ' + s.jour + ' sur ' + s.nbJours);
-    if (t.C > t.P + DEMI && s.causes.length) {
-      tot = tot.replace(/<\/div>$/, '<details class="tb-cz"><summary><span class="cz">Causes du dépassement (' + s.causes.length + ')</span></summary><div class="tb-czl">' +
-        s.causes.slice(0, 8).map(x => '<span><b>' + esc(x.a.label) + '</b> ' + (x.hb ? '<span class="hb-t num">' + fmt(x.v) + '</span> hors budget' : '<span class="bad-t num">' + fmt(x.v) + '</span> de plus') + '</span>').join('') +
-        (s.causes.length > 8 ? '<span class="muted">et ' + (s.causes.length - 8) + ' autres</span>' : '') + '</div></details></div>');
-    }
-    body += '<tr class="gsp blk"><td colspan="5"></td></tr><tr class="total"><td colspan="5">' + tot + '</td></tr>';
-    body += '<tr class="total solrow ' + solCls(s) + '"><td colspan="5">' + soldeBar(B, s) + '</td></tr>';
+    if (HB.lignes.length) h += sect('hb', 'hb', 'Hors budget', '', fmt(HB.c), HB.c > DEMI ? 1 : 0, 'hb', past ? 'postes sans budget' : 'postes sans budget · projection ' + fmt(HB.proj), HB.lignes.map(a => ligne(a, a.nat, 'hb')).join(''));
 
-    const head = past ? '<th>Poste <span class="th-cyc">· ' + esc(lab) + '</span></th><th class="r">Budget</th><th style="min-width:210px">Consommé</th><th class="r ec-c">Écart</th><th>État</th>'
-      : '<th>Poste <span class="th-cyc">· ' + esc(lab) + '</span></th><th class="r">Budget</th><th style="min-width:210px"><span class="th-cr"><span>Consommé</span><span>Reste</span></span></th><th class="r hide-s">Projection</th><th>État</th>';
-    const cols = '<colgroup><col><col style="width:90px"><col><col class="hide-s" style="width:90px"><col style="width:120px"></colgroup>';
-    let h = (past ? '<div id="track-sum"><div class="past-band"><span>📅 <b>Période clôturée</b> · ' + esc(lab.replace(' · terminé', '')) + ' : budget, reçu ou consommé et écart par poste.</span><button class="btn" type="button" data-nav="now">Revenir au cycle en cours</button></div></div>' : '') +
-      '<div class="tablewrap"><table class="cats budget rev-t" id="rev-table" data-mode="suivi">' + cols + '<tbody id="cats-rev">' + rev + '</tbody></table>' +
-      '<table class="cats budget' + (past ? ' closed' : '') + '" data-mode="suivi">' + cols + '<thead><tr id="bhead">' + head + '</tr></thead><tbody id="cats">' + body + '</tbody></table></div>';
-    // plus gros écarts et répartition
-    const OV = s.depasses;
-    h += '<div class="b-extra" id="b-extra"><div class="over" id="b-over"><span class="eyebrow">Plus gros écarts' + (past ? '' : ' à date') + '</span>' +
-      (OV.length ? '<ol>' + OV.slice(0, 3).map(a => '<li>' + U().icoPoste(C, a) + ' <b>' + esc(a.label) + '</b> ' + (a.pm > DEMI ? '<span class="bad-t num">' + fmt(a.cur - a.pm) + ' de plus</span> <span class="subs">(' + fmt(a.cur) + ' consommés pour ' + fmt(a.pm) + ' de budget)</span>' : '<span class="hb-t num">' + fmt(a.cur) + '</span> <span class="subs">hors budget</span>') + '</li>').join('') + '</ol>'
-        : '<p class="muted" style="margin:6px 0 0">Aucun dépassement' + (past ? ' : budget tenu.' : ' pour l\'instant.') + '</p>') + '</div>' +
-      '<div class="res-split" id="split-b">' + repartition(B, scope, per.start, per.upto) + '</div></div>';
+    h = (past ? '<div id="track-sum"><div class="past-band"><span>' + ico('calendar-check', 16) + ' <b>Période clôturée</b> · ' + esc(lab.replace(' · terminé', '')) + ' : budget, reçu ou consommé et écart par poste.</span></div></div>' : '') +
+      '<div class="bg-corps" data-mode="suivi">' + h + '</div>' + bilan(B, s);
+    // plus gros écarts et répartition (le total de la répartition dans son titre)
+    const OV = s.depasses, rep = repartition(B, scope, per.start, per.upto), repTot = /<span class="muted num">([^<]*)<\/span>/.exec(rep);
+    const repCorps = rep.replace(/^<div class="sub-h">[\s\S]*?<\/div>/, '');
+    h += '<div class="b-extra" id="b-extra"><div class="over bg-ec" id="b-over"><h3>Plus gros écarts' + (past ? '' : ' à date') + '</h3>' +
+      (OV.length ? '<ol>' + OV.slice(0, 3).map(a => '<li>' + anneau(1, a.pm > DEMI ? 'bad' : 'hb', '<span class="ic">' + U().icoPoste(C, a) + '</span>', 32) + '<span><b>' + esc(a.label) + '</b> ' +
+        (a.pm > DEMI ? '<span class="bad-t num">' + fmt(a.cur - a.pm) + ' de plus</span><small>' + fmt(a.cur) + ' consommés pour ' + fmt(a.pm) + ' de budget</small>' : '<span class="hb-t num">' + fmt(a.cur) + '</span><small>hors budget</small>') + '</span></li>').join('') + '</ol>'
+        : '<p class="muted">Aucun dépassement' + (past ? ' : budget tenu.' : ' pour l\'instant.') + '</p>') + '</div>' +
+      '<details class="res-split bg-rep" id="split-b" data-pli="rep-' + scope + '"' + (U().replie('rep-' + scope) ? '' : ' open') + '><summary>' + ico('chart-pie', 18) + '<span>Répartition des dépenses</span>' + (repTot ? '<b class="num">' + repTot[1] + '</b>' : '') + '</summary>' +
+        (repCorps || '<p class="muted">Aucune dépense sur cette période.</p>') + '</details></div>';
+    // accès aux écrans détaillés (sous-vues : un appui, retour en haut à gauche)
+    const VAc = g.KladVuesAccueil, dernier = scope === 'perso' && VAc && VAc.bilan && VAc.bilan(s);
+    const acc = scope === 'commun' ? [['tresorerie', 'Trésorerie', 'chart-line'], ['equilibre', 'Équilibre', 'scale'], ['contrats-commun', 'Contrats', 'file-text']]
+      : [['tendance', 'Tendance', 'trending-up'], ['contrats-perso', 'Contrats', 'file-text']];
+    h += '<nav class="ap-act" aria-label="Écrans détaillés">' + acc.map(([k, t, i]) => '<button type="button" class="ap-ab" data-aller="' + k + '">' + ico(i) + '<span>' + t + '</span></button>').join('') +
+      (dernier ? '<button type="button" class="ap-ab" data-av="bilan">' + ico('calendar-check') + '<span>Dernier bilan</span></button>' : '') + '</nav>';
     h += U().comment(past ? libellePeriode(per).replace(' · terminé', '') + ' (période terminée) : budget = votre budget actuel, consommé = opérations de la période (paiements carte à leur date de paiement) ; hors budget = postes sans budget et dépassements.'
       : (per.cyc ? 'Cycle du ' + U().dfr(per.cyc.start) + ' (dernier salaire) au ' + U().dfr(per.cyc.end) + ' : ' : 'Suivi de ' + mLabel(per.pm0) + ' : ') +
       'budget = votre budget du mois (les charges trimestrielles ou annuelles ne comptent que le mois de leur échéance' + (scope === 'commun' ? ', sauf au compte commun où elles sont provisionnées chaque mois' : '') +
       '), consommé = opérations depuis le début de la période. Les paiements carte comptent à leur date de paiement (lue dans le libellé), pas à leur date d\'enregistrement. ' +
-      'La projection = dépensé à date + rythme habituel du poste (dépenses des 90 jours précédant la période) × jours restants ; la barre montre la consommation, le trait vertical la date du jour.');
+      'La projection = dépensé à date + rythme habituel du poste (dépenses des 90 jours précédant la période) × jours restants ; l\'anneau montre la consommation du poste, le trait sur les barres la date du jour.');
     return { html: h, s };
   }
+
+  // Bilan du budget : total des dépenses (dans le budget, hors budget, reste), causes d'un dépassement, puis les soldes
+  // (prévu par le budget, réel, projeté ; au commun : mouvements du mois et provisions).
+  function bilan(B, s) {
+    const t = s.total, o = s.solde, per = s.per, fmt = e0;
+    const mx = Math.max(t.C, t.P, 1), pc = v => Math.max(0, Math.min(100, v / mx * 100)), e = t.P - t.C;
+    const seg = (cls, v, lab) => { const p = pc(Math.max(0, v)); return p > 0.05 ? '<i class="' + cls + '" style="width:' + p.toFixed(1) + '%" title="' + e0(v) + ' ' + lab + '"></i>' : ''; };
+    const br = (lab, sub, val, cls) => '<div class="ap-br' + (cls ? ' ' + cls : '') + '"><span>' + lab + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + val + '</div>';
+    let h = '<div class="ap-bilan bg-bilan" role="group" aria-label="Bilan">' +
+      br('Total des dépenses', past0(per) ? '' : 'jour ' + s.jour + ' sur ' + s.nbJours, '<b class="num' + (e < -DEMI ? ' bad-t' : '') + '">' + fmt(t.C) + ' <small>/ ' + fmt(t.P) + '</small></b>') +
+      '<div class="tb-bar bg-tot">' + seg('in', t.IN, 'dans le budget') + seg('out', t.OUT, 'hors budget') + (t.C < t.P ? '<em style="left:' + pc(t.P).toFixed(1) + '%" title="budget ' + e0(t.P) + '"></em>' : '') + '</div>' +
+      '<div class="bg-leg"><span><i class="sw in"></i>dans le budget <b class="num">' + fmt(Math.max(0, t.IN)) + '</b></span>' + (t.OUT > DEMI ? '<span><i class="sw out"></i>hors budget <b class="num">' + fmt(t.OUT) + '</b></span>' : '') +
+      (e < -DEMI ? '<span class="bad-t">dépassé de <b class="num">' + fmt(-e) + '</b></span>' : '<span>reste <b class="num">' + fmt(Math.max(0, e)) + '</b></span>') + '</div>';
+    if (t.C > t.P + DEMI && s.causes.length) {
+      h += '<details class="tb-cz bg-cz"><summary><span class="cz">Causes du dépassement (' + s.causes.length + ')</span></summary><div class="tb-czl">' +
+        s.causes.slice(0, 8).map(x => '<span><b>' + esc(x.a.label) + '</b> ' + (x.hb ? '<span class="hb-t num">' + fmt(x.v) + '</span> hors budget' : '<span class="bad-t num">' + fmt(x.v) + '</span> de plus') + '</span>').join('') +
+        (s.causes.length > 8 ? '<span class="muted">et ' + (s.causes.length - 8) + ' autres</span>' : '') + '</div></details>';
+    }
+    const projete = () => s.jour < PROJ_JOUR ? '<span class="ap-mu">à partir du ' + PROJ_JOUR + 'e jour</span>' : solde(o.pj);
+    if (s.scope === 'commun' && !per.past && o.compte != null) {
+      const lu = B.comptes.filter(c => c.role === 'commun').map(c => c.sync && c.sync.lu).filter(Boolean).sort().pop();
+      // 1.3.6 : le solde est en tête de l'écran ; ici, ce que le mois a changé (variation réelle) et les provisions
+      h += br('Mouvements du mois', 'entrées − sorties réelles depuis le début du mois' + (lu ? ' · relevé bancaire du ' + esc(new Date(lu).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })) : ''), solde(o.variation), 'bg-sep') +
+        (o.provisions > DEMI ? br('Provisions du mois', 'part mensuelle des charges trimestrielles : comptée dans le budget, rien n\'est sorti du compte', '<b class="num">' + e0(o.provisions) + '</b>') : '') +
+        (o.pj != null ? br('Projeté fin de mois', '', projete()) : '');
+    } else if (s.scope === 'perso' && !per.past) {
+      h += br('Solde prévu par le budget', 'revenus prévus ' + e0(s.revenus.p) + ' − budget ' + e0(t.P) + (per.cyc ? ' · sur le cycle' : ' · sur le mois'), solde(o.balP), 'bg-sep') +
+        br('Réel à ce jour', 'revenus ' + e0(o.revenus) + ' − dépenses ' + e0(o.depenses), solde(o.bal)) +
+        br('Projeté fin de mois', '', projete());
+    } else {
+      h += br('Solde ' + (per.past ? 'de la période' : 'du mois'), 'revenus ' + e0(o.revenus) + ' − dépenses ' + e0(o.depenses) + ' · ' + (o.bal >= -DEMI ? (per.past ? 'resté' : 'restant') + ' sur les revenus' : 'dépensés au-delà des revenus'), solde(o.bal), 'bg-sep') +
+        br('Prévu par le budget', 'revenus prévus − budget', solde(o.balP)) +
+        (per.past ? br('Écart', '', '<b class="num ' + (o.ecart < -DEMI ? 'bad-t' : 'pos-t') + '">' + (o.ecart < -DEMI ? e0(-o.ecart) + ' moins bien' : e0(Math.max(0, o.ecart)) + ' mieux') + '</b>') : br('Projeté fin de mois', '', projete()));
+    }
+    return h + '</div>';
+  }
+  const past0 = per => !!per.past;
+
+  // avant 2.1 (lu par les tests) : bandeau du solde
   const solCls = s => { const o = s.solde; const v = s.scope === 'commun' && !s.per.past && o.compte != null ? o.compte : s.scope === 'perso' && !s.per.past ? o.balP : o.bal; return v < -DEMI ? 'neg' : 'pos'; };
   function soldeBar(B, s) {
     const o = s.solde, per = s.per;
@@ -263,36 +327,40 @@
     return '<div class="sub-h"><h3>Répartition des dépenses</h3><span class="muted num">' + e0(dep) + '</span></div>' + bar(pn) + bar(pc);
   }
 
-  // ------------------------------------------------------------ mode Budget (prévu, parts du commun, carburant)
-  // ui : { ouverts: Set ('d|<clé>' détail, 'mo|<clé>' mois par mois) }.
+  // ------------------------------------------------------------ mode Budget : régler le budget (prévu, parts du commun, carburant)
+  // ui : { ouverts: Set ('d|<clé>' détail, 'mo|<clé>' mois par mois, 'ps|<nature>' section repliée) }.
+  // 2.1 : une ligne par poste (case, nom, réel habituel comparé au budget, montant, périodicité, « = »), sections repliables.
   function plan(B, scope, ui) {
-    const C = B.cx.C, SH = scope === 'commun', COLS = SH ? 8 : 5;
+    const C = B.cx.C, SH = scope === 'commun';
     const P = KB().postes(B, scope), W = P.W, n = P.n;
     const ouv = ui.ouverts || new Set();
     const fmt = e0;
-    const money = v => '<span style="color:' + (v < 0 ? 'var(--bad)' : 'inherit') + '">' + (v < 0 ? 'déficit ' : '') + fmt(Math.abs(v)) + '</span>';
     const span = W.start === W.end ? mLabel(W.start) : mLabel(W.start) + ' → ' + mLabel(W.end);
     const how = a => a.calcul === 'douze' ? 'total des 12 derniers mois ÷ 12' : a.calcul === 'moyenne' ? 'moyenne des ' + n + ' mois ' + span : 'médiane des ' + n + ' mois ' + span + ' (moyenne : ' + fmt(a.mean) + ')';
     const hs = a => a.calcul === 'douze' ? '12 mois ÷ 12' : a.calcul === 'moyenne' ? 'moy. ' + span : 'médiane ' + span;
+    const moisCourant = U().mLong(B.auj.slice(0, 7), B.auj);
     const R = B.R.commun;
-    const head = '<th>Poste</th><th class="r">Réel habituel</th><th class="r hide-s">' + esc(U().mLong(B.auj.slice(0, 7), B.auj)) + '</th><th class="r">Budget</th>' +
-      (SH ? '<th class="r" title="Ma part">% ' + esc((R.moi || 'Moi').slice(0, 1)) + '.</th><th class="r">' + esc(R.moi || 'Moi') + '</th><th class="r">' + esc(R.autre || 'Autre') + '</th><th class="c" title="Compte dans l\'équilibre des apports">Équil.</th>' : '<th class="r">Reste</th>');
-    let tb = '', rp = 0;
+    const trio = L => '<p class="bg-trio">' + L.filter(Boolean).map(([l, v, cls]) => '<span>' + l + ' <b class="num' + (cls ? ' ' + cls : '') + '">' + v + '</b></span>').join('') + '</p>';
+    const reste = v => v < -DEMI ? 'déficit ' + fmt(-v) : fmt(Math.max(0, v));
+    // comparaison réel habituel / budget (deux barres sur la même échelle)
+    const cmp = (hab, bud) => { const mx = Math.max(hab, bud, 1); return '<div class="bg-cmpb" aria-hidden="true"><i class="hab" style="width:' + (Math.max(0, hab) / mx * 100).toFixed(0) + '%"></i><i class="bud" style="width:' + (Math.max(0, bud) / mx * 100).toFixed(0) + '%"></i></div>'; };
+    let h = '', rp = 0;
     if (!SH) {
       const RV = KB().revenusAttendus(B);
       rp = RV.reduce((t, x) => t + (x.on ? x.amt : 0), 0);
-      tb += '<tr class="grp rev"><td><span class="nat rev"></span>Revenus <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">— point de départ de la cascade</span></td><td class="r num">' + fmt(RV.reduce((t, x) => t + (x.on ? x.avg : 0), 0)) +
-        '</td><td class="r num hide-s">' + fmt(RV.reduce((t, x) => t + (x.cur || 0), 0)) + '</td><td class="r num">' + fmt(rp) + '</td><td class="r num"><b>' + money(rp) + '</b></td></tr>';
+      let rows = '';
       for (const x of RV) {
         const id = 'rv-' + x.cat.replace(/\W+/g, '_');
-        tb += '<tr class="cat' + (x.on ? '' : ' off') + '"><td><label class="chk" for="' + id + '"><input type="checkbox" id="' + id + '" data-pon="r|' + esc(x.cat) + '"' + (x.on ? ' checked' : '') + '> ' + U().cico(C, x.cat) + ' ' + esc(x.cat) + '</label></td>' +
-          '<td class="r num" title="médiane des mois de la base de calcul">' + fmt(x.avg || 0) + '<div class="subs">médiane</div></td><td class="r num hide-s">' + (x.cur ? '+' + fmt(x.cur) : '—') + '</td><td class="r">' +
-          (x.cat === 'Salaire' ? '<span class="planbox"><select class="salmode" data-psal="1" aria-label="Mode de calcul du salaire">' + Object.keys(KB().MODES_SALAIRE).map(k => '<option value="' + k + '"' + (x.mode === k ? ' selected' : '') + '>' + esc(KB().MODES_SALAIRE[k]) + '</option>').join('') + '</select>' +
-            (x.mode === 'libre' ? '<input type="text" inputmode="decimal" data-pamt="r|Salaire" value="' + esc(x.amt ? F().versSaisie(x.amt) : '') + '" aria-label="Salaire prévu">' : '<b class="num" style="min-width:84px;text-align:right">' + fmt(x.amt) + '</b>') + '</span>' +
-            (x.mode === 'dernier' && x.sal && x.sal.last ? '<div class="subs">reçu le ' + U().dfr(x.sal.last.date) + '</div>' : x.mode === 'moy3' && x.sal ? '<div class="subs">sur ' + x.sal.n3 + ' mois</div>' : '')
-            : '<span class="planbox"><input type="text" inputmode="decimal" data-pamt="r|' + esc(x.cat) + '" value="' + esc(x.set ? F().versSaisie(x.amt) : '') + '" placeholder="0"' + (x.on ? '' : ' disabled') + ' aria-label="Prévu ' + esc(x.cat) + '"></span>' +
-            (x.cat === 'Autres revenus' ? '<div class="subs">autres apports prévus (saisie libre)</div>' : '')) + '</td><td></td></tr>';
+        const champ = x.cat === 'Salaire'
+          ? '<span class="planbox"><select class="salmode" data-psal="1" aria-label="Mode de calcul du salaire">' + Object.keys(KB().MODES_SALAIRE).map(k => '<option value="' + k + '"' + (x.mode === k ? ' selected' : '') + '>' + esc(KB().MODES_SALAIRE[k]) + '</option>').join('') + '</select>' +
+            (x.mode === 'libre' ? '<input type="text" inputmode="decimal" data-pamt="r|Salaire" value="' + esc(x.amt ? F().versSaisie(x.amt) : '') + '" aria-label="Salaire prévu">' : '<b class="num bg-ro">' + fmt(x.amt) + '</b>') + '</span>'
+          : '<span class="planbox"><input type="text" inputmode="decimal" data-pamt="r|' + esc(x.cat) + '" value="' + esc(x.set ? F().versSaisie(x.amt) : '') + '" placeholder="0"' + (x.on ? '' : ' disabled') + ' aria-label="Prévu ' + esc(x.cat) + '"></span>';
+        const note = x.cat === 'Salaire' ? (x.mode === 'dernier' && x.sal && x.sal.last ? 'reçu le ' + U().dfr(x.sal.last.date) : x.mode === 'moy3' && x.sal ? 'sur ' + x.sal.n3 + ' mois' : '') : x.cat === 'Autres revenus' ? 'autres apports prévus (saisie libre)' : '';
+        rows += '<div class="bg-rg' + (x.on ? '' : ' off') + '"><div class="bg-rg1"><label class="chk" for="' + id + '"><input type="checkbox" id="' + id + '" data-pon="r|' + esc(x.cat) + '"' + (x.on ? ' checked' : '') + '> ' + U().cico(C, x.cat) + ' <span class="n">' + esc(x.cat) + '</span></label></div>' +
+          '<div class="bg-rg2">' + champ + '<span class="bg-h">habituel <b class="num">' + fmt(x.avg || 0) + '</b> <small>médiane</small> · ' + esc(moisCourant) + ' <b class="num">' + (x.cur ? '+' + fmt(x.cur) : '—') + '</b>' + (note ? ' · ' + esc(note) : '') + '</span></div></div>';
       }
+      h += '<div class="bg-sec rev ouvert"><div class="bg-sh"><i class="dot" aria-hidden="true"></i><span class="t">Revenus <small>point de départ de la cascade</small></span><span class="v num">' + fmt(rp) + '</span></div>' +
+        trio([['habituel', fmt(RV.reduce((t, x) => t + (x.on ? x.avg : 0), 0))], [esc(moisCourant), fmt(RV.reduce((t, x) => t + (x.cur || 0), 0))], ['budget', fmt(rp)]]) + rows + '</div>';
     }
     let left = rp;
     const T = {};
@@ -303,11 +371,10 @@
       left -= T[nk].bud;
       const gG = SH ? on.reduce((x, a) => x + Math.max(0, a.amt) * KB().partDe(B, a.key).pg / 100, 0) : 0;
       const addable = KB().ajoutables(B, scope, nk);
-      const addSel = ' <select class="addpost" data-ajoutposte="' + nk + '" aria-label="Ajouter un poste ' + NAT_LABEL[nk].toLowerCase() + '"><option value="">+ Ajouter un poste</option>' +
+      const addSel = '<select class="addpost" data-ajoutposte="' + nk + '" aria-label="Ajouter un poste ' + NAT_LABEL[nk].toLowerCase() + '"><option value="">+ Ajouter un poste</option>' +
         addable.map(c => '<option value="' + esc(c.key) + '">' + esc(c.label) + '</option>').join('') + (nk === 'fixe' ? '<option value="__new">✚ nouveau poste fixe…</option>' : '') + '</select>';
-      tb += '<tr class="grp"><td><span class="nat ' + nk + '"></span>' + (SH ? '' : '− ') + NAT_LABEL[nk] + (SH ? '' : ' <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">— ' + NAT_HELP[nk] + '</span>') + addSel + '</td>' +
-        '<td class="r num">' + fmt(T[nk].avg) + '</td><td class="r num hide-s">' + fmt(T[nk].cur) + '</td><td class="r num">' + fmt(T[nk].bud) + '</td>' +
-        (SH ? '<td></td><td class="r num">' + fmt(gG) + '</td><td class="r num">' + fmt(Math.max(0, T[nk].bud) - gG) + '</td><td></td>' : '<td class="r num" title="Reste après ' + NAT_LABEL[nk].toLowerCase() + '">' + money(left) + '</td>') + '</tr>';
+      const ouvert = !ouv.has('ps|' + nk);
+      let rows = '';
       for (const a of grp) {
         const id = 'bl-' + scope + '-' + a.key.replace(/\W+/g, '_');
         const det = ouv.has('d|' + a.key) ? KB().detailPoste(B, scope, a.key) : null;
@@ -316,53 +383,63 @@
         const isFuel = a.key === 'c|Carburant' && !SH;
         const perSel = '<select class="per" data-pper="' + esc(a.key) + '" aria-label="Périodicité ' + esc(a.label) + '"' + (a.on ? '' : ' disabled') + '>' + KB().PER.map(v => '<option value="' + v + '"' + (v === a.per ? ' selected' : '') + '>' + PERLAB[v] + '</option>').join('') + '</select>';
         const part = SH ? KB().partDe(B, a.key) : null, amt = a.on ? Math.max(0, a.amt) : 0, gp = SH ? amt * part.pg / 100 : 0;
-        tb += '<tr class="cat' + (a.on ? '' : ' off') + ' rmable"><td><label class="chk" for="' + id + '"><input type="checkbox" id="' + id + '" data-pon="' + esc(a.key) + '"' + (a.on ? ' checked' : '') + '> ' + U().icoPoste(C, a) + ' ' + esc(a.label) + '</label>' +
-          (nd ? ' <button class="linkbtn more" type="button" data-pdet="' + esc(a.key) + '" aria-expanded="' + !!det + '">' + (det ? 'masquer' : 'détail') + '</button>' : '') +
-          (isFuel ? ' <button class="linkbtn fuelbtn" type="button" data-fuel="1">calculateur carburant</button>' : '') + '</td>' +
-          '<td class="r num"><button class="refbtn" type="button" data-pmois="' + esc(a.key) + '" aria-expanded="' + ouv.has('mo|' + a.key) + '" title="' + esc(how(a)) + ' — toucher pour le détail mois par mois">' + fmt(a.avg) + '</button><div class="subs">' + esc(hs(a)) + '</div></td>' +
-          '<td class="r num hide-s' + (a.on && a.amt && a.per === 1 && a.cur > a.amt + DEMI ? ' neg' : '') + '">' + (a.cur ? fmt(a.cur) : '—') + '</td>' +
-          (a.lie ? '<td class="r"><span class="num"><b>' + fmt(a.amt) + '</b></span><div class="subs"><button type="button" class="linkbtn golink" data-scope="commun">= ma part du compte commun</button></div></td>'
-            : '<td class="r"><span class="planbox"><input type="text" inputmode="decimal" id="' + id + '-amt" data-pamt="' + esc(a.key) + '" aria-label="Prévu ' + esc(a.label) + ' par échéance" value="' + esc(a.ech ? F().versSaisie(a.ech) : '') + '" placeholder="0"' + (a.on ? '' : ' disabled') + (a.set ? '' : ' class="auto" title="Proposé : référence de la base de calcul"') + '>' + perSel +
-              '<button class="alignbtn" type="button" data-paligner="' + esc(a.key) + '" title="Aligner le prévu sur la référence (' + fmt(a.avg) + ' / mois)" aria-label="Aligner sur la référence"' + (a.on ? '' : ' disabled') + '>=</button></span>' + (a.per > 1 ? '<div class="subs num">= ' + fmt(a.amt) + ' / mois</div>' : '') + '</td>') +
-          (SH ? '<td class="r nowrap"><input type="number" class="sh-pg" data-ppg="' + esc(a.key) + '" min="0" max="100" step="1" value="' + part.pg + '" aria-label="Ma part pour ' + esc(a.label) + '"' + (a.on ? '' : ' disabled') + '> %</td><td class="r num">' + fmt(gp) +
-            (a.per > 1 ? '<div class="subs">' + fmt(a.ech) + ' ' + PERLAB[a.per] + ' → ' + fmt(amt) + ' / mois</div>' : '') + '</td><td class="r num">' + fmt(amt - gp) + '</td><td class="c has-rm"><input type="checkbox" class="sh-elig" data-pelig="' + esc(a.key) + '"' + (part.elig ? ' checked' : '') + (a.on ? '' : ' disabled') + ' aria-label="' + esc(a.label) + ' compte dans l\'équilibre">' + (!a.lie ? '<button class="linkbtn rm-line" type="button" data-pretirer="' + esc(a.key) + '" aria-label="Retirer ' + esc(a.label) + '">✕</button>' : '') + '</td>'
-            : '<td class="has-rm' + (a.lie ? '' : ' rm-only') + '">' + (!a.lie ? '<button class="linkbtn rm-line" type="button" data-pretirer="' + esc(a.key) + '" title="Retirer ce poste du budget (la catégorie est conservée)" aria-label="Retirer ' + esc(a.label) + '">✕</button>' : '') + '</td>') + '</tr>';
+        const depasse = a.on && a.amt && a.per === 1 && a.cur > a.amt + DEMI;
+        rows += '<div class="bg-rg' + (a.on ? '' : ' off') + ' rmable"><div class="bg-rg1"><label class="chk" for="' + id + '"><input type="checkbox" id="' + id + '" data-pon="' + esc(a.key) + '"' + (a.on ? ' checked' : '') + '> ' + U().icoPoste(C, a) + ' <span class="n">' + esc(a.label) + '</span></label>' +
+          (nd ? '<button class="bg-mini" type="button" data-pdet="' + esc(a.key) + '" aria-expanded="' + !!det + '">' + (det ? 'masquer' : 'détail') + '</button>' : '') +
+          (isFuel ? '<button class="bg-mini fuelbtn" type="button" data-fuel="1">' + ico('fuel', 13) + ' calculateur</button>' : '') +
+          (!a.lie ? '<button class="bg-x rm-line" type="button" data-pretirer="' + esc(a.key) + '" title="Retirer ce poste du budget (la catégorie est conservée)" aria-label="Retirer ' + esc(a.label) + '">✕</button>' : '') + '</div>' +
+          '<div class="bg-cmp">' + cmp(a.avg, a.on ? a.amt : 0) + '<button class="refbtn bg-h" type="button" data-pmois="' + esc(a.key) + '" aria-expanded="' + ouv.has('mo|' + a.key) + '" title="' + esc(how(a)) + ' — toucher pour le détail mois par mois">habituel <b class="num">' + fmt(a.avg) + '</b> <small>' + esc(hs(a)) + ' ▾</small></button>' +
+          '<span class="bg-h' + (depasse ? ' bad-t' : '') + '">' + esc(moisCourant) + ' <b class="num">' + (a.cur ? fmt(a.cur) : '—') + '</b></span></div>' +
+          '<div class="bg-rg2">' + (a.lie ? '<b class="num bg-ro">' + fmt(a.amt) + '</b><button type="button" class="linkbtn golink" data-scope="commun">= ma part du compte commun</button>'
+            : '<span class="planbox"><input type="text" inputmode="decimal" id="' + id + '-amt" data-pamt="' + esc(a.key) + '" aria-label="Prévu ' + esc(a.label) + ' par échéance" value="' + esc(a.ech ? F().versSaisie(a.ech) : '') + '" placeholder="0"' + (a.on ? '' : ' disabled') + (a.set ? '' : ' class="auto" title="Proposé : référence de la base de calcul"') + '>' + perSel +
+              '<button class="alignbtn" type="button" data-paligner="' + esc(a.key) + '" title="Aligner le prévu sur la référence (' + fmt(a.avg) + ' / mois)" aria-label="Aligner sur la référence"' + (a.on ? '' : ' disabled') + '>=</button></span>' +
+              (a.per > 1 ? '<span class="bg-h num">= ' + fmt(a.amt) + ' / mois</span>' : '')) + '</div>' +
+          (SH ? '<div class="bg-rg3"><label class="bg-pg">Ma part <input type="number" class="sh-pg" data-ppg="' + esc(a.key) + '" min="0" max="100" step="1" value="' + part.pg + '" aria-label="Ma part pour ' + esc(a.label) + '"' + (a.on ? '' : ' disabled') + '> %</label>' +
+            '<span class="bg-h">' + esc(R.moi || 'Moi') + ' <b class="num">' + fmt(gp) + '</b></span><span class="bg-h">' + esc(R.autre || 'Autre') + ' <b class="num">' + fmt(amt - gp) + '</b></span>' +
+            '<label class="bg-pg" title="Compte dans l\'équilibre des apports"><input type="checkbox" class="sh-elig" data-pelig="' + esc(a.key) + '"' + (part.elig ? ' checked' : '') + (a.on ? '' : ' disabled') + ' aria-label="' + esc(a.label) + ' compte dans l\'équilibre"> équilibre</label>' +
+            (a.per > 1 ? '<span class="bg-h">' + fmt(a.ech) + ' ' + PERLAB[a.per] + ' → ' + fmt(amt) + ' / mois</span>' : '') + '</div>' : '');
         if (ouv.has('mo|' + a.key)) {
           const ms = a.calcul === 'douze' ? (() => { const L = []; for (let m = KB().shift(W.end, -11); m <= W.end; m = KB().shift(m, 1)) L.push([m, (a.m12 || {})[m] || 0]); return L; })() : W.months.map(m => [m, (a.mon || {})[m] || 0]);
           const mx = Math.max(1, ...ms.map(x => x[1]));
-          tb += '<tr class="months"><td colspan="' + COLS + '"><div class="mgrid">' + ms.map(([m, v]) => '<div class="mcell' + (v < DEMI ? ' zero' : '') + '"><span class="subs">' + esc(mLabel(m)) + '</span><span class="num">' + (v < DEMI ? '0 €' : fmt(v)) + '</span><i style="width:' + Math.round(100 * Math.max(0, v) / mx) + '%"></i></div>').join('') + '</div>' +
-            '<p class="subs" style="margin:6px 0 0">Réel habituel = <b>' + esc(how(a)) + '</b> = ' + fmt(a.avg) + ' / mois. ' + (a.per > 1 ? 'Utilisé car ce poste est payé ' + ({ 3: 'tous les trimestres', 4: 'tous les 4 mois', 12: 'une fois par an' })[a.per] + '.' : 'Les mois viennent de « Base de calcul depuis » en haut du tableau.') +
-            (a.nat !== 'fixe' && !a.manuel && a.per === 1 ? ' La médiane (le mois du milieu) évite qu\'un mois exceptionnel fausse le chiffre.' : '') + '</p></td></tr>';
+          rows += '<div class="months"><div class="mgrid">' + ms.map(([m, v]) => '<div class="mcell' + (v < DEMI ? ' zero' : '') + '"><span class="subs">' + esc(mLabel(m)) + '</span><span class="num">' + (v < DEMI ? '0 €' : fmt(v)) + '</span><i style="width:' + Math.round(100 * Math.max(0, v) / mx) + '%"></i></div>').join('') + '</div>' +
+            '<p class="subs" style="margin:6px 0 0">Réel habituel = <b>' + esc(how(a)) + '</b> = ' + fmt(a.avg) + ' / mois. ' + (a.per > 1 ? 'Utilisé car ce poste est payé ' + ({ 3: 'tous les trimestres', 4: 'tous les 4 mois', 12: 'une fois par an' })[a.per] + '.' : 'Les mois viennent de « Base de calcul depuis » en haut du budget.') +
+            (a.nat !== 'fixe' && !a.manuel && a.per === 1 ? ' La médiane (le mois du milieu) évite qu\'un mois exceptionnel fausse le chiffre.' : '') + '</p></div>';
         }
         if (det) {
-          const vide = SH ? '<td></td><td></td><td></td><td></td>' : '<td></td>';
-          for (const c of cs) tb += '<tr class="det ctr-det"><td class="subs" style="padding-left:30px">📄 <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + PERLAB[c.per || 1] + (c.src ? ' · ' + esc(c.src) : '') + '</td><td class="r num subs">' + e2(c.montant / (c.per || 1)) + '</td><td class="hide-s"></td><td></td>' + vide + '</tr>';
+          let L = cs.map(c => '<li class="det ctr-det"><span class="l">' + ico('file-text', 14) + ' <b>' + esc(c.label) + '</b> · contrat ' + e2(c.montant) + ' ' + PERLAB[c.per || 1] + (c.src ? ' · ' + esc(c.src) : '') + '</span><b class="num">' + e2(c.montant / (c.per || 1)) + '</b></li>').join('');
           for (const d of det) {
             const nm = a.nat === 'fixe' ? Object.entries(d.noms).sort((x, y) => y[1] - x[1]).map(x => x[0]).slice(0, 3).join(', ') : d.cle;
             const lab = a.nat === 'fixe' ? fmt(+d.cle * 100) + ' <span class="muted">· ' + (d.n ? d.n + ' fois sur la période' : 'ce mois-ci') + ' — ' + esc(nm) + '</span>' : esc(d.cle) + (d.n ? ' <span class="muted">· ' + d.n + ' × ' + fmt(d.ref / d.n) + '</span>' : '');
-            tb += '<tr class="det"><td class="subs" style="padding-left:30px">' + lab + '</td><td class="r num subs" title="moyenne sur la base de calcul">' + fmt(d.ref / n) + '</td><td class="r num subs hide-s">' + (d.cur ? fmt(d.cur) : '—') + '</td><td></td>' + vide + '</tr>';
+            L += '<li class="det"><span class="l">' + lab + '</span><span class="bg-h" title="moyenne sur la base de calcul">habituel <b class="num">' + fmt(d.ref / n) + '</b> · ' + esc(moisCourant) + ' <b class="num">' + (d.cur ? fmt(d.cur) : '—') + '</b></span></li>';
           }
+          rows += '<ul class="bg-ops">' + L + '</ul>';
         }
       }
+      h += '<div class="bg-sec ' + nk + (ouvert ? ' ouvert' : '') + '"><button type="button" class="bg-sh" data-psec="' + nk + '" aria-expanded="' + ouvert + '"><i class="dot" aria-hidden="true"></i><span class="t">' + NAT_LABEL[nk] +
+        (SH ? '' : ' <small>' + NAT_HELP[nk] + '</small>') + '</span><span class="v num">' + fmt(T[nk].bud) + '</span><span class="chev" aria-hidden="true"></span></button>' +
+        trio([['habituel', fmt(T[nk].avg)], [esc(moisCourant), fmt(T[nk].cur)], ['budget', fmt(T[nk].bud)], SH ? [esc(R.moi || 'Moi'), fmt(gG)] : ['il reste', reste(left), left < -DEMI ? 'bad-t' : ''], SH ? [esc(R.autre || 'Autre'), fmt(Math.max(0, T[nk].bud) - gG)] : null]) +
+        (ouvert ? rows + '<div class="bg-addr">' + addSel + '</div>' : '') + '</div>';
     }
     const TA = T.fixe.avg + T.courante.avg + T.optionnelle.avg, TC = T.fixe.cur + T.courante.cur + T.optionnelle.cur, TB = T.fixe.bud + T.courante.bud + T.optionnelle.bud;
     const ST = SH ? KB().parts(B) : null;
-    tb += '<tr class="total"><td>' + (SH ? 'Total retenu' : '= Reste / mois <span class="muted" style="font-weight:500">(total des dépenses prévues : ' + fmt(TB) + ')</span>') + '</td><td class="r num">' + fmt(TA) + '</td><td class="r num hide-s">' + fmt(TC) + '</td><td class="r num">' + fmt(TB) + '</td>' +
-      (SH ? '<td></td><td class="r num">' + fmt(ST.moi) + '</td><td class="r num">' + fmt(ST.autre) + '</td><td></td>' : '<td class="r num">' + money(left) + (rp ? '<div class="subs">' + Math.round(100 * left / rp) + ' % du salaire</div>' : '') + '</td>') + '</tr>';
-    let h = '';
+    h += '<div class="ap-bilan bg-bilan">' + (SH
+      ? '<div class="ap-br"><span>Total retenu</span><b class="num">' + fmt(TB) + '</b></div>' + trio([['habituel', fmt(TA)], [esc(moisCourant), fmt(TC)], [esc(R.moi || 'Moi'), fmt(ST.moi)], [esc(R.autre || 'Autre'), fmt(ST.autre)]])
+      : '<div class="ap-br"><span>= Reste / mois<small>total des dépenses prévues : ' + fmt(TB) + '</small></span>' + solde(left) + '</div>' +
+        trio([['habituel', fmt(TA)], [esc(moisCourant), fmt(TC)], ['budget', fmt(TB)], rp ? ['', Math.round(100 * left / rp) + ' % du salaire'] : null])) + '</div>';
+    let tete = '';
     if (SH) {
       const vers = g.KladCommun ? g.KladCommun.versementsMoyens(B, W) : null;
-      h += '<div id="share-box"><div class="kpis" id="share-sum" style="margin-bottom:12px">' +
+      tete = '<div id="share-box"><div class="kpis" id="share-sum">' +
         '<div class="kpi"><span class="eyebrow">Virement mensuel ' + esc(R.moi || 'moi') + '</span><span class="v">' + fmt(ST.moi) + '</span><span class="s">' + (vers ? 'versé en moyenne : ' + fmt(vers.moi) : '') + '</span></div>' +
         '<div class="kpi"><span class="eyebrow">Virement mensuel ' + esc(R.autre || 'autre') + '</span><span class="v">' + fmt(ST.autre) + '</span><span class="s">' + (vers ? 'versé en moyenne : ' + fmt(vers.autre) : '') + '</span></div>' +
         '<div class="kpi"><span class="eyebrow">Rattrapage par mois</span><span class="v">' + fmt(Math.abs(ST.eqMoi - ST.eqAutre)) + '</span><span class="s">postes cochés « Équilibre » : ' + esc(R.moi || 'moi') + ' ' + fmt(ST.eqMoi) + ', ' + esc(R.autre || 'autre') + ' ' + fmt(ST.eqAutre) + '</span></div></div>' +
-        '<div class="row addshare" style="margin-bottom:12px"><input type="text" id="sh-label" placeholder="Nouveau poste commun, ex. Courses" aria-label="Nouveau poste commun">' +
+        '<div class="row addshare"><input type="text" id="sh-label" placeholder="Nouveau poste commun, ex. Courses" aria-label="Nouveau poste commun">' +
         '<input type="text" inputmode="decimal" id="sh-amt" placeholder="€ / mois" aria-label="Montant mensuel"><label class="ctl" for="sh-pg">Ma part <input type="number" id="sh-pg" min="0" max="100" step="1" value="50" style="width:64px"> %</label>' +
         '<button class="btn" type="button" data-shajout="1">Ajouter au compte commun</button></div></div>';
     }
-    h += '<div class="tablewrap"><table class="cats budget" data-mode="plan"><thead><tr id="bhead">' + head + '</tr></thead><tbody id="cats">' + tb + '</tbody></table></div>';
+    h = tete + '<div class="bg-corps bg-regl" data-mode="plan">' + h + '</div>';
     h += U().comment((SH ? '' : 'La contribution au compte commun suit automatiquement ma part du budget commun. ') + 'Réel habituel calculé de ' + mLabel(W.start) + ' à ' + mLabel(W.end) + ' (' + pluriel(n, 'mois', 'mois') + ' complets) : moyenne pour les charges fixes, médiane des mois pour les dépenses courantes et optionnelles, réel des 12 derniers mois pour les charges trimestrielles, de 4 mois ou annuelles. ' +
-      'Le prévu se saisit par échéance avec sa périodicité ; il est lissé par mois pour la cascade et les virements. Touchez un montant « Réel habituel » pour le détail mois par mois. En gris, le montant proposé tant que vous n\'avez rien saisi ; « = » aligne le prévu sur le réel habituel.');
+      'Le prévu se saisit par échéance avec sa périodicité ; il est lissé par mois pour la cascade et les virements. Touchez « habituel » pour le détail mois par mois. En gris, le montant proposé tant que vous n\'avez rien saisi ; « = » aligne le prévu sur le réel habituel.');
     return h;
   }
 
@@ -408,7 +485,13 @@
     const crow = (lab, sub, v, cls) => '<div class="cr-r' + (cls ? ' ' + cls : '') + '"><span class="cr-l">' + lab + (sub ? ' <span class="subs">' + sub + '</span>' : '') + '</span><b class="num"' + (cls === 'tot' ? ' style="color:' + col(v) + '"' : '') + '>' + esc(e2(Math.abs(v))) + (v < 0 && cls !== 'minus' ? ' débiteur' : '') + '</b></div>';
     // 1.1.2 : tant que des virements du mois manquent (en route ou attendus), la marge affichée est la marge prévue
     const prevue = Mr.base === 'prevue';
-    return '<div class="cm-rav"><div class="cr-h"><span class="rav">' + (prevue ? 'Marge prévue du commun' : 'Marge réelle du commun') + '</span><b class="num" style="color:' + col(Mr.affichee) + '">' + m2(Mr.affichee) + '</b>' +
+    // 2.1 : « Où va l'argent du commun » : le solde en barre (charges fixes à venir, reste du budget variable, marge)
+    const base = Mr.solde + (Mr.enRoute || 0) + (Mr.attendus || 0);
+    const P = [['fix', 'charges fixes à venir', Mr.fixes], ['var', 'reste du budget variable', Mr.variable], ['libre', prevue ? 'marge prévue' : 'marge réelle', Mr.affichee]];
+    const barre = base > DEMI ? '<div class="ap-mtete"><span>Solde du compte commun' + (Mr.enRoute || Mr.attendus ? ' et virements attendus' : '') + '</span><b class="num">' + e0(base) + '</b></div><div class="ap-mbar" role="img" aria-label="' + esc(P.map(p => p[1] + ' ' + e0(Math.abs(p[2]))).join(', ')) + '">' + P.filter(p => p[2] > DEMI).map(p => '<i class="m-' + p[0] + '" style="flex:' + Math.round(p[2]) + '"></i>').join('') +
+      (Mr.affichee < -DEMI ? '<i class="m-dep" style="flex:' + Math.round(-Mr.affichee) + '"></i>' : '') + '</div>' +
+      '<div class="ap-mleg">' + P.map(p => '<span><i class="m-' + (p[2] < -DEMI ? 'dep' : p[0]) + '"></i><b class="num">' + e0(Math.abs(p[2])) + '</b><small>' + esc(p[0] === 'libre' && p[2] < -DEMI ? 'dépassement' : p[1]) + '</small></span>').join('') + '</div>' : '';
+    return '<div class="cm-rav ap-card"><h2>Où va l\'argent du commun</h2>' + barre + '<div class="cr-h"><span class="rav">' + (prevue ? 'Marge prévue du commun' : 'Marge réelle du commun') + '</span><b class="num" style="color:' + col(Mr.affichee) + '">' + m2(Mr.affichee) + '</b>' +
       (prevue ? ' <span class="chip info">prévue · en attente de ' + esc(e2(Mr.enAttente)) + '</span>' : '') + '</div><div class="cr-calc">' +
       crow('Disponible', 'solde du compte commun', Mr.solde) +
       (Mr.enRoute ? crow('+ Virements en route', 'partis, pas encore arrivés', Mr.enRoute) : '') +
@@ -654,21 +737,23 @@
     const KO = g.KladObservations;
     if (!KO) return '';
     const O = KO.observations(B, scope);
-    const LAB = { bad: 'Action', warn: 'À faire', info: 'Info', good: 'OK' }, SCL = { perso: 'Perso', commun: 'Commun', all: 'Général' };
-    const item = (a, todo) => '<li class="' + esc(a.niveau) + '"><span class="chip ' + esc(a.niveau) + '">' + LAB[a.niveau] + '</span><div><b>' + esc(a.titre) + '</b> <span class="sc-tag sc-' + esc(a.scope) + '">' + SCL[a.scope] + '</span><p>' + esc(a.texte) + '</p>' +
-      (todo ? '<button class="linkbtn obs-done" type="button" data-fait="' + esc(a.titre) + '">c\'est fait</button>' : '') + '</div></li>';
+    const SCL = { perso: 'Perso', commun: 'Commun', all: 'Général' };
     const cnt = sc => O.faire.filter(a => a.scope === sc).length;
-    let h = '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Observations et recommandations</h2><div class="obs-head" id="obs-head">' +
+    // 2.1 : carte « À faire » en bas de l'Aperçu : les points du périmètre affiché (Moi : perso et général, Nous : commun et
+    // général) ; tous les points, les observations, les points faits et leur historique : « Toutes les observations » (volet)
+    const ici = O.faire.filter(a => a.scope === scope || a.scope === 'all'), ailleurs = O.faire.length - ici.length;
+    const court = a => '<li class="' + esc(a.niveau) + '"><i aria-hidden="true"></i><div><b>' + esc(a.titre) + '</b> <span class="sc-tag sc-' + esc(a.scope) + '">' + SCL[a.scope] + '</span><p>' + esc(a.texte) + '</p>' +
+      '<button class="linkbtn obs-done" type="button" data-fait="' + esc(a.titre) + '">c\'est fait</button></div></li>';
+    let h = '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">À faire</h2><div class="obs-head" id="obs-head">' +
       (O.faire.length ? '<span class="chip warn">' + O.faire.length + ' à faire</span><span class="subs">' + ['perso', 'commun', 'all'].filter(k => cnt(k)).map(k => SCL[k] + ' ' + cnt(k)).join(' · ') + '</span>' : '<span class="chip good">rien à faire</span>') + '</div></div>';
-    h += '<div id="obs-todo">' + (O.faire.length ? '<h3 class="obs-h3">À faire</h3><ul class="alerts obs-todo">' + O.faire.map(a => item(a, true)).join('') + '</ul>' : '<p class="muted" style="margin:0 0 8px">Aucune action en attente, sur vos comptes comme sur le compte commun.</p>') +
-      (O.masques.length ? '<p class="subs obs-hid">' + pluriel(O.masques.length, 'point') + ' marqué' + (O.masques.length > 1 ? 's' : '') + ' « fait » : ' + O.masques.map(a => esc(a.titre)).join(' · ') + ' <button class="linkbtn obs-undo" type="button" data-reafficher="1">réafficher</button></p>' : '') + '</div>';
-    h += '<div class="obs-list"><h3 class="obs-h3">Observations</h3><ul class="alerts" id="alerts">' + (O.infos.length ? O.infos.map(a => item(a, false)).join('') : '<li><p class="muted">Aucune observation.</p></li>') + '</ul></div>';
-    if (g.KladVuesFisc && g.KladVuesFisc.historiqueObs) h += g.KladVuesFisc.historiqueObs(B);
+    h += '<div id="obs-todo">' + (ici.length ? '<ul class="obs-c">' + ici.map(court).join('') + '</ul>' : '<p class="muted" style="margin:0 0 8px">' + (O.faire.length ? 'Rien à faire ici' + (ailleurs ? ' : ' + pluriel(ailleurs, 'point') + ' ' + (scope === 'commun' ? 'perso' : 'du commun') + ' (Toutes les observations).' : '.') : 'Aucune action en attente, sur vos comptes comme sur le compte commun.') + '</p>') + '</div>';
+    h += '<div class="obs-tous"><button class="ap-lien" type="button" data-ouvrir="secObs">Toutes les observations (' + (O.faire.length + O.infos.length) + ') ›</button>' +
+      (O.masques.length ? '<button class="ap-lien obs-undo" type="button" data-reafficher="1">Réafficher ' + pluriel(O.masques.length, 'point fait', 'points faits') + '</button>' : '') + '</div>';
     h += '<div class="row obs-act"><button class="btn" type="button" data-audit="1">Relancer l\'audit</button>' + (opt && opt.analyse ? '<button class="btn" type="button" data-analyse="1">Analyse de Claude</button>' : '') +
       '<span class="eyebrow" id="audit-at">audit du ' + esc(U().dfr(B.auj)) + ' · mes comptes et compte commun</span></div>' +
       (opt && opt.texteAnalyse ? '<div class="ai-out" id="ai-out" aria-live="polite">' + esc(opt.texteAnalyse) + '</div>' : '');
     return h;
   }
 
-  g.KladVuesBudget = { observations, libellePeriode, cycNav, teteBudget, suivi, plan, carburantVolet, totBar, repartition, ravM, tendance, contrats, formContrat, edition, detailRav, carteRav, PERLAB, NAT_LABEL };
+  g.KladVuesBudget = { observations, libellePeriode, cycNav, teteBudget, suivi, bilan, soldeBar, anneau, plan, carburantVolet, totBar, repartition, ravM, tendance, contrats, formContrat, edition, detailRav, carteRav, PERLAB, NAT_LABEL };
 })(typeof window !== 'undefined' ? window : globalThis);

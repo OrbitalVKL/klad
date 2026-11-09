@@ -32,7 +32,7 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
       for (const nk of ['courante', 'optionnelle']) for (const a of res.sections[nk].lignes) if (a.on && a.pm > 50) postes.push([a.label, KB.eur(a.cur), KB.eur(a.pm)]);
       // 2.0 : l'Aperçu arrondit à l'euro (cadran, postes, commun) ; le détail du reste à vivre garde les centimes
       const e0 = c => KB.eur(Math.abs(Math.round(c)));
-      return { rav: [F.montant(Math.abs(rav.budget.reste)), F.montant(Math.abs(rav.comptes.reste))], rav0: e0(rav.budget.reste), soldes, ech,
+      return { rav: [F.montant(Math.abs(rav.budget.reste)), F.montant(Math.abs(rav.comptes.reste))], rav0: e0(rav.budget.reste), ravB: [e0(rav.budget.reste), e0(rav.comptes.reste)], soldes, ech,
         fdm: [e0(fdm.solde), e0(fdm.end)], fdmC: [F.montant(Math.abs(fdm.solde)), F.montant(Math.abs(fdm.end))], postes };
     });
     // Aperçu, page Moi
@@ -41,15 +41,15 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
     // 2.0 : cadran de l'Aperçu ; détail par le « ? » de « Où va l'argent »
     const rav = await texte('.ap-hero');
     assert.ok(rav.includes(norm(attendu.rav0)), 'reste à vivre ' + attendu.rav0 + ' dans « ' + rav + ' »');
-    await page.locator('[data-mesure="argent"] [data-aller="rav"]').click();
+    await page.locator('[data-mesure="argent"] [data-aller="rav"]').first().click();
     await B.pause(200);
     const det = await texte('#ravCorps');
     for (const v of attendu.rav) assert.ok(det.includes(norm(v)), 'reste à vivre ' + v + ' dans le détail « ' + det + ' »');
     await B.fermer();
     const sold = await texte('[data-mesure="soldes"]');
     for (const [lib, v] of attendu.soldes) { assert.ok(sold.includes(lib), lib); assert.ok(sold.includes(norm(v)), 'solde ' + lib + ' ' + v); }
-    // 2.0 : budget du cycle complet (tous les postes, montant / budget)
-    const cyc = await texte('[data-mesure="budget-perso"]');
+    // 2.0 : budget du cycle complet (tous les postes, montant / budget) ; 2.1 : le budget lui-même, dans l'Aperçu
+    const cyc = await texte('#budget-main');
     const vus = attendu.postes.filter(([lib]) => cyc.includes(lib));
     assert.equal(vus.length, attendu.postes.length, 'postes du cycle sur l\'Aperçu');
     for (const [lib, cur, pm] of vus) assert.ok(cyc.includes(norm(cur) + ' / ' + norm(pm)), 'poste ' + lib);
@@ -65,25 +65,25 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
     const cm = await texte('.ap-hero');
     for (const v of attendu.fdm) assert.ok(cm.includes(norm(v)), 'commun ' + v);
     if (attendu.ech.some(e => e[1] === 'commun')) await ech('jours-commun', 'commun');
-    // Écrans d'origine : reste à vivre de Budget, postes du budget, fin de mois et solde de Commun, contrats
+    // 2.1 : reste à vivre sur les deux bases (interrupteur), postes du budget, fin de mois et solde du commun, contrats
     await B.onglet('budget');
-    const rb = await texte('#rav-m');
-    for (const v of attendu.rav) assert.ok(rb.includes(norm(v)), 'Budget › reste à vivre ' + v);
+    const rb = await texte('#ap-haut .rav-base');
+    for (const v of attendu.ravB) assert.ok(rb.includes(norm(v)), 'Aperçu › reste à vivre ' + v + ' dans « ' + rb + ' »');
     for (let i = 0; i < 6; i++) { const b = page.locator('#budget-main .sec-tog[aria-expanded="false"]').first(); if (!(await b.count())) break; await b.click(); }
     const bm = await texte('#budget-main');
     for (const [lib] of vus) assert.ok(bm.includes(lib), 'Budget › poste ' + lib);
     for (const sc of ['perso', 'commun']) {
       await B.onglet(sc === 'perso' ? 'budget' : 'commun');
-      const sv = page.locator('#view-budget [data-sousvue="' + (sc === 'perso' ? 'contrats' : 'tresorerie') + '"]');
+      const sv = page.locator('#budget-main [data-aller="' + (sc === 'perso' ? 'contrats-perso' : 'tresorerie') + '"]');
       if (await sv.count()) { await sv.click(); await B.pause(200); }
       await page.evaluate(() => { const p = document.getElementById('p-contrats'); if (p && p.classList.contains('collapsed')) p.querySelector('.panel-h h2.fold').click(); });
       const ctr = await texte('#p-contrats');
       for (const [lib] of attendu.ech.filter(e => e[1] === sc)) assert.ok(ctr.includes(lib), 'échéance ' + sc + ' ' + lib);
     }
-    const svm = page.locator('#view-budget [data-sousvue="mois"]');
-    if (await svm.count()) { await svm.click(); await B.pause(200); }
-    const bc = await texte('#bal-panel');
-    for (const v of attendu.fdmC) assert.ok(bc.includes(norm(v)), 'Commun › fin de mois ' + v);
+    await page.locator('#ah-back').click(); await B.pause(200);
+    const bc = await texte('#ap-haut');
+    assert.ok(bc.includes(norm(attendu.fdmC[0])), 'Nous › solde du commun ' + attendu.fdmC[0]);
+    assert.ok(bc.includes(norm(attendu.fdm[1])), 'Nous › fin de mois ' + attendu.fdm[1]);
     assert.deepEqual(B.erreurs, []);
   } finally { await B.fin(); }
 });
