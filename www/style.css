@@ -2369,7 +2369,7 @@ button.bg-h{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;displ
 .inf.muted.small.inf-vu,.inf.rg-aide.inf-vu{margin:4px 0 8px;padding:7px 10px;border-radius:10px;background:var(--surface-2);border-left:3px solid var(--accent)}
 /* Aperçu : ⓘ dans le cadran, montant à la couleur du côté, encart sous le cadran */
 .ap-dial > .inf-b{position:absolute;left:50%;bottom:21%;transform:translateX(-50%);margin:0;z-index:1}
-.ap-hero.moi .ap-dc .v{color:var(--ap-moi)} .ap-hero.nous .ap-dc .v{color:var(--ap-nous)}
+/* 2.2.1 : montant du cadran en couleur de texte ; la couronne porte la couleur du côté (vapercu.cadran, coul) */
 .ap-enc{width:100%;max-width:30em;box-sizing:border-box} .ap-enc p{margin:0 0 4px} .ap-enc .ap-cote{justify-content:flex-start;margin:0 0 4px}
 .ap-mtete .inf.enc{flex-basis:100%}
 .ac-lu.inf{margin:0 0 6px;font-size:12.5px;color:var(--muted)}

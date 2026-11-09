@@ -31,8 +31,8 @@
 
   // ------------------------------------------------------------ cadran
   // temps 0..1 (anneau fin et repère), conso 0..1 (anneau épais, couleur de l'état), centre : HTML
-  // apres (2.2) : bouton posé dans le cadran (ⓘ)
-  function cadran(temps, conso, et, centre, nom, apres) {
+  // apres (2.2) : bouton posé dans le cadran (ⓘ) ; coul (2.2.1) : couleur de la couronne (celle du côté), sinon l'état
+  function cadran(temps, conso, et, centre, nom, apres, coul) {
     const S = 200, c = S / 2, rO = 94, rI = 77, wI = 17, CO = 2 * Math.PI * rO, CI = 2 * Math.PI * rI;
     const t = Math.max(0, Math.min(1, temps)), k = Math.max(0, Math.min(1, conso));
     const a = t * 2 * Math.PI - Math.PI / 2, tx = c + Math.cos(a) * rO, ty = c + Math.sin(a) * rO;
@@ -40,7 +40,7 @@
       '<g transform="rotate(-90 ' + c + ' ' + c + ')"><circle cx="' + c + '" cy="' + c + '" r="' + rO + '" class="ap-t0"/>' +
       '<circle cx="' + c + '" cy="' + c + '" r="' + rO + '" class="ap-t1" stroke-dasharray="' + (CO * t).toFixed(1) + ' ' + CO.toFixed(1) + '"/>' +
       '<circle cx="' + c + '" cy="' + c + '" r="' + rI + '" class="ap-c0" stroke-width="' + wI + '"/>' +
-      (k > 0 ? '<circle cx="' + c + '" cy="' + c + '" r="' + rI + '" fill="none" stroke="' + COUL[et] + '" stroke-width="' + wI + '" stroke-linecap="round" stroke-dasharray="' + (CI * k).toFixed(1) + ' ' + CI.toFixed(1) + '"/>' : '') +
+      (k > 0 ? '<circle cx="' + c + '" cy="' + c + '" r="' + rI + '" fill="none" stroke="' + (coul || COUL[et]) + '" stroke-width="' + wI + '" stroke-linecap="round" stroke-dasharray="' + (CI * k).toFixed(1) + ' ' + CI.toFixed(1) + '"/>' : '') +
       '</g><circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="7" class="ap-ici"/></svg><div class="ap-dc" aria-hidden="true">' + centre + '</div>' + (apres || '') + '</div>';
   }
   // petit anneau autour d'une icône (postes)
@@ -287,9 +287,9 @@
         const temps = Math.min(1, res.jour / (res.nbJours || 1)), et = c.reste < -DEMI ? 'bad' : etat(conso, temps);
         const nom = 'Reste à vivre ' + e0(c.reste) + (c.reste < -DEMI ? ' en dépassement' : '') + ' jusqu\'au ' + U().jjmm(rav.fin) + ', jour ' + res.jour + ' sur ' + res.nbJours + ', budget variable consommé à ' + Math.round(conso * 100) + ' %';
         // 2.2 : montant à la couleur du côté (Moi bleu) ; échéance, jour et légende du cadran en info (ⓘ)
-        h += '<div class="ap-hero moi inf-l">' + cadran(temps, conso, et, '<span class="lbl">Reste à vivre</span><span class="v num">' + esc(e0(c.reste)) + (c.reste < -DEMI ? '<small class="bad-t"> dépassé</small>' : '') + '</span>', nom, U().ib('Reste à vivre')) +
+        h += '<div class="ap-hero moi inf-l">' + cadran(temps, conso, et, '<span class="lbl">Reste à vivre</span><span class="v num">' + esc(e0(c.reste)) + (c.reste < -DEMI ? '<small class="bad-t"> dépassé</small>' : '') + '</span>', nom, U().ib('Reste à vivre'), 'var(--ap-moi)') +
           '<div class="inf enc ap-enc"><p>jusqu\'au ' + esc(jm(rav.fin)) + ' · jour ' + res.jour + ' sur ' + res.nbJours + '</p>' +
-          '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>variable dépensé ' + Math.round(conso * 100) + ' %</span></div></div>' +
+          '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:var(--ap-moi)"></i>variable dépensé ' + Math.round(conso * 100) + ' %</span></div></div>' +
           U().interrupteurRav(x.choix, !!rav.comptes, { salaire: rav.budget.reste, comptes: rav.comptes ? rav.comptes.reste : null }) + '</div>';
         h += carte('Où va l\'argent', '', barreArgent(x), ' data-mesure="argent"', 'data-aller="rav"');
       } else h += VA().reste(res, KB().baseRav(d.S));
@@ -307,9 +307,9 @@
     const conso = P > DEMI ? Cn / P : 0, et = fdm.end < -DEMI || fdm.decouvert ? 'bad' : etat(conso, temps);
     // 2.2 : montant à la couleur du côté (Nous orange) ; jour, légende et calcul de la fin de mois en info (ⓘ)
     h += '<div class="ap-hero nous inf-l">' + cadran(temps, conso, et, '<span class="lbl">Fin de mois estimée</span><span class="v num">' + esc(e0(fdm.end)) + (fdm.end < -DEMI ? '<small class="bad-t"> débiteur</small>' : '') + '</span>',
-      'Fin de mois estimée du compte commun ' + e0(fdm.end) + ', solde ' + F().solde(fdm.solde), U().ib('Fin de mois estimée')) +
+      'Fin de mois estimée du compte commun ' + e0(fdm.end) + ', solde ' + F().solde(fdm.solde), U().ib('Fin de mois estimée'), 'var(--ap-nous)') +
       '<div class="inf enc ap-enc">' + (res ? '<p>jour ' + res.jour + ' sur ' + res.nbJours + '</p>' : '') +
-      '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>budget du commun ' + Math.round(conso * 100) + ' %</span></div>' +
+      '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:var(--ap-nous)"></i>budget du commun ' + Math.round(conso * 100) + ' %</span></div>' +
       // calcul de la fin de mois (avant 2.1 : carte « Fin de mois estimée » de l'écran Commun), provisions, prélèvements à venir
       '<p class="ap-calc">solde ' + esc(F().solde(fdm.solde)) + ' − prélèvements à venir ' + esc(F().montant(fdm.due || 0)) + (fdm.route ? ' + en route ' + esc(F().montant(fdm.route)) : '') +
         (fdm.inc ? ' + virements attendus ' + esc(F().montant(fdm.inc)) : '') + (fdm.reserve > DEMI ? ' − provisions en cours ' + esc(F().montant(fdm.reserve)) : '') + '</p>' +
