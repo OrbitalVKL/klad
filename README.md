@@ -2,7 +2,7 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 1.0.0 (maintenance) — version complète : tous les réglages du complément se font dans Klad, sauvegarde vérifiée, organisation de l'interface (2.1 : Aperçu Moi / Nous avec le budget perso et le budget du commun en entier, Opérations, Trier, Patrimoine, Plus ; palettes Klad et Grafit), parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`), mode démo. Notes de version : `docs/NOTES.md`.** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 1.0.0 (maintenance) — version complète : tous les réglages du complément se font dans Klad, sauvegarde vérifiée, organisation de l'interface (2.2 : Aperçu Moi / Nous avec le budget perso et le budget du commun en entier, Opérations, Trier, Patrimoine, Plus ; infos derrière un ⓘ pour une lecture rapide ; palettes Klad et Grafit), parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`), mode démo. Notes de version : `docs/NOTES.md`.** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
@@ -500,6 +500,8 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
    commun à vérifier, équilibre, 12 prochains mois, où va l'argent du commun (marge réelle), virements à mettre en place
    (ordres permanents modifiables), le compte commun ce mois-ci, budget du commun (accès à Trésorerie, Équilibre,
    Contrats), à faire, prochains jours. *Trier* (bouton central) : les opérations à vérifier une à une.
+   Lecture rapide (2.2) : partout, les dates, formules et explications sont derrière un ⓘ (un toucher l'ouvre, un
+   second la referme) ; un ⓘ de titre montre toutes celles de la carte.
 12. *Plus › Observations, Impôts, Épargne* : points à faire, impôt du foyer et taxe foncière, livret et plan d'épargne.
 
 Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement. Un faux client Enable Banking (`window.KladFauxEB`, utilisé par le parcours Chromium) permet d'essayer la connexion et la synchro sans réseau.

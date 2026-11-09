@@ -2,6 +2,26 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.2.0
+
+Lecture rapide (retour du propriétaire, 09/11 ; maquette validée : « ⓘ partout », toute l'appli d'un coup).
+- **Règle** : reste visible le nom, le montant, l'état et le mot qui dit ce qu'est le montant ; les dates, formules,
+  explications et petits textes sous les titres sont derrière un **ⓘ**. Un toucher sur ⓘ ouvre l'info juste dessous (ou
+  toutes celles de la carte, pour un ⓘ de titre) ; un second la referme. Rien n'est retiré, aucun calcul ne change.
+- **Aperçu** : le montant du cadran est à la couleur du côté (bleu Moi, orange Nous) ; l'échéance, le jour du cycle, la
+  légende et, pour Nous, le calcul de la fin de mois (solde, prélèvements à venir, provisions) sont dans le ⓘ du cadran.
+  Dates des soldes, heure du relevé, détail des opérations à vérifier, nature des échéances : ⓘ du titre de la carte.
+  Le lien « Le calcul sur les deux bases » (doublon du « ? ») est retiré.
+- **Budget** : plus de bandeau « N poste dépassé » ni de compteurs en tête des sections (les postes portent leur état, les
+  « Plus gros écarts » sont en bas) ; plus de « jour N/T » ni de « + Ajouter un poste » dans le suivi (ajout dans
+  « Régler le budget ») ; un poste replié montre son nom, son état (« à venir », sans la date) et son montant, le reste
+  quand on le déplie ; formules du bilan et détail des écarts : ⓘ sur chaque ligne ; dates de la période : ⓘ.
+- **Commun** : chaque part du solde (Disponible, Réserve fixe, Provisions, Enveloppes) a son ⓘ (ex. Enveloppes : les
+  impôts) ; le calcul détaillé de la marge s'ouvre par le ⓘ de « Marge réelle du commun ».
+- **Partout ailleurs** (Opérations, Trésorerie, Équilibre, Tendance, Contrats, Patrimoine, Plus et ses volets) : sous-textes
+  et aides derrière un ⓘ (titre de la section ou libellé du champ) ; les états restent visibles (« Lien Grafit désactivé »,
+  « 3 ordres à modifier », résultat d'une crypto…). Opérations : le nom du compte passe dans le détail de l'opération.
+
 ## 2.1.0
 
 Budget fusionné dans l'Aperçu (retour du propriétaire, 08/11 : l'Aperçu 2.0 répétait le budget au lieu de le

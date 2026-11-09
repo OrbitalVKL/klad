@@ -42,12 +42,12 @@
       <a class="app-seen" id="app-seen" href="#operations" hidden></a>
       <div class="av-zone" id="av-zone" hidden></div>
       <section id="rav-m" aria-label="Où va l'argent du commun" hidden></section>
-      <section class="panel" id="cm-plan" aria-label="Virements à mettre en place" hidden></section>
-      <section class="panel" id="cm-com" aria-label="Le compte commun ce mois-ci" hidden></section>
-      <section class="panel" id="cm-tres" aria-label="Trésorerie du compte commun" hidden></section>
+      <section class="panel inf-auto" id="cm-plan" aria-label="Virements à mettre en place" hidden></section>
+      <section class="panel inf-auto" id="cm-com" aria-label="Le compte commun ce mois-ci" hidden></section>
+      <section class="panel inf-auto" id="cm-tres" aria-label="Trésorerie du compte commun" hidden></section>
       <section class="panel budget-main" id="budget-main"></section>
       <div id="an-zone">
-        <section class="panel" id="tend-panel"></section>
+        <section class="panel inf-auto" id="tend-panel"></section>
         <section class="panel" id="ops-panel">
           <div id="ops-scope"></div>
           <div class="panel-h"><h2>Opérations</h2>
@@ -64,7 +64,7 @@
           <div class="ops-tot" id="ops-tot" hidden></div>
         </section>
       </div>
-      <div id="ctr-zone" style="display:grid;gap:18px"></div>
+      <div id="ctr-zone" class="inf-auto" style="display:grid;gap:18px"></div>
       <section class="panel obs-panel" id="actions" aria-label="À faire"></section>
       <div class="ap-page ap-bas" id="ap-bas"></div>
       <div class="ap-page ap-fin" id="ap-fin"></div>
@@ -73,24 +73,24 @@
     <!-- ================= DÉTAIL D'UNE OPÉRATION (page, 0.10.2) ================= -->
     <div id="view-op" class="vue" hidden style="display:grid;gap:14px"><section class="panel op-page" aria-label="Détail de l'opération"><div id="opDetail"></div></section></div>
     <!-- ================= ÉQUILIBRE ================= -->
-    <div id="view-appart" class="vue" hidden style="display:grid;gap:18px"><div class="sv-bar" id="sv-eq"></div><div id="appart-corps" style="display:grid;gap:18px"></div></div>
+    <div id="view-appart" class="vue inf-auto" hidden style="display:grid;gap:18px"><div class="sv-bar" id="sv-eq"></div><div id="appart-corps" style="display:grid;gap:18px"></div></div>
     <!-- ================= IMPÔTS ================= -->
-    <div id="view-impots" class="vue" hidden style="display:grid;gap:18px"></div>
+    <div id="view-impots" class="vue inf-auto" hidden style="display:grid;gap:18px"></div>
     <!-- ================= ÉPARGNE ================= -->
-    <div id="view-epargne" class="vue" hidden style="display:grid;gap:18px"></div>
+    <div id="view-epargne" class="vue inf-auto" hidden style="display:grid;gap:18px"></div>
     <!-- ================= CRYPTO (1.1, onglet Patrimoine) ================= -->
-    <div id="view-crypto" class="vue" hidden style="display:grid;gap:18px"></div>
+    <div id="view-crypto" class="vue inf-auto" hidden style="display:grid;gap:18px"></div>
     <!-- ================= PLUS (page, 0.10.3) : Verrouiller, puis 6 groupes ================= -->
-    <div id="view-plus" class="vue" hidden style="display:grid;gap:14px"><div id="plusCorps"></div></div>
+    <div id="view-plus" class="vue inf-auto" hidden style="display:grid;gap:14px"><div id="plusCorps"></div></div>
     <!-- ================= RELEVÉS DES COMPTES ================= -->
-    <div id="view-data" class="vue" hidden style="display:grid;gap:18px">
+    <div id="view-data" class="vue inf-auto" hidden style="display:grid;gap:18px">
       <section class="panel" id="imp-panel"></section>
     </div>
     <!-- ================= SAUVEGARDE ================= -->
-    <div id="view-save" class="vue" hidden style="display:grid;gap:18px">
+    <div id="view-save" class="vue inf-auto" hidden style="display:grid;gap:18px">
       <section class="panel" id="save-panel">
         <div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Sauvegarde</h2><span class="muted">où sont vos données, export et restauration</span></div>
-        <p class="note" style="margin-top:0"><b>État :</b> <span id="sauvState">…</span></p>
+        <p class="note vis" style="margin-top:0"><b>État :</b> <span id="sauvState">…</span></p>
         <div class="row" style="margin-top:10px">
           <button id="btnExport" class="btn primary" type="button">Exporter ma sauvegarde</button>
           <button id="btnVerifier" class="btn" type="button">Vérifier une sauvegarde</button>
@@ -126,7 +126,7 @@
       <div class="sh-body">
         <div class="sh-head"><button type="button" class="sh-back" data-retour hidden aria-label="Retour">‹</button>
           <div class="t"><h2 id="voletTitre"></h2></div><button type="button" class="sh-x" data-fermer aria-label="Fermer">✕</button></div>
-        <div id="voletCorps"></div>
+        <div id="voletCorps" class="inf-auto"></div>
       </div>
     </section>
   </div>
@@ -198,7 +198,7 @@
     <section id="secModules" data-titre="Lien Grafit">
       <h3>Lien Grafit</h3>
       <label class="inline"><input id="grafitActif" type="checkbox"> Partager un résumé avec Grafit</label>
-      <p id="grafitEtat" class="muted"></p>
+      <p id="grafitEtat" class="muted vis"></p>
       <p class="muted">Grafit, installé sur ce téléphone, lit un résumé de Klad, même Klad verrouillé, sans réseau ni fichier partagé.
         Le résumé est chiffré sur le téléphone et mis à jour après chaque synchronisation, import, réglage, classement ou opération vue.</p>
       <p class="muted"><b>Partagé :</b> libellés et types des comptes, soldes, somme à prélever des cartes, totaux, heure du dernier relevé,

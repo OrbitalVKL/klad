@@ -382,7 +382,7 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     // Lien Grafit (faux plugin) : désactivé par défaut ; activé → résumé écrit tout de suite ; renommage suivi
     const grafit = () => page.evaluate(() => { const j = window.KladLienGrafit.demo(); return j == null ? null : JSON.parse(j); });
     await page.locator('#app-tb [data-tab="plus"]').click();
-    assert.match(await page.locator('#plusCorps [data-volet="secModules"]').innerText(), /Lien Grafit désactivé/);
+    assert.match(await page.locator('#plusCorps [data-volet="secModules"]').innerText(), /Lien Grafit désactivé/);      // état : visible (2.2)
     await page.locator('#plusCorps [data-volet="secModules"]').click();
     assert.equal(await page.locator('#grafitActif').isChecked(), false);
     assert.equal(await grafit(), null);
@@ -496,14 +496,15 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.equal(await page.locator('#ah-back').isVisible(), false);
     assert.equal(await page.locator('#view-accueil').isVisible(), false);
     const acc = await page.locator('#view-budget').innerText();
-    assert.match(acc, /Reste à vivre[\s\S]*jusqu'au[\s\S]*jour \d+\/\d+[\s\S]*Où va l'argent[\s\S]*Soldes[\s\S]*Budget du cycle[\s\S]*Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Total des dépenses[\s\S]*Solde prévu par le budget[\s\S]*Tendance[\s\S]*À faire[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
+    // 2.2 : échéance et jour du cycle dans l'info du cadran (ⓘ)
+    assert.match(acc, /Reste à vivre[\s\S]*Où va l'argent[\s\S]*Soldes[\s\S]*Budget du cycle[\s\S]*Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Total des dépenses[\s\S]*Solde prévu par le budget[\s\S]*Tendance[\s\S]*À faire[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
     assert.doesNotMatch(acc, /Tout le budget|Total dépensé/);      // plus de résumé du budget en double
     assert.doesNotMatch(acc, SANS_SIGNE);
     assert.doesNotMatch(acc, /[−-]\s?\d[\d\s  ]* €/);
     await page.locator('#ap-haut [data-apcote="nous"]').click();
     assert.equal(await page.evaluate(() => window.KladApp.vue()), 'commun');
     const accN = await page.locator('#view-budget').innerText();
-    assert.match(accN, /Fin de mois estimée[\s\S]*solde[\s\S]*prélèvements à venir[\s\S]*Où va l'argent du commun[\s\S]*Marge (réelle|prévue) du commun[\s\S]*Virements à mettre en place[\s\S]*Budget du commun[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
+    assert.match(accN, /Fin de mois estimée[\s\S]*Où va l'argent du commun[\s\S]*Marge (réelle|prévue) du commun[\s\S]*Virements à mettre en place[\s\S]*Budget du commun[\s\S]*Prochains jours[\s\S]*Verrouiller/i);
     assert.doesNotMatch(accN, SANS_SIGNE);
     await page.locator('#ap-haut [data-apcote="moi"]').click();
     await page.locator('#ap-haut [data-aller="rav"]').first().click();
@@ -519,7 +520,10 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     // budget du cycle : sections, cycle de salaire, aucun montant signé
     await ecran('budget');
     let b = await page.locator('#budget-main').innerText();
-    assert.match(b, /Cycle en cours · du \d\d\/\d\d au/);
+    assert.match(b, /Cycle en cours/);
+    assert.doesNotMatch(b, /du \d\d\/\d\d au/);      // 2.2 : dates de la période dans son info (ⓘ)
+    await page.locator('#budget-main .bg-per .inf-b').click();
+    assert.match(await page.locator('#budget-main .bg-per').innerText(), /Cycle en cours[\s\S]*du \d\d\/\d\d au/);
     assert.match(b, /Revenus[\s\S]*Charges fixes[\s\S]*Dépenses courantes[\s\S]*Dépenses optionnelles[\s\S]*Solde prévu par le budget/i);
     assert.doesNotMatch(b, SANS_SIGNE);
     assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]* €/);
@@ -584,7 +588,10 @@ test('parcours : budget, reste à vivre, contrats, tendance', { skip: !chromium 
     assert.doesNotMatch(b, /Règles de classement/);
     assert.equal(await page.locator('#view-budget [data-scope="perso"]').isVisible(), false);
     assert.equal(await page.locator('#sv-bar').isVisible(), false);
-    assert.match(await page.locator('#ap-haut').innerText(), /Fin de mois estimée[\s\S]*prélèvements à venir/i);
+    assert.doesNotMatch(await page.locator('#ap-haut').innerText(), /prélèvements à venir/i);      // 2.2 : calcul en info
+    await page.locator('#ap-haut .ap-dial .inf-b').click();
+    assert.match(await page.locator('#ap-haut').innerText(), /Fin de mois estimée[\s\S]*solde[\s\S]*prélèvements à venir/i);
+    await page.locator('#ap-haut .ap-dial .inf-b').click();
     assert.doesNotMatch(b, /[−-]\s?\d[\d\s  ]*(,\d\d)? €/);
     await capture(page, '14-budget-commun');
     // ordres permanents (annulable)

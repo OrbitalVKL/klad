@@ -2352,3 +2352,28 @@ button.bg-h{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;displ
 #rav-m .ap-mleg{display:flex;flex-wrap:wrap;gap:8px 14px} #rav-m .ap-mleg > span{flex:1 1 7em}
 #rav-m .ap-mleg b{min-width:max-content;white-space:nowrap}
 #rav-m .ap-mleg > span{min-width:auto}
+
+/* ============================================================ 2.2 : infos masquées derrière ⓘ (lecture rapide) */
+/* .inf : date, formule, explication ; visible quand sa ligne ou sa carte (.inf-l) est ouverte (.inf-on) ou, reliée à un
+   bouton (data-inf-of), quand elle est montrée (.inf-vu) */
+.inf{display:none!important}
+.inf-on .inf,.inf.inf-vu{display:block!important}
+.inf-on .inf.inl,.inf.inl.inf-vu{display:inline!important}
+.inf-b{all:unset;box-sizing:border-box;position:relative;flex:none;display:inline-grid;place-items:center;width:24px;height:24px;margin:-4px 0 -4px 4px;border-radius:50%;color:var(--muted);vertical-align:middle;cursor:pointer}
+.inf-b::after{content:"";position:absolute;inset:-12px}
+.inf-b svg{width:16px;height:16px}
+.inf-b[aria-expanded="true"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.inf-b:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.inf-t{cursor:pointer}
+.inf.enc,.inf-on .inf.enc,.inf.enc.inf-vu{margin:6px 0 2px;padding:7px 10px;border-radius:10px;background:var(--surface-2);border-left:3px solid var(--accent);font-size:12.5px;line-height:1.45;font-weight:500;color:var(--ink-2);text-align:left;white-space:normal;overflow-wrap:anywhere;letter-spacing:0;text-transform:none}
+.inf.muted.small.inf-vu,.inf.rg-aide.inf-vu{margin:4px 0 8px;padding:7px 10px;border-radius:10px;background:var(--surface-2);border-left:3px solid var(--accent)}
+/* Aperçu : ⓘ dans le cadran, montant à la couleur du côté, encart sous le cadran */
+.ap-dial > .inf-b{position:absolute;left:50%;bottom:21%;transform:translateX(-50%);margin:0;z-index:1}
+.ap-hero.moi .ap-dc .v{color:var(--ap-moi)} .ap-hero.nous .ap-dc .v{color:var(--ap-nous)}
+.ap-enc{width:100%;max-width:30em;box-sizing:border-box} .ap-enc p{margin:0 0 4px} .ap-enc .ap-cote{justify-content:flex-start;margin:0 0 4px}
+.ap-mtete .inf.enc{flex-basis:100%}
+.ac-lu.inf{margin:0 0 6px;font-size:12.5px;color:var(--muted)}
+/* ⓘ d'un titre dépliant : à droite du titre (summary : tout à droite), pour que le toucher sur le titre replie */
+details > summary > .inf-b{margin-left:auto}
+.panel-h > h2.fold + .inf-b{margin:0 auto 0 2px}
+.ap-enc .ap-calc{text-align:left;max-width:none}

@@ -31,16 +31,17 @@
 
   // ------------------------------------------------------------ cadran
   // temps 0..1 (anneau fin et repère), conso 0..1 (anneau épais, couleur de l'état), centre : HTML
-  function cadran(temps, conso, et, centre, nom) {
+  // apres (2.2) : bouton posé dans le cadran (ⓘ)
+  function cadran(temps, conso, et, centre, nom, apres) {
     const S = 200, c = S / 2, rO = 94, rI = 77, wI = 17, CO = 2 * Math.PI * rO, CI = 2 * Math.PI * rI;
     const t = Math.max(0, Math.min(1, temps)), k = Math.max(0, Math.min(1, conso));
     const a = t * 2 * Math.PI - Math.PI / 2, tx = c + Math.cos(a) * rO, ty = c + Math.sin(a) * rO;
-    return '<div class="ap-dial" role="img" aria-label="' + esc(nom) + '"><svg viewBox="0 0 ' + S + ' ' + S + '" aria-hidden="true" focusable="false">' +
+    return '<div class="ap-dial"><svg viewBox="0 0 ' + S + ' ' + S + '" role="img" aria-label="' + esc(nom) + '" focusable="false">' +
       '<g transform="rotate(-90 ' + c + ' ' + c + ')"><circle cx="' + c + '" cy="' + c + '" r="' + rO + '" class="ap-t0"/>' +
       '<circle cx="' + c + '" cy="' + c + '" r="' + rO + '" class="ap-t1" stroke-dasharray="' + (CO * t).toFixed(1) + ' ' + CO.toFixed(1) + '"/>' +
       '<circle cx="' + c + '" cy="' + c + '" r="' + rI + '" class="ap-c0" stroke-width="' + wI + '"/>' +
       (k > 0 ? '<circle cx="' + c + '" cy="' + c + '" r="' + rI + '" fill="none" stroke="' + COUL[et] + '" stroke-width="' + wI + '" stroke-linecap="round" stroke-dasharray="' + (CI * k).toFixed(1) + ' ' + CI.toFixed(1) + '"/>' : '') +
-      '</g><circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="7" class="ap-ici"/></svg><div class="ap-dc">' + centre + '</div></div>';
+      '</g><circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="7" class="ap-ici"/></svg><div class="ap-dc" aria-hidden="true">' + centre + '</div>' + (apres || '') + '</div>';
   }
   // petit anneau autour d'une icône (postes)
   function anneau(frac, et, icone, sz) {
@@ -52,6 +53,8 @@
   }
   const carte = (titre, droite, corps, attr, aide) => '<section class="ap-card"' + (attr || '') + '><h2>' + esc(titre) + (droite ? '<span class="r">' + droite + '</span>' : '') +
     (aide ? '<button type="button" class="ap-aide" ' + aide + ' aria-label="Comment c\'est calculé">?</button>' : '') + '</h2>' + corps + '</section>';
+  // 2.2 : carte dont les lignes ont des infos : ⓘ dans le titre
+  const carteInf = (titre, corps, attr) => '<section class="ap-card inf-l"' + (attr || '') + '><h2>' + esc(titre) + U().ib(titre) + '</h2>' + corps + '</section>';
   const lien = (attr, t) => '<button type="button" class="ap-lien" ' + attr + '>' + esc(t) + ' ›</button>';
 
   // ------------------------------------------------------------ barre de l'argent (calcul du reste à vivre, en couleurs)
@@ -67,7 +70,8 @@
     const bar = '<div class="ap-mbar" role="img" aria-label="' + esc(vis.map(p => p[1] + ' ' + e0(p[2])).join(', ')) + '">' +
       pos.map(p => '<i class="m-' + p[0] + '" style="flex:' + Math.round(p[2]) + '"></i>').join('') + (depasse ? '<i class="m-dep" style="flex:' + Math.round(-c.reste) + '"></i>' : '') + '</div>';
     const leg = '<div class="ap-mleg">' + vis.map(p => '<span><i class="m-' + (p[0] === 'libre' && p[2] < 0 ? 'dep' : p[0]) + '"></i><b class="num">' + e0(p[2]) + '</b><small>' + esc(p[0] === 'libre' && p[2] < 0 ? 'dépassement' : p[1]) + '</small></span>').join('') + '</div>';
-    return '<div class="ap-mtete"><span>' + (comptes ? 'Comptes courants' : 'Salaire' + (c.date ? ' du ' + U().jjmm(c.date) : '')) + '</span><b class="num">' + e0(c.base) + '</b></div>' + bar + leg;
+    // 2.2 : la date du salaire en info (ⓘ)
+    return '<div class="ap-mtete inf-l"><span>' + (comptes ? 'Comptes courants' : 'Salaire' + (c.date ? U().ib('Salaire') + U().inf('reçu le ' + esc(U().jjmm(c.date)), 'enc') : '')) + '</span><b class="num">' + e0(c.base) + '</b></div>' + bar + leg;
   }
 
   // montant court d'une case du fil des jours : « 950 € », « 1,3 k€ » (le montant exact est dans la liste dépliée)
@@ -87,7 +91,7 @@
     const apres = L.filter(e => e.date >= plusJours(auj, 7));
     if (suite) cases += '<span class="ap-suite">' + suite + '</span>';
     const liste = L.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0).map(e =>
-      '<li><span class="d num">' + esc(U().jjmm(e.date)) + '</span><span class="l">' + esc(e.label) + '<small>' + esc({ contrat: 'contrat', recurrent: 'prélèvement récurrent', carte: 'carte à débit différé' }[e.sorte] || '') + (scope === 'tout' ? ' · ' + (e.scope === 'commun' ? 'commun' : 'perso') : '') + '</small></span><b class="num">' + esc(F().montant(e.montant)) + '</b></li>').join('');
+      '<li><span class="d num">' + esc(U().jjmm(e.date)) + '</span><span class="l">' + esc(e.label) + '<small class="inf">' + esc({ contrat: 'contrat', recurrent: 'prélèvement récurrent', carte: 'carte à débit différé' }[e.sorte] || '') + (scope === 'tout' ? ' · ' + (e.scope === 'commun' ? 'commun' : 'perso') : '') + '</small></span><b class="num">' + esc(F().montant(e.montant)) + '</b></li>').join('');
     return '<div class="ap-days">' + cases + '</div>' + (L.length ? '<details class="ap-plis"><summary>' + L.length + ' échéance' + (L.length > 1 ? 's' : '') + ' sur 31 jours' + (apres.length ? ' · ' + apres.length + ' après le ' + esc(jm(plusJours(auj, 6))) : '') + '</summary><ul class="ap-ech">' + liste + '</ul></details>'
       : '<p class="ap-note">Aucune échéance connue dans les 31 prochains jours.</p>');
   }
@@ -236,8 +240,7 @@
       tu += '<button type="button" class="ap-tile" data-aller="equilibre" aria-label="' + esc('Équilibre de l\'indivision : ' + (Math.abs(gap) < 100 ? 'atteint' : nom(aqui) + ' doit encore investir ' + e0(Math.abs(gap))) + (E.dateEquilibre ? ', équilibre vers ' + U().mLabel(E.dateEquilibre) : '')) + '">' +
         '<span class="h">Équilibre</span><svg viewBox="0 0 150 70" aria-hidden="true" focusable="false"><polygon points="75,66 65,50 85,50" class="ap-piv"/><g transform="rotate(' + tilt.toFixed(1) + ' 75 48)"><rect x="10" y="44" width="130" height="6" rx="3" class="ap-plank"/>' +
         '<circle cx="26" cy="32" r="12" class="ap-pm"/><text x="26" y="37" text-anchor="middle">' + ini('moi') + '</text><circle cx="124" cy="32" r="12" class="ap-pa"/><text x="124" y="37" text-anchor="middle">' + ini('autre') + '</text></g></svg>' +
-        '<b class="num">' + (Math.abs(gap) < 100 ? 'atteint' : e0(Math.abs(gap))) + '</b><small>' + esc(Math.abs(gap) < 100 ? '50 / 50' : 'à combler par ' + nom(aqui)) + '</small>' +
-        '<small>' + esc(E.dateEquilibre ? 'vers ' + U().mLabel(E.dateEquilibre) : 'au rythme actuel : jamais') + '</small></button>';
+        '<b class="num">' + (Math.abs(gap) < 100 ? 'atteint' : e0(Math.abs(gap))) + '</b><small>' + esc(Math.abs(gap) < 100 ? '50 / 50' : 'à combler par ' + nom(aqui)) + '</small></button>';
     }
     if (T && T.months && T.months.length) {
       const vals = T.months.map(m => m.low), mx = Math.max(...vals, 1), mn = Math.min(...vals, 0), W = 140, H = 54;
@@ -248,7 +251,7 @@
         '<span class="h">12 prochains mois</span><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="' + d0 + ' L' + x(vals.length - 1).toFixed(1) + ' ' + H + ' L2 ' + H + ' Z" class="ap-area"/>' +
         '<path d="' + d0 + '" class="ap-line"/>' + (seuil > 0 || mn < 0 ? '<line x1="2" x2="' + (W - 2) + '" y1="' + y(Math.max(seuil, 0)).toFixed(1) + '" y2="' + y(Math.max(seuil, 0)).toFixed(1) + '" class="ap-floor"/>' : '') +
         '<circle cx="' + x(iMin).toFixed(1) + '" cy="' + y(vals[iMin]).toFixed(1) + '" r="4" class="ap-low"/></svg>' +
-        '<b class="num' + (T.min < 0 ? ' bad-t' : '') + '">' + esc(F().solde(T.min)) + '</b><small>point bas le ' + esc(U().jjmm(T.minAt)) + '</small>' + (T.negAt ? '<small class="bad-t">découvert le ' + esc(U().jjmm(T.negAt)) + '</small>' : '') + '</button>';
+        '<b class="num' + (T.min < 0 ? ' bad-t' : '') + '">' + esc(F().solde(T.min)) + '</b><small>point bas</small>' + (T.negAt ? '<small class="bad-t">découvert le ' + esc(U().jjmm(T.negAt)) + '</small>' : '') + '</button>';
     }
     if (tu) h += '<div class="ap-tiles">' + tu + '</div>';
     // répartition du solde
@@ -283,11 +286,12 @@
         const V = res.T.courante, O = res.T.optionnelle, bud = V.p + O.p, conso = bud > DEMI ? (V.c + O.c) / bud : 0;
         const temps = Math.min(1, res.jour / (res.nbJours || 1)), et = c.reste < -DEMI ? 'bad' : etat(conso, temps);
         const nom = 'Reste à vivre ' + e0(c.reste) + (c.reste < -DEMI ? ' en dépassement' : '') + ' jusqu\'au ' + U().jjmm(rav.fin) + ', jour ' + res.jour + ' sur ' + res.nbJours + ', budget variable consommé à ' + Math.round(conso * 100) + ' %';
-        h += '<div class="ap-hero">' + cadran(temps, conso, et, '<span class="lbl">Reste à vivre</span><span class="v num' + (c.reste < -DEMI ? ' bad-t' : '') + '">' + esc(e0(c.reste)) + (c.reste < -DEMI ? '<small> dépassé</small>' : '') + '</span>' +
-          '<span class="s">jusqu\'au ' + esc(jm(rav.fin)) + '</span><span class="j num">jour ' + res.jour + '/' + res.nbJours + '</span>', nom) +
-          '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>variable dépensé ' + Math.round(conso * 100) + ' %</span></div>' +
+        // 2.2 : montant à la couleur du côté (Moi bleu) ; échéance, jour et légende du cadran en info (ⓘ)
+        h += '<div class="ap-hero moi inf-l">' + cadran(temps, conso, et, '<span class="lbl">Reste à vivre</span><span class="v num">' + esc(e0(c.reste)) + (c.reste < -DEMI ? '<small class="bad-t"> dépassé</small>' : '') + '</span>', nom, U().ib('Reste à vivre')) +
+          '<div class="inf enc ap-enc"><p>jusqu\'au ' + esc(jm(rav.fin)) + ' · jour ' + res.jour + ' sur ' + res.nbJours + '</p>' +
+          '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>variable dépensé ' + Math.round(conso * 100) + ' %</span></div></div>' +
           U().interrupteurRav(x.choix, !!rav.comptes, { salaire: rav.budget.reste, comptes: rav.comptes ? rav.comptes.reste : null }) + '</div>';
-        h += carte('Où va l\'argent', '', barreArgent(x) + lien('data-aller="rav"', 'Le calcul sur les deux bases'), ' data-mesure="argent"', 'data-aller="rav"');
+        h += carte('Où va l\'argent', '', barreArgent(x), ' data-mesure="argent"', 'data-aller="rav"');
       } else h += VA().reste(res, KB().baseRav(d.S));
       // la ligne « N observations à faire » n'est pas répétée : la carte « À faire » (plus bas) les montre déjà
       h += VA().aVerifier(Vu().lignesAVerifier(d.S, d.now, d.ext).filter(l => l.cle !== 'observations'));
@@ -301,15 +305,16 @@
     const temps = res ? Math.min(1, res.jour / (res.nbJours || 1)) : 0;
     const P = res ? NATS.reduce((t, [k]) => t + res.sections[k].p, 0) : 0, Cn = res ? NATS.reduce((t, [k]) => t + res.sections[k].c, 0) : 0;
     const conso = P > DEMI ? Cn / P : 0, et = fdm.end < -DEMI || fdm.decouvert ? 'bad' : etat(conso, temps);
-    h += '<div class="ap-hero nous">' + cadran(temps, conso, et, '<span class="lbl">Fin de mois estimée</span><span class="v num' + (fdm.end < -DEMI ? ' bad-t' : '') + '">' + esc(e0(fdm.end)) + (fdm.end < -DEMI ? '<small> débiteur</small>' : '') + '</span>' +
-      '<span class="s">solde ' + esc(e0(fdm.solde)) + (fdm.solde < 0 ? ' débiteur' : '') + '</span>' + (res ? '<span class="j num">jour ' + res.jour + '/' + res.nbJours + '</span>' : ''),
-      'Fin de mois estimée du compte commun ' + e0(fdm.end) + ', solde ' + F().solde(fdm.solde)) +
+    // 2.2 : montant à la couleur du côté (Nous orange) ; jour, légende et calcul de la fin de mois en info (ⓘ)
+    h += '<div class="ap-hero nous inf-l">' + cadran(temps, conso, et, '<span class="lbl">Fin de mois estimée</span><span class="v num">' + esc(e0(fdm.end)) + (fdm.end < -DEMI ? '<small class="bad-t"> débiteur</small>' : '') + '</span>',
+      'Fin de mois estimée du compte commun ' + e0(fdm.end) + ', solde ' + F().solde(fdm.solde), U().ib('Fin de mois estimée')) +
+      '<div class="inf enc ap-enc">' + (res ? '<p>jour ' + res.jour + ' sur ' + res.nbJours + '</p>' : '') +
       '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>budget du commun ' + Math.round(conso * 100) + ' %</span></div>' +
       // calcul de la fin de mois (avant 2.1 : carte « Fin de mois estimée » de l'écran Commun), provisions, prélèvements à venir
       '<p class="ap-calc">solde ' + esc(F().solde(fdm.solde)) + ' − prélèvements à venir ' + esc(F().montant(fdm.due || 0)) + (fdm.route ? ' + en route ' + esc(F().montant(fdm.route)) : '') +
         (fdm.inc ? ' + virements attendus ' + esc(F().montant(fdm.inc)) : '') + (fdm.reserve > DEMI ? ' − provisions en cours ' + esc(F().montant(fdm.reserve)) : '') + '</p>' +
       (fdm.aVenir && fdm.aVenir.length ? '<p class="ap-calc">à venir : ' + esc(fdm.aVenir.join(', ')) + '</p>' : '') +
-      (fdm.reserve > DEMI ? '<p class="ap-calc">provisions en cours ' + esc(F().montant(fdm.reserve)) + ' · mis de côté : ' + esc(Vu().provisionsTexte(fdm.reserveDet)) + '</p>' : '') +
+      (fdm.reserve > DEMI ? '<p class="ap-calc">provisions en cours ' + esc(F().montant(fdm.reserve)) + ' · mis de côté : ' + esc(Vu().provisionsTexte(fdm.reserveDet)) + '</p>' : '') + '</div>' +
       (fdm.decouvert ? '<p class="ap-warn">découvert si les prélèvements passent avant les virements</p>' : '') + '</div>';
     // à vérifier : les opérations du commun (la liste s'ouvre sur le périmètre Commun)
     const n = +d.avCommun || 0;
@@ -335,8 +340,7 @@
       tu += '<button type="button" class="ap-tile" data-aller="equilibre" aria-label="' + esc('Équilibre de l\'indivision : ' + (Math.abs(gap) < 100 ? 'atteint' : nom(aqui) + ' doit encore investir ' + e0(Math.abs(gap))) + (E.dateEquilibre ? ', équilibre vers ' + U().mLabel(E.dateEquilibre) : '')) + '">' +
         '<span class="h">Équilibre</span><svg viewBox="0 0 150 70" aria-hidden="true" focusable="false"><polygon points="75,66 65,50 85,50" class="ap-piv"/><g transform="rotate(' + tilt.toFixed(1) + ' 75 48)"><rect x="10" y="44" width="130" height="6" rx="3" class="ap-plank"/>' +
         '<circle cx="26" cy="32" r="12" class="ap-pm"/><text x="26" y="37" text-anchor="middle">' + ini('moi') + '</text><circle cx="124" cy="32" r="12" class="ap-pa"/><text x="124" y="37" text-anchor="middle">' + ini('autre') + '</text></g></svg>' +
-        '<b class="num">' + (Math.abs(gap) < 100 ? 'atteint' : e0(Math.abs(gap))) + '</b><small>' + esc(Math.abs(gap) < 100 ? '50 / 50' : 'à combler par ' + nom(aqui)) + '</small>' +
-        '<small>' + esc(E.dateEquilibre ? 'vers ' + U().mLabel(E.dateEquilibre) : 'au rythme actuel : jamais') + '</small></button>';
+        '<b class="num">' + (Math.abs(gap) < 100 ? 'atteint' : e0(Math.abs(gap))) + '</b><small>' + esc(Math.abs(gap) < 100 ? '50 / 50' : 'à combler par ' + nom(aqui)) + '</small></button>';
     }
     if (T && T.months && T.months.length) {
       const vals = T.months.map(m => m.low), mx = Math.max(...vals, 1), mn = Math.min(...vals, 0), W = 140, H = 54;
@@ -347,7 +351,7 @@
         '<span class="h">12 prochains mois</span><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="' + d0 + ' L' + x(vals.length - 1).toFixed(1) + ' ' + H + ' L2 ' + H + ' Z" class="ap-area"/>' +
         '<path d="' + d0 + '" class="ap-line"/>' + (seuil > 0 || mn < 0 ? '<line x1="2" x2="' + (W - 2) + '" y1="' + y(Math.max(seuil, 0)).toFixed(1) + '" y2="' + y(Math.max(seuil, 0)).toFixed(1) + '" class="ap-floor"/>' : '') +
         '<circle cx="' + x(iMin).toFixed(1) + '" cy="' + y(vals[iMin]).toFixed(1) + '" r="4" class="ap-low"/></svg>' +
-        '<b class="num' + (T.min < 0 ? ' bad-t' : '') + '">' + esc(F().solde(T.min)) + '</b><small>point bas le ' + esc(U().jjmm(T.minAt)) + '</small>' + (T.negAt ? '<small class="bad-t">découvert le ' + esc(U().jjmm(T.negAt)) + '</small>' : '') + '</button>';
+        '<b class="num' + (T.min < 0 ? ' bad-t' : '') + '">' + esc(F().solde(T.min)) + '</b><small>point bas</small>' + (T.negAt ? '<small class="bad-t">découvert le ' + esc(U().jjmm(T.negAt)) + '</small>' : '') + '</button>';
     }
     return tu ? '<div class="ap-tiles">' + tu + '</div>' : '';
   }
@@ -355,7 +359,7 @@
   function bas(d, scope) {
     if (!d.B) return '';
     const nous = scope === 'commun';
-    return carte('Prochains jours', '', filJours(d.ech, d.B.auj, nous ? 'commun' : 'perso', nous ? '' : paie(d.res)), ' data-mesure="' + (nous ? 'jours-commun' : 'jours') + '"');
+    return carteInf('Prochains jours', filJours(d.ech, d.B.auj, nous ? 'commun' : 'perso', nous ? '' : paie(d.res)), ' data-mesure="' + (nous ? 'jours-commun' : 'jours') + '"');
   }
 
   // Écran complet. d : mêmes données que KladVuesAccueil.ecran ; cote : « moi » ou « nous ».

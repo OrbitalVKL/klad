@@ -6,6 +6,10 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.2.0** — lecture rapide : infos additionnelles (dates, formules, explications, sous-titres) derrière un ⓘ dans toute
+l'appli ; montant du cadran à la couleur du côté ; plus de postes dépassés en tête du budget ; « + Ajouter un poste »
+seulement dans « Régler le budget » (retour du propriétaire du 09/11, maquette validée : ⓘ partout, toute l'appli).
+
 **2.1.0** — budget fusionné dans l'Aperçu (retour du propriétaire, 08/11 : « l'Aperçu est une surcouche redondante, on
 devait juste améliorer l'interface », « la nouvelle interface doit suivre pour le réglage du budget, ne perdre aucune
 information » ; maquettes validées puis « go »). Aperçu Moi = écran Budget, Aperçu Nous = écran Commun ; budget en
@@ -107,6 +111,32 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.2.0 — détails techniques
+- Mécanisme (`ui.js`) : `.inf` = info masquée (CSS `display:none!important`), visible quand un ancêtre `.inf-l` a
+  `.inf-on` ou, reliée à un bouton (`data-inf-of` ↔ `data-inf-k`), quand elle a `.inf-vu` ; `.inf.inl` se montre dans la
+  ligne, `.inf.enc` en encart. `U.ib(nom, k)` : bouton ⓘ (`.inf-b`, `aria-expanded`, zone d'appui 48 dp par `::after`) ;
+  `U.inf(html, cls)`. Clic global en capture sur `.inf-b` / `.inf-t` (`preventDefault` + `stopPropagation` : ni repli
+  du titre, ni ouverture de la ligne). Titre dépliant (`h2.fold`) : le ⓘ est posé à côté, pas dedans ; `summary` : tout à
+  droite.
+- Pose automatique (`U.infos`, observateur de mutations sur `body`) : 1) aide de formulaire `.muted.small`, `.rg-aide` →
+  ⓘ sur le libellé (`label`, `.rg-l`) ou le titre qui précède ; 2) zones `.inf-auto` (`#cm-plan`, `#cm-com`, `#cm-tres`,
+  `#tend-panel`, `#ctr-zone`, `#view-appart`, `#view-impots`, `#view-epargne`, `#view-crypto`, `#view-plus`,
+  `#view-data`, `#view-save`, `#voletCorps`) : `.subs`, `small`, `.muted`, `p.note` sans montant (`.num`), sans alerte
+  ni état (`.bad-t`, `.warn-t`, `.pos-t`, `.chip`), hors `.vis`, `[aria-live]`, `label`, `summary`, titres, dépliants
+  (sauf `.cm-sub`, `.ctr-sub`) et états vides (« Aucun… ») → un ⓘ par bloc (`details`, carte, `.panel`, `section`…)
+  posé sur son titre. Garder un texte visible : classe `vis`.
+- Pose explicite : `vapercu.js` (cadran : `cadran(…, apres)` reçoit le ⓘ, encart `.ap-enc` ; `.ap-hero.moi/.nous` pour la
+  couleur du montant ; carte `carteInf` pour Prochains jours ; tuiles sans date), `vaccueil.js` (`li(…, etat)` : sous-texte
+  en info sauf état ; carte avec infos → ⓘ du titre ; heure du relevé en info), `vbudget.js` (en-tête : ⓘ de la carte à côté
+  du titre, dates de la période ; `pastille(st, tout)` ; résumé des sections `.bg-ss.inf` ; poste replié : sous-texte,
+  repères et cause en info ; plus de compteurs de section ni de « + Ajouter un poste » ; bilan `br()` et écarts : ⓘ par
+  ligne ; réglage : aides en info ; `ravM` commun : calcul `.cr-calc.inf` ; À faire : explication par ⓘ), `vcommun.js`
+  (`part()` : ⓘ par part), `vfisc.js` (`kpi`/`kp` : ⓘ par case ; barème ; résultat crypto visible), `vues.js` (compte et
+  « règle » d'une opération en info), `app.js` (Plus : `it(…, etat)`), `ecranbudget.js` (plus de bandeau des dépassés ;
+  `#budget-main` est `.inf-l`).
+- Tests : banc `B.infos()` (montre toutes les infos, pour vérifier que rien n'est perdu) ; tests adaptés : `ux`, `lot11`
+  (ⓘ du cadran), `parcours` (ⓘ de la période et du cadran Nous), `parite` (ⓘ des soldes), `demo`.
 
 ### 2.1.0 — détails techniques
 - Navigation (`app.js`) : `montrer('accueil')` ouvre `budget` (côté Moi) ou `commun` (côté Nous) sur leur page
@@ -1035,6 +1065,10 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 2.2.0
+- Nouveau texte d'explication : le mettre dans une `.inf` (ou laisser la pose automatique d'une zone `.inf-auto`) ; un
+  état ou un montant à garder visible : classe `vis` (ou un `.num`, `.chip`, `.bad-t`).
 
 ## Points d'appui laissés par la 2.1.0
 - Toute nouvelle donnée du budget va dans la carte du budget (`vbudget.js`, `suivi` / `plan` / `bilan`) ; du haut de

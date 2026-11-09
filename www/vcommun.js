@@ -91,7 +91,7 @@
         detailPostes(qui, tot) +
         (p > 0 ? '<div class="cmp-pon">' + chip('warn', 'virement ponctuel') + ' <b class="num">' + e0(p) + '</b> <span class="subs">une fois, ' + esc(pDate) + '</span></div>' : '') + '</div>';
     };
-    let h = '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Virements à mettre en place</h2><div class="row"><span class="muted">' +
+    let h = '<div class="panel-h"><h2 class="fold" role="button" tabindex="0" title="Replier / déplier">Virements à mettre en place</h2><div class="row"><span class="muted vis">' +
       (D.changes.length ? pl(D.changes.length, 'ordre') + ' à modifier' : 'ordres permanents conformes au budget') + (D.pon > 0 ? ' · 1 virement ponctuel' : '') + '</span>' +
       '<button class="btn" type="button" data-ouvrir="secVirements">Modifier les ordres</button></div></div>' +
       '<div class="cmp-grid">' + card('moi', R.moi) + card('autre', R.autre) + '</div>' + enRoute(B) +
@@ -232,11 +232,11 @@
     let h = '<section class="panel eq-hero" id="eq-hero" aria-label="Équilibre de l\'indivision"><div class="panel-h"><h2>Équilibre de l\'indivision</h2><span class="muted">objectif : 50 / 50</span></div>' +
       '<div class="eqh-bar" role="img" aria-label="' + esc(N.moi) + ' ' + Math.round(pM) + ' %, ' + esc(N.autre) + ' ' + Math.round(100 - pM) + ' %"><i class="g" style="width:' + pM.toFixed(1) + '%"><span>' + esc(N.moi) + ' <span class="hide-m">' + e0(R.invMoi) + ' · </span>' + Math.round(pM) + ' %</span></i>' +
       '<i class="s" style="width:' + (100 - pM).toFixed(1) + '%"><span>' + esc(N.autre) + ' <span class="hide-m">' + e0(R.invAutre) + ' · </span>' + Math.round(100 - pM) + ' %</span></i><em title="50 / 50"></em></div>' +
-      '<div class="eqh-figs"><div><span class="sb-l">Reste à combler</span><b class="num">' + (Math.abs(gap) < 100 ? '0 €' : e0(Math.abs(gap))) + '</b><span class="subs">' + (Math.abs(gap) < 100 ? 'équilibre atteint' : esc(qui) + ' doit encore investir de plus que ' + esc(autre)) + '</span></div>' +
+      '<div class="eqh-figs"><div><span class="sb-l">Reste à combler</span><b class="num">' + (Math.abs(gap) < 100 ? '0 €' : e0(Math.abs(gap))) + '</b><span class="subs vis">' + (Math.abs(gap) < 100 ? 'équilibre atteint' : esc(qui) + ' doit encore investir de plus que ' + esc(autre)) + '</span></div>' +
       '<div><span class="sb-l">Rattrapage par mois</span><b class="num">' + (Math.abs(rate) < 50 ? '0 €' : '+' + e0(Math.abs(rate))) + '</b><span class="subs">' + e0(R.mensMoi) + ' ' + esc(N.moi) + ' − ' + e0(R.mensAutre) + ' ' + esc(N.autre) + ' (postes « Équilibre »)' + (rate < -50 ? ', en faveur de ' + esc(N.autre) : '') + '</span></div>' +
       '<div class="main"><span class="sb-l">Équilibre atteint vers</span><b class="num">' + (R.dateEquilibre ? esc(mLabel(R.dateEquilibre)) : 'jamais') + '</b><span class="subs">' + (R.dateEquilibre ? 'dans ' + dur(R.mois) + ' au rythme actuel' : 'au rythme actuel, l\'écart ne se réduit pas') + '</span></div></div>' +
       '<div class="eqh-sim"><span class="sb-l">Simuler</span><label class="ctl">' + esc(qui) + ' ajoute <input type="text" inputmode="decimal" id="eqSimX" placeholder="0" value="' + (s.x ? esc(F().versSaisie(s.x)) : '') + '"> € / mois</label>' +
-      '<label class="ctl">versement ponctuel <input type="text" inputmode="decimal" id="eqSimY" placeholder="0" value="' + (s.y ? esc(F().versSaisie(s.y)) : '') + '"> €</label><span id="eqSimOut">' + simTxt + '</span></div></section>';
+      '<label class="ctl">versement ponctuel <input type="text" inputmode="decimal" id="eqSimY" placeholder="0" value="' + (s.y ? esc(F().versSaisie(s.y)) : '') + '"> €</label><span id="eqSimOut" aria-live="polite">' + simTxt + '</span></div></section>';
     // composition
     const line = (lab, a, b, note, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + lab + (note ? '<div class="subs">' + note + '</div>' : '') + '</td><td class="r num">' + e0(Math.abs(a)) + '</td><td class="r num">' + e0(Math.abs(b)) + '</td><td class="r num hide-s">' + e0(Math.abs(b - a)) + '</td></tr>';
     h += '<section class="panel" id="eq-compo-panel">' + U().tete('Comment chacun a investi', '<span class="muted">objectif : parts égales (indivision 50/50)</span>') +
@@ -283,7 +283,7 @@
     const ops = R.OPS.map((x, i) => x.concat([i])).filter(x => !fk || x[3] === fk).slice().reverse();
     h += '<section class="panel" id="eq-ops-panel">' + U().tete('Tous les mouvements du compte commun', '<select id="eq-kind" aria-label="Filtrer par nature"><option value="">Tous</option>' + Object.keys(R.libelles).map(k => '<option value="' + k + '"' + (k === fk ? ' selected' : '') + '>' + esc(R.libelles[k]) + '</option>').join('') + '</select>') +
       '<div id="eq-ops-nat" class="eq-nat">' + ks.map(k => '<button type="button" class="eqn' + (fk === k ? ' on' : '') + '" data-eqk="' + k + '"><span>' + esc(R.libelles[k]) + '</span><b class="num' + (R.S[k] > 0 ? ' pos-t' : '') + '">' + (R.S[k] > 0 ? '+' : '') + e0(Math.abs(R.S[k])) + '</b></button>').join('') + '</div>' +
-      '<p class="note" id="eq-ops-sum" style="margin-top:0">' + pl(ops.length, 'mouvement') + ', ' + (() => { const t = ops.reduce((x, y) => x + y[2], 0); return t < 0 ? 'sorties nettes ' + e2(-t) : 'entrées nettes ' + e2(t); })() + '</p>' +
+      '<p class="note vis" id="eq-ops-sum" style="margin-top:0">' + pl(ops.length, 'mouvement') + ', ' + (() => { const t = ops.reduce((x, y) => x + y[2], 0); return t < 0 ? 'sorties nettes ' + e2(-t) : 'entrées nettes ' + e2(t); })() + '</p>' +
       '<div class="scroll tablewrap"><table class="tx"><thead><tr><th>Date</th><th>Nature</th><th>Libellé</th><th style="text-align:right">Montant</th></tr></thead><tbody id="eq-ops">' +
       ops.slice(0, 600).map(([d, l, a, k, i]) => '<tr><td class="num">' + dfr(d) + '</td><td>' + esc(R.libelles[k] || k) + (R.mentions && R.mentions.get(i) ? '<div class="subs">' + esc(R.mentions.get(i)) + '</div>' : '') + '</td><td class="lab">' + esc(l) + '</td><td class="amt' + (a > 0 ? ' pos' : '') + '">' + (a > 0 ? '+' : '') + e2(Math.abs(a)) + '</td></tr>').join('') +
       (ops.length > 600 ? '<tr><td colspan="4" class="muted">et ' + (ops.length - 600) + ' mouvements plus anciens</td></tr>' : '') + '</tbody></table></div>' +
@@ -340,7 +340,8 @@
     const R = KC().reglages(B), u = ui || {};
     let h = '<div class="panel-h"><h2>Le compte commun ce mois-ci</h2><span class="muted">répartition du solde</span></div>';
     // décomposition du solde
-    const part = (lab, v, sub, cls) => '<div class="cd-p' + (cls ? ' ' + cls : '') + '"><span class="sb-l">' + esc(lab) + '</span><b class="num">' + s2(v) + '</b>' + (sub ? '<span class="subs">' + esc(sub) + '</span>' : '') + '</div>';
+    // 2.2 : ce que recouvre chaque part (ex. Enveloppes : impôts) en info (ⓘ)
+    const part = (lab, v, sub, cls) => '<div class="cd-p inf-l' + (cls ? ' ' + cls : '') + '"><span class="sb-l">' + esc(lab) + (sub ? U().ib(lab) : '') + '</span><b class="num">' + s2(v) + '</b>' + (sub ? '<span class="subs inf enc">' + esc(sub) + '</span>' : '') + '</div>';
     // 1.3.6 : plus de ligne « Solde » (déjà en tête de l'écran) : les quatre parts seulement
     h += '<div class="cm-decomp" aria-label="Répartition du solde du compte commun (' + esc(s2(D.solde)) + ')"><div class="cd-parts">' +
       part('Disponible', D.disponible, D.disponible < -0.5 ? 'pris sur les enveloppes et la réserve' : 'pour les dépenses du mois', D.disponible < -0.5 ? 'neg' : '') +

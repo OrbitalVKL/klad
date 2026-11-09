@@ -31,7 +31,7 @@
     const res = I.chercher(q);
     const z = $('icGrille');
     if (!z) return;
-    z.innerHTML = res.length ? res.slice(0, MAX).map(n => bouton(n, ic, col)).join('') + (res.length > MAX ? '<p class="muted small ic-plus">' + (res.length - MAX) + ' autres : précisez la recherche.</p>' : '')
+    z.innerHTML = res.length ? res.slice(0, MAX).map(n => bouton(n, ic, col)).join('') + (res.length > MAX ? '<p class="muted small ic-plus vis">' + (res.length - MAX) + ' autres : précisez la recherche.</p>' : '')
       : '<p class="muted">Aucune icône pour « ' + esc(q) + ' ». Essayez un autre mot : courses, bar, essence, loyer, sport, impôts…</p>';
     $('icNb').textContent = q ? res.length + ' icône' + (res.length > 1 ? 's' : '') : '';
   }

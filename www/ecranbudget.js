@@ -54,7 +54,8 @@
     // 1.3.0 : décomposition du solde, renflouement, fiche du mois, enveloppes et avances (le plan poste par poste est dans « Virements à mettre en place » depuis la 1.3.1)
     const com = scope === 'commun' && VC && VC.mois ? (() => { try { return VC.mois(B, ui); } catch (e) { A.log('err', 'Commun (ce mois) : ' + (e.message || e)); return ''; } })() : '';
     $('cm-com').innerHTML = com; $('cm-com').hidden = !com;
-    sur('budget-main', () => VB.teteBudget(B, scope, ui) + (ui.mode === 'plan' ? VB.plan(B, scope, { ouverts: ui.ouvertsPlan }) : depasses(B, scope) + VB.suivi(B, scope, ui).html));
+    sur('budget-main', () => VB.teteBudget(B, scope, ui) + (ui.mode === 'plan' ? VB.plan(B, scope, { ouverts: ui.ouvertsPlan }) : VB.suivi(B, scope, ui).html));
+    $('budget-main').classList.add('inf-l');      // 2.2 : ⓘ du titre = toutes les infos de la carte
     sur('tend-panel', () => VB.tendance(B, scope, tend, periodeTendance(B)));
     sur('ctr-zone', () => '<section class="panel" id="p-contrats">' + VB.contrats(B, scope, ui.ctrEdit) + '</section>');
     plis($('view-budget'));
@@ -63,13 +64,7 @@
     const seule = scope === 'perso' ? { tendance: 'tend-panel', contrats: 'p-contrats' }[sv] : null;
     for (const id of ['tend-panel', 'p-contrats']) { const p = $(id); if (p) { p.classList.toggle('force-open', id === seule); U.appliquerPli(p); } }
   }
-  // Suivi : postes dépassés d'abord, en bandeau (mêmes chiffres que les sections du budget, KladBudget.suivi).
-  function depasses(B, scope) {
-    const res = KB.suivi(B, scope, ui.nav), L = (res.depasses || []).filter(a => a.on && a.pm > 50);
-    if (!L.length) return '';
-    return '<div class="bg-dep" role="group" aria-label="Postes dépassés">' + (window.KladIcones ? window.KladIcones.svg('triangle-alert', 16) : '') + '<span><b>' + L.length + ' poste' + (L.length > 1 ? 's' : '') + ' dépassé' + (L.length > 1 ? 's' : '') + '</b>' +
-      L.map(a => '<span class="bg-dr"> · ' + U.esc(a.label) + ' <span class="num">' + U.esc(KB.eur(a.cur)) + ' / ' + U.esc(KB.eur(a.pm)) + '</span> <span class="bad-t">dépassé de ' + U.esc(KB.eur(a.cur - a.pm)) + '</span></span>').join('') + '</span></div>';
-  }
+  // 2.2 : plus de bandeau des postes dépassés (doublon des « Plus gros écarts » en bas du budget)
   // Choix d'une sous-vue (barre en haut de Budget, de Commun et de l'écran Équilibre).
   function sousVue(k) {
     const scope = A.vue() === 'appartement' ? 'commun' : A.scope();

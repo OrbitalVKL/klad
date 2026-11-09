@@ -206,5 +206,14 @@ export async function ouvrir(o) {
     await pause(60);
   }
   async function fin() { await browser.close(); srv.close(); }
-  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, barre, ecransPrincipaux, ecransPlus, theme, texte, fin, phrase: groupes.join('-') };
+  // 2.2 : montrer toutes les infos (ce que verrait quelqu'un qui a touché chaque ⓘ), pour vérifier qu'aucune n'est perdue
+  async function infos(v = true) {
+    await page.evaluate(v => {
+      let st = document.getElementById('banc-infos');
+      if (!st) { st = document.createElement('style'); st.id = 'banc-infos'; document.head.appendChild(st); }
+      st.textContent = v ? '.inf{display:revert!important}' : '';
+    }, v);
+    await pause(60);
+  }
+  return { page, ctx, erreurs, code, pause, verrouiller, fermer, onglet, operationsPerso, onglets, barre, ecransPrincipaux, ecransPlus, theme, texte, infos, fin, phrase: groupes.join('-') };
 }

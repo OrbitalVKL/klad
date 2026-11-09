@@ -20,6 +20,7 @@ test('accueil : chiffres identiques aux calculs et aux écrans d\'origine', { sk
   const B = await ouvrir({});
   try {
     const { page } = B;
+    await B.infos();      // 2.2 : chaque info derrière un ⓘ compte (rien n'est perdu)
     const norm = t => t.replace(/[\s\u00a0\u202f]+/g, ' ');
     const texte = async sel => norm(await page.locator(sel).first().innerText());
     const attendu = await page.evaluate(() => {

@@ -21,13 +21,14 @@
   const mLabel = m => MOIS[+m.slice(5, 7) - 1] + ' ' + m.slice(2, 4);
   const chip = (n, t) => '<span class="chip ' + n + '">' + esc(t) + '</span>';
   const LV = { warn: 'À faire', info: 'Info', good: 'OK', bad: 'Action' };
-  const kpi = (t, v, s, cls) => '<div class="kpi"><small>' + esc(t) + '</small><b class="' + (cls || '') + '">' + v + '</b><small>' + s + '</small></div>';
+  // 2.2 : le détail d'une case (formule, date, qui) en info (ⓘ sur son titre)
+  const kpi = (t, v, s, cls) => '<div class="kpi' + (s ? ' inf-l' : '') + '"><small>' + esc(t) + (s ? U().ib(t) : '') + '</small><b class="' + (cls || '') + '">' + v + '</b>' + (s ? '<small class="inf enc">' + s + '</small>' : '') + '</div>';
   const alerte = a => '<li class="obs ' + a.lvl + '">' + chip(a.lvl, LV[a.lvl] || a.lvl) + '<div><b>' + esc(a.t) + '</b>' + (a.p ? '<p>' + esc(a.p) + '</p>' : '') + '</div></li>';
   const pct1 = v => KF().pct1(v);
 
   // ------------------------------------------------------------ impôts (écran Impôts, comme l'ancienne version)
   // opt : { annee, lecture: bool (extra Claude : lecture des bulletins et avis), analyse: bool, texteAnalyse }.
-  const kp = (t, v, s, cls) => '<div class="kpi"><span class="eyebrow">' + esc(t) + '</span><span class="v' + (cls ? ' ' + cls : '') + '">' + v + '</span><span class="s">' + s + '</span></div>';
+  const kp = (t, v, s, cls) => '<div class="kpi' + (s ? ' inf-l' : '') + '"><span class="eyebrow">' + esc(t) + (s ? U().ib(t) : '') + '</span><span class="v' + (cls ? ' ' + cls : '') + '">' + v + '</span>' + (s ? '<span class="s inf enc">' + s + '</span>' : '') + '</div>';
   const tete = (titre, apres) => g.KladUI.tete(titre, apres);
   const comment = t => g.KladUI.comment(t);
   const li = a => '<li><span class="chip ' + esc(a.lvl) + '">' + (LV[a.lvl] || a.lvl) + '</span><div><b>' + esc(a.t) + '</b>' + (a.p ? '<div class="subs">' + esc(a.p) + '</div>' : '') + '</div></li>';
@@ -58,10 +59,11 @@
         kp('Revenu fiscal de réf.', eu(R.av.rfr || 0), (R.av.parts || 2) + ' parts');
     }
     let h = '<section class="panel eq-hero" id="tx-hero" aria-label="Synthèse des impôts"><div class="panel-h"><h2>Impôt sur le revenu du foyer</h2>' + seg + '</div><div class="kpis">' + k + '</div>' +
-      '<div class="tx-meta">' + (P.st === 'projet' ? chip('warn', 'barème en projet') : chip('good', 'barème voté')) + '<span>' + esc(P.lab) + '</span><span>· déclaration commune (PACS), 2 parts</span><span>· tranche marginale ' + Fo.B.tmi + ' %</span>' + (Fo.B.dec ? '<span>· décote ' + eu(Fo.B.dec) + '</span>' : '') + '</div></section>';
+      // 2.2 : l'état du barème visible, son détail en info (ⓘ)
+      '<div class="tx-meta inf-l">' + (P.st === 'projet' ? chip('warn', 'barème en projet') : chip('good', 'barème voté')) + U().ib('Barème') + '<span class="inf enc">' + esc(P.lab) + ' · déclaration commune (PACS), 2 parts · tranche marginale ' + Fo.B.tmi + ' %' + (Fo.B.dec ? ' · décote ' + eu(Fo.B.dec) : '') + '</span></div></section>';
     // observations et régularisations
     const RG = KF().regularisations(X), AL = KF().alertes(X, R), nW = AL.filter(a => a.lvl === 'warn').length;
-    h += '<section class="panel obs-panel" id="tx-obs">' + tete('À régler et à suivre', '<span class="muted" id="tx-obs-n">' + (nW ? nW + ' point(s) à suivre' : 'rien d\'urgent') + '</span>') +
+    h += '<section class="panel obs-panel" id="tx-obs">' + tete('À régler et à suivre', '<span class="muted vis" id="tx-obs-n">' + (nW ? nW + ' point(s) à suivre' : 'rien d\'urgent') + '</span>') +
       '<div id="tx-regul" class="tx-regul"><h3 class="obs-h3">À régulariser entre vous</h3>' + RG.map(r => '<div class="cr-r"><span class="cr-l">' + esc(r.per) + '<span class="subs">' + esc(r.kind === 'avis' ? (r.done ? 'Rien à régulariser.' : 'Partage : ' + KF().PART_RULES[FI.hyp.partage || 'seul'][0].toLowerCase() + '.') : r.txt) + '</span></span><b>' +
         (r.kind === 'avis' ? (r.done ? 'à jour' : esc(W[r.from]) + ' verse ' + eu(r.amt) + ' à ' + esc(W[r.to])) : (r.solde >= 0 ? 'solde ≈ ' + eu(r.solde) : 'remboursement ≈ ' + eu(r.solde))) + '</b></div>').join('') + '</div>' +
       '<h3 class="obs-h3">Points à suivre</h3><ul class="alerts" id="tx-alerts">' + AL.map(li).join('') + '</ul>' +
@@ -84,7 +86,7 @@
         '<tr class="tx-proj"><td>' + Y + '</td><td>dont ' + esc(W.s) + (R.pas.est ? ' (estimé au prorata)' : '') + '</td><td class="r num">' + eu(R.av.sal.s) + '</td><td></td><td class="r num">' + eu(R.pas.s) + '</td><td></td></tr>';
     }
     const nb = Object.keys(FI.bs).length;
-    h += '<section class="panel" id="tx-pas-panel">' + tete('Prélèvement à la source', '<div class="row"><span class="muted" id="tx-bs-st">' + (nb ? nb + ' bulletin(s) lu(s)' : 'aucun bulletin lu') + '</span>' + boutonLire + '</div>') +
+    h += '<section class="panel" id="tx-pas-panel">' + tete('Prélèvement à la source', '<div class="row"><span class="muted vis" id="tx-bs-st">' + (nb ? nb + ' bulletin(s) lu(s)' : 'aucun bulletin lu') + '</span>' + boutonLire + '</div>') +
       '<div class="tablewrap"><table class="cats" id="tx-pas"><thead><tr><th>Paiement</th><th>Employeur</th><th class="r">Net imposable</th><th>Taux</th><th class="r">Prélevé</th><th class="r">Cumul</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       comment('Net imposable, taux, type de taux et montant prélevé de chaque bulletin de paie' + (o.lecture ? ' (lus par l\'ancienne version, ou par Claude avec « Lire un bulletin » : aperçu et confirmation avant enregistrement)' : ' (lus par l\'ancienne version)') + '. Chaque salaire est rattaché à l\'année de son paiement. Les mois restants sont projetés avec le dernier bulletin.') + '</section>';
     // calcul détaillé
@@ -256,7 +258,8 @@
       h += '<div class="kpis">' + kp('Valeur', eu2(C.valeur / 100), 'investi ' + eu2(C.investi / 100)) + kp('Résultat', gp(C.ecart), C.positions.length + ' position' + (C.positions.length > 1 ? 's' : '')) + '</div>';
       if (C.aMettreAJour.length) h += '<p class="note cr-maj">Valeur à mettre à jour (plus de ' + KF().CRYPTO_JOURS + ' jours) : ' + C.aMettreAJour.map(p => esc(p.nom)).join(', ') + '.</p>';
       h += '<ul class="list cr-list">' + C.positions.map(p => edit === p.id ? '<li>' + form(p) + '</li>' :
-        '<li><div class="grow"><b>' + esc(p.nom) + '</b><small>investi ' + eu2((p.investi || 0) / 100) + ' · ' + gp(p.ecart) + ' · valeur au ' + dfr2(p.le) + (p.aJour ? '' : ' <span class="chip warn">à mettre à jour</span>') + '</small></div>' +
+        // 2.2 : résultat visible ; montant investi et date de la valeur en info (ⓘ)
+        '<li class="inf-l"><div class="grow"><b>' + esc(p.nom) + '</b>' + U().ib(p.nom) + '<small>' + gp(p.ecart) + '<span class="inf inl"> · investi ' + eu2((p.investi || 0) / 100) + ' · valeur au ' + dfr2(p.le) + '</span>' + (p.aJour ? '' : ' <span class="chip warn">à mettre à jour</span>') + '</small></div>' +
         '<span class="num">' + eu2((p.valeur || 0) / 100) + '</span><button class="btn small" type="button" data-cr="edit" data-crid="' + esc(p.id) + '">Modifier</button>' +
         '<button class="btn small" type="button" data-cr="suppr" data-crid="' + esc(p.id) + '">Retirer</button></li>').join('') + '</ul>';
     } else h += '<p class="muted">Aucune position. Ajoutez chaque crypto (ou plateforme) avec le montant investi et sa valeur actuelle.</p>';
