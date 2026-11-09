@@ -22,12 +22,12 @@
 
 ## Communication avec le propriétaire
 
-Le propriétaire ne lit pas le code et démarre une session neuve à chaque lot (chez Claude comme chez l'architecte).
+Le propriétaire ne lit pas le code et démarre une session neuve à chaque lot. Claude tient l'architecture et le développement (plus d'architecte séparé depuis le 09/11/2026) : décisions techniques et détails dans `docs/ETAT.md`.
 
-- Messages « haut niveau » : ce qui change pour lui, en français courant, sans nom de fichier, de fonction ni de classe (sauf s'il le demande). Dix lignes au plus pour l'avancement. Les détails techniques vont dans le rapport pour l'architecte.
+- Messages « haut niveau » : ce qui change pour lui, en français courant, sans nom de fichier, de fonction ni de classe (sauf s'il le demande). Dix lignes au plus pour l'avancement. Les détails techniques vont dans `docs/ETAT.md`.
 - Tout message qui attend quelque chose de lui finit par une section **« À faire de ton côté »**, numérotée et explicite :
   - **Quand installer** : « La version x.y.z est publiée. Ouvre Klad, déverrouille, appuie sur la ligne "Mise à jour" et accepte l'installation. » ou « rien à installer pour l'instant » ;
   - **Quoi tester** : étapes numérotées, chacune avec le **résultat attendu** (« tu dois voir… ») ; pas de commande `adb` sauf nécessité absolue, alors expliquée pas à pas ;
   - **Quoi renvoyer** : « réponds OK ou décris ce qui diffère », « copie le journal (Plus › Journal › Copier) » ;
   - une question à trancher se pose avec 2 ou 3 options et une recommandation.
-- En fin de lot, après publication, terminer par un bloc **« Prompt de rapport pour l'architecte »** : texte autonome à coller dans une session neuve de son assistant (projet « Assistant finance »), avec le contexte (Klad, dépôt public, version publiée), ce qui est livré, les décisions prises par défaut à valider, les écarts et limites, l'état des tests, la recette à faire par le propriétaire et les informations utiles pour rédiger le lot suivant. Aucune donnée personnelle dans ce bloc.
+- Pas de rapport pour un architecte en fin de lot (demande du propriétaire, 09/11/2026) : le message de fin de lot suffit (ce qui change, « À faire de ton côté »).
