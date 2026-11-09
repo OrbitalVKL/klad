@@ -2,6 +2,13 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.2.1
+
+Couleurs du cadran (retour du propriétaire, 09/11) : le montant du reste à vivre (Moi) et de la fin de mois (Nous) est
+en couleur de texte ; la couronne (part du budget variable ou du budget du commun déjà dépensée) prend la couleur du côté,
+bleu pour Moi, orange pour Nous, comme la légende de son ⓘ. Un dépassement reste signalé par le mot en rouge sous le
+montant.
+
 ## 2.2.0
 
 Lecture rapide (retour du propriétaire, 09/11 ; maquette validée : « ⓘ partout », toute l'appli d'un coup).

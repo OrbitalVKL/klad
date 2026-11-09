@@ -6,6 +6,9 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.2.1** — couleurs du cadran : montant en couleur de texte, couronne bleue (Moi) ou orange (Nous) (retour du
+propriétaire du 09/11). `vapercu.cadran(…, apres, coul)` : `coul` = couleur de la couronne (sinon couleur de l'état).
+
 **2.2.0** — lecture rapide : infos additionnelles (dates, formules, explications, sous-titres) derrière un ⓘ dans toute
 l'appli ; montant du cadran à la couleur du côté ; plus de postes dépassés en tête du budget ; « + Ajouter un poste »
 seulement dans « Régler le budget » (retour du propriétaire du 09/11, maquette validée : ⓘ partout, toute l'appli).
