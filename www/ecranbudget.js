@@ -37,11 +37,16 @@
     const sur = (id, fn) => { try { $(id).innerHTML = fn(); } catch (e) { $(id).innerHTML = '<p class="muted">Calcul impossible.</p>'; A.log('err', 'Budget (' + id + ') : ' + (e.message || e)); } };
     const sv = ui.sv[scope] === 'equilibre' || !SOUSVUES[scope].some(([k]) => k === ui.sv[scope]) ? (scope === 'commun' ? 'mois' : 'suivi') : ui.sv[scope];
     $('view-budget').dataset.sv = sv;
-    $('sv-bar').innerHTML = barre(scope, sv);
+    // 2.1 : la page principale (Suivi, Ce mois) est l'Aperçu : les sous-vues s'ouvrent depuis la carte du budget ;
+    // la barre des sous-vues ne s'affiche que dans une sous-vue (Tendance, Contrats, Trésorerie)
+    const top = sv === (scope === 'commun' ? 'mois' : 'suivi');
+    $('sv-bar').innerHTML = top ? '' : barre(scope, sv);
+    $('sv-bar').hidden = top;
     sur('cyc-nav', () => VB.cycNav(B, scope, ui.nav));
     sur('actions', () => VB.observations(B, scope, { analyse: !!(window.KladExtras && window.KladExtras.actif(S(), 'claude')), texteAnalyse: window.KladExtras && window.KladExtras.analyse && window.KladExtras.analyse(scope) }));
     const rav = (() => { try { return VB.ravM(B, scope, ui); } catch (e) { return ''; } })();
-    $('rav-m').innerHTML = rav; $('rav-m').hidden = !rav;
+    // 2.1 : le reste à vivre perso est le cadran de l'Aperçu (détail : « Où va l'argent ») ; reste la marge du commun
+    $('rav-m').innerHTML = scope === 'commun' ? rav : ''; $('rav-m').hidden = !rav || scope !== 'commun';
     const planC = partie => scope === 'commun' && VC && VC.plan ? (() => { try { return VC.plan(B, ui, partie); } catch (e) { A.log('err', 'Commun : ' + (e.message || e)); return ''; } })() : '';
     const cm = planC('mois'), ct = planC('tresorerie');
     $('cm-plan').innerHTML = cm; $('cm-plan').hidden = !cm;
@@ -58,13 +63,12 @@
     const seule = scope === 'perso' ? { tendance: 'tend-panel', contrats: 'p-contrats' }[sv] : null;
     for (const id of ['tend-panel', 'p-contrats']) { const p = $(id); if (p) { p.classList.toggle('force-open', id === seule); U.appliquerPli(p); } }
   }
-  // Suivi : postes dépassés d'abord (mêmes chiffres que les sections du budget, KladBudget.suivi).
+  // Suivi : postes dépassés d'abord, en bandeau (mêmes chiffres que les sections du budget, KladBudget.suivi).
   function depasses(B, scope) {
     const res = KB.suivi(B, scope, ui.nav), L = (res.depasses || []).filter(a => a.on && a.pm > 50);
     if (!L.length) return '';
-    return '<div class="dep-l" role="group" aria-label="Postes dépassés"><div class="sh-lab">Dépassés</div>' + L.map(a =>
-      '<div class="dep-r"><span>' + U.esc(a.label) + '</span><span class="num">' + U.esc(KB.eur(a.cur)) + ' <span class="muted">/ ' + U.esc(KB.eur(a.pm)) + '</span></span>' +
-      '<span class="bad-t">dépassé de ' + U.esc(KB.eur(a.cur - a.pm)) + '</span></div>').join('') + '</div>';
+    return '<div class="bg-dep" role="group" aria-label="Postes dépassés">' + (window.KladIcones ? window.KladIcones.svg('triangle-alert', 16) : '') + '<span><b>' + L.length + ' poste' + (L.length > 1 ? 's' : '') + ' dépassé' + (L.length > 1 ? 's' : '') + '</b>' +
+      L.map(a => '<span class="bg-dr"> · ' + U.esc(a.label) + ' <span class="num">' + U.esc(KB.eur(a.cur)) + ' / ' + U.esc(KB.eur(a.pm)) + '</span> <span class="bad-t">dépassé de ' + U.esc(KB.eur(a.cur - a.pm)) + '</span></span>').join('') + '</span></div>';
   }
   // Choix d'une sous-vue (barre en haut de Budget, de Commun et de l'écran Équilibre).
   function sousVue(k) {
@@ -149,8 +153,11 @@
     // poste ou revenu du Suivi : déplier ses opérations (perdu en 0.9.0, rétabli en 0.10.7)
     const po = t.closest('[data-poste]');
     if (po) { const k = po.dataset.poste; if (ui.ouverts.has(k)) ui.ouverts.delete(k); else ui.ouverts.add(k); render(); return; }
+    const psec = t.closest('[data-psec]');
+    if (psec) { const k = 'ps|' + psec.dataset.psec; if (ui.ouvertsPlan.has(k)) ui.ouvertsPlan.delete(k); else ui.ouvertsPlan.add(k); render(); return; }
     const sg = t.closest('[data-sec]');
-    if (sg) { const k = 'm|' + sg.dataset.sec; if (ui.ouverts.has(k)) ui.ouverts.delete(k); else ui.ouverts.add(k); render(); return; }
+    // 2.1 : section ouverte ('m|') ou repliée ('f|') par l'utilisateur, sinon son état par défaut
+    if (sg) { const k = sg.dataset.sec, ouvert = sg.getAttribute('aria-expanded') === 'true'; ui.ouverts.delete('m|' + k); ui.ouverts.delete('f|' + k); ui.ouverts.add((ouvert ? 'f|' : 'm|') + k); render(); return; }
     const cl = t.closest('[data-classer][data-op]');
     if (cl) { window.KladApp.ouvrirOp(cl.dataset.c, cl.dataset.op); return; }
     const al = t.closest('[data-aligner]');

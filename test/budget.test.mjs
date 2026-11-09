@@ -124,7 +124,7 @@ test('suivi du cycle : sections, date de dépense des cartes, hors budget et ép
   // rendu : aucun montant signé
   const h = VB.suivi(ctx(S), 'perso', { ouverts: new Set(['c|Bars']) }).html;
   assert.ok(!montantSigne(h), 'aucun montant négatif affiché');
-  assert.match(h.replace(/<[^>]+>/g, ' '), /Dépassé de\s+40\s€/);
+  assert.match(h.replace(/<[^>]+>/g, ' '), /dépassé de\s+40\s€/);
 });
 
 test('reste à vivre : deux colonnes (dernier salaire, comptes courants)', () => {

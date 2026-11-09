@@ -268,6 +268,96 @@
     return h;
   }
 
+  // ------------------------------------------------------------ 2.1 : l'Aperçu dans l'écran du budget
+  // Le budget (Moi : budget perso, Nous : budget du commun) n'est plus résumé ici : il est en entier dans l'écran, entre
+  // le haut (cadran, où va l'argent, à vérifier, soldes) et le bas (prochains jours, verrouiller).
+  const seg = c => '<div class="ap-seg" role="tablist" aria-label="Aperçu"><button type="button" role="tab" data-apcote="moi" aria-selected="' + (c === 'moi') + '"><i class="moi"></i>Moi</button>' +
+    '<button type="button" role="tab" data-apcote="nous" aria-selected="' + (c === 'nous') + '"><i class="nous"></i>Nous</button></div>';
+  function haut(d, scope) {
+    const nous = scope === 'commun';
+    let h = seg(nous ? 'nous' : 'moi');
+    if (!nous) {
+      const res = d.res, rav = res && res.rav;
+      if (rav) {
+        const x = KB().ravChoisi(rav, KB().baseRav(d.S)), c = x.col;
+        const V = res.T.courante, O = res.T.optionnelle, bud = V.p + O.p, conso = bud > DEMI ? (V.c + O.c) / bud : 0;
+        const temps = Math.min(1, res.jour / (res.nbJours || 1)), et = c.reste < -DEMI ? 'bad' : etat(conso, temps);
+        const nom = 'Reste à vivre ' + e0(c.reste) + (c.reste < -DEMI ? ' en dépassement' : '') + ' jusqu\'au ' + U().jjmm(rav.fin) + ', jour ' + res.jour + ' sur ' + res.nbJours + ', budget variable consommé à ' + Math.round(conso * 100) + ' %';
+        h += '<div class="ap-hero">' + cadran(temps, conso, et, '<span class="lbl">Reste à vivre</span><span class="v num' + (c.reste < -DEMI ? ' bad-t' : '') + '">' + esc(e0(c.reste)) + (c.reste < -DEMI ? '<small> dépassé</small>' : '') + '</span>' +
+          '<span class="s">jusqu\'au ' + esc(jm(rav.fin)) + '</span><span class="j num">jour ' + res.jour + '/' + res.nbJours + '</span>', nom) +
+          '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>variable dépensé ' + Math.round(conso * 100) + ' %</span></div>' +
+          U().interrupteurRav(x.choix, !!rav.comptes, { salaire: rav.budget.reste, comptes: rav.comptes ? rav.comptes.reste : null }) + '</div>';
+        h += carte('Où va l\'argent', '', barreArgent(x) + lien('data-aller="rav"', 'Le calcul sur les deux bases'), ' data-mesure="argent"', 'data-aller="rav"');
+      } else h += VA().reste(res, KB().baseRav(d.S));
+      // la ligne « N observations à faire » n'est pas répétée : la carte « À faire » (plus bas) les montre déjà
+      h += VA().aVerifier(Vu().lignesAVerifier(d.S, d.now, d.ext).filter(l => l.cle !== 'observations'));
+      h += VA().soldes(d.S, d.now, { dettes: d.dettes, livrets: d.livrets });
+      return h;
+    }
+    const B = d.B, fdm = d.fdm;
+    if (!B || !fdm) return h + '<section class="ap-card"><p class="ap-note">Le compte commun apparaît ici dès qu\'un compte a le rôle « commun » (Plus › Comptes).</p></section>';
+    let res = null;
+    try { res = KB().suivi(B, 'commun', null); } catch (e) { res = null; }
+    const temps = res ? Math.min(1, res.jour / (res.nbJours || 1)) : 0;
+    const P = res ? NATS.reduce((t, [k]) => t + res.sections[k].p, 0) : 0, Cn = res ? NATS.reduce((t, [k]) => t + res.sections[k].c, 0) : 0;
+    const conso = P > DEMI ? Cn / P : 0, et = fdm.end < -DEMI || fdm.decouvert ? 'bad' : etat(conso, temps);
+    h += '<div class="ap-hero nous">' + cadran(temps, conso, et, '<span class="lbl">Fin de mois estimée</span><span class="v num' + (fdm.end < -DEMI ? ' bad-t' : '') + '">' + esc(e0(fdm.end)) + (fdm.end < -DEMI ? '<small> débiteur</small>' : '') + '</span>' +
+      '<span class="s">solde ' + esc(e0(fdm.solde)) + (fdm.solde < 0 ? ' débiteur' : '') + '</span>' + (res ? '<span class="j num">jour ' + res.jour + '/' + res.nbJours + '</span>' : ''),
+      'Fin de mois estimée du compte commun ' + e0(fdm.end) + ', solde ' + F().solde(fdm.solde)) +
+      '<div class="ap-cote"><span><i class="ap-k t"></i>temps</span><span><i class="ap-k" style="background:' + COUL[et] + '"></i>budget du commun ' + Math.round(conso * 100) + ' %</span></div>' +
+      // calcul de la fin de mois (avant 2.1 : carte « Fin de mois estimée » de l'écran Commun), provisions, prélèvements à venir
+      '<p class="ap-calc">solde ' + esc(F().solde(fdm.solde)) + ' − prélèvements à venir ' + esc(F().montant(fdm.due || 0)) + (fdm.route ? ' + en route ' + esc(F().montant(fdm.route)) : '') +
+        (fdm.inc ? ' + virements attendus ' + esc(F().montant(fdm.inc)) : '') + (fdm.reserve > DEMI ? ' − provisions en cours ' + esc(F().montant(fdm.reserve)) : '') + '</p>' +
+      (fdm.aVenir && fdm.aVenir.length ? '<p class="ap-calc">à venir : ' + esc(fdm.aVenir.join(', ')) + '</p>' : '') +
+      (fdm.reserve > DEMI ? '<p class="ap-calc">provisions en cours ' + esc(F().montant(fdm.reserve)) + ' · mis de côté : ' + esc(Vu().provisionsTexte(fdm.reserveDet)) + '</p>' : '') +
+      (fdm.decouvert ? '<p class="ap-warn">découvert si les prélèvements passent avant les virements</p>' : '') + '</div>';
+    // à vérifier : les opérations du commun (la liste s'ouvre sur le périmètre Commun)
+    const n = +d.avCommun || 0;
+    if (n) {
+      const nv = Vu().nomsAVoir ? Vu().nomsAVoir(d.S, 'commun') : { n: 0, noms: [] };
+      h += VA().aVerifier([{ cle: 'averifier-commun', texte: n + ' opération' + (n > 1 ? 's' : '') + ' du commun à vérifier', sous: nv.n ? nv.n + ' à voir : ' + nv.noms.join(', ') : 'non classées ou à rapprocher', niveau: 'info' }]);
+    }
+    h += tuiles(d, B);
+    return h;
+  }
+  // tuiles Équilibre et 12 prochains mois (Nous)
+  function tuiles(d, B) {
+    const R = d.R || {};
+    const nom = q => (q === 'moi' ? R.moi : R.autre) || (q === 'moi' ? 'Moi' : 'L\'autre personne');
+    const AF = g.KladAffichage, demo = !!(AF && AF.demoActif && AF.demoActif());
+    const ini = q => esc(demo ? (q === 'moi' ? 'A' : 'B') : String(nom(q)).trim().charAt(0).toUpperCase() || '?');
+    let E = null, T = null;
+    try { E = KC().equilibre(B); } catch (e) { E = null; }
+    try { T = KC().tresorerie(B); } catch (e) { T = null; }
+    let tu = '';
+    if (E) {
+      const gap = E.ecart, aqui = gap > 0 ? 'moi' : 'autre', tilt = Math.max(-14, Math.min(14, (E.invAutre - E.invMoi) / Math.max(1, E.invAutre + E.invMoi) * 60));
+      tu += '<button type="button" class="ap-tile" data-aller="equilibre" aria-label="' + esc('Équilibre de l\'indivision : ' + (Math.abs(gap) < 100 ? 'atteint' : nom(aqui) + ' doit encore investir ' + e0(Math.abs(gap))) + (E.dateEquilibre ? ', équilibre vers ' + U().mLabel(E.dateEquilibre) : '')) + '">' +
+        '<span class="h">Équilibre</span><svg viewBox="0 0 150 70" aria-hidden="true" focusable="false"><polygon points="75,66 65,50 85,50" class="ap-piv"/><g transform="rotate(' + tilt.toFixed(1) + ' 75 48)"><rect x="10" y="44" width="130" height="6" rx="3" class="ap-plank"/>' +
+        '<circle cx="26" cy="32" r="12" class="ap-pm"/><text x="26" y="37" text-anchor="middle">' + ini('moi') + '</text><circle cx="124" cy="32" r="12" class="ap-pa"/><text x="124" y="37" text-anchor="middle">' + ini('autre') + '</text></g></svg>' +
+        '<b class="num">' + (Math.abs(gap) < 100 ? 'atteint' : e0(Math.abs(gap))) + '</b><small>' + esc(Math.abs(gap) < 100 ? '50 / 50' : 'à combler par ' + nom(aqui)) + '</small>' +
+        '<small>' + esc(E.dateEquilibre ? 'vers ' + U().mLabel(E.dateEquilibre) : 'au rythme actuel : jamais') + '</small></button>';
+    }
+    if (T && T.months && T.months.length) {
+      const vals = T.months.map(m => m.low), mx = Math.max(...vals, 1), mn = Math.min(...vals, 0), W = 140, H = 54;
+      const x = i => 2 + i * (W - 4) / (vals.length - 1 || 1), y = a => 4 + (1 - (a - mn) / ((mx - mn) || 1)) * (H - 8);
+      const d0 = vals.map((a, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(a).toFixed(1)).join(' ');
+      const seuil = (B.R && B.R.commun && B.R.commun.reserveFixe) || 0, iMin = vals.indexOf(Math.min(...vals));
+      tu += '<button type="button" class="ap-tile" data-aller="tresorerie" aria-label="' + esc('Trésorerie du commun sur 12 mois : point bas ' + F().solde(T.min) + ' le ' + U().jjmm(T.minAt)) + '">' +
+        '<span class="h">12 prochains mois</span><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="' + d0 + ' L' + x(vals.length - 1).toFixed(1) + ' ' + H + ' L2 ' + H + ' Z" class="ap-area"/>' +
+        '<path d="' + d0 + '" class="ap-line"/>' + (seuil > 0 || mn < 0 ? '<line x1="2" x2="' + (W - 2) + '" y1="' + y(Math.max(seuil, 0)).toFixed(1) + '" y2="' + y(Math.max(seuil, 0)).toFixed(1) + '" class="ap-floor"/>' : '') +
+        '<circle cx="' + x(iMin).toFixed(1) + '" cy="' + y(vals[iMin]).toFixed(1) + '" r="4" class="ap-low"/></svg>' +
+        '<b class="num' + (T.min < 0 ? ' bad-t' : '') + '">' + esc(F().solde(T.min)) + '</b><small>point bas le ' + esc(U().jjmm(T.minAt)) + '</small>' + (T.negAt ? '<small class="bad-t">découvert le ' + esc(U().jjmm(T.negAt)) + '</small>' : '') + '</button>';
+    }
+    return tu ? '<div class="ap-tiles">' + tu + '</div>' : '';
+  }
+  // bas de l'Aperçu : prochains jours (échéances perso ou du commun)
+  function bas(d, scope) {
+    if (!d.B) return '';
+    const nous = scope === 'commun';
+    return carte('Prochains jours', '', filJours(d.ech, d.B.auj, nous ? 'commun' : 'perso', nous ? '' : paie(d.res)), ' data-mesure="' + (nous ? 'jours-commun' : 'jours') + '"');
+  }
+
   // Écran complet. d : mêmes données que KladVuesAccueil.ecran ; cote : « moi » ou « nous ».
   function ecran(d, cote) {
     const c = cote === 'nous' ? 'nous' : 'moi';
@@ -277,5 +367,5 @@
       '<div class="ap-dots" aria-hidden="true"><i class="' + (c === 'moi' ? 'on' : '') + '"></i><i class="' + (c === 'nous' ? 'on' : '') + '"></i></div>';
   }
 
-  g.KladVuesApercu = { ecran, moi, nous, cadran, barreArgent, filJours, budget, etat };
+  g.KladVuesApercu = { ecran, moi, nous, haut, bas, tuiles, cadran, anneau, barreArgent, filJours, budget, etat, sgB };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -193,18 +193,34 @@
     impots: 'Patrimoine', epargne: 'Patrimoine', crypto: 'Patrimoine', donnees: 'Relevés des comptes', sauvegarde: 'Sauvegarde' };
   // Écrans « page » ouverts depuis un autre (bouton Retour de l'en-tête et retour d'Android) : écran d'où l'on vient
   // (par défaut : la liste des opérations, Plus).
-  const RETOUR = { operation: 'operations', donnees: 'plus', sauvegarde: 'plus', budget: 'accueil', commun: 'accueil', appartement: 'accueil' };      // 2.0 : retour vers l'Aperçu
+  // 2.1 : Budget (Moi) et Commun (Nous) sont l'Aperçu ; leurs sous-vues (Tendance, Contrats, Trésorerie) et l'Équilibre
+  // ont un Retour vers la page principale (retourPossible, retourEcran).
+  const RETOUR = { operation: 'operations', donnees: 'plus', sauvegarde: 'plus', appartement: 'commun' };
+  const SV_HAUT = { perso: 'suivi', commun: 'mois' };
+  const EBui = () => window.KladEcranBudget ? window.KladEcranBudget.ui : null;
+  // sous-vue affichée de Budget / Commun (« suivi », « mois » : page principale de l'Aperçu)
+  function svCourante() { const u = EBui(); if (!u) return SV_HAUT[scope]; const k = u.sv[scope]; return k === 'equilibre' || !k ? SV_HAUT[scope] : k; }
+  const pagePrincipale = () => (vue === 'budget' || vue === 'commun') && svCourante() === SV_HAUT[scope];
+  // 2.1 : l'Aperçu est l'écran du budget dès qu'un compte existe (avant : l'Accueil seul, « Connectez une banque »)
+  const apercuBudget = () => !!(S && S.modele.comptes.length && budget());
+  const retourPossible = () => !!RETOUR[vue] || ((vue === 'budget' || vue === 'commun') && !pagePrincipale());
   let retourDe = {};
   const pos = {};                    // position de défilement de chaque écran
   let vue = 'accueil', scope = 'perso';
   function montrer(v, opts) {
     if (!VUES[v]) v = 'accueil';
+    // 2.1 : l'Aperçu est l'écran Budget (Moi) ou Commun (Nous), sur sa page principale (suivi du budget, ce mois)
+    if (v === 'accueil' && apercuBudget()) {
+      v = apCote === 'nous' ? 'commun' : 'budget';
+      const u = EBui(); if (u) u.sv[v === 'commun' ? 'commun' : 'perso'] = SV_HAUT[v === 'commun' ? 'commun' : 'perso'];
+      opts = Object.assign({ force: true }, opts || {});
+    }
     const avant = vue;
     pos[avant] = window.scrollY;
     if (RETOUR[v] && avant !== v) retourDe[v] = avant;
     vue = v;
-    if (v === 'budget') scope = 'perso';
-    else if (v === 'commun') scope = 'commun';
+    if (v === 'budget') { scope = 'perso'; apCote = 'moi'; }
+    else if (v === 'commun') { scope = 'commun'; apCote = 'nous'; }
     const html = document.documentElement;
     html.classList.toggle('ops-mode', v === 'operations');
     if (v !== 'operations') html.classList.remove('q-open');
@@ -220,9 +236,9 @@
   function chrome() {
     // 2.0 : Budget, Commun et Équilibre s'ouvrent depuis l'Aperçu (plus d'onglet à eux)
     const tb = RETOUR[vue] === 'plus' ? 'plus' : vue === 'operation' ? 'operations' : vue === 'appartement' || vue === 'budget' || vue === 'commun' ? 'accueil' : PATRIMOINE.indexOf(vue) >= 0 ? 'patrimoine' : vue;
-    $('ah-back').hidden = !RETOUR[vue];
+    $('ah-back').hidden = !retourPossible();
     document.querySelectorAll('#app-tb [data-tab]').forEach(b => { if (b.dataset.tab === tb) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    $('ah-title').textContent = TITRES[vue] || 'Accueil';
+    $('ah-title').textContent = (vue === 'budget' || vue === 'commun') ? ({ tendance: 'Tendance', contrats: 'Contrats', tresorerie: 'Trésorerie' }[svCourante()] || 'Aperçu') : TITRES[vue] || 'Accueil';
     let e = '';
     if (S && vue === 'accueil') {
       try { const B = budget(); e = B ? window.KladVuesAccueil.surTitre(window.KladBudget.suivi(B, 'perso', null)) : ''; } catch (x) { e = ''; }
@@ -256,12 +272,17 @@
       if (PATRIMOINE.indexOf(vue) >= 0) { window.scrollTo({ top: 0, behavior: 'auto' }); return; }
       montrer(window.KladEcranFisc ? window.KladEcranFisc.vuePatrimoine() : 'impots', { force: true, haut: true }); return;
     }
-    if (k === vue) { window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
+    if (k === vue || (k === 'accueil' && pagePrincipale())) { window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
     if (k === 'operations') { opsFin = 0; montrer('operations', { rendre: false }); renderOps(true); return; }
     montrer(k, { force: true });
   });
   // Retour (écran ouvert depuis un autre) : vers l'écran d'où l'on vient.
-  function retourEcran() { montrer(retourDe[vue] || RETOUR[vue] || 'accueil', { force: vue === 'operation' }); }
+  function retourEcran() {
+    // 2.1 : sous-vue de Budget / Commun → page principale de l'Aperçu
+    if ((vue === 'budget' || vue === 'commun') && !pagePrincipale()) { const u = EBui(); if (u) u.sv[scope] = SV_HAUT[scope]; montrer(vue, { force: true, haut: true }); return; }
+    if (vue === 'appartement') { const u = EBui(); if (u) u.sv.commun = 'mois'; montrer('commun', { force: true, haut: true }); return; }
+    montrer(retourDe[vue] || RETOUR[vue] || 'accueil', { force: vue === 'operation' });
+  }
   $('ah-back').addEventListener('click', retourEcran);
 
   // ------------------------------------------------------------ période d'analyse (tendance et opérations)
@@ -490,9 +511,9 @@
     const av = Vu.aVoir(S, scope, ctx());
     $('app-seen').hidden = !av; $('app-seen').innerHTML = av;
     // 0.10.1 : le haut de l'onglet Budget (grande carte, cartes des comptes, à voir, à vérifier) est passé à l'Accueil
-    const perso = scope === 'perso';
-    $('app-hero').hidden = perso; $('bal-panel').hidden = perso;
-    if (perso) $('app-seen').hidden = true;
+    // 2.1 : le haut de Budget et de Commun est l'Aperçu (cadran, soldes, à vérifier) : plus de grande carte ni de cartes
+    // de comptes séparées
+    $('app-hero').hidden = true; $('bal-panel').hidden = true; $('app-seen').hidden = true;
     $('av-zone').hidden = true; $('av-zone').innerHTML = '';
     renderBadge();
     renderAccueilEcran(now, ex, dettes, livrets);
@@ -510,9 +531,16 @@
       try { R = window.KladCommun ? window.KladCommun.reglages(B) : {}; } catch (e) { R = {}; }
       try { ech = window.KladBudget.echeances(B, 31); } catch (e) { ech = []; }
     }
-    // 2.0 : Aperçu en deux pages, Moi et Nous (on glisse de l'une à l'autre)
-    const dA = { S, B, now, ext: ex, res, dettes, livrets, fdm, plan: pl, R, ech };
-    try { el.innerHTML = window.KladVuesApercu ? window.KladVuesApercu.ecran(dA, coteApercu()) : window.KladVuesAccueil.ecran(dA); }
+    const dA = { S, B, now, ext: ex, res, dettes, livrets, fdm, plan: pl, R, ech, avCommun: compteursAV().commun };
+    const AP = window.KladVuesApercu;
+    // 2.1 : haut (cadran, où va l'argent, à vérifier, soldes) et bas (prochains jours, verrouiller) de l'Aperçu, dans
+    // Budget (Moi) et Commun (Nous) ; l'écran Accueil seul ne sert plus que sans budget (aucun compte encore)
+    if (B && AP && AP.haut && apercuBudget()) {
+      try { $('ap-haut').innerHTML = AP.haut(dA, scope); $('ap-bas').innerHTML = AP.bas(dA, scope); $('ap-fin').innerHTML = window.KladVuesAccueil.actions(); }
+      catch (e) { $('ap-haut').innerHTML = '<p class="muted">Affichage impossible.</p>'; log('err', 'Aperçu : ' + (e.message || e)); }
+      if (vue !== 'accueil') { el.innerHTML = ''; return; }
+    }
+    try { el.innerHTML = AP ? AP.ecran(dA, coteApercu()) : window.KladVuesAccueil.ecran(dA); }
     catch (e) { el.innerHTML = '<p class="muted">Affichage impossible.</p>'; log('err', 'Accueil : ' + (e.message || e)); }
   }
   // 2.0 : page de l'Aperçu affichée (« moi » ou « nous »), en mémoire seulement (rien en clair sur le téléphone) :
@@ -521,6 +549,8 @@
   const coteApercu = () => apCote;
   function choisirCote(c) {
     apCote = c === 'nous' ? 'nous' : 'moi';
+    // 2.1 : avec un budget, Moi et Nous sont les écrans Budget et Commun
+    if (apercuBudget() && vue !== 'accueil') { montrer('accueil', { haut: true }); return; }
     renderAccueilEcran(Date.now(), extras(Date.now()), dettesDe(Date.now()), {});
     window.scrollTo(0, 0);
   }
@@ -528,6 +558,9 @@
   function rendre() {
     if (!S) return;
     CTX = null; BCTX = null;
+    // 2.1 : premier compte arrivé (banque connectée, reprise) pendant que l'Accueil seul est affiché : l'Aperçu devient
+    // l'écran du budget
+    if (vue === 'accueil' && apercuBudget()) { montrer('accueil', { haut: true }); return; }
     renderHaut();
     if (vue === 'operations') renderOps(true);
     if (vue === 'operation') renderDetail();
@@ -542,7 +575,8 @@
   // une ligne de « À vérifier » l'écran concerné.
   const AV = { comptes: 'secComptes', banques: 'secBanques', sync: 'secSync', maj: 'secMaj', observations: 'secObs' };
   // Accueil : lignes « À vérifier », comptes, raccourcis vers les onglets, actions rapides.
-  $('view-accueil').addEventListener('click', ev => {
+  $('view-accueil').addEventListener('click', ev => clicApercu(ev));
+  function clicApercu(ev) {
     if (!S) return;
     const ap = ev.target.closest('[data-apcote]');
     if (ap) { if (ap.getAttribute('aria-selected') !== 'true') choisirCote(ap.dataset.apcote); return; }
@@ -553,6 +587,7 @@
       else if (k === 'averifier') versOps({ cat: '__av', perimetre: 'tout' });      // 1.3.5 : la liste du même nombre
       else if (k === 'nonclassees' || k === 'rapprocher' || k === 'ecarts') versOps({ cat: k === 'nonclassees' ? '__nc' : k === 'ecarts' ? '__ecart' : '__rap' });
       else if (k === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
+      else if (k === 'averifier-commun') versOps({ cat: '__av', perimetre: 'commun' });      // 2.1 : à vérifier du commun (Nous)
       else if (k === 'bilan') { if (window.KladEcranBudget) window.KladEcranBudget.ui.sv.perso = 'suivi'; montrer('budget', { force: true, haut: true }); if (window.KladEcranBudget && window.KladEcranBudget.cyclePrecedent) window.KladEcranBudget.cyclePrecedent(); }
       else if (AV[k]) ouvrirVolet(AV[k]);
       return;
@@ -587,12 +622,11 @@
     if (act.dataset.act === 'sync') synchro('manuel');
     else if (act.dataset.act === 'trier') trier('nv', 'tout');
     else if (act.dataset.act === 'sauvegarde') montrer('sauvegarde', { force: true, haut: true });
-  });
-  // 2.0 : glisser horizontalement sur l'Aperçu : Moi ⇄ Nous
-  (() => {
+  }
+  // 2.0 : glisser horizontalement sur l'Aperçu : Moi ⇄ Nous ; 2.1 : sur la page principale de Budget / Commun aussi
+  for (const el of [$('view-accueil'), $('view-budget')]) {
     let x0 = null, y0 = 0, t0 = 0;
-    const el = $('view-accueil');
-    el.addEventListener('touchstart', e => { const t = e.touches[0]; if (e.target.closest('input, select, textarea, .ap-days')) { x0 = null; return; } x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); }, { passive: true });
+    el.addEventListener('touchstart', e => { const t = e.touches[0]; if (e.target.closest('input, select, textarea, .ap-days, .tablewrap, #an-zone, .txr') || (el.id === 'view-budget' && !pagePrincipale())) { x0 = null; return; } x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); }, { passive: true });
     el.addEventListener('touchend', e => {
       if (x0 == null || !S) return;
       const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
@@ -601,7 +635,7 @@
       const c = coteApercu();
       if (dx < 0 && c === 'moi') choisirCote('nous'); else if (dx > 0 && c === 'nous') choisirCote('moi');
     }, { passive: true });
-  })();
+  }
   preparer.secRav = () => {
     let rav = null;
     try {
@@ -635,6 +669,7 @@
     renderOps(true);
   }
   $('view-budget').addEventListener('click', ev => {
+    if (ev.target.closest('#ap-haut, #ap-bas, #ap-fin, [data-av="bilan"], #budget-main [data-aller]')) { clicApercu(ev); return; }      // 2.1 : l'Aperçu
     if (ev.target.closest('#app-seen')) { ev.preventDefault(); versOps({ nonVues: true }); return; }
     const av = ev.target.closest('[data-av]');
     if (av) {

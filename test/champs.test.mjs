@@ -112,8 +112,9 @@ test('textes des cartes : titres repliés ou réduits, montants entiers (Accueil
           await B.onglet(t);
           await B.pause(150);
           await f(t);
-          const sv = await page.$$eval('[data-sousvue]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.sousvue))]);
-          for (const s of sv) { await page.locator('[data-sousvue="' + s + '"]:visible').first().click(); await B.pause(250); await f(t + '›' + s); }
+          // 2.1 : écrans détaillés ouverts depuis la carte du budget de l'Aperçu
+          const sv = await page.$$eval('#budget-main [data-aller]', bs => [...new Set(bs.filter(b => b.offsetParent !== null).map(b => b.dataset.aller))]);
+          for (const s of sv) { await B.onglet(t); await page.locator('#budget-main [data-aller="' + s + '"]').first().click(); await B.pause(250); await f(t + '›' + s); }
         }
       }
     }

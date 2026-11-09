@@ -2,7 +2,7 @@
 
 Carnet de comptes personnel pour Android. *Klad*, prononcé « KLAT », veut dire « trésor enfoui ».
 
-**État : version 1.0.0 (maintenance) — version complète : tous les réglages du complément se font dans Klad, sauvegarde vérifiée, organisation de l'interface (2.0 : Aperçu Moi / Nous, Opérations, Trier, Patrimoine, Plus ; Budget et Commun ouverts depuis l'Aperçu ; palettes Klad et Grafit), parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`), mode démo. Notes de version : `docs/NOTES.md`.** L'appli lit les comptes, soldes et opérations par Enable Banking
+**État : version 1.0.0 (maintenance) — version complète : tous les réglages du complément se font dans Klad, sauvegarde vérifiée, organisation de l'interface (2.1 : Aperçu Moi / Nous avec le budget perso et le budget du commun en entier, Opérations, Trier, Patrimoine, Plus ; palettes Klad et Grafit), parité des fonctions avec l'ancienne version (`docs/parite-fonctions.md`), mode démo. Notes de version : `docs/NOTES.md`.** L'appli lit les comptes, soldes et opérations par Enable Banking
 (clé .pem, signature JWT RS256, autorisation bancaire, retour par `klad://eb`). Toutes les données sont chiffrées sur le téléphone
 (code à 6 chiffres ou empreinte, depuis la 0.2). Depuis la 0.3 : historique des opérations conservé et dédoublonné, récupération
 automatique au déverrouillage, comptes nommés et typés, import de la reprise de l'ancienne version, interface en onglets.
@@ -491,15 +491,15 @@ Ne pas créer de publication à la main dans *Releases*. Le site renvoie vers la
 8. *Plus › Sauvegarde* et *Plus › Verrou* : exporter ou restaurer une sauvegarde, changer le code, activer ou désactiver l'empreinte, tout effacer.
 9. *Plus › Modules › Lien Grafit* : partager le résumé avec Grafit (désactivé par défaut).
 10. *Opérations* : appui = détail ; glisser à droite = vue / non vue, à gauche = « Classer » ; filtres non vues, non classées, catégorie. *Plus › Classement* : catégories (nature, icône), règles, reprise du carnet.
-11. *Aperçu* (2.0) : deux pages qu'on fait glisser. *Moi* : cadran du reste à vivre (temps du cycle, budget variable
-   consommé), où va l'argent, à vérifier, soldes, budget du cycle poste par poste avec son bilan et l'accès aux écrans
-   détaillés (Tout le budget, Tendance, Contrats, Dernier bilan), prochains jours, à faire, Verrouiller. *Nous* : fin de
-   mois estimée, virements de chacun, équilibre, 12 prochains mois, répartition du solde, budget du commun (Tout le commun,
-   Trésorerie, Équilibre, Contrats), prochains jours, à faire. *Trier* (bouton central) : les opérations à vérifier une à une.
-   *Budget* (depuis l'Aperçu) : ◀ ▶ entre cycles ; un appui sur un poste montre ses opérations, « Modifier le budget » ouvre
-   le volet d'édition (annulable) ; *Contrats* et *Tendance* en haut. Aperçu : cadran du reste à vivre (détail par « ? »).
-   *Commun* (depuis l'Aperçu, page Nous) : marge réelle, fin de mois, virements (ordres permanents modifiables), trésorerie, appels de fonds, d'où vient
-   le solde ; bouton *Équilibre*. *Résultats* : bilan de la période précédente et répartition des dépenses.
+11. *Aperçu* (2.1) : deux pages qu'on fait glisser, chacune avec son budget en entier. *Moi* : cadran du reste à vivre
+   (temps du cycle, budget variable consommé ; les deux bases avec leur montant), où va l'argent (détail par « ? »), à
+   vérifier, soldes, puis le budget du cycle : ‹ › entre cycles, sections et postes repliables (un appui sur un poste
+   montre ses opérations, ses contrats, « Modifier le budget »), « Régler le budget » dans la même carte (réel habituel
+   comparé au budget, montant, périodicité, « = »), bilan, plus gros écarts, répartition, accès à Tendance, Contrats,
+   Dernier bilan ; enfin à faire, prochains jours, Verrouiller. *Nous* : fin de mois estimée et son calcul, opérations du
+   commun à vérifier, équilibre, 12 prochains mois, où va l'argent du commun (marge réelle), virements à mettre en place
+   (ordres permanents modifiables), le compte commun ce mois-ci, budget du commun (accès à Trésorerie, Équilibre,
+   Contrats), à faire, prochains jours. *Trier* (bouton central) : les opérations à vérifier une à une.
 12. *Plus › Observations, Impôts, Épargne* : points à faire, impôt du foyer et taxe foncière, livret et plan d'épargne.
 
 Dans un navigateur ordinaire (`npm run serve`, après `KLAD_OWNER=<compte> node scripts/prepare-android.mjs web`), l'interface utilise un coffre de démonstration sans Keystore ni empreinte : données fictives uniquement. Un faux client Enable Banking (`window.KladFauxEB`, utilisé par le parcours Chromium) permet d'essayer la connexion et la synchro sans réseau.

@@ -131,10 +131,10 @@ test('préférences d\'affichage gardées sur le téléphone : liste fermée, se
   assert.throws(() => U.pref('cle', 'x'), /préférence inconnue/);       // jamais de donnée hors du coffre
   U.pref('periode', null);
   assert.equal(U.pref('periode'), null);
-  assert.equal(U.replie('actions'), true);
+  assert.equal(U.replie('actions'), false);                // 2.1 : « À faire » ouvert par défaut, en bas de l'Aperçu
   assert.equal(U.replie('budget-main'), false);
-  U.plier('actions', false);
-  assert.equal(U.replie('actions'), false);
+  U.plier('actions', true);
+  assert.equal(U.replie('actions'), true);
   assert.deepEqual(Object.keys(mem).sort(), ['klad.replis.v', 'klad.replis.v2']);
   // calcul dans un champ de montant (comme l'ancienne version), sans eval
   assert.deepEqual(['29,99+64', '=566,19/3', '(10+5)*2', '1 200,50', '12-', 'alert(1)', '2*(3'].map(U.calcul), [93.99, 188.73, 30, 1200.5, null, null, null]);

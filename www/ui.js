@@ -111,8 +111,10 @@
 
   // ------------------------------------------------------------ reste à vivre : interrupteur de la base affichée (0.10.7)
   // base : « salaire » ou « comptes » ; sans solde connu, « Comptes courants » est désactivé.
-  function interrupteurRav(base, avecComptes) {
-    const b = (k, t) => '<button type="button" data-ravbase="' + k + '" aria-pressed="' + (base === k) + '"' + (k === 'comptes' && !avecComptes ? ' disabled' : '') + '>' + t + '</button>';
+  // valeurs (2.1, facultatif) : { salaire, comptes } en centimes, montrées sous chaque base (sans signe : « dépassé » si négatif)
+  function interrupteurRav(base, avecComptes, valeurs) {
+    const v = k => !valeurs || valeurs[k] == null ? '' : '<b class="num rb-v">' + esc(e0(Math.abs(valeurs[k]))) + (valeurs[k] < -50 ? ' dépassé' : '') + '</b>';
+    const b = (k, t) => '<button type="button" data-ravbase="' + k + '" aria-pressed="' + (base === k) + '"' + (k === 'comptes' && !avecComptes ? ' disabled' : '') + '>' + (valeurs ? '<span>' + t + v(k) + '</span>' : t) + '</button>';
     return '<div class="seg rav-base" role="group" aria-label="Base du reste à vivre">' + b('salaire', 'Dernier salaire') + b('comptes', 'Comptes courants') + '</div>';
   }
 
@@ -200,7 +202,8 @@
   // ancien identifiant → nouveau (null : section disparue, ou toujours ouverte dans sa sous-vue)
   const MIGRATION_PLIS = { 'tend-panel': null, 'p-contrats': null, 'cats-panel': null, 'rules-panel': null };
   // Repliées au départ, comme l'ancienne version (Tendance et Contrats ont leur sous-vue, toujours ouvertes).
-  const REPLIES = { actions: 1, 'eq-uses-panel': 1, 'eq-ops-panel': 1 };
+  // 2.1 : « À faire » (#actions) ouvert par défaut, en bas de l'Aperçu
+  const REPLIES = { 'eq-uses-panel': 1, 'eq-ops-panel': 1 };
   let plis = null;
   function migrerPlis(ancien) {
     const out = {};
