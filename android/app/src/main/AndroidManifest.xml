@@ -55,6 +55,26 @@
             android:exported="true"
             android:grantUriPermissions="false"
             tools:ignore="ExportedContentProvider" />
+
+        <!-- 2.3.0 : widget d'écran d'accueil (reste à vivre, opérations à vérifier). Exporté : Android lui envoie
+             les mises à jour du widget ; il ne reçoit rien d'autre. -->
+        <receiver
+            android:name="app.klad.widget.WidgetKlad"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_klad_info" />
+        </receiver>
+
+        <!-- 2.3.0 : synchro planifiée (8 h et 14 h), seulement si elle est activée dans Plus › Verrou. -->
+        <service
+            android:name="app.klad.fond.FondJob"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
     </application>
 
     <!-- Android 11 et plus : Grafit visible par Klad, pour contrôler son paquet et sa signature. -->
@@ -70,4 +90,6 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Retour haptique léger au seuil des gestes sur les opérations (navigator.vibrate de la WebView, 0.10.7). -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- 2.3.0 : la synchro planifiée reste programmée après un redémarrage du téléphone. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>

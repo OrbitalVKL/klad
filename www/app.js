@@ -1324,6 +1324,8 @@
     p.title = syncP ? 'Synchronisation en cours' : err ? err + ' compte(s) en erreur — toucher pour le détail' : late ? late + ' compte(s) en retard — toucher pour synchroniser' : 'Relevés lus à ' + (d ? F.heure(d) : '—') + ' — toucher pour synchroniser';
   }
   async function dispoPSU() {
+    // 2.3.0 : synchro planifiée (Klad fermé) : l'utilisateur n'est pas là, aucun en-tête « utilisateur présent »
+    if (window.KLAD_FOND) return {};
     let ip = '';
     if (ReseauP) { try { ip = (await ReseauP.adresse()).ip || ''; } catch (e) { ip = ''; } }
     return { 'Psu-Ip-Address': ip, 'Psu-User-Agent': navigator.userAgent + ' Klad/' + (CFG.version || 'dev'), 'Psu-Accept-Language': navigator.language || 'fr-FR' };
@@ -1779,6 +1781,8 @@
   window.KladApp = {
     open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
     ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, rendre, redessiner, renderHaut, chrome, vue: () => vue, scope: () => scope, periode, choisirPeriode, versOps, etat: () => S, hooks: () => hooks, esc, isNative,
-    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp, trier, demoDebut, demoFin
+    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp, trier, demoDebut, demoFin,
+    // 2.3.0 : nombre « à vérifier » (pastille « Tout »), recalculé (widget d'écran d'accueil)
+    aVerifier: () => { if (!S) return 0; try { return Vu.compteursAVerifier(S, ctx()).tout; } catch (e) { return 0; } }
   };
 })();

@@ -31,6 +31,8 @@ public final class Coffre {
     public static final byte[] AAD_PIN = ascii("klad.code.v1");
     public static final byte[] AAD_DEVICE = ascii("klad.appareil.v1");
     public static final byte[] AAD_BIO = ascii("klad.empreinte.v1");
+    /** 2.3.0 : enveloppe « arrière-plan » (synchro planifiée, clé Keystore « klad.fond » sans authentification). */
+    public static final byte[] AAD_FOND = ascii("klad.fond.v1");
 
     private Coffre() {}
 

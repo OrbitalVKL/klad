@@ -78,6 +78,7 @@
     actif: () => { const S = A.etat(); return !!(S && R.actif(S)); },
     etiquette: () => { const S = A.etat(); return 'Lien Grafit ' + (S && R.actif(S) ? 'activé' : 'désactivé'); },
     effacer: () => lien.effacer(),
+    maj,                                     // 2.3.0 : fin d'une synchro planifiée
     demo: () => (P && P.contenu ? P.contenu() : undefined)
   };
 })();

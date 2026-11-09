@@ -25,12 +25,17 @@ public class GrafitProvider extends ContentProvider {
     private Stockage stockage;
 
     /** Dossier du résumé (sans sauvegarde Android). */
-    static File dossier(Context ctx) {
+    public static File dossier(Context ctx) {
         return new File(ctx.getNoBackupFilesDir(), "klad");
     }
 
-    static Stockage stockage(Context ctx) {
+    public static Stockage stockage(Context ctx) {
         return new Stockage(dossier(ctx), new CleKeystore());
+    }
+
+    /** 2.3.0 : données du widget, chiffrées par la même clé que le résumé (lisibles appli verrouillée). */
+    public static Stockage stockageWidget(Context ctx) {
+        return new Stockage(dossier(ctx), new CleKeystore(), "widget.bin");
     }
 
     /** content://<authority>/summary */
