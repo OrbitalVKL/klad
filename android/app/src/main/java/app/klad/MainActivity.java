@@ -16,6 +16,7 @@ import app.klad.mail.KladMailPlugin;
 import app.klad.reseau.KladReseauPlugin;
 import app.klad.update.KladUpdatePlugin;
 import app.klad.vault.KladVaultPlugin;
+import app.klad.widget.KladWidgetPlugin;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
 
@@ -32,6 +33,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(KladMailPlugin.class);
         registerPlugin(KladAffichagePlugin.class);
         registerPlugin(KladArretPlugin.class);
+        registerPlugin(KladWidgetPlugin.class);
         super.onCreate(savedInstanceState);
         // Pas de capture d'écran ni d'aperçu lisible dans les applis récentes.
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);

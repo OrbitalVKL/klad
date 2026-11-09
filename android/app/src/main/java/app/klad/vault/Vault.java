@@ -30,6 +30,9 @@ import javax.crypto.SecretKey;
  *   « klad.appareil » (sans authentification, non exportable) : les codes ne peuvent être testés que sur ce téléphone.
  * - Enveloppe « empreinte » : DEK chiffrée par la clé Keystore « klad.empreinte » (empreinte forte exigée à chaque usage,
  *   invalidée si une empreinte est ajoutée).
+ * - Enveloppe « arrière-plan » (2.3.0, facultative, activée dans Sécurité par le code) : DEK chiffrée par la clé Keystore
+ *   « klad.fond » (sans authentification, non exportable) ; seule la synchro planifiée l'ouvre (app.klad.fond).
+ *   Désactivée : enveloppe et clé supprimées.
  * - Compteur de codes faux et heure du dernier essai, dans le même fichier.
  * Les méthodes sont synchronisées : appels du plugin (fil des plugins) et de BiometricPrompt (fil principal).
  */
@@ -40,6 +43,16 @@ final class Vault {
     // Lien Grafit : clé SANS authentification du « résumé » lisible appli verrouillée (créée et utilisée par
     // app.klad.grafit.CleKeystore). Le coffre la supprime seulement, avec tout le reste, à l'effacement complet.
     static final String KEY_RESUME = "klad.resume";
+    // 2.3.0 : synchro planifiée (Klad fermé) : clé SANS authentification de l'enveloppe « fond ».
+    static final String KEY_FOND = "klad.fond";
+
+    private static Vault instance;
+
+    /** Coffre unique du processus (plugin de l'appli et synchro planifiée partagent le même fichier). */
+    static synchronized Vault get(Context ctx) {
+        if (instance == null) instance = new Vault(ctx.getApplicationContext());
+        return instance;
+    }
 
     private static final String KS = "AndroidKeyStore";
 
@@ -224,6 +237,7 @@ final class Vault {
         if (exists()) throw new GeneralSecurityException("Coffre déjà créé");
         deleteKey(KEY_DEVICE);
         deleteKey(KEY_BIO);
+        deleteKey(KEY_FOND);
         p = new Properties();
         byte[] dek = new byte[Coffre.DEK_BYTES];
         rnd.nextBytes(dek);
@@ -343,6 +357,48 @@ final class Vault {
         store();
     }
 
+    // ------------------------------------------------------------ arrière-plan (2.3.0)
+
+    /** Vrai si l'enveloppe « arrière-plan » existe et que sa clé est présente. */
+    synchronized boolean fondActif() {
+        if (p.getProperty("fond") == null) return false;
+        try {
+            return getKey(KEY_FOND) != null;
+        } catch (GeneralSecurityException | IOException e) {
+            return false;
+        }
+    }
+
+    /** Active la synchro planifiée : DEK chiffrée par une nouvelle clé « klad.fond » (sans authentification). */
+    synchronized void activerFond(byte[] dek) throws GeneralSecurityException, IOException {
+        deleteKey(KEY_FOND);
+        newKey(KEY_FOND, false);
+        SecretKey k = getKey(KEY_FOND);
+        if (k == null) throw new GeneralSecurityException("Clé d'arrière-plan indisponible");
+        put("fond", Coffre.seal(k, dek, Coffre.AAD_FOND, null));
+        store();
+    }
+
+    /** Désactive : enveloppe et clé supprimées. */
+    synchronized void desactiverFond() throws IOException {
+        deleteKey(KEY_FOND);
+        if (p.remove("fond") != null) store();
+    }
+
+    /** DEK pour la synchro planifiée, ou null si désactivée ou illisible (l'enveloppe est alors retirée). */
+    synchronized byte[] dekFond() {
+        byte[] env = bytes("fond");
+        if (env == null) return null;
+        try {
+            SecretKey k = getKey(KEY_FOND);
+            if (k == null) throw new GeneralSecurityException("clé absente");
+            return Coffre.open(k, env, Coffre.AAD_FOND);
+        } catch (GeneralSecurityException | IOException e) {
+            try { desactiverFond(); } catch (IOException ignored) { /* nouvel essai au prochain passage */ }
+            return null;
+        }
+    }
+
     // ------------------------------------------------------------ blocs chiffrés (déjà chiffrés par l'appli)
 
     private AtomicFile blob(String name) {
@@ -383,6 +439,7 @@ final class Vault {
         deleteKey(KEY_DEVICE);
         deleteKey(KEY_BIO);
         deleteKey(KEY_RESUME);
+        deleteKey(KEY_FOND);
         p = new Properties();
     }
 }

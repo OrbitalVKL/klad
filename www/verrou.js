@@ -32,6 +32,7 @@
   let B = null;            // bloc « sauvegarde » : { sel, iter, cle, dernier }
   let st = {};             // état du coffre natif
   let pendingUrl = null;   // retour bancaire reçu verrouillé : en mémoire seulement
+  let pendingVue = null;   // 2.3.0 : écran demandé par le widget (« trier », « apercu »), ouvert après déverrouillage
   let active = true;       // appli au premier plan
   let hiddenAt = 0;
   let lockTimer = null;
@@ -355,6 +356,7 @@
 
   // ------------------------------------------------------------ démarrage
   async function start() {
+    if (window.KLAD_FOND) return fond();
     busyScreen('Ouverture du coffre…');
     try { st = await V.status(); }
     catch (e) { return fatal('Coffre indisponible : ' + (e.message || e)); }
@@ -504,6 +506,9 @@
     if (r.migration) A().log('ok', 'Données de la version 0.2 converties : ' + r.migration.sessions + ' session(s), ' + r.migration.comptes +
       ' compte(s), ' + r.migration.operations + ' opération(s), ' + r.migration.soldes + ' solde(s) ; ancien format supprimé.');
     if (pendingUrl) { const u = pendingUrl; pendingUrl = null; A().handleReturn(u); }
+    if (window.KLAD_FOND) return;            // synchro planifiée : rien d'autre (voir fond())
+    session(true);
+    if (pendingVue) { const v = pendingVue; pendingVue = null; setTimeout(() => allerVue(v), 400); }
     window.KladMaj.check(true);              // publication plus récente ? (bandeau)
     await arretPrecedent();
     await resultatsEnAttente();              // enregistrement terminé pendant que Klad était verrouillé
@@ -556,6 +561,8 @@
   async function unlocked(dek, pin, how) {
     busyScreen('Ouverture…');
     try {
+      // 2.3.0 : synchro planifiée en cours (Klad était fermé) : ses écritures d'abord (90 s au plus)
+      if (V.attendreFond) { try { await V.attendreFond(); } catch (e) { /* ancienne version native */ } }
       key = await C.importDek(C.fromB64(dek));
       st = await V.status();
       await afterKey(pin, false);
@@ -574,6 +581,7 @@
       try { await flush(); } catch (e) { /* déjà signalé */ }
       key = null; S = null; B = null; ecrits = {};
       A().close();
+      session(false);
       closeModal();
       try { st = await V.status(); } catch (e) { /* état précédent */ }
       lockScreen();
@@ -720,6 +728,67 @@
     renderSecu();
   }
 
+  // 2.3.0 : synchro planifiée. Activer exige le code : la clé de données reçoit une enveloppe « arrière-plan »
+  // (clé Keystore sans authentification, utilisable par Klad seulement). Désactiver supprime enveloppe et clé.
+  async function toggleFond() {
+    if (st.fond) {
+      const r = await V.desactiverFond();
+      if (r && r.ok === false) toast(explain(r), true);
+      else A().log('info', 'Synchro automatique désactivée.');
+    } else {
+      const pin = await askPin('Synchro automatique', 'Klad se synchronisera vers 8 h et 14 h, même fermé, sans demander le code. Saisissez votre code pour l\'activer.');
+      if (!pin) return;
+      const r = await V.activerFond({ pin });
+      if (r.ok) { A().log('ok', 'Synchro automatique activée (vers 8 h et 14 h).'); toast('Synchro automatique activée.'); }
+      else toast(explain(r), true);
+    }
+    st = await V.status();
+    renderSecu();
+  }
+
+  function session(ouverte) {
+    if (isNative && V.session) V.session({ ouverte: !!ouverte }).catch(() => {});
+  }
+
+  function allerVue(v) {
+    if (!key || !S) return;
+    try {
+      if (v === 'trier' && A().trier) A().trier('nv', 'tout');
+      else A().montrer('accueil');
+    } catch (e) { /* écran indisponible */ }
+  }
+
+  // ------------------------------------------------------------ synchro planifiée (page de fond, Klad fermé)
+  // Lancée par Android (app.klad.fond) avec www/fond.js : ouverture par l'enveloppe « arrière-plan », synchro sans
+  // en-têtes « utilisateur présent », enregistrement, widget et résumé Grafit, puis fin. Jamais d'écran ni de question.
+  async function fond() {
+    const fin = r => { try { window.KladFond.fin(r); } catch (e) { /* pont fermé */ } };
+    const pause = ms => new Promise(r => setTimeout(r, ms));
+    try {
+      st = await V.status();
+      if (!st.exists || !st.fond) return fin({ raison: 'inactif' });
+      const r = await V.unlockFond();
+      if (!r || !r.ok) return fin({ raison: 'cle' });
+      key = await C.importDek(C.fromB64(r.dek));
+      B = await store.get('sauvegarde');
+      if (!B) { key = null; return fin({ raison: 'coffre' }); }   // coffre jamais terminé : rien à faire seul
+      await openApp();
+      if (!S) return fin({ raison: 'ouverture' });
+      A().log('info', 'Synchro planifiée (Klad fermé).');
+      const res = await A().synchro('planifiée');
+      await pause(600);
+      await flush();
+      try { if (window.KladWidget) await window.KladWidget.maj(); } catch (e) { /* signalé par le widget */ }
+      try { if (window.KladLienGrafit && window.KladLienGrafit.maj) await window.KladLienGrafit.maj(); } catch (e) { /* idem */ }
+      await pause(100);
+      await flush();
+      fin({ raison: 'ok', erreurs: res ? res.erreurs : null });
+    } catch (e) {
+      try { if (S) { A().log('err', 'Synchro planifiée : ' + (e.message || e)); await flush(); } } catch (e2) { /* rien */ }
+      fin({ raison: 'erreur' });
+    }
+  }
+
   async function wipeAll() {
     const pin = await askPin('Tout effacer', 'Clé, banques, opérations, journal et sauvegarde interne seront effacés de ce téléphone. ' +
       'Pensez d\'abord à déconnecter les banques. Saisissez votre code pour confirmer.');
@@ -737,6 +806,11 @@
     $('bioState').textContent = bioOn ? 'Activée.' : st.bioAvailable ? 'Désactivée.' : 'Aucune empreinte forte disponible sur ce téléphone.';
     $('btnBio').textContent = bioOn ? 'Désactiver' : 'Activer';
     $('btnBio').disabled = !bioOn && !st.bioAvailable;
+    // 2.3.0 : synchro planifiée (8 h et 14 h)
+    const fondOn = !!st.fond, fondPossible = isNative && !!V.activerFond;
+    $('fondState').textContent = !fondPossible ? 'Sur le téléphone seulement.' : fondOn ? 'Activée : vers 8 h et 14 h, Klad fermé.' : 'Désactivée.';
+    $('btnFond').textContent = fondOn ? 'Désactiver' : 'Activer';
+    $('btnFond').disabled = !fondPossible;
     $('vaultInfo').textContent = isNative
       ? 'Clés gardées par ' + (st.strongBox ? 'la puce sécurisée du téléphone (StrongBox).' : 'le Keystore Android.')
       : 'Mode navigateur : coffre de démonstration.';
@@ -761,6 +835,7 @@
   }
   document.addEventListener('click', ev => { if (ev.target.closest('#btnLock, [data-act="verrou"]')) lock(); });
   $('btnBio').addEventListener('click', guard(toggleBio));
+  $('btnFond').addEventListener('click', guard(toggleFond));
   $('btnPin').addEventListener('click', guard(changePin));
   $('btnExport').addEventListener('click', guard(exportNow));
   $('btnRestore').addEventListener('click', guard(restoreInApp));
@@ -769,6 +844,13 @@
 
   // ------------------------------------------------------------ retour bancaire klad://eb
   function onUrl(url) {
+    // 2.3.0 : widget d'écran d'accueil → klad://ouvrir/trier ou klad://ouvrir/apercu (après déverrouillage)
+    const ov = /^klad:\/\/ouvrir\/(trier|apercu)\b/i.exec(url || '');
+    if (ov) {
+      const v = ov[1].toLowerCase();
+      if (key && S && !lockDue() && !lockP) allerVue(v); else pendingVue = v;
+      return;
+    }
     if (!url || !/^klad:\/\/eb\b/i.test(url) && url.indexOf('code=') < 0 && url.indexOf('error=') < 0) return;
     if (key && S && !lockDue() && !lockP) { A().handleReturn(url); return; }
     pendingUrl = url;                        // traité après déverrouillage (state vérifié par app.js)

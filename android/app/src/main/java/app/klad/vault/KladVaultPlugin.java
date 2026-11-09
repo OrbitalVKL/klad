@@ -9,6 +9,9 @@ import androidx.activity.result.ActivityResult;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
+import app.klad.fond.FondEtat;
+import app.klad.fond.Planificateur;
+import app.klad.widget.WidgetKlad;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -43,7 +46,7 @@ public class KladVaultPlugin extends Plugin {
 
     @Override
     public void load() {
-        vault = new Vault(getContext());
+        vault = Vault.get(getContext());
         transfert = new Transfert(new File(getContext().getNoBackupFilesDir(), "klad/echanges"));
         fil.execute(() -> transfert.nettoyer(System.currentTimeMillis()));
     }
@@ -119,6 +122,7 @@ public class KladVaultPlugin extends Plugin {
         r.put("waitMs", vault.waitMs());
         r.put("failures", vault.failures());
         r.put("strongBox", vault.strongBox());
+        r.put("fond", vault.fondActif());
         call.resolve(r);
     }
 
@@ -186,13 +190,81 @@ public class KladVaultPlugin extends Plugin {
                 return;
             }
             Arrays.fill(a.dek, (byte) 0);
+            Planificateur.annuler(getContext());
             vault.wipe();
+            WidgetKlad.majTous(getContext());     // données du widget illisibles (clé supprimée) : état vide
             call.resolve(ok());
         } catch (Exception e) {
             call.resolve(fail("erreur", describe(e)));
         } finally {
             Arrays.fill(pin, '\0');
         }
+    }
+
+    // ------------------------------------------------------------ synchro planifiée (2.3.0)
+
+    /** Active la synchro planifiée (8 h et 14 h) : le code est exigé, la DEK reçoit l'enveloppe « arrière-plan ». */
+    @PluginMethod
+    public void activerFond(PluginCall call) {
+        char[] pin = pin(call, "pin");
+        if (pin == null) return;
+        byte[] dek = null;
+        try {
+            Vault.Attempt a = vault.unlock(pin);
+            if (a.dek == null) {
+                call.resolve(attemptFail(a));
+                return;
+            }
+            dek = a.dek;
+            vault.activerFond(dek);
+            Planificateur.planifier(getContext());
+            call.resolve(ok());
+        } catch (Exception e) {
+            call.resolve(fail("erreur", describe(e)));
+        } finally {
+            if (dek != null) Arrays.fill(dek, (byte) 0);
+            Arrays.fill(pin, '\0');
+        }
+    }
+
+    @PluginMethod
+    public void desactiverFond(PluginCall call) {
+        try {
+            Planificateur.annuler(getContext());
+            vault.desactiverFond();
+            call.resolve(ok());
+        } catch (Exception e) {
+            call.resolve(fail("erreur", describe(e)));
+        }
+    }
+
+    /**
+     * Appli déverrouillée ({ ouverte: true }) ou verrouillée. Ouverte : la synchro planifiée n'écrit plus rien ; le
+     * prochain passage est reprogrammé s'il manque (après une mise à jour de l'appli, par exemple).
+     */
+    @PluginMethod
+    public void session(PluginCall call) {
+        boolean ouverte = Boolean.TRUE.equals(call.getBoolean("ouverte", false));
+        FondEtat.appli(ouverte);
+        if (ouverte && vault.fondActif()) {
+            try { Planificateur.verifier(getContext()); } catch (Exception ignored) { /* nouvel essai à la prochaine ouverture */ }
+        }
+        call.resolve(ok());
+    }
+
+    /** Attend la fin d'une synchro planifiée en cours (90 s au plus) avant la lecture des blocs. */
+    @PluginMethod
+    public void attendreFond(PluginCall call) {
+        new Thread(() -> {
+            JSObject r = ok();
+            try {
+                r.put("attendu", FondEtat.attendre(90_000));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                r.put("attendu", false);
+            }
+            call.resolve(r);
+        }, "klad-attente-fond").start();
     }
 
     // ------------------------------------------------------------ empreinte

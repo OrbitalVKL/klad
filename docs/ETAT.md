@@ -6,6 +6,12 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.3.0** — widget d'écran d'accueil et synchro planifiée (demande du propriétaire du 09/11 ; maquette validée : « Base ok,
+couleur rouge go » ; plan validé « go »). Widget 2 × 2 sans logo ni légende : reste à vivre de la base choisie (bleu, rouge
+s'il est dépassé, jamais de signe), pastille des opérations à vérifier, heure de la dernière synchro (ambre au-delà de
+12 h, « à ouvrir » si la banque est à reconnecter), « ••• » en mode démo ; toucher : Trier s'il y a une pastille, sinon
+l'Aperçu. Synchro automatique vers 8 h et 14 h, Klad fermé (Plus › Verrou, désactivée par défaut, activée par le code).
+
 **2.2.1** — couleurs du cadran : montant en couleur de texte, couronne bleue (Moi) ou orange (Nous) (retour du
 propriétaire du 09/11). `vapercu.cadran(…, apres, coul)` : `coul` = couleur de la couronne (sinon couleur de l'état).
 
@@ -114,6 +120,46 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.3.0 — détails techniques
+- **Widget** (`app.klad.widget`) : `WidgetKlad` (AppWidgetProvider, `res/layout/widget_klad.xml`, `xml/widget_klad_info.xml`,
+  couleurs `values/widget.xml` et `values-night/widget.xml`, icônes Lucide `drawable/ic_w_*`) ; trois montants (bleu,
+  rouge, gris) et deux lignes du bas (normale, ambre) choisis par visibilité, pour que les couleurs suivent le thème du
+  téléphone. `WidgetDonnees` (pur, JUnit) : états vide / démo / ok, montant en euros arrondis (espace fine), heure
+  « HH:mm » / « hier HH:mm » / « JJ/MM », ancienne au-delà de 12 h. Données dans `noBackupFilesDir/klad/widget.bin`
+  (`Stockage` avec un nom de fichier, clé `klad.resume` sans authentification, effacée par « Tout effacer »). Toucher :
+  `klad://ouvrir/trier|apercu` vers `MainActivity` (explicite), traité par `verrou.js:onUrl` (après déverrouillage,
+  `pendingVue`). Redessiné à chaque écriture, par la synchro planifiée et toutes les 3 h (`updatePeriodMillis`).
+- **Données** (`www/widget.js`, `KladWidgetDonnees.construire`) : `{ v, etat: 'ok' | 'demo', rav (centimes, valeur
+  absolue, null si non calculable), epuise, av (= pastille « Tout », `KladApp.aVerifier`), sync, reconnecter (compte à
+  réassocier, connexion absente ou accès expiré) }`. Écrit par le plugin `KladWidget` sur `KladModele.surChangement`, au
+  déverrouillage, à l'entrée et à la sortie du mode démo (`KladApp.demoDebut` / `demoFin` enveloppés), seulement si le JSON
+  change. Écrit même lien Grafit désactivé.
+- **Coffre** : enveloppe facultative « arrière-plan » (`Vault.activerFond` / `desactiverFond` / `dekFond`, clé Keystore
+  `klad.fond` SANS authentification, AAD `klad.fond.v1`). Activée par le code (`KladVault.activerFond({ pin })`),
+  supprimée à la désactivation, à la création d'un coffre et par « Tout effacer ». `Vault.get(ctx)` : coffre unique du
+  processus (plugin et synchro planifiée). `status()` renvoie `fond`. Changer le code ne la touche pas (DEK inchangée).
+  Risque accepté par le propriétaire (09/11) : du code exécuté comme Klad (téléphone rooté) ouvre les données sans le code ;
+  il pouvait déjà essayer le million de codes possibles.
+- **Synchro planifiée** (`app.klad.fond`) : `Planificateur` (JobScheduler, un seul travail `ID` persistant, réseau exigé,
+  `Planning.prochain` : 8 h ou 14 h locales, passage à moins d'une minute sauté), reprogrammé à la fin de chaque passage
+  (jamais pendant : programmer le même travail l'arrêterait) et vérifié à chaque déverrouillage. `FondJob` : rien si
+  désactivée, si Klad est déverrouillé (`FondEtat.appli`, posé par `KladVault.session`) ou si un passage tourne.
+  `Execution` : WebView invisible (fil principal, 4 min au plus) qui charge l'appli elle-même depuis `assets/public`
+  (`Pages`, https://localhost/, aucune navigation ailleurs) ; `index.html` reçoit `www/fond.js` en tête.
+  `www/fond.js` : plateforme « android », en-têtes de plugins (liste vérifiée contre les `@PluginMethod` Java par
+  `test/lot230`), `nativePromise` → `KladFondPont.appel` (synchrone), `fetch` hors page → `KladFondPont.http`
+  (`Http.autorise` : https://api.enablebanking.com seulement), `requestAnimationFrame` par minuterie. `Pont` répond au
+  coffre (status, unlockFond, blocs ; écriture refusée dès que l'appli est déverrouillée), au résumé Grafit, au widget ;
+  le reste : `{ ok: false, reason: 'fond' }`. `verrou.js:fond()` : ouverture par l'enveloppe, jamais de phrase ni de
+  question, `KladApp.synchro('planifiée')` SANS en-têtes PSU (`dispoPSU` : `{}` si `KLAD_FOND` ; les banques permettent
+  4 lectures par jour sans l'utilisateur), enregistrement, widget, résumé Grafit, journal, `KladFond.fin`.
+  Au déverrouillage, l'appli attend la fin d'un passage en cours (`KladVault.attendreFond`, 90 s au plus).
+- Limites connues : Android peut décaler un passage (économie d'énergie, appli rarement ouverte) ; sans réseau, le
+  passage attend le réseau ; un passage arrêté par Android à mi-écriture laisse des blocs déjà écrits (chacun atomique).
+- Tests : `test/lot230.test.mjs` (données du widget, plugins du pont, page de fond en vm, parcours Chromium complet avec
+  un faux pont Android et une banque fictive : aucun en-tête PSU, blocs réécrits, widget, journal) ; JUnit `PlanningTest`,
+  `FondEtatTest`, `HttpTest` (adresses permises, injection, chemins), `WidgetDonneesTest`.
 
 ### 2.2.0 — détails techniques
 - Mécanisme (`ui.js`) : `.inf` = info masquée (CSS `display:none!important`), visible quand un ancêtre `.inf-l` a
@@ -1068,6 +1114,12 @@ Restent :
   des 3 derniers mois qui en dépend).
 - Hors périmètre (choix de conception) : script bancaire Google et Drive, fichier de données lié, synchronisation
   « en ligne ».
+
+## Points d'appui laissés par la 2.3.0
+- Un nouveau plugin natif ou une nouvelle méthode : l'ajouter aussi à `www/fond.js` (`PLUGINS`) ; `Pont` n'y répond que
+  si la synchro planifiée en a besoin. Tout ce qui s'exécute à l'ouverture doit supporter `KLAD_FOND` (pas d'écran, pas
+  de question, pas de réseau hors Enable Banking).
+- Le widget lit `widget.bin` : un nouveau champ s'ajoute à `KladWidgetDonnees.construire` et à `WidgetKlad.lire`.
 
 ## Points d'appui laissés par la 2.2.0
 - Nouveau texte d'explication : le mettre dans une `.inf` (ou laisser la pose automatique d'une zone `.inf-auto`) ; un

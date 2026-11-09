@@ -2,6 +2,20 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.3.0
+
+Widget d'écran d'accueil et synchro automatique (demande du propriétaire, 09/11 ; maquette validée).
+- **Widget** (2 × 2 cases, à poser depuis l'écran d'accueil du téléphone) : le reste à vivre, sans légende, en bleu (en
+  rouge s'il est dépassé, jamais avec un signe moins), une pastille avec le nombre d'opérations à vérifier, l'heure de la
+  dernière synchro en bas (en ambre au-delà de 12 h ; « à ouvrir » si la banque est à reconnecter). Mode démo : « ••• ».
+  Un toucher ouvre Klad sur « Trier » s'il y a une pastille, sinon sur l'Aperçu (après le code ou l'empreinte). Il suit
+  le thème clair ou sombre du téléphone et se met à jour dès qu'une opération est vue ou classée.
+- **Synchro automatique** (Plus › Verrou, désactivée par défaut) : vers 8 h et 14 h, Klad fermé, les comptes sont lus
+  comme d'habitude, sans écran ; le widget et le résumé Grafit sont mis à jour. L'activer demande le code : Klad garde
+  alors une clé du coffre utilisable sans code, mais seulement par Klad sur ce téléphone ; la désactiver l'efface.
+  Android peut décaler un passage de quelques minutes (ou davantage pour économiser la batterie). Rien ne se passe si
+  Klad est ouvert ; s'il s'ouvre pendant une synchro, il attend qu'elle finisse.
+
 ## 2.2.1
 
 Couleurs du cadran (retour du propriétaire, 09/11) : le montant du reste à vivre (Moi) et de la fin de mois (Nous) est

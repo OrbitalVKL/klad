@@ -25,11 +25,18 @@ public final class Stockage {
 
     private final File dir;
     private final File fichier;
+    private final String nom;
     private final Cles cles;
 
     public Stockage(File dir, Cles cles) {
+        this(dir, cles, NOM);
+    }
+
+    /** 2.3.0 : autre fichier chiffré par la même clé (données du widget, « widget.bin »). */
+    public Stockage(File dir, Cles cles, String nom) {
         this.dir = dir;
-        this.fichier = new File(dir, NOM);
+        this.nom = nom;
+        this.fichier = new File(dir, nom);
         this.cles = cles;
     }
 
@@ -40,7 +47,7 @@ public final class Stockage {
         if (k == null) throw new GeneralSecurityException("Clé du résumé indisponible");
         byte[] b = Resume.sceller(k, misAJour, json, null);
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Dossier du résumé impossible à créer");
-        File tmp = new File(dir, NOM + ".tmp");
+        File tmp = new File(dir, nom + ".tmp");
         try (FileOutputStream out = new FileOutputStream(tmp)) {
             out.write(b);
             out.getFD().sync();
@@ -67,7 +74,7 @@ public final class Stockage {
 
     /** Supprime le résumé. true s'il existait. */
     public synchronized boolean effacer() {
-        new File(dir, NOM + ".tmp").delete();
+        new File(dir, nom + ".tmp").delete();
         return fichier.delete();
     }
 }
