@@ -304,8 +304,9 @@
     return '<div class="' + cls + '" data-op="' + esc(o.id) + '" data-c="' + esc(o.compte) + '" role="button" tabindex="0" aria-label="' + esc(nom) + '"><div class="ic">' + U().icoOp(C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '</div>' +
       '<div class="lab"><div class="tl">' + (vue ? '' : '<span class="sr">Non vue. </span>') + esc(libelleCourt(o.libelle)) + '</div><div class="tm">' +
       (opt && opt.date ? '<span class="num">' + jjmm(o.date) + '</span> · ' : '') +
-      '<span class="acct">' + esc(c ? c.libelle : '') + '</span> <span class="tx-cat">' + cat + '</span>' +
-      (r.src === 'regle' ? '<span class="tx-tag" title="Classée par une de vos règles">règle</span>' : '') + nc +
+      // 2.2 : le compte et « règle » sont dans le détail de l'opération (et dans le nom lu par le lecteur d'écran)
+      '<span class="acct inf inl">' + esc(c ? c.libelle : '') + '</span> <span class="tx-cat">' + cat + '</span>' +
+      (r.src === 'regle' ? '<span class="tx-tag inf inl" title="Classée par une de vos règles">règle</span>' : '') + nc +
       (g.KladCommun && g.KladCommun.equipementDeOp(S, o.id) ? '<span class="tx-tag eq" title="Ajoutée à l\'équilibre des apports">équilibre</span>' : '') +
       (o.statut === 'en_cours' ? (o.absente ? '<span class="tx-tag" title="la banque ne la renvoie plus : pas comptée">en cours · plus renvoyée</span>' : '<span class="tx-tag">en cours</span>') : '') +
       // 1.3.0 : statut d'un mouvement du compte commun (couleur et libellé)

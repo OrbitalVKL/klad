@@ -88,6 +88,8 @@ test('parcours 0.10.8 : catégories, règles, tri, total, équilibre', { skip: S
     assert.ok(await page.locator('#tx .tx-day').count() > 0);
     // Accueil : « Total perso » (1.2.0 : courants, paiement en ligne et épargne, sans le commun)
     await B.onglet('accueil');
+    assert.doesNotMatch(await page.locator('[data-mesure="soldes"]').innerText(), /sans le commun/);      // 2.2 : en info
+    await page.locator('[data-mesure="soldes"] h2 .inf-b').click();      // ⓘ des soldes : dates et explication du total
     const so = await page.locator('[data-mesure="soldes"]').innerText();
     assert.match(so, /Total perso : /);
     assert.match(so, /sans le commun/);

@@ -18,12 +18,14 @@
   const hhmm = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 
   // Ligne cliquable (56 dp) : gauche (pastille, compteur), titre, sous-titre, valeur à droite.
-  function li(gauche, titre, sous, attr, droite, nom) {
+  // etat (2.2) : le sous-texte est un état (« solde à saisir »…) et reste visible ; sinon c'est une info (ⓘ du titre)
+  function li(gauche, titre, sous, attr, droite, nom, etat) {
     return '<button type="button" class="ac-li" ' + (attr || '') + (nom ? ' aria-label="' + esc(nom) + '"' : '') + '>' + gauche + '<span class="tx"><b>' + esc(titre) + '</b>' +
-      (sous ? '<small>' + esc(sous) + '</small>' : '') + '</span>' + (droite ? '<span class="v">' + droite + '</span>' : '') + '<span class="chev" aria-hidden="true">›</span></button>';
+      (sous ? '<small' + (etat ? '' : ' class="inf"') + '>' + esc(sous) + '</small>' : '') + '</span>' + (droite ? '<span class="v">' + droite + '</span>' : '') + '<span class="chev" aria-hidden="true">›</span></button>';
   }
-  const carte = (id, titre, droite, corps, attr) => '<section class="ac-card" aria-labelledby="' + id + '"' + (attr || '') + '><h2 id="' + id + '">' + esc(titre) +
-    (droite ? '<span class="r">' + esc(droite) + '</span>' : '') + '</h2>' + corps + '</section>';
+  // 2.2 : les sous-textes des lignes (dates, détails) sont des infos, montrées par le ⓘ du titre de la carte
+  const carte = (id, titre, droite, corps, attr) => { const i = /class="inf[ "]/.test(corps); return '<section class="ac-card' + (i ? ' inf-l' : '') + '" aria-labelledby="' + id + '"' + (attr || '') + '><h2 id="' + id + '">' + esc(titre) +
+    (i ? U().ib(titre) : '') + (droite ? '<span class="r">' + esc(droite) + '</span>' : '') + '</h2>' + corps + '</section>'; };
 
   // ------------------------------------------------------------ 1. reste à vivre
   // res : KladBudget.suivi(B, 'perso', null) ; base : « salaire » ou « comptes » (KladBudget.baseRav, 0.10.7). Grand
@@ -90,12 +92,12 @@
         if (d) cartes += d.centimes;
         const sous = d ? 'à prélever' + (c.prelevement && c.prelevement.jour ? ' le ' + c.prelevement.jour : '') + (d.depuis ? ' · depuis le ' + U().jjmm(d.depuis) : '') : 'libellé du prélèvement à choisir';
         return li(U().bico(S, c), c.libelle, sous, 'data-compte="' + esc(c.id) + '"', d ? '<span class="num">' + esc(F().montant(d.centimes)) + '</span>' : '—',
-          c.libelle + ', carte à débit différé, ' + (d ? F().montant(d.centimes) + ' ' + sous : sous));
+          c.libelle + ', carte à débit différé, ' + (d ? F().montant(d.centimes) + ' ' + sous : sous), !d);
       }
       const lv = (o.livrets || {})[c.id];
       const s0 = M().soldeAffiche(S, c);
       const s = lv ? { centimes: lv.centimes, dateRef: s0 && s0.dateRef } : s0;
-      if (!s) return li(U().bico(S, c), c.libelle, c.source.type === 'manuel' ? 'solde à saisir' : 'solde pas encore lu', 'data-compte="' + esc(c.id) + '"', '—');
+      if (!s) return li(U().bico(S, c), c.libelle, c.source.type === 'manuel' ? 'solde à saisir' : 'solde pas encore lu', 'data-compte="' + esc(c.id) + '"', '—', '', true);
       if (c.role === 'courant' || c.role === 'commun') { total += s.centimes; n++; }
       else if (c.role === 'epargne') { ep += s.centimes; nep++; }
       const ancien = eb && (!t || now - Date.parse(t) > 30 * 3600e3);
@@ -103,7 +105,7 @@
       const v = s.centimes;
       return li(U().bico(S, c), c.libelle, sous, 'data-compte="' + esc(c.id) + '"',
         '<span class="num' + (v < 0 ? ' bad-t' : '') + '">' + esc(F().montant(Math.abs(v))) + '</span>' + (v < 0 ? '<small class="bad-t">débiteur</small>' : ''),
-        c.libelle + ', ' + F().montant(Math.abs(v)) + (v < 0 ? ' débiteur' : '') + ', ' + sous);
+        c.libelle + ', ' + F().montant(Math.abs(v)) + (v < 0 ? ' débiteur' : '') + ', ' + sous, ancien);      // relevé ancien : reste visible
     }).join('');
     // 1.2.0 : un seul total, « Total perso » (KladModele.totalPerso, même valeur que le total du résumé Grafit) : comptes
     // courants, paiement en ligne et épargne, moins la dette des cartes à débit différé ; sans le compte commun (il a son
@@ -111,9 +113,10 @@
     // les comptes ».
     const tp = M().totalPerso(S, o.dettes || {}, o.livrets || {});
     const tot = tp.n ? '<p class="ac-tot">Total perso : <b class="num' + (tp.centimes < 0 ? ' bad-t' : '') + '">' + esc(F().solde(tp.centimes)) + '</b>' +
-      '<small class="ac-tot-s">' + esc((nep ? 'comptes courants, paiement en ligne et épargne' : 'comptes courants et paiement en ligne') + (cartes ? ', cartes déduites' : '') + ' ; sans le commun' +
-        (tp.manque.length ? ' ; incomplet : ' + tp.manque.join(', ') : '')) + '</small></p>' : '';
-    return carte('ac-so', 'Soldes', lu ? 'relevés de ' + hhmm(lu) : '', lignes + tot, ' data-mesure="soldes"');
+      '<small class="ac-tot-s inf">' + esc((nep ? 'comptes courants, paiement en ligne et épargne' : 'comptes courants et paiement en ligne') + (cartes ? ', cartes déduites' : '') + ' ; sans le commun') + '</small>' +
+      (tp.manque.length ? '<small class="ac-tot-s bad-t">incomplet : ' + esc(tp.manque.join(', ')) + '</small>' : '') + '</p>' : '';
+    // 2.2 : l'heure du relevé bancaire en info (ⓘ du titre)
+    return carte('ac-so', 'Soldes', '', (lu ? '<p class="ac-lu inf">relevés de ' + esc(hhmm(lu)) + '</p>' : '') + lignes + tot, ' data-mesure="soldes"');
   }
 
   // ------------------------------------------------------------ 4. ce cycle-ci (4 postes : dépassés et à surveiller d'abord)

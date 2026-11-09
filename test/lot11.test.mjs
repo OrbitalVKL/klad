@@ -40,8 +40,15 @@ test('lot 1.1 : clavier du Budget, reste à vivre, Patrimoine et crypto, carbura
     // 2. Accueil : encart du reste à vivre réduit à l'essentiel (1.2.0 : « jour N/T » à la place du montant par jour) ;
     // 2.0 : cadran de l'Aperçu (montant à l'euro), détail par le « ? » de « Où va l'argent »
     await B.onglet('accueil');
+    // 2.2 : cadran = libellé et montant ; échéance et jour du cycle dans l'info (ⓘ du cadran)
     const hero = await page.locator('#ap-haut .ap-dial').innerText();
-    assert.match(hero.replace(/\s+/g, ' '), /^RESTE À VIVRE [\d\s  ]+ €( dépassé)? jusqu'au \d+ \S+ jour \d+\/\d+$/i);
+    assert.match(hero.replace(/\s+/g, ' ').trim(), /^RESTE À VIVRE [\d\s  ]+ €( dépassé)?$/i);
+    assert.equal(await page.locator('#ap-haut .ap-enc').isVisible(), false);
+    await page.locator('#ap-haut .ap-dial .inf-b').click();
+    assert.match((await page.locator('#ap-haut .ap-enc').innerText()).replace(/\s+/g, ' '), /^jusqu'au \d+ \S+ · jour \d+ sur \d+ temps variable dépensé \d+ %/);
+    assert.equal(await page.locator('#ap-haut .ap-dial .inf-b').getAttribute('aria-expanded'), 'true');
+    await page.locator('#ap-haut .ap-dial .inf-b').click();
+    assert.equal(await page.locator('#ap-haut .ap-enc').isVisible(), false);
     assert.doesNotMatch(hero, /cycle écoulé|budget utilisé|sur le dernier salaire/);
     await page.locator('#ap-haut [data-mesure="argent"] [data-aller="rav"]').first().click();
     assert.doesNotMatch(await page.locator('#ravCorps').innerText(), /Par jour/);

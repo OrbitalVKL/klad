@@ -115,7 +115,7 @@ test('mode démo : captures autorisées en entrant, interdites en sortant et au 
     await B.onglet('plus');
     await page.locator('#plusCorps [data-volet="secAffichage"]').click();
     await page.waitForSelector('#affichageCorps [data-demo="on"]');
-    assert.match(await page.locator('#affichageCorps').innerText(), /Captures d'écran autorisées pendant le mode démo seulement/);
+    assert.match(await page.locator('#affichageCorps').textContent(), /Captures d'écran autorisées pendant le mode démo seulement/);      // 2.2 : aide derrière un ⓘ
     await page.locator('#affichageCorps [data-demo="on"]').click();
     await B.pause(150);
     assert.match(await page.locator('#demoBar').innerText(), /MODE DÉMO · chiffres et libellés fictifs · captures d'écran autorisées/i);

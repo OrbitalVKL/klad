@@ -421,32 +421,33 @@
   // Comptes et banques · Données · Modules · Extras · Réglages · Aide et à propos. Synchroniser (pastille, Accueil),
   // le thème (Réglages › Apparence) et les observations (Accueil, Budget) n'y sont plus.
   function renderPlus() {
-    const it = (ic, t, s2, attr) => '<button type="button" class="sh-li" ' + attr + '><span class="ic" aria-hidden="true">' + ic + '</span><span>' + esc(t) + (s2 ? '<small>' + esc(s2) + '</small>' : '') + '</span><span class="r" aria-hidden="true">›</span></button>';
+    // 2.2 : l'état d'une entrée reste visible (etat) ; sa description passe en info (ⓘ du groupe)
+    const it = (ic, t, s2, attr, etat) => '<button type="button" class="sh-li" ' + attr + '><span class="ic" aria-hidden="true">' + ic + '</span><span>' + esc(t) + (etat ? '<small class="vis">' + esc(etat) + '</small>' : '') + (s2 ? '<small>' + esc(s2) + '</small>' : '') + '</span><span class="r" aria-hidden="true">›</span></button>';
     const grp = (t, corps) => '<section class="pl-grp" aria-label="' + esc(t) + '"><h2 class="sh-lab">' + esc(t) + '</h2><div class="sh-list">' + corps + '</div></section>';
     const n = Object.keys(S.modele.connexions).length, c = S.modele.comptes.length;
     const t = AF.theme(), p = AF.palette ? AF.palette() : 'klad';
     $('plusCorps').innerHTML =
       '<button type="button" id="btnLock" class="btn pl-lock"><span aria-hidden="true">🔒</span> Verrouiller maintenant</button>' +
       grp('Comptes et banques',
-        it('🏦', 'Banques et accès', n ? n + ' banque' + (n > 1 ? 's' : '') + ' connectée' + (n > 1 ? 's' : '') : 'Aucune banque connectée', 'data-volet="secBanques"') +
-        it('💳', 'Comptes', c ? c + ' compte' + (c > 1 ? 's' : '') : 'Aucun compte', 'data-volet="secComptes"') +
+        it('🏦', 'Banques et accès', '', 'data-volet="secBanques"', n ? n + ' banque' + (n > 1 ? 's' : '') + ' connectée' + (n > 1 ? 's' : '') : 'Aucune banque connectée') +
+        it('💳', 'Comptes', '', 'data-volet="secComptes"', c ? c + ' compte' + (c > 1 ? 's' : '') : 'Aucun compte') +
         it('🧾', 'Relevés des comptes', 'État de chaque compte, relevé manuel', 'data-vue="donnees"')) +
       grp('Données',
         it('💾', 'Sauvegarde', 'Export chiffré, restauration', 'data-vue="sauvegarde"') +
         it('📥', 'Importer', 'Relevé d\'un compte, reprise et complément, avec aperçu', 'data-volet="secImporter"') +
         it('🧮', 'Contrôle', 'Relevé pour comparer avec l\'ancienne version', 'data-volet="secControle"')) +
       grp('Modules',
-        it('🧩', 'Lien Grafit', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : 'Résumé pour Grafit', 'data-volet="secModules"')) +
+        it('🧩', 'Lien Grafit', window.KladLienGrafit && window.KladLienGrafit.etiquette ? '' : 'Résumé pour Grafit', 'data-volet="secModules"', window.KladLienGrafit && window.KladLienGrafit.etiquette ? window.KladLienGrafit.etiquette() : '')) +
       grp('Extras',
-        it('✨', 'Mail et Claude', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : 'Mail, Claude', 'data-volet="secExtras"')) +
+        it('✨', 'Mail et Claude', window.KladExtras && window.KladExtras.resume ? '' : 'Mail, Claude', 'data-volet="secExtras"', window.KladExtras && window.KladExtras.resume ? window.KladExtras.resume(S) : '')) +
       grp('Réglages',
-        it('🎨', 'Apparence', 'Thème ' + ({ auto: 'automatique', clair: 'clair', sombre: 'sombre' }[t]) + ' · palette ' + (p === 'grafit' ? 'Grafit' : 'Klad') + ' · mode démo', 'data-volet="secAffichage"') +
+        it('🎨', 'Apparence', 'thème, palette, mode démo', 'data-volet="secAffichage"', 'Thème ' + ({ auto: 'automatique', clair: 'clair', sombre: 'sombre' }[t]) + ' · palette ' + (p === 'grafit' ? 'Grafit' : 'Klad')) +
         it('🔒', 'Verrou', 'Code, empreinte, effacement', 'data-volet="secVerrou"') +
         it('🗂️', 'Classement', 'Catégories, règles', 'data-volet="secClassement"') +
         it('📐', 'Budget', 'Cycle, salaire, reste à vivre affiché, personnes du commun, compte secondaire', 'data-volet="secReglBudget"') +
         it('🧰', 'Complément', 'Motifs, mots-clés, taxe foncière, livret, PEE, carburant, éditeur avancé', 'data-volet="secReglages"')) +
       grp('Aide et à propos',
-        it('ℹ️', 'À propos', 'Version ' + (CFG.version || 'dev') + (CFG.date ? ' du ' + CFG.date.split('-').reverse().join('/') : '') + ', notes de version, mise à jour', 'data-volet="secMaj"') +
+        it('ℹ️', 'À propos', 'notes de version, mise à jour', 'data-volet="secMaj"', 'Version ' + (CFG.version || 'dev') + (CFG.date ? ' du ' + CFG.date.split('-').reverse().join('/') : '')) +
         it('📜', 'Journal', 'Anonyme, à copier pour un diagnostic', 'data-volet="secLog"') +
         it('📏', 'Diagnostic d\'affichage', 'Mesures de l\'écran copiées, sans donnée personnelle', 'data-plus="diagaff"'));
   }

@@ -286,7 +286,88 @@
   // Note « Comment c'est calculé » repliable.
   const comment = t => '<details class="bnote"><summary>Comment c\'est calculé</summary><p class="note">' + t + '</p></details>';
 
-  g.KladUI = { ajuster, ajusterBientot,
+  // ------------------------------------------------------------ 2.2 : infos masquées (ⓘ)
+  // Reste visible le nom, le montant, l'état et le mot qui dit ce qu'est le montant ; dates, formules, explications et
+  // sous-titres sont dans une info (.inf), masquée tant que sa ligne ou sa carte (.inf-l) n'est pas ouverte par le bouton
+  // ⓘ (.inf-b) ou par un toucher sur un libellé non cliquable (.inf-t). Bouton relié à des infos ailleurs : data-inf-k ↔
+  // data-inf-of. L'aide des formulaires (.muted.small, .rg-aide) passe d'elle-même derrière un ⓘ (infos()).
+  const ib = (nom, k) => '<button type="button" class="inf-b" aria-expanded="false" aria-label="' + esc('Infos' + (nom ? ' : ' + nom : '')) + '"' + (k ? ' data-inf-k="' + esc(k) + '"' : '') + '>' +
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button>';
+  // info : enc = encart (explication sous une ligne), sinon simple sous-texte révélé ; inl = révélée dans la ligne
+  const inf = (html, cls) => html ? '<span class="inf' + (cls ? ' ' + cls : '') + '">' + html + '</span>' : '';
+  function basculerInfo(el) {
+    const k = el.dataset.infK;
+    if (k) {
+      const L = g.document.querySelectorAll('[data-inf-of="' + k + '"]'), on = !(L[0] && L[0].classList.contains('inf-vu'));
+      L.forEach(x => x.classList.toggle('inf-vu', on));
+      g.document.querySelectorAll('[data-inf-k="' + k + '"]').forEach(x => { if (x.classList.contains('inf-b')) x.setAttribute('aria-expanded', String(on)); });
+      return;
+    }
+    const l = el.closest('.inf-l');
+    if (!l) return;
+    const on = l.classList.toggle('inf-on');
+    l.querySelectorAll('.inf-b:not([data-inf-k])').forEach(x => { if (x.closest('.inf-l') === l) x.setAttribute('aria-expanded', String(on)); });
+  }
+  // Pose automatique (écrans secondaires, volets) : infos() parcourt une racine.
+  // 1. aide d'un champ (.muted.small, .rg-aide) : ⓘ sur le libellé ou le titre qui la précède ;
+  // 2. dans une zone .inf-auto : sous-textes (.subs, small, .muted, p.note) sans montant, sans alerte ni état : un seul ⓘ
+  //    par bloc (section, carte, sous-partie dépliante), posé sur son titre, qui les montre tous.
+  let nInf = 0;
+  const ANCRE = 'label, h2, h3, h4, legend, .panel-h, .sh-lab, .obs-h3, .rg-t, .rg-l';
+  const BLOC = 'details, .ap-card, .ac-card, .cmp-card, .panel, section, .pl-sec, .rg-sec, fieldset, .card';
+  const TITRE = ':scope > summary .cms-t, :scope > summary, :scope > .panel-h h2, :scope > .panel-h h3, :scope > h2, :scope > h3, :scope > legend, :scope > .cmp-h > b:first-child, :scope > .rg-t';
+  const EXCLU = '.vis, [aria-live], [role="status"], [role="alert"], .inf, .inf-b, summary, h2, h3, h4, legend, label, button.btn, .chip, .err, .toast';
+  const VIDE = /^(aucun|aucune|rien|pas encore|pas de|non disponible|chargement)/i;
+  const bouton = (nom, k) => { const t = g.document.createElement('template'); t.innerHTML = ib(nom, k); return t.content.firstChild; };
+  function cacher(p, h, k) {
+    p.classList.add('inf'); p.dataset.infOf = k;
+    const prec = h && (h.querySelector(':scope > .inf-b[data-inf-k]') || (h.nextElementSibling && h.nextElementSibling.matches('.inf-b[data-inf-k]') ? h.nextElementSibling : null));
+    if (prec) { p.dataset.infOf = prec.dataset.infK; return; }
+    const b = bouton(h ? h.textContent.trim().slice(0, 60) : '', k);
+    // titre qui replie sa section : ⓘ à côté (et non dedans), pour qu'un toucher sur le titre replie toujours
+    if (h && h.matches('h2.fold, h3.fold')) h.after(b); else if (h) h.appendChild(b); else p.before(b);
+  }
+  function infos(root) {
+    if (!root || !root.querySelectorAll) return;
+    for (const p of root.querySelectorAll('.muted.small:not([data-infx]), .rg-aide:not([data-infx])')) {
+      p.dataset.infx = '1';
+      if (p.closest(EXCLU.replace(', label', '')) || p.closest('details:not(.cm-sub)') || p.hasAttribute('aria-live') || p.id === 'repIgnores' || !p.textContent.trim()) continue;
+      let a = null, x = p.previousElementSibling;
+      for (let i = 0; x && i < 4 && !a; i++, x = x.previousElementSibling) if (x.matches(ANCRE)) a = x; else if (x.querySelector && x.querySelector(ANCRE)) a = x.querySelector(ANCRE);
+      if (!a && p.parentElement && p.parentElement.firstElementChild !== p && p.parentElement.firstElementChild.matches(ANCRE)) a = p.parentElement.firstElementChild;
+      cacher(p, a && a.matches('.panel-h') ? a.querySelector('h2, h3') || a : a, 'ai' + (++nInf));
+    }
+    for (const z of root.querySelectorAll('.inf-auto')) {
+      for (const p of z.querySelectorAll('.subs:not([data-infx]), small:not([data-infx]), .muted:not([data-infx]), p.note:not([data-infx])')) {
+        p.dataset.infx = '1';
+        const t = p.textContent.trim();
+        if (!t || t.length < 4 || VIDE.test(t) || p.closest(EXCLU) || p.closest('.num, .v, .amt, .ap-mleg, .ap-tile') || p.querySelector('.num, .bad-t, .warn-t, .pos-t, .chip, input, select, button, a') || p.matches('.bad-t, .warn-t, .pos-t')) continue;
+        if (p.querySelector('.inf, [data-infx]')) continue;
+        // déjà dans un dépliant (« Comment c'est calculé », détail par poste…) : rien à ajouter ; sections dépliantes : oui
+        const dt = p.closest('details');
+        if (dt && !dt.matches('.cm-sub, .ctr-sub')) continue;
+        // bloc qui a un titre (le plus proche)
+        let bl = p.closest(BLOC), h = null;
+        while (bl && z.contains(bl)) { h = bl.querySelector(TITRE); if (h && !h.contains(p)) break; h = null; bl = bl.parentElement && bl.parentElement.closest(BLOC); }
+        if (!h) continue;
+        cacher(p, h, 'ab' + (++nInf));
+      }
+    }
+  }
+  if (g.document && g.document.addEventListener) {
+    g.document.addEventListener('click', ev => {
+      const el = ev.target && ev.target.closest && ev.target.closest('.inf-b, .inf-t');
+      if (!el) return;
+      ev.preventDefault(); ev.stopPropagation();
+      basculerInfo(el);
+    }, true);
+    let attente = 0;
+    const planifier = () => { if (attente) return; attente = 1; (g.requestAnimationFrame || setTimeout)(() => { attente = 0; infos(g.document.body); }); };
+    if (g.MutationObserver && g.document.body) new g.MutationObserver(planifier).observe(g.document.body, { childList: true, subtree: true });
+    else g.document.addEventListener('DOMContentLoaded', () => { if (g.MutationObserver) new g.MutationObserver(planifier).observe(g.document.body, { childList: true, subtree: true }); planifier(); });
+  }
+
+  g.KladUI = { ajuster, ajusterBientot, ib, inf, infos, basculerInfo,
     esc, e0, e2, plus0, plus2, MOIS, MOIS_L, mLabel, mLong, dfr, jjmm, jjmmaa, dLong, pluriel, chip,
     interrupteurRav, COULEURS, SVG, reglerApparence, couleurDe, iconeDe, iconHtml, cico, icoOp, icoPoste, bico,
     replie, plier, migrerPlis, MIGRATION_PLIS, pref, PREFS, tete, appliquerPli, comment, graduation, couleurGraduation, calcul, estCalcul
