@@ -11,8 +11,14 @@ const RES = 'android/app/src/main/res/';
 test('widget natif : deux formats (1 × 1, 2 × 1), quatre styles, pastille de 12 dp, carte de la taille d\'une icône', () => {
   for (const f of ['widget_klad_1x1', 'widget_klad_2x1']) {
     const l = read(RES + 'layout/' + f + '.xml');
-    assert.match(l, /android:id="@\+id\/w_carte"[\s\S]*?android:layout_height="52dp"/, f + ' : carte de 52 dp');
-    assert.doesNotMatch(l.slice(0, l.indexOf('w_carte')), /android:background=/, f + ' : case transparente autour de la carte');
+    assert.match(l, /android:id="@android:id\/background"[\s\S]*?android:layout_height="52dp"/, f + ' : carte de 52 dp');
+    const i = l.indexOf('android:id="@android:id/background"');
+    assert.doesNotMatch(l.slice(0, i), /android:background=/, f + ' : case transparente autour de la carte');
+    // 2.3.3 : sans ce couple, le lanceur (Android 12 et plus) arrondit la carte à son rayon (~28 dp) : rond en 1 × 1,
+    // bordure et pastille coupées
+    const carte = l.slice(i, l.indexOf('>', i));
+    assert.match(carte, /android:clipToOutline="true"/, f + ' : la carte garde ses propres coins');
+    assert.equal((l.match(/android:background=/g) || []).length, 1, f + ' : un seul fond (la carte)');
   }
   assert.match(read(RES + 'layout/widget_klad_1x1.xml'), /android:layout_width="52dp"/, '1 × 1 carré');
   const m = read('android/app/src/main/AndroidManifest.xml');

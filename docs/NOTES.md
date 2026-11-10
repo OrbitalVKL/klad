@@ -2,6 +2,11 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.3.3
+
+- **Widget** : le 1 × 1 n'est plus rond. L'écran d'accueil arrondissait le widget à sa façon, ce qui coupait la
+  bordure et cachait la pastille ; Klad garde maintenant ses propres coins (carré aux coins arrondis, comme les icônes).
+
 ## 2.3.2
 
 - **Widget** : le 1 × 1 est un carré de la taille d'une icône, aligné sur les icônes ; le 2 × 1 a la même hauteur. La

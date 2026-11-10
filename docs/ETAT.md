@@ -6,6 +6,12 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.3.3** — correctif du widget (capture du propriétaire du 10/11 : « Bords toujours coupés » ; le 1 × 1 apparaissait
+rond, bordure coupée aux coins, pastille invisible). Cause : le lanceur d'Android 12 et plus cherche le fond du widget
+et l'arrondit à son propre rayon (~28 dp, `system_app_widget_background_radius`) ; sur une carte de 52 dp, cela donne un
+rond. La carte porte maintenant `@android:id/background` avec `clipToOutline="true"` : c'est la façon prévue par Android
+de garder ses propres coins (14 dp). À confirmer sur le téléphone (non vérifiable hors appareil).
+
 **2.3.2** — widget en forme d'icône (maquette v4 validée le 10/11 : « Orbital verre par défaut et on garde tout ») et
 sections du budget en blocs (maquette B validée le 10/11 : « B »). Widget : la carte fait la taille d'une icône (52 dp,
 1 × 1 carré ; 2 × 1 à la hauteur d'une icône), en haut de la case comme les icônes ; la bordure n'est plus coupée par
@@ -132,6 +138,13 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.3.3 — détails techniques
+- Gabarits `widget_klad_1x1` et `widget_klad_2x1` : la carte (ex-`w_carte`) devient `@android:id/background`,
+  `android:clipToOutline="true"` (`tools:targetApi="31"`) ; `WidgetKlad.vues` pose le fond sur `android.R.id.background`.
+  Lanceur3 (Pixel) : sans ce couple, il prend la première vue à fond visible et la découpe au rayon système ; avec, il
+  la laisse telle quelle. En 2.3.1, même cause (fond sur toute la case : coins de la case recoupés).
+- Test : `lot231` (carte = fond identifié, `clipToOutline`, un seul fond par gabarit).
 
 ### 2.3.2 — détails techniques
 - Widget : gabarits avec une case transparente (`w_racine`, toucher) et une carte `w_carte` (fond posé par
