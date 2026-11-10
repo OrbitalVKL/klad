@@ -56,7 +56,7 @@
             android:grantUriPermissions="false"
             tools:ignore="ExportedContentProvider" />
 
-        <!-- 2.3.0 : widget d'écran d'accueil (reste à vivre, opérations à vérifier). Exporté : Android lui envoie
+        <!-- 2.3.0 : widget d'écran d'accueil 2 × 1 depuis la 2.3.1 (reste à vivre, opérations à vérifier). Exporté : Android lui envoie
              les mises à jour du widget ; il ne reçoit rien d'autre. -->
         <receiver
             android:name="app.klad.widget.WidgetKlad"
@@ -68,6 +68,19 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_klad_info" />
+        </receiver>
+
+        <!-- 2.3.1 : widget 1 × 1 (même rôle que le 2 × 1 ci-dessus). -->
+        <receiver
+            android:name="app.klad.widget.WidgetKladPetit"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_klad_petit_info" />
         </receiver>
 
         <!-- 2.3.0 : synchro planifiée (8 h et 14 h), seulement si elle est activée dans Plus › Verrou. -->

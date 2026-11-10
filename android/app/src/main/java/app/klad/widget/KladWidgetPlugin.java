@@ -10,6 +10,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * Plugin local « KladWidget » (2.3.0) : données du widget d'écran d'accueil.
  *   ecrire({ json }) → contrôle (objet JSON de moins de 32 Ko), chiffrement, écriture atomique, widgets redessinés.
  *   effacer()        → données supprimées, widget « — ».
+ *   style({ style }) → 2.3.1 : « bleu », « verre » ou « orbital » (Plus › Apparence), widgets redessinés.
  * Aucun contenu n'est journalisé.
  */
 @CapacitorPlugin(name = "KladWidget")
@@ -32,6 +33,11 @@ public class KladWidgetPlugin extends Plugin {
         } catch (Exception e) {
             call.resolve(resultat(false, "erreur"));
         }
+    }
+
+    @PluginMethod
+    public void style(PluginCall call) {
+        call.resolve(resultat(WidgetKlad.choisirStyle(getContext(), call.getString("style")), null));
     }
 
     @PluginMethod

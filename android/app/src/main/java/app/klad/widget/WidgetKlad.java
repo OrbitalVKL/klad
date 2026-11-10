@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -20,13 +21,17 @@ import java.time.ZoneId;
 import org.json.JSONObject;
 
 /**
- * Widget d'écran d'accueil (2.3.0), 2 × 2 cases, sans logo ni légende : reste à vivre, pastille des opérations à
- * vérifier, heure de la dernière synchro. Données relues dans « widget.bin » (chiffré par la clé « klad.resume »,
- * lisible appli verrouillée), écrites par l'appli et par la synchro planifiée. Toucher : Klad sur « Trier » s'il y a
- * une pastille, sinon l'Aperçu (après déverrouillage).
- * Les couleurs viennent des ressources (thème clair ou sombre du téléphone, résolu par l'écran d'accueil).
+ * Widget d'écran d'accueil 2 × 1 (2.3.0 ; 2 × 1 et style au choix depuis la 2.3.1), sans logo ni légende : reste à
+ * vivre, heure de la dernière synchro, pastille des opérations à vérifier (taille d'une pastille de notification).
+ * WidgetKladPetit : même chose en 1 × 1, sans l'heure (alerte sur la bordure).
+ * Données relues dans « widget.bin » (chiffré par la clé « klad.resume », lisible appli verrouillée), écrites par
+ * l'appli et par la synchro planifiée. Style (bleu, verre, orbital) : préférences « klad.widget », non sensibles.
+ * Toucher : Klad sur « Trier » s'il y a une pastille, sinon l'Aperçu (après déverrouillage).
  */
 public class WidgetKlad extends AppWidgetProvider {
+
+    static final String PREFS = "klad.widget";
+    static final String CLE_STYLE = "style";
 
     @Override
     public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) {
@@ -46,14 +51,36 @@ public class WidgetKlad extends AppWidgetProvider {
         majTous(ctx);
     }
 
-    /** Redessine tous les widgets posés (rien s'il n'y en a pas). Jamais d'exception. */
+    /** Style choisi dans Klad ; false si la clé est inconnue. */
+    public static boolean choisirStyle(Context ctx, String cle) {
+        if (!WidgetStyle.connu(cle)) return false;
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(CLE_STYLE, cle).apply();
+        majTous(ctx);
+        return true;
+    }
+
+    static WidgetStyle style(Context ctx) {
+        SharedPreferences p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return WidgetStyle.de(p.getString(CLE_STYLE, null));
+    }
+
+    /** Redessine tous les widgets posés, des deux tailles (rien s'il n'y en a pas). Jamais d'exception. */
     public static void majTous(Context ctx) {
         try {
             AppWidgetManager m = AppWidgetManager.getInstance(ctx);
             if (m == null) return;
-            int[] ids = m.getAppWidgetIds(new ComponentName(ctx, WidgetKlad.class));
-            if (ids == null || ids.length == 0) return;
-            m.updateAppWidget(ids, vues(ctx, lire(ctx)));
+            WidgetDonnees d = null;
+            WidgetStyle st = null;
+            for (int t = 0; t < 2; t++) {
+                boolean petit = t == 1;
+                int[] ids = m.getAppWidgetIds(new ComponentName(ctx, petit ? WidgetKladPetit.class : WidgetKlad.class));
+                if (ids == null || ids.length == 0) continue;
+                if (d == null) {
+                    d = lire(ctx);
+                    st = style(ctx);
+                }
+                m.updateAppWidget(ids, vues(ctx, d, st, petit));
+            }
         } catch (Exception ignored) {
             // widget laissé tel quel
         }
@@ -75,32 +102,51 @@ public class WidgetKlad extends AppWidgetProvider {
         }
     }
 
-    static RemoteViews vues(Context ctx, WidgetDonnees d) {
+    static int fond(WidgetStyle s, boolean alerte) {
+        switch (s) {
+            case BLEU: return alerte ? R.drawable.w_fond_bleu_alerte : R.drawable.w_fond_bleu;
+            case VERRE: return alerte ? R.drawable.w_fond_verre_alerte : R.drawable.w_fond_verre;
+            default: return alerte ? R.drawable.w_fond_orbital_alerte : R.drawable.w_fond_orbital;
+        }
+    }
+
+    static int pastille(WidgetStyle s) {
+        switch (s) {
+            case BLEU: return R.drawable.w_pastille_bleu;
+            case VERRE: return R.drawable.w_pastille_verre;
+            default: return R.drawable.w_pastille_orbital;
+        }
+    }
+
+    static RemoteViews vues(Context ctx, WidgetDonnees d, WidgetStyle st, boolean petit) {
         WidgetDonnees.Affichage a = d.affichage(System.currentTimeMillis(), ZoneId.systemDefault());
-        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_klad);
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), petit ? R.layout.widget_klad_1x1 : R.layout.widget_klad_2x1);
         CharSequence m = a.montant;
         if (a.chiffre) {
             SpannableString s = new SpannableString(a.montant + "€");
-            s.setSpan(new RelativeSizeSpan(0.6f), a.montant.length(), s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            s.setSpan(new RelativeSizeSpan(0.62f), a.montant.length(), s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             m = s;
         }
-        int[] montants = {R.id.w_montant_bleu, R.id.w_montant_rouge, R.id.w_montant_gris};
-        int choisi = a.couleur == WidgetDonnees.Couleur.BLEU ? 0 : a.couleur == WidgetDonnees.Couleur.ROUGE ? 1 : 2;
-        for (int i = 0; i < montants.length; i++) {
-            v.setViewVisibility(montants[i], i == choisi ? View.VISIBLE : View.GONE);
-            if (i == choisi) v.setTextViewText(montants[i], m);
-        }
+        v.setTextViewText(R.id.w_montant, m);
+        v.setTextColor(R.id.w_montant, st.couleur(a.couleur));
+        // 1 × 1 : pas de place pour l'heure, l'alerte (synchro ancienne, banque à reconnecter) passe sur la bordure
+        v.setInt(R.id.w_racine, "setBackgroundResource", fond(st, petit && a.basAmbre && d.etat == WidgetDonnees.Etat.OK));
         if (a.pastille == null) v.setViewVisibility(R.id.w_pastille, View.GONE);
         else {
             v.setViewVisibility(R.id.w_pastille, View.VISIBLE);
             v.setTextViewText(R.id.w_pastille, a.pastille);
+            v.setTextColor(R.id.w_pastille, st.pastilleTexte);
+            v.setInt(R.id.w_pastille, "setBackgroundResource", pastille(st));
         }
-        int icone = a.icone == WidgetDonnees.Icone.SYNCHRO ? R.drawable.ic_w_synchro : a.icone == WidgetDonnees.Icone.HORLOGE ? R.drawable.ic_w_horloge
-            : a.icone == WidgetDonnees.Icone.LIEN ? R.drawable.ic_w_lien : R.drawable.ic_w_cadenas;
-        v.setViewVisibility(R.id.w_bas, a.basAmbre ? View.GONE : View.VISIBLE);
-        v.setViewVisibility(R.id.w_bas_ambre, a.basAmbre ? View.VISIBLE : View.GONE);
-        v.setImageViewResource(a.basAmbre ? R.id.w_bas_ambre_icone : R.id.w_bas_icone, icone);
-        v.setTextViewText(a.basAmbre ? R.id.w_bas_ambre_texte : R.id.w_bas_texte, a.bas);
+        if (!petit) {
+            int icone = a.icone == WidgetDonnees.Icone.SYNCHRO ? R.drawable.ic_w_synchro : a.icone == WidgetDonnees.Icone.HORLOGE ? R.drawable.ic_w_horloge
+                : a.icone == WidgetDonnees.Icone.LIEN ? R.drawable.ic_w_lien : R.drawable.ic_w_cadenas;
+            int c = a.basAmbre ? st.ambre : st.muet;
+            v.setImageViewResource(R.id.w_bas_icone, icone);
+            v.setInt(R.id.w_bas_icone, "setColorFilter", c);
+            v.setTextViewText(R.id.w_bas_texte, a.bas);
+            v.setTextColor(R.id.w_bas_texte, c);
+        }
         v.setOnClickPendingIntent(R.id.w_racine, ouvrir(ctx, a.vue));
         return v;
     }

@@ -19,7 +19,7 @@
       'unlockBio', 'enableBio', 'disableBio', 'writeBlob', 'readBlob', 'deleteBlob', 'tmpOuvrir', 'tmpAjouter', 'tmpLire', 'tmpAbandon',
       'enregistrerFichier', 'resultatEnregistrement', 'oublierEnregistrement', 'choisirFichier'],
     KladGrafit: ['ecrire', 'effacer', 'lire', 'infos'],
-    KladWidget: ['ecrire', 'effacer'],
+    KladWidget: ['ecrire', 'style', 'effacer'],
     KladArret: ['action', 'lire', 'effacer'],
     KladReseau: ['adresse'],
     KladUpdate: ['info', 'openInstallSettings', 'download', 'install'],

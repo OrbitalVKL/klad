@@ -34,7 +34,7 @@ public class WidgetDonneesTest {
         WidgetDonnees.Affichage a = ok(112800L, false, 3, NOW - 5 * H, false);
         assertEquals("1" + F + "128", a.montant);
         assertTrue(a.chiffre);
-        assertEquals(WidgetDonnees.Couleur.BLEU, a.couleur);
+        assertEquals(WidgetDonnees.Couleur.NORMAL, a.couleur);
         assertEquals("3", a.pastille);
         assertEquals("14:04", a.bas);
         assertFalse(a.basAmbre);
@@ -50,7 +50,8 @@ public class WidgetDonneesTest {
         WidgetDonnees.Affichage e = ok(-4200L, true, 1, NOW - H, false);
         assertEquals("42", e.montant);
         assertEquals(WidgetDonnees.Couleur.ROUGE, e.couleur);
-        assertEquals("99+", ok(1L, false, 150, NOW, false).pastille);
+        assertEquals("pastille de 12 dp : 9+ au-delà de 9", "9+", ok(1L, false, 10, NOW, false).pastille);
+        assertEquals("9", ok(1L, false, 9, NOW, false).pastille);
     }
 
     @Test

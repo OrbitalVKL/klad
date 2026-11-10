@@ -577,6 +577,7 @@
   // ------------------------------------------------------------ affichage : thème, palette et mode démo
   const AF = window.KladAffichage;
   function renderAffichage() {
+    const W = window.KladWidget;             // 2.3.1 : style du widget d'écran d'accueil (widget.js, chargé après)
     const t = AF.theme(), p = AF.palette(), d = AF.demoActif();
     $('affichageCorps').innerHTML = '<h3>Thème</h3><div class="seg" role="group" aria-label="Thème">' +
       [['auto', 'Automatique'], ['clair', 'Clair'], ['sombre', 'Sombre']].map(([k, l]) => '<button data-theme-choix="' + k + '" aria-pressed="' + (k === t) + '">' + l + '</button>').join('') + '</div>' +
@@ -584,6 +585,10 @@
       '<h3>Palette</h3><div class="seg" role="group" aria-label="Palette">' +
       [['klad', 'Klad'], ['grafit', 'Grafit']].map(([k, l]) => '<button data-palette-choix="' + k + '" aria-pressed="' + (k === p) + '">' + l + '</button>').join('') + '</div>' +
       '<p class="muted small">Klad : couleurs habituelles. Grafit : noir et rouge, comme l\'icône. Indépendante du thème, gardée sur ce téléphone.</p>' +
+      (W ? '<h3>Widget d\'écran d\'accueil</h3><div class="seg" role="group" aria-label="Style du widget">' +
+        [['orbital', 'Orbital'], ['bleu', 'Bleu Klad'], ['verre', 'Verre']].map(([k, l]) => '<button data-widget-style="' + k + '" aria-pressed="' + (k === W.style()) + '">' + l + '</button>').join('') + '</div>' +
+        '<p class="muted small">Orbital : couleur des dossiers de l\'écran d\'accueil, bordure rouille. Bleu Klad : bleu de l\'appli. Verre : fond sombre transparent. ' +
+        'Deux formats à poser depuis l\'écran d\'accueil : 1 × 1 et 2 × 1. Gardé sur ce téléphone.</p>' : '') +
       '<h3>Mode démo</h3><p class="muted">Pour montrer l\'appli sans rien dévoiler : montants multipliés par un facteur pris au hasard ; ' +
       'libellés des opérations remplacés par leur sous-catégorie ; catégories et postes que vous avez créés renommés « Catégorie 1 », « Poste 2 »… ; ' +
       'noms des personnes, de l\'employeur et des banques remplacés ; numéros (IBAN, références, fins de carte) et adresses masqués ; ' +
@@ -599,6 +604,9 @@
     if (t) { AF.choisirTheme(t.dataset.themeChoix); renderAffichage(); if (A.redessiner) A.redessiner(); return; }
     const p = ev.target.closest('[data-palette-choix]');
     if (p) { AF.choisirPalette(p.dataset.paletteChoix); renderAffichage(); if (A.redessiner) A.redessiner(); return; }
+    const w = ev.target.closest('[data-widget-style]');
+    const W = window.KladWidget;
+    if (w && W) { W.choisirStyle(w.dataset.widgetStyle); renderAffichage(); A.toast('Style du widget : ' + w.textContent + '.'); return; }
     const d = ev.target.closest('[data-demo]');
     if (!d) return;
     if (d.dataset.demo === 'on') { AF.demarrerDemo(S()); A.log('info', 'Mode démo activé.'); A.fermerVolet(); }

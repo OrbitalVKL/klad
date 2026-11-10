@@ -2,6 +2,16 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.3.1
+
+Widget retravaillé (maquettes validées le 10/11).
+- Deux formats à poser depuis l'écran d'accueil : **1 × 1** (le montant et la pastille) et **2 × 1** (le montant, l'heure
+  de la dernière synchro et la pastille). Le 2 × 2 disparaît ; un widget déjà posé passe à la disposition 2 × 1.
+- Bordure fine ; pastille à la taille d'une pastille de notification Android (« 9+ » au-delà de 9).
+- Trois styles au choix dans Plus › Apparence : Orbital (par défaut, couleur des dossiers de l'écran d'accueil,
+  bordure et pastille rouille), Bleu Klad, Verre (fond sombre transparent).
+- 1 × 1 : synchro ancienne ou banque à reconnecter = bordure ambre (pas de place pour l'heure).
+
 ## 2.3.0
 
 Widget d'écran d'accueil et synchro automatique (demande du propriétaire, 09/11 ; maquette validée).

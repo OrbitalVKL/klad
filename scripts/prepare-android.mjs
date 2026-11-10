@@ -40,7 +40,7 @@ export function checkManifest(x) {
 }
 
 // Lien Grafit : un seul provider exporté, en lecture seule, sans permission ni délégation d'accès ; aucun autre
-// composant exporté que l'activité principale et (2.3.0) le widget d'écran d'accueil, qui ne reçoit que la mise à jour
+// composant exporté que l'activité principale et (2.3.0, 2.3.1) les widgets d'écran d'accueil, qui ne reçoivent que la mise à jour
 // de widget d'Android (il redessine ses données locales). Renvoie le problème trouvé, ou null.
 export function checkGrafit(x) {
   const p = (x.match(/<provider\b[^>]*app\.klad\.grafit\.GrafitProvider[^>]*>/) || [])[0];
@@ -50,11 +50,11 @@ export function checkGrafit(x) {
   if (!/android:grantUriPermissions="false"/.test(p)) return 'GrafitProvider : grantUriPermissions="false" attendu';
   if (/[Pp]ermission="/.test(p.replace('grantUriPermissions="false"', ''))) return 'GrafitProvider : aucune permission attendue (contrôle de l\'appelant dans le code)';
   const exportes = (x.match(/<(activity|activity-alias|service|receiver|provider)\b[^>]*android:exported="true"[^>]*>/g) || []);
-  const widget = (x.match(/<receiver\b[^>]*app\.klad\.widget\.WidgetKlad"[^>]*>([\s\S]*?)<\/receiver>/) || []);
-  const autres = exportes.filter(e => !/\.MainActivity"/.test(e) && !/app\.klad\.grafit\.GrafitProvider"/.test(e) && !/app\.klad\.widget\.WidgetKlad"/.test(e));
+  const widgets = [...x.matchAll(/<receiver\b[^>]*app\.klad\.widget\.WidgetKlad(?:Petit)?"[^>]*>([\s\S]*?)<\/receiver>/g)];
+  const autres = exportes.filter(e => !/\.MainActivity"/.test(e) && !/app\.klad\.grafit\.GrafitProvider"/.test(e) && !/app\.klad\.widget\.WidgetKlad(Petit)?"/.test(e));
   if (autres.length || !exportes.some(e => /\.MainActivity"/.test(e))) return 'composants exportés : seulement MainActivity, GrafitProvider et le widget';
-  if (widget[1] != null) {
-    const actions = [...widget[1].matchAll(/<action android:name="([^"]+)"/g)].map(a => a[1]);
+  for (const w of widgets) {
+    const actions = [...w[1].matchAll(/<action android:name="([^"]+)"/g)].map(a => a[1]);
     if (actions.join() !== 'android.appwidget.action.APPWIDGET_UPDATE') return 'widget : seule l\'action APPWIDGET_UPDATE est permise';
   }
   return null;
