@@ -1,26 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget 1 × 1 (2.3.1) : montant seul, pastille en haut à droite. Pas de place pour l'heure : synchro ancienne ou
-     banque à reconnecter = bordure ambre (fond « alerte »). Couleurs posées par WidgetKlad. -->
+<!-- Widget 1 × 1 (2.3.1 ; 2.3.2 : carré de la taille d'une icône, 52 dp, en haut de la case comme les icônes du
+     lanceur). Fond transparent autour : le lanceur arrondit les bords de la case sans couper la bordure. Montant seul,
+     pastille en haut à droite ; synchro ancienne ou banque à reconnecter = bordure ambre (fond « alerte »). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_racine"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/w_fond_orbital">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/w_montant"
-        style="@style/WidgetMontant"
-        android:layout_width="match_parent"
-        android:layout_height="26dp"
-        android:layout_gravity="center"
-        android:autoSizeMaxTextSize="16sp"
-        android:autoSizeMinTextSize="9sp"
-        android:gravity="center"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp"
-        android:text="@string/widget_apercu_montant" />
+    <FrameLayout
+        android:id="@+id/w_carte"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="@dimen/w_haut"
+        android:background="@drawable/w_fond_orbital_verre">
 
-    <TextView
-        android:id="@+id/w_pastille"
-        style="@style/WidgetPastille" />
+        <TextView
+            android:id="@+id/w_montant"
+            style="@style/WidgetMontant"
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:autoSizeMaxTextSize="15sp"
+            android:autoSizeMinTextSize="8sp"
+            android:gravity="center"
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp"
+            android:text="@string/widget_apercu_montant" />
+
+        <TextView
+            android:id="@+id/w_pastille"
+            style="@style/WidgetPastille" />
+    </FrameLayout>
 </FrameLayout>

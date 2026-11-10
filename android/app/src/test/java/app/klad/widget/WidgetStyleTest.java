@@ -13,8 +13,9 @@ public class WidgetStyleTest {
         assertEquals(WidgetStyle.BLEU, WidgetStyle.de("bleu"));
         assertEquals(WidgetStyle.VERRE, WidgetStyle.de("verre"));
         assertEquals(WidgetStyle.ORBITAL, WidgetStyle.de("orbital"));
-        assertEquals("défaut : Orbital", WidgetStyle.ORBITAL, WidgetStyle.de(null));
-        assertEquals(WidgetStyle.ORBITAL, WidgetStyle.de("inconnu"));
+        assertEquals(WidgetStyle.ORBITAL_VERRE, WidgetStyle.de("orbital_verre"));
+        assertEquals("défaut : Orbital verre (2.3.2)", WidgetStyle.ORBITAL_VERRE, WidgetStyle.de(null));
+        assertEquals(WidgetStyle.ORBITAL_VERRE, WidgetStyle.de("inconnu"));
         assertTrue(WidgetStyle.connu("verre"));
         assertFalse(WidgetStyle.connu("Verre"));
         assertFalse(WidgetStyle.connu(null));
@@ -47,5 +48,6 @@ public class WidgetStyleTest {
         assertEquals(WidgetStyle.ORBITAL.montant, WidgetStyle.ORBITAL.couleur(WidgetDonnees.Couleur.NORMAL));
         assertEquals(WidgetStyle.ORBITAL.rouge, WidgetStyle.ORBITAL.couleur(WidgetDonnees.Couleur.ROUGE));
         assertEquals(WidgetStyle.VERRE.muet, WidgetStyle.VERRE.couleur(WidgetDonnees.Couleur.GRIS));
+        assertEquals(WidgetStyle.ORBITAL_VERRE.rouge, WidgetStyle.ORBITAL_VERRE.couleur(WidgetDonnees.Couleur.ROUGE));
     }
 }

@@ -59,6 +59,7 @@ header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justif
 .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
 .seg button{all:unset;cursor:pointer;padding:6px 12px;border-radius:6px;font-weight:600;font-size:13px;color:var(--ink-2)}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg.seg-w{display:flex;flex-wrap:wrap;width:fit-content;max-width:100%}       /* 2.3.2 : quatre styles du widget, à la ligne sur petit écran */
 .seg button:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 select,input[type=text],input[type=number],input[type=search]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
 label.ctl{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-2)}

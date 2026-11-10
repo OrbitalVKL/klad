@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget d'écran d'accueil (2.3.1) : trois styles au choix (Plus › Apparence), couleurs posées par WidgetKlad.
-     Valeurs par défaut des gabarits (aperçu du sélecteur de widgets) : style Orbital. -->
+<!-- Widget d'écran d'accueil (2.3.1, 2.3.2) : quatre styles au choix (Plus › Apparence), couleurs posées par
+     WidgetKlad. Valeurs par défaut des gabarits (aperçu du sélecteur de widgets) : style Orbital verre. -->
 <resources>
-    <color name="w_orbital_montant">#F6EBE0</color>
-    <color name="w_orbital_muet">#BDB4AD</color>
+    <color name="w_orbital_montant">#F8EEE4</color>
+    <color name="w_orbital_muet">#E2D6CC</color>
     <color name="w_orbital_pastille_texte">#FFFFFF</color>
+    <!-- 2.3.2 : décalage du haut de la carte dans la case, pour l'aligner sur les icônes (mesuré sur le lanceur Pixel). -->
+    <dimen name="w_haut">12dp</dimen>
     <string name="widget_description">Reste à vivre et opérations à vérifier</string>
     <string name="widget_petit_description">Reste à vivre (petit format)</string>
     <string name="widget_apercu_montant">1 128€</string>
@@ -14,7 +16,7 @@
         <item name="android:layout_width">12dp</item>
         <item name="android:layout_height">12dp</item>
         <item name="android:layout_gravity">top|end</item>
-        <item name="android:layout_margin">5dp</item>
+        <item name="android:layout_margin">4dp</item>
         <item name="android:background">@drawable/w_pastille_orbital</item>
         <item name="android:gravity">center</item>
         <item name="android:includeFontPadding">false</item>

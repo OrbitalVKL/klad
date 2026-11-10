@@ -77,10 +77,10 @@
 
   // 2.3.1 : style du widget (Plus › Apparence), gardé sur ce téléphone comme le thème ; envoyé au widget à chaque
   // ouverture (après une réinstallation, par exemple). Non sensible : ni montant ni donnée.
-  const STYLES = ['orbital', 'bleu', 'verre'];
+  const STYLES = ['orbital_verre', 'orbital', 'bleu', 'verre'];       // 2.3.2 : Orbital verre, par défaut
   const CLE_STYLE = 'klad.widget.style';
   function style() {
-    try { const v = g.localStorage && g.localStorage.getItem(CLE_STYLE); return STYLES.indexOf(v) >= 0 ? v : 'orbital'; } catch (e) { return 'orbital'; }
+    try { const v = g.localStorage && g.localStorage.getItem(CLE_STYLE); return STYLES.indexOf(v) >= 0 ? v : STYLES[0]; } catch (e) { return STYLES[0]; }
   }
   function envoyerStyle() {
     if (!P || !P.style || g.KLAD_FOND) return Promise.resolve(null);
@@ -88,7 +88,7 @@
   }
   function choisirStyle(k) {
     if (STYLES.indexOf(k) < 0) return Promise.resolve(null);
-    try { if (k === 'orbital') g.localStorage.removeItem(CLE_STYLE); else g.localStorage.setItem(CLE_STYLE, k); } catch (e) { /* stockage indisponible : style envoyé quand même */ }
+    try { if (k === STYLES[0]) g.localStorage.removeItem(CLE_STYLE); else g.localStorage.setItem(CLE_STYLE, k); } catch (e) { /* stockage indisponible : style envoyé quand même */ }
     return envoyerStyle();
   }
 

@@ -5,14 +5,16 @@ package app.klad.widget;
  * pastille sont des formes (res/drawable/w_fond_<cle>[_alerte], w_pastille_<cle>) choisies par WidgetKlad.
  *   bleu    : bleu Klad, pastille ambre ;
  *   verre   : fond sombre translucide (Android ne floute pas le fond d'écran derrière un widget), pastille blanche ;
- *   orbital : couleur des dossiers du lanceur Pixel, bordure et pastille rouille (style par défaut).
+ *   orbital : couleur des dossiers du lanceur Pixel, bordure et pastille rouille ;
+ *   orbital_verre (2.3.2, style par défaut) : fond sombre translucide teinté chaud, bordure et pastille rouille.
  */
 public enum WidgetStyle {
     BLEU("bleu", 0xFFFFFFFF, 0xFFFFB6A6, 0xFFC9D6E8, 0xFFF6C46E, 0xFF1B1406),
     VERRE("verre", 0xFFFFFFFF, 0xFFFFAB98, 0xFFDFE2E4, 0xFFF6C46E, 0xFF1E1F24),
-    ORBITAL("orbital", 0xFFF6EBE0, 0xFFFF8F73, 0xFFBDB4AD, 0xFFF0A850, 0xFFFFFFFF);
+    ORBITAL("orbital", 0xFFF6EBE0, 0xFFFF8F73, 0xFFBDB4AD, 0xFFF0A850, 0xFFFFFFFF),
+    ORBITAL_VERRE("orbital_verre", 0xFFF8EEE4, 0xFFFFA08A, 0xFFE2D6CC, 0xFFF6B35C, 0xFFFFFFFF);
 
-    public static final WidgetStyle DEFAUT = ORBITAL;
+    public static final WidgetStyle DEFAUT = ORBITAL_VERRE;
 
     public final String cle;
     public final int montant;
