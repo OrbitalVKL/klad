@@ -14,7 +14,7 @@ test('budget : chaque section est un bloc de sa couleur, distinct des postes', (
   for (const [k, v] of [['rev', 'good'], ['fixe', 'nfix'], ['courante', 'cour'], ['optionnelle', 'nopt'], ['hb', 'hb']]) {
     assert.match(css, new RegExp('\\.bg-sec\\.' + k + '\\{--sc:var\\(--' + v + '\\)\\}'), k);
   }
-  assert.match(regle('.bg-sh .t'), /color:color-mix\(in srgb,var\(--sc\) 78%,var\(--ink\)\)/, 'titre de la couleur de la section');
+  assert.match(regle('.bg-sh .t'), /color:color-mix\(in srgb,var\(--sc\) 65%,var\(--ink\)\)/, 'titre de la couleur de la section');
   assert.match(regle('.bg-sh .dot'), /display:none/, 'plus de point : la couleur est portée par le bloc');
   assert.match(regle('.bg-sh'), /grid-template-columns:minmax\(0,1fr\) auto auto/);
   assert.match(regle('div.bg-sh'), /grid-template-columns:minmax\(0,1fr\) auto/);
