@@ -2,6 +2,14 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.3.2
+
+- **Widget** : le 1 × 1 est un carré de la taille d'une icône, aligné sur les icônes ; le 2 × 1 a la même hauteur. La
+  bordure n'est plus coupée. Nouveau style **Orbital verre** (fond sombre transparent, bordure et pastille rouille),
+  par défaut ; Orbital, Bleu Klad et Verre restent au choix dans Plus › Apparence.
+- **Budget** : chaque section (Revenus, Charges fixes, Dépenses courantes, Dépenses optionnelles, Hors budget) est un
+  bloc à part, avec un liseré et un titre de sa couleur ; on distingue tout de suite une section d'un poste.
+
 ## 2.3.1
 
 Widget retravaillé (maquettes validées le 10/11).
