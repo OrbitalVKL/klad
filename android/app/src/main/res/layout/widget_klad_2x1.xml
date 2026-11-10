@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Widget 2 × 1 (2.3.1 ; 2.3.2 : carte de la hauteur d'une icône, 52 dp, en haut de la case, sur la largeur de deux
-     icônes). Montant, heure de la dernière synchro dessous, pastille en haut à droite. Fond et couleurs posés par
+     icônes ; 2.3.3 : carte = @android:id/background avec clipToOutline, coins gardés par le lanceur). Montant, heure
+     de la dernière synchro dessous, pastille en haut à droite. Fond et couleurs posés par
      WidgetKlad selon le style choisi ; valeurs ci-dessous = style Orbital verre (aperçu). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/w_racine"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
     <FrameLayout
-        android:id="@+id/w_carte"
+        android:id="@android:id/background"
         android:layout_width="match_parent"
         android:layout_height="52dp"
         android:layout_gravity="top"
         android:layout_marginStart="4dp"
         android:layout_marginTop="@dimen/w_haut"
         android:layout_marginEnd="4dp"
-        android:background="@drawable/w_fond_orbital_verre">
+        android:background="@drawable/w_fond_orbital_verre"
+        android:clipToOutline="true"
+        tools:targetApi="31">
 
         <LinearLayout
             android:layout_width="match_parent"

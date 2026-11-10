@@ -22,8 +22,9 @@ import org.json.JSONObject;
 
 /**
  * Widget d'écran d'accueil 2 × 1 (2.3.0 ; 2 × 1 et style au choix depuis la 2.3.1 ; 2.3.2 : forme d'icône, la carte
- * « w_carte » fait la hauteur d'une icône, en haut de la case, et ne touche plus les bords que le lanceur arrondit,
- * ce qui coupait la bordure), sans logo ni légende : reste à
+ * fait la hauteur d'une icône, en haut de la case ; 2.3.3 : la carte porte l'identifiant android:id/background avec
+ * clipToOutline : le lanceur d'Android 12 et plus garde alors nos coins au lieu d'arrondir la carte à son propre rayon,
+ * ce qui la rendait ronde en 1 × 1 et coupait bordure et pastille), sans logo ni légende : reste à
  * vivre, heure de la dernière synchro, pastille des opérations à vérifier (taille d'une pastille de notification).
  * WidgetKladPetit : même chose en 1 × 1, sans l'heure (alerte sur la bordure).
  * Données relues dans « widget.bin » (chiffré par la clé « klad.resume », lisible appli verrouillée), écrites par
@@ -133,7 +134,7 @@ public class WidgetKlad extends AppWidgetProvider {
         v.setTextViewText(R.id.w_montant, m);
         v.setTextColor(R.id.w_montant, st.couleur(a.couleur));
         // 1 × 1 : pas de place pour l'heure, l'alerte (synchro ancienne, banque à reconnecter) passe sur la bordure
-        v.setInt(R.id.w_carte, "setBackgroundResource", fond(st, petit && a.basAmbre && d.etat == WidgetDonnees.Etat.OK));
+        v.setInt(android.R.id.background, "setBackgroundResource", fond(st, petit && a.basAmbre && d.etat == WidgetDonnees.Etat.OK));
         if (a.pastille == null) v.setViewVisibility(R.id.w_pastille, View.GONE);
         else {
             v.setViewVisibility(R.id.w_pastille, View.VISIBLE);

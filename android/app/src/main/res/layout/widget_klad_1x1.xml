@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Widget 1 × 1 (2.3.1 ; 2.3.2 : carré de la taille d'une icône, 52 dp, en haut de la case comme les icônes du
-     lanceur). Fond transparent autour : le lanceur arrondit les bords de la case sans couper la bordure. Montant seul,
+     lanceur ; 2.3.3 : carte = @android:id/background avec clipToOutline, pour que le lanceur (Android 12 et plus)
+     garde nos coins de 14 dp au lieu d'imposer les siens, ~28 dp, qui en faisaient un rond et coupaient la bordure). Fond transparent autour : le lanceur arrondit les bords de la case sans couper la bordure. Montant seul,
      pastille en haut à droite ; synchro ancienne ou banque à reconnecter = bordure ambre (fond « alerte »). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/w_racine"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
     <FrameLayout
-        android:id="@+id/w_carte"
+        android:id="@android:id/background"
         android:layout_width="52dp"
         android:layout_height="52dp"
         android:layout_gravity="top|center_horizontal"
         android:layout_marginTop="@dimen/w_haut"
-        android:background="@drawable/w_fond_orbital_verre">
+        android:background="@drawable/w_fond_orbital_verre"
+        android:clipToOutline="true"
+        tools:targetApi="31">
 
         <TextView
             android:id="@+id/w_montant"
