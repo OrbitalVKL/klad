@@ -2260,7 +2260,7 @@ html.appm #view-budget > .panel{border-top:0!important}
 .bg-sh{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;min-height:48px;cursor:pointer}
 div.bg-sh{cursor:default;grid-template-columns:minmax(0,1fr) auto}
 .bg-sh .dot{display:none}
-.bg-sh .t{min-width:0;font-weight:800;font-size:14px;letter-spacing:.02em;text-transform:uppercase;overflow-wrap:anywhere;color:color-mix(in srgb,var(--sc) 78%,var(--ink))}
+.bg-sh .t{min-width:0;font-weight:800;font-size:14px;letter-spacing:.02em;text-transform:uppercase;overflow-wrap:anywhere;color:color-mix(in srgb,var(--sc) 65%,var(--ink))}
 .bg-sh .t small{color:var(--muted)}
 .bg-sh .t small{display:block;text-transform:none;letter-spacing:0;font-weight:500;font-size:12px;color:var(--muted)}
 .bg-sh .t .ap-chip{text-transform:none;letter-spacing:0;margin-left:4px}

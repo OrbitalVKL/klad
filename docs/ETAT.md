@@ -143,8 +143,8 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   pastille rouille partagée avec Orbital. Appli : `KladWidget.STYLES[0]`, rien gardé dans `localStorage` pour le défaut ;
   boutons à la ligne sur petit écran (`.seg.seg-w`).
 - Budget : `.bg-sec` = bloc (`--sc` par section, liseré 4 dp en haut, bordure et fond teintés par `color-mix`, coins
-  16 px, marges négatives pour garder la largeur des postes, plus encore sous 380 px) ; titre `color-mix(--sc 78 %,
-  --ink)` pour le contraste dans les deux thèmes ; plus de point de couleur (grilles des en-têtes à 3 et 2 colonnes).
+  16 px, marges négatives pour garder la largeur des postes, plus encore sous 380 px) ; titre `color-mix(--sc 65 %,
+  --ink)` : contraste AA (≥ 5,2:1 au pire) dans les deux thèmes et les deux palettes ; plus de point de couleur (grilles des en-têtes à 3 et 2 colonnes).
 - Tests : `test/lot232.test.mjs` (règles du bloc) ; `lot231` (carte de 52 dp, case transparente, quatre styles, 320 px).
 
 ### 2.3.1 — détails techniques
