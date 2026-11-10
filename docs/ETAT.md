@@ -6,6 +6,11 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.3.1** — widget retravaillé (maquettes posées sur l'écran du propriétaire, validées le 10/11 : « C e et f. 2x2
+inutile ») : deux formats, 1 × 1 et 2 × 1 (plus de 2 × 2), bordure fine, pastille à la taille d'une pastille de
+notification Android (12 dp, chiffre en 8 sp, « 9+ » au-delà de 9), trois styles au choix dans Plus › Apparence :
+Orbital (défaut : couleur des dossiers du lanceur, bordure et pastille rouille), Bleu Klad, Verre (fond translucide).
+
 **2.3.0** — widget d'écran d'accueil et synchro planifiée (demande du propriétaire du 09/11 ; maquette validée : « Base ok,
 couleur rouge go » ; plan validé « go »). Widget 2 × 2 sans logo ni légende : reste à vivre de la base choisie (bleu, rouge
 s'il est dépassé, jamais de signe), pastille des opérations à vérifier, heure de la dernière synchro (ambre au-delà de
@@ -120,6 +125,20 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.3.1 — détails techniques
+- Deux fournisseurs : `WidgetKlad` (2 × 1, `layout/widget_klad_2x1.xml`, `xml/widget_klad_info.xml`, garde les widgets
+  déjà posés) et `WidgetKladPetit` (1 × 1, `widget_klad_1x1.xml`, `widget_klad_petit_info.xml`), tous deux redessinés par
+  `WidgetKlad.majTous`. Garde-fou du manifeste (`scripts/prepare-android.mjs`) : les deux récepteurs, action
+  APPWIDGET_UPDATE seule.
+- Style : `WidgetStyle` (pur, JUnit : clés, défaut, contrastes ≥ 4,5:1 sur fonds opaques) ; fond et pastille par
+  `setBackgroundResource` (`drawable/w_fond_<style>[_alerte]`, `w_pastille_<style>`), couleurs par `setTextColor` /
+  `setColorFilter`. Plus de `values-night` : les trois styles sont sombres. Préférence native `klad.widget/style`
+  (SharedPreferences, non sensible) posée par `KladWidget.style({ style })` ; côté appli `localStorage`
+  `klad.widget.style` (comme le thème), renvoyée à chaque ouverture (sauf page de fond).
+- 1 × 1 : pas d'heure ; synchro ancienne ou banque à reconnecter → fond « alerte » (bordure ambre 1,5 dp).
+- Verre : Android ne floute pas le fond d'écran derrière un widget (simple transparence, 50 %).
+- Tests : `test/lot231.test.mjs` (ressources, réglage dans Apparence) ; JUnit `WidgetStyleTest`.
 
 ### 2.3.0 — détails techniques
 - **Widget** (`app.klad.widget`) : `WidgetKlad` (AppWidgetProvider, `res/layout/widget_klad.xml`, `xml/widget_klad_info.xml`,

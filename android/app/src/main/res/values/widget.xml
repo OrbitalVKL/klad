@@ -1,27 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget d'écran d'accueil (2.3.0) : couleurs du thème clair ; thème sombre dans values-night. -->
+<!-- Widget d'écran d'accueil (2.3.1) : trois styles au choix (Plus › Apparence), couleurs posées par WidgetKlad.
+     Valeurs par défaut des gabarits (aperçu du sélecteur de widgets) : style Orbital. -->
 <resources>
-    <color name="w_fond">#FFFFFF</color>
-    <color name="w_muet">#56615C</color>
-    <color name="w_bleu">#2A5D9F</color>
-    <color name="w_rouge">#A8321F</color>
-    <color name="w_ambre">#8F5405</color>
-    <color name="w_pastille_fond">#9A4D06</color>
-    <color name="w_pastille_texte">#FFFFFF</color>
+    <color name="w_orbital_montant">#F6EBE0</color>
+    <color name="w_orbital_muet">#BDB4AD</color>
+    <color name="w_orbital_pastille_texte">#FFFFFF</color>
     <string name="widget_description">Reste à vivre et opérations à vérifier</string>
-    <string name="widget_vide">—</string>
+    <string name="widget_petit_description">Reste à vivre (petit format)</string>
+    <string name="widget_apercu_montant">1 128€</string>
+    <string name="widget_apercu_heure">08:01</string>
+
+    <style name="WidgetPastille">
+        <item name="android:layout_width">12dp</item>
+        <item name="android:layout_height">12dp</item>
+        <item name="android:layout_gravity">top|end</item>
+        <item name="android:layout_margin">5dp</item>
+        <item name="android:background">@drawable/w_pastille_orbital</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/w_orbital_pastille_texte</item>
+        <item name="android:textSize">8sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:visibility">gone</item>
+    </style>
 
     <style name="WidgetMontant">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">52dp</item>
-        <item name="android:gravity">center</item>
+        <item name="android:gravity">center_vertical</item>
         <item name="android:maxLines">1</item>
+        <item name="android:includeFontPadding">false</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">34sp</item>
+        <item name="android:textColor">@color/w_orbital_montant</item>
         <item name="android:autoSizeTextType">uniform</item>
-        <item name="android:autoSizeMinTextSize">16sp</item>
-        <item name="android:autoSizeMaxTextSize">36sp</item>
         <item name="android:autoSizeStepGranularity">1sp</item>
     </style>
 
@@ -30,7 +41,8 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:maxLines">1</item>
         <item name="android:fontFamily">monospace</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/w_orbital_muet</item>
+        <item name="android:textSize">11sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 </resources>

@@ -11,15 +11,16 @@ import java.util.Locale;
  *
  * Données écrites par l'appli (www/widget.js) : reste à vivre (base choisie, centimes, sans signe), dépassé ou non,
  * nombre d'opérations à vérifier, heure de la dernière synchro, banque à reconnecter, mode démo.
- * Affichage (maquette validée le 09/11/2026) : montant sans légende, bleu (rouge s'il est dépassé, jamais de signe
- * moins) ; pastille du nombre à vérifier ; heure de la dernière synchro, en ambre au-delà de 12 h ; « à ouvrir » si la
- * banque est à reconnecter ; « ••• » en mode démo ; « — » sans donnée.
+ * Affichage (maquettes validées les 09 et 10/11/2026) : montant sans légende (rouge s'il est dépassé, jamais de signe
+ * moins) ; pastille du nombre à vérifier (« 9+ » au-delà) ; heure de la dernière synchro, en ambre au-delà de 12 h ;
+ * « à ouvrir » si la banque est à reconnecter ; « ••• » en mode démo ; « — » sans donnée. Le 1 × 1 n'a pas de place pour
+ * l'heure : « alerte » (ambre) passe alors sur la bordure.
  */
 public final class WidgetDonnees {
 
     public enum Etat { VIDE, DEMO, OK }
 
-    public enum Couleur { BLEU, ROUGE, GRIS }
+    public enum Couleur { NORMAL, ROUGE, GRIS }
 
     public enum Icone { SYNCHRO, HORLOGE, LIEN, CADENAS }
 
@@ -75,8 +76,8 @@ public final class WidgetDonnees {
         if (etat == Etat.DEMO) return new Affichage("•••", false, Couleur.GRIS, null, "—", false, Icone.CADENAS, "apercu");
         boolean chiffre = rav != null;
         String m = chiffre ? montant(rav) : "—";
-        Couleur c = !chiffre ? Couleur.GRIS : epuise ? Couleur.ROUGE : Couleur.BLEU;
-        String p = aVerifier <= 0 ? null : aVerifier > 99 ? "99+" : Integer.toString(aVerifier);
+        Couleur c = !chiffre ? Couleur.GRIS : epuise ? Couleur.ROUGE : Couleur.NORMAL;
+        String p = aVerifier <= 0 ? null : aVerifier > 9 ? "9+" : Integer.toString(aVerifier);    // pastille de 12 dp
         String vue = aVerifier > 0 ? "trier" : "apercu";
         if (reconnecter) return new Affichage(m, chiffre, c, p, "à ouvrir", true, Icone.LIEN, vue);
         if (sync <= 0) return new Affichage(m, chiffre, c, p, "—", true, Icone.HORLOGE, vue);

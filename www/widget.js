@@ -1,4 +1,5 @@
-// Klad — widget d'écran d'accueil (2.3.0) : données lues par le widget Android (plugin natif KladWidget).
+// Klad — widget d'écran d'accueil (2.3.0 ; style au choix et formats 1 × 1 / 2 × 1 en 2.3.1) : données lues par le
+// widget Android (plugin natif KladWidget).
 // Le widget n'a ni logo ni légende (maquette validée le 09/11/2026) : reste à vivre de la base choisie (centimes, sans
 // signe ; « epuise » s'il est dépassé), nombre « à vérifier » (pastille « Tout »), heure de la dernière synchro, banque à
 // reconnecter. Mode démo : rien que « demo ». Écrit au déverrouillage, à chaque changement (regroupé) et à la fin d'une
@@ -74,8 +75,25 @@
     return lien.maj(S, now, ext).catch(e => { if (A.etat()) A.log('err', 'Widget : ' + (e.message || e)); return null; });
   }
 
+  // 2.3.1 : style du widget (Plus › Apparence), gardé sur ce téléphone comme le thème ; envoyé au widget à chaque
+  // ouverture (après une réinstallation, par exemple). Non sensible : ni montant ni donnée.
+  const STYLES = ['orbital', 'bleu', 'verre'];
+  const CLE_STYLE = 'klad.widget.style';
+  function style() {
+    try { const v = g.localStorage && g.localStorage.getItem(CLE_STYLE); return STYLES.indexOf(v) >= 0 ? v : 'orbital'; } catch (e) { return 'orbital'; }
+  }
+  function envoyerStyle() {
+    if (!P || !P.style || g.KLAD_FOND) return Promise.resolve(null);
+    return P.style({ style: style() }).catch(() => null);
+  }
+  function choisirStyle(k) {
+    if (STYLES.indexOf(k) < 0) return Promise.resolve(null);
+    try { if (k === 'orbital') g.localStorage.removeItem(CLE_STYLE); else g.localStorage.setItem(CLE_STYLE, k); } catch (e) { /* stockage indisponible : style envoyé quand même */ }
+    return envoyerStyle();
+  }
+
   M.surChangement(() => maj());
-  A.ouvertures.push(() => maj());          // déverrouillage, retour au premier plan
+  A.ouvertures.push(() => { envoyerStyle(); return maj(); });   // déverrouillage, retour au premier plan
   // mode démo : « ••• » pendant le mode, données réelles dès la sortie (y compris au verrouillage)
   const debut = A.demoDebut, finDemo = A.demoFin;
   A.demoDebut = function () { const r = debut.apply(this, arguments); setTimeout(maj, 0); return r; };
@@ -83,8 +101,11 @@
 
   function faux() {
     let json = null;
-    return { async ecrire(o) { json = o.json; return { ok: true }; }, async effacer() { json = null; return { ok: true }; }, contenu: () => json };
+    let st = null;
+    return { async ecrire(o) { json = o.json; return { ok: true }; }, async effacer() { json = null; return { ok: true }; },
+      async style(o) { st = o.style; return { ok: true }; }, contenu: () => json, styleEnvoye: () => st };
   }
 
-  g.KladWidget = { maj, contenu: () => (P && P.contenu ? P.contenu() : undefined) };
+  g.KladWidget = { maj, STYLES, style, choisirStyle, contenu: () => (P && P.contenu ? P.contenu() : undefined),
+    styleEnvoye: () => (P && P.styleEnvoye ? P.styleEnvoye() : undefined) };
 })(typeof window !== 'undefined' ? window : globalThis);
