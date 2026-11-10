@@ -145,7 +145,12 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Budget : `.bg-sec` = bloc (`--sc` par section, liseré 4 dp en haut, bordure et fond teintés par `color-mix`, coins
   16 px, marges négatives pour garder la largeur des postes, plus encore sous 380 px) ; titre `color-mix(--sc 65 %,
   --ink)` : contraste AA (≥ 5,2:1 au pire) dans les deux thèmes et les deux palettes ; plus de point de couleur (grilles des en-têtes à 3 et 2 colonnes).
-- Tests : `test/lot232.test.mjs` (règles du bloc) ; `lot231` (carte de 52 dp, case transparente, quatre styles, 320 px).
+- Mode démo (`affichage.js:balayer`) : un `aria-label`, `title` ou `placeholder` changé SEUL (sans nouveau nœud) n'était
+  pas revu : fuite intermittente d'un montant réel dans un libellé d'accessibilité (vue par `demo.test`, Patrimoine ›
+  impôts › prélèvements). L'observateur suit aussi ces attributs ; valeur masquée retenue (`demo.attrsFaits`) pour ne
+  jamais masquer deux fois ; dernière valeur réelle rendue à la sortie.
+- Tests : `test/lot232.test.mjs` (règles du bloc ; mode démo : attribut changé seul masqué une fois, rendu à la sortie) ;
+  `lot231` (carte de 52 dp, case transparente, quatre styles, 320 px).
 
 ### 2.3.1 — détails techniques
 - Deux fournisseurs : `WidgetKlad` (2 × 1, `layout/widget_klad_2x1.xml`, `xml/widget_klad_info.xml`, garde les widgets
