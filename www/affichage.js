@@ -115,7 +115,7 @@
   // ------------------------------------------------------------ mode démo (DOM)
   // 0.10.10 : dictionnaire tiré des données (KladDemo) ; texte, infobulles et valeurs des champs masqués ; champs de
   // saisie en lecture seule (sauf les recherches) ; tout est rendu tel quel en sortant (textes et champs d'origine).
-  const demo = { on: false, k: 1, alias: [], D: null, obs: null, file: false, faits: new WeakMap(), origines: new Map() };
+  const demo = { on: false, k: 1, alias: [], D: null, obs: null, file: false, faits: new WeakMap(), attrsFaits: new WeakMap(), origines: new Map() };
   const LIBRES = 'input[type="search"], #q, #icQ, #bankSearch';
   const NUMERIQUE = /^\s*\d[\d\s  ]*([.,]\d+)?\s*$/;
   function texteDemo(v) {
@@ -160,14 +160,19 @@
       demo.faits.set(n, o);
       if (o !== v) { const r = origine(n); if (!r.texte) r.texte = { v }; r.texte.masque = o; n.nodeValue = o; }
     }
+    // 2.3.2 : attributs suivis aussi quand seul l'attribut change (infobulle ou libellé d'accessibilité mis à jour sans
+    // nouveau nœud) ; valeur déjà masquée retenue pour ne jamais la masquer deux fois.
     for (const e of d.querySelectorAll('[aria-label],[title],[placeholder]')) {
+      let fait = demo.attrsFaits.get(e);
       for (const a of ['aria-label', 'title', 'placeholder']) {
         const v = e.getAttribute(a);
-        if (!v) continue;
+        if (!v || (fait && fait[a] === v)) continue;
         const o = texteDemo(v);
+        if (!fait) { fait = {}; demo.attrsFaits.set(e, fait); }
+        fait[a] = o;
         if (o === v) continue;
         const r = origine(e); r.attrs = r.attrs || {};
-        if (!(a in r.attrs)) r.attrs[a] = v;
+        r.attrs[a] = v;
         e.setAttribute(a, o);
       }
     }
@@ -206,7 +211,7 @@
     }
     b.hidden = false;
     replierDemo(false);
-    if (!demo.obs) { demo.obs = new g.MutationObserver(planifier); demo.obs.observe(d.body, { subtree: true, childList: true, characterData: true }); }
+    if (!demo.obs) { demo.obs = new g.MutationObserver(planifier); demo.obs.observe(d.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-label', 'title', 'placeholder'] }); }
     // pastilles de banque (initiales) : redessinées avec la lettre de l'alias
     if (g.KladApp && g.KladApp.rendre) { try { g.KladApp.rendre(); } catch (e) { /* écran fermé */ } }
     balayer();
@@ -241,6 +246,7 @@
     if (demo.obs) { demo.obs.disconnect(); demo.obs = null; }
     rendreOrigines();
     demo.faits = new WeakMap();
+    demo.attrsFaits = new WeakMap();
     d.documentElement.classList.remove('demo');
     const b = d.getElementById('demoBar'); if (b) b.hidden = true;
     clearTimeout(replT);

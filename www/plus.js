@@ -585,9 +585,9 @@
       '<h3>Palette</h3><div class="seg" role="group" aria-label="Palette">' +
       [['klad', 'Klad'], ['grafit', 'Grafit']].map(([k, l]) => '<button data-palette-choix="' + k + '" aria-pressed="' + (k === p) + '">' + l + '</button>').join('') + '</div>' +
       '<p class="muted small">Klad : couleurs habituelles. Grafit : noir et rouge, comme l\'icône. Indépendante du thème, gardée sur ce téléphone.</p>' +
-      (W ? '<h3>Widget d\'écran d\'accueil</h3><div class="seg" role="group" aria-label="Style du widget">' +
-        [['orbital', 'Orbital'], ['bleu', 'Bleu Klad'], ['verre', 'Verre']].map(([k, l]) => '<button data-widget-style="' + k + '" aria-pressed="' + (k === W.style()) + '">' + l + '</button>').join('') + '</div>' +
-        '<p class="muted small">Orbital : couleur des dossiers de l\'écran d\'accueil, bordure rouille. Bleu Klad : bleu de l\'appli. Verre : fond sombre transparent. ' +
+      (W ? '<h3>Widget d\'écran d\'accueil</h3><div class="seg seg-w" role="group" aria-label="Style du widget">' +
+        [['orbital_verre', 'Orbital verre'], ['orbital', 'Orbital'], ['bleu', 'Bleu Klad'], ['verre', 'Verre']].map(([k, l]) => '<button data-widget-style="' + k + '" aria-pressed="' + (k === W.style()) + '">' + l + '</button>').join('') + '</div>' +
+        '<p class="muted small">Orbital verre : fond sombre transparent, bordure rouille. Orbital : couleur des dossiers de l\'écran d\'accueil, bordure rouille. Bleu Klad : bleu de l\'appli. Verre : fond sombre transparent, bordure claire. ' +
         'Deux formats à poser depuis l\'écran d\'accueil : 1 × 1 et 2 × 1. Gardé sur ce téléphone.</p>' : '') +
       '<h3>Mode démo</h3><p class="muted">Pour montrer l\'appli sans rien dévoiler : montants multipliés par un facteur pris au hasard ; ' +
       'libellés des opérations remplacés par leur sous-catégorie ; catégories et postes que vous avez créés renommés « Catégorie 1 », « Poste 2 »… ; ' +

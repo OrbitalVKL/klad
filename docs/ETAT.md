@@ -6,6 +6,13 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.3.2** — widget en forme d'icône (maquette v4 validée le 10/11 : « Orbital verre par défaut et on garde tout ») et
+sections du budget en blocs (maquette B validée le 10/11 : « B »). Widget : la carte fait la taille d'une icône (52 dp,
+1 × 1 carré ; 2 × 1 à la hauteur d'une icône), en haut de la case comme les icônes ; la bordure n'est plus coupée par
+l'arrondi du lanceur ; quatrième style Orbital verre, par défaut. Budget : chaque section (Revenus, Charges fixes,
+Dépenses courantes, Dépenses optionnelles, Hors budget) est un bloc à liseré et titre de sa couleur ; les postes restent
+des lignes à l'intérieur (suivi et « Régler le budget », Moi et Nous).
+
 **2.3.1** — widget retravaillé (maquettes posées sur l'écran du propriétaire, validées le 10/11 : « C e et f. 2x2
 inutile ») : deux formats, 1 × 1 et 2 × 1 (plus de 2 × 2), bordure fine, pastille à la taille d'une pastille de
 notification Android (12 dp, chiffre en 8 sp, « 9+ » au-delà de 9), trois styles au choix dans Plus › Apparence :
@@ -125,6 +132,25 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.3.2 — détails techniques
+- Widget : gabarits avec une case transparente (`w_racine`, toucher) et une carte `w_carte` (fond posé par
+  `setBackgroundResource`) de 52 dp de haut, `layout_marginTop="@dimen/w_haut"` (12 dp, mesuré sur le lanceur Pixel du
+  propriétaire : haut des icônes à 31 px du haut de la case, à 2,625 px/dp) ; 1 × 1 : 52 × 52 dp centré ; 2 × 1 :
+  largeur de la case moins 4 dp de chaque côté. Coins 14 dp. En 2.3.1 le fond remplissait la case et le lanceur en
+  arrondissait les bords, ce qui coupait la bordure.
+- Style `orbital_verre` (`WidgetStyle.ORBITAL_VERRE`, `DEFAUT`) : fond #85160E0A, bordure #B3D6622C (ambre en alerte),
+  pastille rouille partagée avec Orbital. Appli : `KladWidget.STYLES[0]`, rien gardé dans `localStorage` pour le défaut ;
+  boutons à la ligne sur petit écran (`.seg.seg-w`).
+- Budget : `.bg-sec` = bloc (`--sc` par section, liseré 4 dp en haut, bordure et fond teintés par `color-mix`, coins
+  16 px, marges négatives pour garder la largeur des postes, plus encore sous 380 px) ; titre `color-mix(--sc 65 %,
+  --ink)` : contraste AA (≥ 5,2:1 au pire) dans les deux thèmes et les deux palettes ; plus de point de couleur (grilles des en-têtes à 3 et 2 colonnes).
+- Mode démo (`affichage.js:balayer`) : un `aria-label`, `title` ou `placeholder` changé SEUL (sans nouveau nœud) n'était
+  pas revu : fuite intermittente d'un montant réel dans un libellé d'accessibilité (vue par `demo.test`, Patrimoine ›
+  impôts › prélèvements). L'observateur suit aussi ces attributs ; valeur masquée retenue (`demo.attrsFaits`) pour ne
+  jamais masquer deux fois ; dernière valeur réelle rendue à la sortie.
+- Tests : `test/lot232.test.mjs` (règles du bloc ; mode démo : attribut changé seul masqué une fois, rendu à la sortie) ;
+  `lot231` (carte de 52 dp, case transparente, quatre styles, 320 px).
 
 ### 2.3.1 — détails techniques
 - Deux fournisseurs : `WidgetKlad` (2 × 1, `layout/widget_klad_2x1.xml`, `xml/widget_klad_info.xml`, garde les widgets
