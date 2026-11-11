@@ -6,6 +6,13 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.3.4** — correctif de la synchro planifiée (retour du propriétaire du 11/11 : « La mise à jour du widget à 8h n'a
+pas fonctionné… les opérations à vérifier ne se sont affichées qu'après ouverture de l'appli et synchro »). Cause
+probable : Klad quitté sans être verrouillé (il ne se verrouille qu'au retour, après 5 min ; le minuteur ne tourne pas
+en arrière-plan) restait « ouvert » pour la synchro, qui se reportait au créneau suivant. Désormais : Klad quitté est
+verrouillé à la demande de la synchro, puis le passage a lieu ; Klad affiché à l'écran : nouvel essai 30 min plus tard.
+Trace des passages dans Plus › Verrou (dernier, résultat, étape, prochain) et bouton « Essayer dans 1 min ».
+
 **2.3.3** — correctif du widget (capture du propriétaire du 10/11 : « Bords toujours coupés » ; le 1 × 1 apparaissait
 rond, bordure coupée aux coins, pastille invisible). Cause : le lanceur d'Android 12 et plus cherche le fond du widget
 et l'arrondit à son propre rayon (~28 dp, `system_app_widget_background_radius`) ; sur une carte de 52 dp, cela donne un
@@ -138,6 +145,26 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.3.4 — détails techniques
+- `FondEtat` : `premierPlan` (posé par `KladVaultPlugin.handleOnResume` / `handleOnPause`), `decision()` → LANCER
+  (verrouillé), VERROUILLER (déverrouillé, écran quitté), REPORTER (écran affiché), DEJA ; `attendreVerrou(ms)`.
+- `FondJob` : VERROUILLER → `KladVaultPlugin.demanderVerrou()` (événement « verrouiller », seulement si l'appli l'écoute),
+  attente de `session({ ouverte: false })` 30 s au plus hors du fil principal, puis passage ; sinon report de 30 min
+  (`Planificateur.dans`, `REPORT_MS`). `verrou.js` : écouteur « verrouiller » → `lock()` (écritures finies, mémoire
+  effacée, session fermée) ou `session(false)` si déjà verrouillé.
+- `Vault.dekFond` : l'enveloppe « arrière-plan » n'est plus retirée sur une erreur passagère du Keystore, seulement si
+  sa clé a disparu (avant, une seule erreur désactivait la synchro automatique sans le dire).
+- `Passages` (préférences `klad.fond`, sans donnée personnelle : heures et codes) : dernier passage, résultat
+  (ok, erreurs, reporte, verrou, inactif, cle, coffre, ouverture, erreur, delai, moteur, arret), dernière étape atteinte
+  par la page (`KladFond.etape` → `Pont.etape` : page, coffre, synchro, enregistrement), prochain passage ; renvoyés par
+  `KladVault.status` (`fondDernier`, `fondResultat`, `fondEtape`, `fondProchain`) et affichés dans Plus › Verrou
+  (`#fondTrace`, `aria-live` pour ne pas être replié derrière un ⓘ). `KladVault.essaiFond` : passage dans 1 min.
+- Limites : Android peut encore décaler un passage (téléphone en veille profonde : jusqu'à la prochaine fenêtre de
+  maintenance ou au réveil de l'écran). La WebView de fond n'est pas attachée à une fenêtre ; si la page ne démarre
+  pas, la trace l'indiquera (étape « chargement », résultat « delai »).
+- Tests : `test/lot234.test.mjs` ; `lot230` (étapes notées dans le parcours complet) ; JUnit `FondEtatTest` (décision,
+  attente du verrou).
 
 ### 2.3.3 — détails techniques
 - Gabarits `widget_klad_1x1` et `widget_klad_2x1` : la carte (ex-`w_carte`) devient `@android:id/background`,

@@ -24,7 +24,8 @@ final class Execution {
     static final String ADRESSE = "https://localhost/index.html";
 
     interface Fin {
-        void apres(String raison);
+        /** resultat : JSON de la page ou raison d'Android ; etape : dernière étape atteinte par la page. */
+        void apres(String resultat, String etape);
     }
 
     private final Context ctx;
@@ -32,6 +33,7 @@ final class Execution {
     private final Handler h = new Handler(Looper.getMainLooper());
     private WebView web;
     private boolean fini;
+    private volatile String etape = "chargement";
 
     Execution(Context ctx, Fin fin) {
         this.ctx = ctx.getApplicationContext();
@@ -73,6 +75,11 @@ final class Execution {
         h.postDelayed(() -> terminer("delai"), DELAI_MS);
     }
 
+    /** Étape atteinte par la page (pont). */
+    void etape(String e) {
+        if (e != null && e.length() <= 20) etape = e;
+    }
+
     /** Fin (depuis n'importe quel fil) : une seule fois, WebView détruite. */
     void terminer(String raison) {
         h.post(() -> {
@@ -89,7 +96,7 @@ final class Execution {
                 }
                 web = null;
             }
-            fin.apres(raison);
+            fin.apres(raison, etape);
         });
     }
 }

@@ -385,16 +385,27 @@ final class Vault {
         if (p.remove("fond") != null) store();
     }
 
-    /** DEK pour la synchro planifiée, ou null si désactivée ou illisible (l'enveloppe est alors retirée). */
+    /**
+     * DEK pour la synchro planifiée, ou null si désactivée ou illisible. 2.3.4 : l'enveloppe n'est retirée que si sa clé
+     * a disparu ; une erreur passagère du Keystore ne désactive plus la synchro automatique (nouvel essai au passage
+     * suivant).
+     */
     synchronized byte[] dekFond() {
         byte[] env = bytes("fond");
         if (env == null) return null;
+        SecretKey k;
         try {
-            SecretKey k = getKey(KEY_FOND);
-            if (k == null) throw new GeneralSecurityException("clé absente");
-            return Coffre.open(k, env, Coffre.AAD_FOND);
+            k = getKey(KEY_FOND);
         } catch (GeneralSecurityException | IOException e) {
+            return null;
+        }
+        if (k == null) {
             try { desactiverFond(); } catch (IOException ignored) { /* nouvel essai au prochain passage */ }
+            return null;
+        }
+        try {
+            return Coffre.open(k, env, Coffre.AAD_FOND);
+        } catch (GeneralSecurityException e) {
             return null;
         }
     }

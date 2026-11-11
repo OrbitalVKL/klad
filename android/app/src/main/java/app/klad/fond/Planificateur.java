@@ -17,12 +17,21 @@ public final class Planificateur {
 
     private Planificateur() {}
 
+    /** Report d'un passage empêché (Klad affiché, verrou non obtenu) : nouvel essai 30 min plus tard. */
+    static final long REPORT_MS = 30 * 60_000L;
+
     /** Programme le prochain passage (remplace le précédent). */
     public static void planifier(Context ctx) {
+        long now = System.currentTimeMillis();
+        dans(ctx, Planning.prochain(now, ZoneId.systemDefault()) - now);
+    }
+
+    /** 2.3.4 : passage dans delaiMs (report, ou essai demandé depuis Plus › Verrou), puis retour au rythme 8 h / 14 h. */
+    public static void dans(Context ctx, long delaiMs) {
         JobScheduler js = ctx.getSystemService(JobScheduler.class);
         if (js == null) return;
-        long now = System.currentTimeMillis();
-        long delai = Math.max(0, Planning.prochain(now, ZoneId.systemDefault()) - now);
+        long delai = Math.max(0, delaiMs);
+        Passages.prochain(ctx, System.currentTimeMillis() + delai);
         JobInfo j = new JobInfo.Builder(ID, new ComponentName(ctx, FondJob.class))
             .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
             .setMinimumLatency(delai)
@@ -40,5 +49,6 @@ public final class Planificateur {
     public static void annuler(Context ctx) {
         JobScheduler js = ctx.getSystemService(JobScheduler.class);
         if (js != null) js.cancel(ID);
+        Passages.prochain(ctx, 0);
     }
 }

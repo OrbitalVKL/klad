@@ -6,11 +6,14 @@ package app.klad.fond;
  * - « appli ouverte » : l'appli est déverrouillée (données en mémoire). La synchro planifiée ne démarre pas, et
  *   n'écrit plus aucun bloc si l'appli s'ouvre pendant qu'elle tourne (les données de l'appli font foi).
  * - « en cours » : une synchro planifiée tourne. L'appli attend sa fin (90 s au plus) avant de lire les blocs.
+ * - 2.3.4 : « premier plan » : l'écran de Klad est affiché. Klad déverrouillé mais en arrière-plan (il ne se verrouille
+ *   qu'au retour, après 5 min) ne doit plus empêcher le passage : la synchro lui demande d'abord de se verrouiller.
  */
 public final class FondEtat {
 
     private static boolean appliOuverte;
     private static boolean enCours;
+    private static boolean premierPlan;
     private static final Object VERROU = new Object();
 
     private FondEtat() {}
@@ -26,6 +29,47 @@ public final class FondEtat {
     public static boolean appliOuverte() {
         synchronized (VERROU) {
             return appliOuverte;
+        }
+    }
+
+    /** Écran de Klad affiché (true) ou quitté (false). */
+    public static void premierPlan(boolean oui) {
+        synchronized (VERROU) {
+            premierPlan = oui;
+        }
+    }
+
+    public static boolean premierPlan() {
+        synchronized (VERROU) {
+            return premierPlan;
+        }
+    }
+
+    /** Que faire au début d'un passage. */
+    public enum Decision { LANCER, VERROUILLER, REPORTER, DEJA }
+
+    /**
+     * LANCER : Klad verrouillé ; VERROUILLER : déverrouillé mais quitté, lui demander de se verrouiller puis lancer ;
+     * REPORTER : Klad affiché ; DEJA : un passage tourne.
+     */
+    public static Decision decision() {
+        synchronized (VERROU) {
+            if (enCours) return Decision.DEJA;
+            if (!appliOuverte) return Decision.LANCER;
+            return premierPlan ? Decision.REPORTER : Decision.VERROUILLER;
+        }
+    }
+
+    /** Attend que Klad se verrouille (maxMs au plus). true s'il l'est. */
+    public static boolean attendreVerrou(long maxMs) throws InterruptedException {
+        long fin = System.currentTimeMillis() + maxMs;
+        synchronized (VERROU) {
+            while (appliOuverte) {
+                long reste = fin - System.currentTimeMillis();
+                if (reste <= 0) break;
+                VERROU.wait(reste);
+            }
+            return !appliOuverte;
         }
     }
 
@@ -77,6 +121,7 @@ public final class FondEtat {
         synchronized (VERROU) {
             appliOuverte = false;
             enCours = false;
+            premierPlan = false;
         }
     }
 }

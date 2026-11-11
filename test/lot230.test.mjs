@@ -182,7 +182,7 @@ test('parcours : synchro planifiée complète dans Chromium (faux pont Android, 
     const erreurs = [];
     page.on('pageerror', e => erreurs.push(e.message));
     await page.addInitScript(({ blobs, dekB64 }) => {
-      const T = window.__fond = { blobs, ecrits: [], effaces: [], widget: null, grafit: null, http: [], fin: null, appels: [] };
+      const T = window.__fond = { blobs, ecrits: [], effaces: [], widget: null, grafit: null, http: [], fin: null, appels: [], etapes: [] };
       const rep = d => JSON.stringify({ data: d });
       window.KladFondPont = {
         appel(p, m, o) {
@@ -211,6 +211,7 @@ test('parcours : synchro planifiée complète dans Chromium (faux pont Android, 
             { booking_date: '2026-11-08', transaction_amount: { amount: '12.00', currency: 'EUR' }, credit_debit_indicator: 'DBIT', remittance_information: ['CB AUTRE COMMERCE FICTIF'], status: 'BOOK', entry_reference: 'REF-FICTIVE-2' }] });
           return JSON.stringify({ status: 404, headers: {}, body: '{}' });
         },
+        etape(e) { T.etapes.push(e); },
         fin(r) { T.fin = JSON.parse(r); }
       };
     }, { blobs, dekB64 });
@@ -220,6 +221,7 @@ test('parcours : synchro planifiée complète dans Chromium (faux pont Android, 
     assert.deepEqual(erreurs, [], 'aucune erreur JavaScript');
     assert.equal(T.fin.raison, 'ok', JSON.stringify(T.fin));
     assert.equal(T.fin.erreurs, 0);
+    assert.deepEqual(T.etapes, ['page', 'coffre', 'synchro', 'enregistrement'], '2.3.4 : étapes notées pour Plus › Verrou');
     assert.ok(T.http.length >= 2, 'banque fictive lue');
     for (const r of T.http) {
       assert.ok(!Object.keys(r.h).some(k => /^psu-/i.test(k)), 'aucun en-tête « utilisateur présent »');

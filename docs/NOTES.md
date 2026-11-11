@@ -2,6 +2,15 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.3.4
+
+- **Synchro automatique** : le passage de 8 h ou de 14 h n'est plus sauté quand Klad a été quitté sans être fermé ;
+  Klad est alors verrouillé, puis la synchro a lieu. Si Klad est affiché à l'écran à ce moment, nouvel essai 30 min
+  plus tard.
+- **Plus › Verrou › Synchro automatique** : heure et résultat du dernier passage, heure du prochain, et un bouton
+  « Essayer dans 1 min » pour vérifier sans attendre.
+- Une erreur passagère ne désactive plus la synchro automatique.
+
 ## 2.3.3
 
 - **Widget** : le 1 × 1 n'est plus rond. L'écran d'accueil arrondissait le widget à sa façon, ce qui coupait la

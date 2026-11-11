@@ -48,6 +48,12 @@ final class Pont {
         return Http.requete(methode, url, entetes, corps);
     }
 
+    /** 2.3.4 : étape atteinte par la page (page, coffre, ouvert, synchro, enregistre), notée avec le résultat. */
+    @JavascriptInterface
+    public void etape(String e) {
+        ex.etape(e);
+    }
+
     @JavascriptInterface
     public void fin(String resultat) {
         ex.terminer(resultat == null ? "fin" : resultat);

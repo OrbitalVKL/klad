@@ -10,6 +10,7 @@ import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
 import app.klad.fond.FondEtat;
+import app.klad.fond.Passages;
 import app.klad.fond.Planificateur;
 import app.klad.widget.WidgetKlad;
 import com.getcapacitor.JSObject;
@@ -44,8 +45,33 @@ public class KladVaultPlugin extends Plugin {
     private Transfert transfert;
     private final ExecutorService fil = Executors.newSingleThreadExecutor();
 
+    /** 2.3.4 : plugin de l'appli en cours (demande de verrouillage par la synchro planifiée). */
+    private static java.lang.ref.WeakReference<KladVaultPlugin> courant = new java.lang.ref.WeakReference<>(null);
+
+    /**
+     * Demande à l'appli (déverrouillée, en arrière-plan) de se verrouiller : événement « verrouiller », traité par
+     * verrou.js (écritures terminées, mémoire effacée, puis session({ ouverte: false })). false sans appli à prévenir.
+     */
+    public static boolean demanderVerrou() {
+        KladVaultPlugin p = courant.get();
+        if (p == null || p.getBridge() == null || !p.hasListeners("verrouiller")) return false;
+        p.notifyListeners("verrouiller", new JSObject());
+        return true;
+    }
+
+    @Override
+    protected void handleOnResume() {
+        FondEtat.premierPlan(true);
+    }
+
+    @Override
+    protected void handleOnPause() {
+        FondEtat.premierPlan(false);
+    }
+
     @Override
     public void load() {
+        courant = new java.lang.ref.WeakReference<>(this);
         vault = Vault.get(getContext());
         transfert = new Transfert(new File(getContext().getNoBackupFilesDir(), "klad/echanges"));
         fil.execute(() -> transfert.nettoyer(System.currentTimeMillis()));
@@ -123,6 +149,11 @@ public class KladVaultPlugin extends Plugin {
         r.put("failures", vault.failures());
         r.put("strongBox", vault.strongBox());
         r.put("fond", vault.fondActif());
+        // 2.3.4 : trace des passages de la synchro planifiée (Plus › Verrou)
+        r.put("fondDernier", Passages.dernier(getContext()));
+        r.put("fondResultat", Passages.resultat(getContext()));
+        r.put("fondEtape", Passages.etape(getContext()));
+        r.put("fondProchain", vault.fondActif() ? Passages.prochain(getContext()) : 0);
         call.resolve(r);
     }
 
@@ -191,6 +222,7 @@ public class KladVaultPlugin extends Plugin {
             }
             Arrays.fill(a.dek, (byte) 0);
             Planificateur.annuler(getContext());
+            Passages.effacer(getContext());
             vault.wipe();
             WidgetKlad.majTous(getContext());     // données du widget illisibles (clé supprimée) : état vide
             call.resolve(ok());
@@ -249,6 +281,20 @@ public class KladVaultPlugin extends Plugin {
         if (ouverte && vault.fondActif()) {
             try { Planificateur.verifier(getContext()); } catch (Exception ignored) { /* nouvel essai à la prochaine ouverture */ }
         }
+        call.resolve(ok());
+    }
+
+    /**
+     * 2.3.4 : essai de la synchro planifiée dans 1 min (Plus › Verrou), pour vérifier sans attendre 8 h ou 14 h. Klad,
+     * quitté entre-temps, sera verrouillé par la synchro. Le rythme 8 h / 14 h reprend ensuite.
+     */
+    @PluginMethod
+    public void essaiFond(PluginCall call) {
+        if (!vault.fondActif()) {
+            call.resolve(fail("inactif", "Synchro automatique désactivée"));
+            return;
+        }
+        Planificateur.dans(getContext(), 60_000);
         call.resolve(ok());
     }
 

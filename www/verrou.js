@@ -746,6 +746,41 @@
     renderSecu();
   }
 
+  // 2.3.4 : trace des passages (codes de app.klad.fond.FondJob), en français courant.
+  const RESULTATS = {
+    ok: 'réussi', erreurs: 'fait, avec des erreurs (voir le journal)', reporte: 'reporté de 30 min (Klad était affiché)',
+    verrou: 'reporté de 30 min (Klad n\'a pas pu être verrouillé)', inactif: 'synchro désactivée', cle: 'clé du coffre illisible',
+    coffre: 'coffre vide', ouverture: 'ouverture impossible', erreur: 'erreur', delai: 'trop long (arrêté après 4 min)',
+    moteur: 'moteur web arrêté par Android', arret: 'arrêté par Android'
+  };
+  function heureCourte(ms) {
+    const d = new Date(ms), auj = new Date();
+    const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    if (d.toDateString() === auj.toDateString()) return 'aujourd\'hui ' + hm;
+    const hier = new Date(auj); hier.setDate(auj.getDate() - 1);
+    if (d.toDateString() === hier.toDateString()) return 'hier ' + hm;
+    const dem = new Date(auj); dem.setDate(auj.getDate() + 1);
+    if (d.toDateString() === dem.toDateString()) return 'demain ' + hm;
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + hm;
+  }
+  function traceFond(s) {
+    const t = [];
+    if (s.fondDernier) {
+      const r = RESULTATS[s.fondResultat] || s.fondResultat || '?';
+      t.push('Dernier passage : ' + heureCourte(s.fondDernier) + ', ' + r + (s.fondResultat !== 'ok' && s.fondEtape ? ' (étape « ' + s.fondEtape + ' »)' : '') + '.');
+    } else t.push('Aucun passage pour l\'instant.');
+    if (s.fondProchain) t.push('Prochain : ' + heureCourte(s.fondProchain) + ' (Android peut le décaler).');
+    return t.join(' ');
+  }
+  async function essaiFond() {
+    const r = await V.essaiFond();
+    if (r && r.ok === false) { toast(explain(r), true); return; }
+    A().log('info', 'Essai de la synchro automatique demandé (dans 1 min).');
+    toast('Essai dans 1 min : quitte Klad (bouton Accueil), puis regarde le widget.');
+    st = await V.status();
+    renderSecu();
+  }
+
   function session(ouverte) {
     if (isNative && V.session) V.session({ ouverte: !!ouverte }).catch(() => {});
   }
@@ -765,17 +800,22 @@
     const fin = r => { try { window.KladFond.fin(r); } catch (e) { /* pont fermé */ } };
     const pause = ms => new Promise(r => setTimeout(r, ms));
     try {
+      const etape = e => { try { window.KladFond.etape(e); } catch (x) { /* ancien pont */ } };
+      etape('page');
       st = await V.status();
       if (!st.exists || !st.fond) return fin({ raison: 'inactif' });
       const r = await V.unlockFond();
       if (!r || !r.ok) return fin({ raison: 'cle' });
       key = await C.importDek(C.fromB64(r.dek));
+      etape('coffre');
       B = await store.get('sauvegarde');
       if (!B) { key = null; return fin({ raison: 'coffre' }); }   // coffre jamais terminé : rien à faire seul
       await openApp();
       if (!S) return fin({ raison: 'ouverture' });
+      etape('synchro');
       A().log('info', 'Synchro planifiée (Klad fermé).');
       const res = await A().synchro('planifiée');
+      etape('enregistrement');
       await pause(600);
       await flush();
       try { if (window.KladWidget) await window.KladWidget.maj(); } catch (e) { /* signalé par le widget */ }
@@ -811,6 +851,10 @@
     $('fondState').textContent = !fondPossible ? 'Sur le téléphone seulement.' : fondOn ? 'Activée : vers 8 h et 14 h, Klad fermé.' : 'Désactivée.';
     $('btnFond').textContent = fondOn ? 'Désactiver' : 'Activer';
     $('btnFond').disabled = !fondPossible;
+    // 2.3.4 : dernier et prochain passages, essai dans 1 min
+    $('fondTrace').textContent = fondOn ? traceFond(st) : '';
+    $('fondTrace').hidden = !fondOn;
+    $('btnFondEssai').hidden = !(fondOn && V.essaiFond);
     $('vaultInfo').textContent = isNative
       ? 'Clés gardées par ' + (st.strongBox ? 'la puce sécurisée du téléphone (StrongBox).' : 'le Keystore Android.')
       : 'Mode navigateur : coffre de démonstration.';
@@ -836,6 +880,9 @@
   document.addEventListener('click', ev => { if (ev.target.closest('#btnLock, [data-act="verrou"]')) lock(); });
   $('btnBio').addEventListener('click', guard(toggleBio));
   $('btnFond').addEventListener('click', guard(toggleFond));
+  $('btnFondEssai').addEventListener('click', guard(essaiFond));
+  // 2.3.4 : la synchro planifiée trouve Klad déverrouillé mais quitté : verrouillage (écritures finies, mémoire effacée)
+  if (isNative && V.addListener) V.addListener('verrouiller', () => { if (key) lock(); else session(false); });
   $('btnPin').addEventListener('click', guard(changePin));
   $('btnExport').addEventListener('click', guard(exportNow));
   $('btnRestore').addEventListener('click', guard(restoreInApp));
