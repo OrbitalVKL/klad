@@ -1380,6 +1380,13 @@ html.appm .txr.sw-back > div:not(.sw-act){transition:transform .2s ease}
 .sh-li .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--surface-2);font-size:17px;flex:none}
 .sh-li small{display:block;font-size:12px;font-weight:500;color:var(--muted)}
 .sh-li .r{margin-left:auto;color:var(--muted)}
+/* 2.4.1 : opération liée, en carte touchable */
+.op-det+.sh-lab,.note+.sh-lab{margin-top:12px}
+.op-liee{margin:4px 0 10px}
+.op-liee .sh-li{border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:var(--surface-2)}
+.op-liee .sh-li:last-child{border-bottom:1px solid var(--line)}
+.op-liee .sh-li>span:first-child{flex:1;min-width:0}
+.op-liee .num{white-space:nowrap}
 
 /* ===== v65 : lot C — apparence appli (téléphone) ===== */
 :root{--hero-bg:#23456e;--hero-ink:#ffffff}

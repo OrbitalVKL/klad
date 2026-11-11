@@ -335,6 +335,33 @@
     for (const w of ctx.portefeuilles) for (const x of ctx.S.ops[w.c.id] || []) if (x.id === id) return x;
     return null;
   }
+  // 2.4.1 : opération liée (demande du propriétaire du 11/11 : « voir l'opération liée quand je suis sur l'opération »).
+  // Achat d'un portefeuille → prélèvement de la banque qui le règle ; prélèvement (ou remboursement) de la banque compté
+  // interne parce que détaillé sur un portefeuille → achat de ce portefeuille (rapproché à la main, sinon même montant,
+  // dates proches, même sens de préférence, le plus proche). → { op, sorte: 'achat' | 'prelevement' }, ou null.
+  function operationLiee(ctx, o) {
+    const c = ctx.comptes.get(o.compte);
+    if (portefeuilleDe(ctx, o)) {
+      if (o.montant >= 0) return null;
+      const p = (o.rapprochement && o.rapprochement.avec && liens(ctx).get(o.id)) || prelevementDe(ctx, o);
+      return p ? { op: p, sorte: 'prelevement' } : null;
+    }
+    if (!estCourant(c)) return null;
+    if (o.categorie && o.categorie.lie) { const a = achatDe(ctx, o.categorie.lie); return a ? { op: a, sorte: 'achat' } : null; }
+    const r = classer(ctx, o);
+    if (r.src !== 'reglement') return null;
+    const w = ctx.portefeuilles.find(x => x.c.id === r.detail);
+    if (!w) return null;
+    let best = null, cle = Infinity;
+    for (const x of ctx.S.ops[w.c.id] || []) {
+      if (Math.abs(x.montant) !== Math.abs(o.montant)) continue;
+      const e = ecart(o.date, x.date);
+      if (e < -PORTEFEUILLE_AVANT || e > PORTEFEUILLE_APRES) continue;
+      const k = ((x.montant < 0) === (o.montant < 0) ? 0 : 100) + Math.abs(e);
+      if (k < cle) { best = x; cle = k; }
+    }
+    return best ? { op: best, sorte: 'achat' } : null;
+  }
   // Écart d'une opération (prélèvement rapproché à la main, ou achat qu'il règle) → { banque, achat, ecart }, ou null
   // (pas de rapprochement à la main, ou montants égaux).
   function ecartDe(ctx, o) {
@@ -678,7 +705,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    aRapprocher, marquerInterne, ECART_SIGNAL, ecartDe, ecarts, ecartAVerifier, marquerEcartVu, annulerEcartVu, ecartPrevu, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, limiteNC, aVerifierOp, suggestKw, motPropose, concernees, restees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, ECART_SIGNAL, ecartDe, ecarts, ecartAVerifier, marquerEcartVu, annulerEcartVu, ecartPrevu, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, limiteNC, aVerifierOp, suggestKw, motPropose, concernees, restees, operationLiee, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,
     creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };

@@ -73,7 +73,7 @@ test('volet : interrupteur coupé d\'office, nombre d\'opérations semblables af
   const app = read('www/app.js');
   assert.match(app, /st: \{ cat, sub: r\.nc \? cat : r\.sub, autres: false, mot,/);
   assert.match(app, /KC\.restees\(ctx\(\), L, st\.cat\)/);
-  assert.match(app, /la catégorie n\\'a pas changé/);
+  assert.match(app, /La catégorie n\\'a pas changé/);
   const V = charge(['anon.js', 'eb.js', 'format.js', 'modele.js', 'icones-donnees.js', 'icones.js', 'classement.js', 'ui.js', 'vues.js']).KladVues;
   assert.equal(V.texteSemblables({ autres: false, mot: 'CAFE' }, 0, 3), 'Seule cette opération sera classée · 3 autres opérations contiennent « CAFE »');
   assert.equal(V.texteSemblables({ autres: false, mot: 'CAFE' }, 0, 1), 'Seule cette opération sera classée · 1 autre opération contient « CAFE »');

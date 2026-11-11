@@ -6,6 +6,12 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.4.1** — opération liée (retour du propriétaire du 11/11 : achat Google Pay via PayPal, il classait le prélèvement
+de la banque, compté interne, au lieu de l'achat ; « Il faudra que je puisse voir l'opération liée quand je suis sur
+l'opération en question »). Détail d'une opération : carte « Opération liée » (achat du portefeuille ↔ prélèvement de
+la banque), un appui l'ouvre, Retour revient à la précédente. « Classer » d'un prélèvement compté interne : note et
+accès direct à l'achat.
+
 **2.4.0** — volet « Classer » (demande du propriétaire du 11/11 : « je veux pouvoir créer une nouvelle catégorie depuis
 cet écran. Le classement des opérations similaires ne doit pas être coché par défaut mais indiquer qu'il en existe. Un
 bug : […] j'ai confirmation après validation mais la catégorie n'a pas changé »). La catégorie choisie devient une
@@ -152,6 +158,18 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.4.1 — détails techniques
+- `KC.operationLiee(ctx, o)` → `{ op, sorte: 'achat' | 'prelevement' }` : achat d'un portefeuille → prélèvement
+  rapproché à la main (`liens`) sinon `prelevementDe` ; opération d'un compte courant ou commun → achat rapproché à la
+  main (`categorie.lie`) sinon, si `classer().src === 'reglement'` sur un portefeuille, achat de même montant dans la
+  fenêtre de `reglement()` (même sens de préférence, le plus proche). Cartes à débit différé : pas d'opération liée
+  (un prélèvement règle plusieurs achats).
+- `Vu.blocLie` : carte `.op-liee` (`[data-a="liee"]`) dans `Vu.detail` et en tête de `Vu.classer` si le prélèvement
+  est un règlement. `ouvrirOp(cid, id, { lie: true })` empile l'opération affichée (`opPile`) ; `retourEcran` (bouton
+  Retour et retour Android) dépile avant de quitter le détail.
+- Message de « Classer » sans effet sur un règlement : renvoie vers l'achat lié.
+- Tests : `test/lot241.test.mjs` (lien automatique, à la main, parcours Chromium détail → achat → retour, Classer).
 
 ### 2.4.0 — détails techniques
 - Cause du bug : `KC.appliquer` avec un mot ne posait qu'une règle ; `brut()` choisit la règle au mot le plus long,

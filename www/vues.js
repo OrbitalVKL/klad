@@ -516,6 +516,18 @@
   }
   const KB2 = () => g.KladBudget;
 
+  // ------------------------------------------------------------ opération liée (2.4.1)
+  // Bouton vers l'opération liée (achat du portefeuille ↔ prélèvement de la banque), dans le détail et dans « Classer ».
+  function blocLie(S, ctx, o) {
+    const L = K().operationLiee && K().operationLiee(ctx, o);
+    if (!L) return '';
+    const x = L.op, c = M().compte(S, x.compte), nom = (c && c.libelle) || 'un autre compte';
+    const quoi = L.sorte === 'achat' ? 'Achat détaillé sur ' + nom : 'Prélèvement sur ' + nom;
+    return '<div class="sh-lab" id="opLieeL">Opération liée</div><div class="sh-list op-liee"><button type="button" class="sh-li" data-a="liee" data-cid="' + esc(x.compte) + '" data-id="' + esc(x.id) + '"' +
+      ' aria-describedby="opLieeL"><span>' + esc(libelleCourt(x.libelle)) + '<small>' + esc(quoi + ' · ' + F().jour(x.date)) + '</small></span>' +
+      '<span class="num">' + esc((x.montant > 0 ? '+' : '') + F().montant(Math.abs(x.montant), (c && c.devise) || 'EUR')) + ' ›</span></button></div>';
+  }
+
   // ------------------------------------------------------------ détail d'une opération (page)
   // B (facultatif, 1.1.2) : contexte du budget, pour la période de comptage (« compte pour : octobre / novembre »).
   function detail(S, o, ctx, B) {
@@ -566,7 +578,8 @@
       (rt && rt.main ? '<button type="button" class="btn" data-a="comptepour" data-val="">Automatique</button>' : '') + '</div>' : '';
     return '<div class="sh-head op-h">' + U().icoOp(ctx.C, { cat: r.cat, sub: r.sub, label: o.libelle }) + '<div class="t"><b>' + esc(libelleCourt(o.libelle)) + '</b><span>' +
       esc(jjmm(o.date) + ' · ' + (c ? c.libelle : '') + ' · ') + '<span class="num">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></span></div></div>' +
-      '<dl class="op-det">' + lignes.map(x => '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>').join('') + '</dl>' +
+      '<dl class="op-det">' + lignes.map(x => '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>').join('') + '</dl>' + blocLie(S, ctx, o) +
+      (r.src === 'reglement' && K().operationLiee(ctx, o) ? '<p class="note">C\'est l\'achat lié qui compte dans le budget : pour changer la catégorie, classez l\'achat.</p>' : '') +
       (w ? '<p class="note">Prélèvement de ' + esc(w.libelle) + ' sans opération de même montant dans son détail : il est compté comme une dépense. ' +
         'Rapprochez-le de l\'achat correspondant, marquez-le interne s\'il est déjà détaillé, ou gardez-le en dépense.</p>' : '') +
       // 1.3.2 : opération que la banque ne renvoie plus : gardée et comptée ; retrait à la main si c'est un double
@@ -646,8 +659,11 @@
       '<label class="sh-l"><span class="sh-lab">Nom de la nouvelle catégorie</span><input type="text" class="sh-in" id="clsNcNom" maxlength="40" autocomplete="off" value="' + esc(nv.nom) + '"></label>' +
       '<label class="sh-l"><span class="sh-lab">Section du budget</span><select class="sh-in" id="clsNcNature">' + natOpts(nv.nature) + '</select></label>' +
       '<div class="row"><button type="button" class="btn primary" data-a="nc-oui">Créer et choisir</button><button type="button" class="btn" data-a="nc-non">Annuler</button></div></div>' : '';
+    // 2.4.1 : règlement d'un achat détaillé sur un portefeuille : la catégorie se choisit sur l'achat
+    const rg = K().classer(ctx, o).src === 'reglement' && K().operationLiee(ctx, o);
     return '<div class="sh-head op-h">' + U().icoOp(ctx.C, { cat: st.cat, sub: st.sub, label: o.libelle }) + '<div class="t"><b>' + esc(libelleCourt(o.libelle)) + '</b><span>' +
       esc(jjmm(o.date) + (c ? ' · ' + c.libelle : '') + ' · ') + '<span class="num">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></span></div></div>' +
+      (rg ? '<p class="note">Ce prélèvement règle un achat détaillé ailleurs : il reste interne. Classez plutôt l\'achat lié.</p>' + blocLie(S, ctx, o) : '') +
       '<div class="sh-lab" id="clsL">Catégorie</div><div class="cat-grid" role="radiogroup" aria-labelledby="clsL">' + liste.map(btn).join('') +
       (st.toutes ? '' : '<button type="button" class="cat-t more" data-toutes="1"><span class="cico" style="--cc:#8b95a1;color:#8b95a1" aria-hidden="true">⋯</span><span>Toutes</span></button>') +
       (nv ? '' : '<button type="button" class="cat-t more" data-nouvellecat="1"><span class="cico" style="--cc:#8b95a1;color:#8b95a1" aria-hidden="true">+</span><span>Nouvelle</span></button>') + '</div>' + formNc +
@@ -729,5 +745,5 @@
     for (const o of U2) { const l = libelleCourt(o.libelle); if (nm.indexOf(l) < 0) nm.push(l); if (nm.length >= 4) break; }
     return { n: U2.length, noms: nm };
   }
-  g.KladVues = { montantCherche, releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, nomsAVoir, provisionsTexte, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, texteSemblables, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { montantCherche, releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, nomsAVoir, provisionsTexte, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, texteSemblables, blocLie, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);

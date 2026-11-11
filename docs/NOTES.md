@@ -2,6 +2,13 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.4.1
+
+- **Opération liée** : un achat payé par PayPal (ou un autre portefeuille) et le prélèvement de la banque qui le
+  règle s'affichent l'un dans l'autre ; un appui ouvre l'autre opération, Retour revient à la première.
+- Dans « Classer », un prélèvement qui règle un achat détaillé ailleurs indique de classer l'achat, avec un accès
+  direct.
+
 ## 2.4.0
 
 - **Classer une opération** : la catégorie choisie s'applique toujours à l'opération. Avant, une règle plus précise
