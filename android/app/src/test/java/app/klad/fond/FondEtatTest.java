@@ -40,4 +40,29 @@ public class FondEtatTest {
         assertTrue(System.currentTimeMillis() - t < 4000);
         assertFalse(FondEtat.ecriturePermise());
     }
+
+    @Test
+    public void decisionSelonEtatDeKlad() {
+        assertTrue("Klad verrouillé : on lance", FondEtat.decision() == FondEtat.Decision.LANCER);
+        FondEtat.appli(true);
+        FondEtat.premierPlan(true);
+        assertTrue("Klad affiché : report", FondEtat.decision() == FondEtat.Decision.REPORTER);
+        FondEtat.premierPlan(false);
+        assertTrue("2.3.4 : déverrouillé mais quitté : on le verrouille", FondEtat.decision() == FondEtat.Decision.VERROUILLER);
+        FondEtat.appli(false);
+        assertTrue(FondEtat.debut());
+        assertTrue(FondEtat.decision() == FondEtat.Decision.DEJA);
+        FondEtat.fin();
+    }
+
+    @Test
+    public void attenteDuVerrou() throws Exception {
+        FondEtat.appli(true);
+        assertFalse("pas de verrou : attente vaine", FondEtat.attendreVerrou(30));
+        new Thread(() -> {
+            try { Thread.sleep(50); } catch (InterruptedException ignored) { }
+            FondEtat.appli(false);
+        }).start();
+        assertTrue(FondEtat.attendreVerrou(5000));
+    }
 }

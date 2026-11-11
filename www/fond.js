@@ -15,7 +15,7 @@
 
   // Méthodes « promesse » de chaque plugin (test/fond.test.mjs vérifie qu'aucune méthode Java ne manque).
   const PLUGINS = {
-    KladVault: ['status', 'create', 'unlockPin', 'changePin', 'wipe', 'activerFond', 'desactiverFond', 'session', 'attendreFond', 'unlockFond',
+    KladVault: ['status', 'create', 'unlockPin', 'changePin', 'wipe', 'activerFond', 'desactiverFond', 'session', 'attendreFond', 'essaiFond', 'unlockFond',
       'unlockBio', 'enableBio', 'disableBio', 'writeBlob', 'readBlob', 'deleteBlob', 'tmpOuvrir', 'tmpAjouter', 'tmpLire', 'tmpAbandon',
       'enregistrerFichier', 'resultatEnregistrement', 'oublierEnregistrement', 'choisirFichier'],
     KladGrafit: ['ecrire', 'effacer', 'lire', 'infos'],
@@ -61,5 +61,5 @@
   g.requestAnimationFrame = cb => setTimeout(() => cb(Date.now()), 16);
   g.cancelAnimationFrame = id => clearTimeout(id);
 
-  g.KladFond = { fin: r => P.fin(JSON.stringify(r || {})) };
+  g.KladFond = { fin: r => P.fin(JSON.stringify(r || {})), etape: e => { if (P.etape) P.etape(String(e)); } };
 })(window);
