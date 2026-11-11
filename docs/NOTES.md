@@ -2,6 +2,15 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.4.0
+
+- **Classer une opération** : la catégorie choisie s'applique toujours à l'opération. Avant, une règle plus précise
+  déjà en place (ou un règlement de carte détaillé ailleurs) pouvait garder l'ancienne catégorie malgré le message
+  « Opération classée ». Le message dit maintenant ce qui s'est réellement passé.
+- « Classer aussi les autres » n'est plus activé d'office ; le volet indique combien d'autres opérations contiennent
+  le mot proposé.
+- **Nouvelle catégorie** depuis le volet « Classer » : nom et section du budget, puis elle est choisie.
+
 ## 2.3.4
 
 - **Synchro automatique** : le passage de 8 h ou de 14 h n'est plus sauté quand Klad a été quitté sans être fermé ;

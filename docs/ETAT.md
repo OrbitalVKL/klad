@@ -6,6 +6,13 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.4.0** — volet « Classer » (demande du propriétaire du 11/11 : « je veux pouvoir créer une nouvelle catégorie depuis
+cet écran. Le classement des opérations similaires ne doit pas être coché par défaut mais indiquer qu'il en existe. Un
+bug : […] j'ai confirmation après validation mais la catégorie n'a pas changé »). La catégorie choisie devient une
+correction de l'opération (priorité la plus haute) ; avec une règle, les corrections contraires des opérations
+concernées suivent ; confirmation d'après le résultat réel. Interrupteur « Classer aussi les autres » coupé d'office,
+nombre d'opérations semblables affiché. Tuile « + Nouvelle » : nom et section, puis catégorie choisie.
+
 **2.3.4** — correctif de la synchro planifiée (retour du propriétaire du 11/11 : « La mise à jour du widget à 8h n'a
 pas fonctionné… les opérations à vérifier ne se sont affichées qu'après ouverture de l'appli et synchro »). Cause
 probable : Klad quitté sans être verrouillé (il ne se verrouille qu'au retour, après 5 min ; le minuteur ne tourne pas
@@ -145,6 +152,21 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
 - Lien Grafit (résumé lu par Grafit, sans donnée identifiante) ; relevé de contrôle ; extras (mail, Claude), désactivés
   par défaut ; mode démo ; palettes Klad et Grafit ; thème clair / sombre.
 - **Tous les réglages se font dans Klad** (1.0.0) ; le complément importé n'est plus qu'une source de valeurs de départ.
+
+### 2.4.0 — détails techniques
+- Cause du bug : `KC.appliquer` avec un mot ne posait qu'une règle ; `brut()` choisit la règle au mot le plus long,
+  donc une règle existante plus précise (ou une correction à la main) l'emportait ; une catégorie retirée repassait en
+  « Autres » ; un règlement détaillé (`reglement()`) reste « interne » quoi qu'on choisisse. Le message disait
+  « classée » sans vérifier.
+- `KC.appliquer` : `o.categorie` toujours posée ; catégorie choisie sortie de `retirees` ; avec un mot, corrections
+  (non `main`) des opérations concernées vers une autre catégorie effacées et gardées dans `snap.autres` (annulation
+  complète par `KC.annuler`). `KC.restees(ctx, ops, cat)` → opérations qui ne sont pas dans `cat` après coup
+  (`{ o, cat, src }`), utilisé par `appliquerClasser` pour le message et le journal (« Classement sans effet (src) »).
+- Volet : `st.autres = false` à l'ouverture ; `nbSemblables()` (mot proposé, hors l'opération) ; texte
+  `Vu.texteSemblables`. `st.nouvelle` : tuile `[data-nouvellecat]`, formulaire `#clsNcNom` / `#clsNcNature`
+  (`KC.NATURES`, « optionnelle » par défaut), `KC.creerCategorie` puis catégorie et sous-catégorie choisies ;
+  création annulable. `KladApp.ouvrirClasser` exposé (tests).
+- Tests : `test/lot240.test.mjs` (règle plus précise, corrections, catégorie retirée, texte, parcours Chromium).
 
 ### 2.3.4 — détails techniques
 - `FondEtat` : `premierPlan` (posé par `KladVaultPlugin.handleOnResume` / `handleOnPause`), `decision()` → LANCER

@@ -1359,6 +1359,8 @@ html.appm .txr.sw-back > div:not(.sw-act){transition:transform .2s ease}
 .cat-t .cico{width:28px;height:28px;font-size:15px;margin:0}
 .cat-t[aria-checked="true"]{border:2px solid var(--good);background:var(--good-soft);color:var(--ink);font-weight:750}
 .cat-t.more{border-style:dashed}
+.cls-nc{margin:10px 0 4px;padding:10px;border:1px dashed var(--line);border-radius:14px;background:var(--surface)}
+.cls-nc .row{margin-top:8px}
 .sh-in{height:46px;box-sizing:border-box;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);font:500 15px var(--display);color:var(--ink);width:100%}
 .sh-rule{border-radius:16px;background:var(--surface-2);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .sh-rule .rl{display:flex;align-items:center;gap:12px}

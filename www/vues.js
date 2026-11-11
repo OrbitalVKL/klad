@@ -613,6 +613,13 @@
   }
 
   // ------------------------------------------------------------ volet « Classer » (comme l'ancienne version)
+  // 2.4.0 : texte sous le mot. Interrupteur coupé : on indique quand même combien d'autres opérations contiennent le mot.
+  function texteSemblables(st, n, semblables) {
+    const mot = String(st.mot || '').trim();
+    if (st.autres) return mot ? pluriel(n, 'opération') + ' ' + (n > 1 ? 'contiennent' : 'contient') + ' « ' + mot + ' »' : 'Saisissez un mot du libellé';
+    const k = semblables || 0;
+    return 'Seule cette opération sera classée' + (mot && k ? ' · ' + pluriel(k, 'autre opération', 'autres opérations') + ' ' + (k > 1 ? 'contiennent' : 'contient') + ' « ' + mot + ' »' : '');
+  }
   // st : { cat, sub, autres (bool), mot, compte (bool), sens ('' | 'debit' | 'credit'), toutes (bool) } ; n : opérations concernées.
   // Aperçu des opérations concernées par une règle (0.10.8, comme l'ancienne version) : les 8 plus récentes.
   function apercuRegle(S, ops) {
@@ -631,11 +638,19 @@
     const top = K().frequentes(ctx, st.cat, 7);
     const liste = st.toutes ? [st.cat].concat(K().listeCategories(ctx.C).filter(x => x !== st.cat)) : (top.indexOf(st.cat) >= 0 ? top : [st.cat].concat(top.slice(0, 6)));
     const btn = x => '<button type="button" class="cat-t" role="radio" aria-checked="' + (x === st.cat) + '" data-cat="' + esc(x) + '">' + U().cico(ctx.C, x) + '<span>' + esc(x) + '</span></button>';
-    const comptes = st.autres ? (st.mot.trim() ? pluriel(n, 'opération') + ' ' + (n > 1 ? 'contiennent' : 'contient') + ' « ' + st.mot.trim() + ' »' : 'Saisissez un mot du libellé') : 'Seule cette opération sera classée';
+    const comptes = texteSemblables(st, n, opt && opt.semblables);
+    const nv = st.nouvelle;
+    const natOpts = v => K().NATURES.map(x => '<option value="' + x + '"' + (x === v ? ' selected' : '') + '>' + esc(K().NOMS_NATURES[x]) + '</option>').join('');
+    // 2.4.0 : création d'une catégorie sans quitter le volet
+    const formNc = nv ? '<div class="cls-nc" role="group" aria-label="Nouvelle catégorie">' +
+      '<label class="sh-l"><span class="sh-lab">Nom de la nouvelle catégorie</span><input type="text" class="sh-in" id="clsNcNom" maxlength="40" autocomplete="off" value="' + esc(nv.nom) + '"></label>' +
+      '<label class="sh-l"><span class="sh-lab">Section du budget</span><select class="sh-in" id="clsNcNature">' + natOpts(nv.nature) + '</select></label>' +
+      '<div class="row"><button type="button" class="btn primary" data-a="nc-oui">Créer et choisir</button><button type="button" class="btn" data-a="nc-non">Annuler</button></div></div>' : '';
     return '<div class="sh-head op-h">' + U().icoOp(ctx.C, { cat: st.cat, sub: st.sub, label: o.libelle }) + '<div class="t"><b>' + esc(libelleCourt(o.libelle)) + '</b><span>' +
       esc(jjmm(o.date) + (c ? ' · ' + c.libelle : '') + ' · ') + '<span class="num">' + esc((o.montant > 0 ? '+' : '') + F().montant(Math.abs(o.montant), cur)) + '</span></span></div></div>' +
       '<div class="sh-lab" id="clsL">Catégorie</div><div class="cat-grid" role="radiogroup" aria-labelledby="clsL">' + liste.map(btn).join('') +
-      (st.toutes ? '' : '<button type="button" class="cat-t more" data-toutes="1"><span class="cico" style="--cc:#8b95a1;color:#8b95a1" aria-hidden="true">⋯</span><span>Toutes</span></button>') + '</div>' +
+      (st.toutes ? '' : '<button type="button" class="cat-t more" data-toutes="1"><span class="cico" style="--cc:#8b95a1;color:#8b95a1" aria-hidden="true">⋯</span><span>Toutes</span></button>') +
+      (nv ? '' : '<button type="button" class="cat-t more" data-nouvellecat="1"><span class="cico" style="--cc:#8b95a1;color:#8b95a1" aria-hidden="true">+</span><span>Nouvelle</span></button>') + '</div>' + formNc +
       '<label class="sh-l"><span class="sh-lab">Sous-catégorie</span><input type="text" class="sh-in" id="clsSub" autocomplete="off" value="' + esc(st.sub) + '"></label>' +
       '<div class="sh-rule"><div class="rl"><div><b>Classer aussi les autres</b><span>Toutes les opérations dont le libellé contient :</span></div>' +
       '<button type="button" class="tgl" role="switch" id="clsAutres" aria-checked="' + !!st.autres + '" aria-label="Créer une règle"></button></div>' +
@@ -714,5 +729,5 @@
     for (const o of U2) { const l = libelleCourt(o.libelle); if (nm.indexOf(l) < 0) nm.push(l); if (nm.length >= 4) break; }
     return { n: U2.length, noms: nm };
   }
-  g.KladVues = { montantCherche, releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, nomsAVoir, provisionsTexte, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
+  g.KladVues = { montantCherche, releves, ROLES, esc, solde, libelleCourt, lignesAVerifier, comptesDe, hero, tuile, rangee, aVoir, nomsAVoir, provisionsTexte, aVerifier, filtrer, ligne, tranche, trancheSansJours, ordonner, ordreParJour, ORDRES, filtres, detail, choixRapprochement, confirmationEcart, classer, texteSemblables, apercuRegle, triVue, perimetre, pastilleStatut, nAVerifier, compteursAVerifier, COMPTEE, PERIODES, bornesPeriode, totaux };
 })(typeof window !== 'undefined' ? window : globalThis);
