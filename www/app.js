@@ -281,6 +281,12 @@
     // 2.1 : sous-vue de Budget / Commun → page principale de l'Aperçu
     if ((vue === 'budget' || vue === 'commun') && !pagePrincipale()) { const u = EBui(); if (u) u.sv[scope] = SV_HAUT[scope]; montrer(vue, { force: true, haut: true }); return; }
     if (vue === 'appartement') { const u = EBui(); if (u) u.sv.commun = 'mois'; montrer('commun', { force: true, haut: true }); return; }
+    // 2.4.1 : retour à l'opération d'où l'on a ouvert l'opération liée
+    if (vue === 'operation' && opPile.length) {
+      const p = opPile.pop();
+      if (trouverOp(p[0], p[1])) { opCourante = p; renderDetail(); window.scrollTo(0, 0); return; }
+      opPile = [];
+    }
     montrer(retourDe[vue] || RETOUR[vue] || 'accueil', { force: vue === 'operation' });
   }
   $('ah-back').addEventListener('click', retourEcran);
@@ -938,8 +944,11 @@
 
   // ------------------------------------------------------------ détail d'une opération (page avec Retour, 0.10.2)
   let opCourante = null;            // [compte, id]
-  function ouvrirOp(cid, id) {
+  // 2.4.1 : opérations liées ouvertes l'une depuis l'autre ; Retour revient à la précédente
+  let opPile = [];
+  function ouvrirOp(cid, id, opts) {
     if (!trouverOp(cid, id)) return;
+    if (opts && opts.lie && vue === 'operation' && opCourante) opPile.push(opCourante); else opPile = [];
     opCourante = [cid, id];
     fermerVolet(true);
     renderDetail();
@@ -978,6 +987,7 @@
       toastAnnuler('Opération retirée.', () => { const l = S.ops[cid] || (S.ops[cid] = []); if (!l.some(x => x.id === o.id)) { l.splice(Math.min(i, l.length), 0, o); changed('ops'); } });
     }
     else if (b.dataset.a === 'classer') ouvrirClasser(opCourante[0], opCourante[1]);
+    else if (b.dataset.a === 'liee') ouvrirOp(b.dataset.cid, b.dataset.id, { lie: true });
     else if (b.dataset.a === 'semblables') {
       const o = trouverOp(opCourante[0], opCourante[1]);
       if (o) versOps({ q: KC.motPropose(o.libelle) || Vu.libelleCourt(o.libelle) });
@@ -1218,6 +1228,9 @@
     if (ev.target.closest('[data-nouvellecat]')) { lireCls(); cls.st.nouvelle = { nom: '', nature: 'optionnelle' }; renderClasser(); return; }
     if (ev.target.closest('[data-a="nc-non"]')) { lireCls(); cls.st.nouvelle = null; renderClasser(); return; }
     if (ev.target.closest('[data-a="nc-oui"]')) { creerCatCls(); return; }
+    // 2.4.1 : règlement d'un achat détaillé ailleurs → ouvrir l'achat lié
+    const li = ev.target.closest('[data-a="liee"]');
+    if (li) { ouvrirOp(li.dataset.cid, li.dataset.id, { lie: true }); return; }
     if (ev.target.closest('#clsAutres')) { lireCls(); cls.st.autres = !cls.st.autres; renderClasser(); return; }
     if (ev.target.closest('[data-a="go"]')) appliquerClasser();
     if (ev.target.closest('[data-a="passer"]') && tri) { tri.i++; triSuivant(); return; }
@@ -1257,7 +1270,7 @@
     const R = KC.restees(ctx(), L, st.cat), n = L.length - R.length, cat = '« ' + st.cat + ' »';
     const ici = R.find(x => x.o === o);
     let msg;
-    if (ici) msg = ici.src === 'reglement' ? 'Cette opération est un règlement détaillé ailleurs (carte ou portefeuille) : elle reste interne, la catégorie n\'a pas changé.'
+    if (ici) msg = ici.src === 'reglement' ? 'Ce prélèvement règle un achat détaillé ailleurs (carte ou portefeuille) : il reste interne. Classez l\'achat lié, visible dans le détail de l\'opération.'
       : 'La catégorie n\'a pas changé : l\'opération reste en « ' + ici.cat + ' ».';
     else if (!st.autres) msg = 'Opération classée en ' + cat + '.';
     else msg = n + ' opération' + (n > 1 ? 's classées' : ' classée') + ' en ' + cat + (R.length ? ' ; ' + R.length + ' reste' + (R.length > 1 ? 'nt' : '') + ' ailleurs (règle plus précise ou règlement détaillé).' : '.');
