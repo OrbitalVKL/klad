@@ -1137,10 +1137,10 @@
     if (!o) return;
     const r = KC.classer(ctx(), o);
     const cat = r.cat;
-    // mot présent dans le libellé ; interrupteur coupé s'il ne retrouve aucune opération
+    // mot présent dans le libellé. 2.4.0 : « Classer aussi les autres » n'est plus activé d'office ; le volet indique
+    // combien d'autres opérations contiennent ce mot (demande du propriétaire, 11/11/2026).
     const mot = KC.motPropose(o.libelle);
-    const trouve = !!mot && KC.concernees(S, mot, {}).length > 0;
-    cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: trouve, mot, compte: false, sens: '', toutes: false }, sub0: r.nc ? cat : r.sub, tri: !!(opts && opts.tri) };
+    cls = { cid, id, st: { cat, sub: r.nc ? cat : r.sub, autres: false, mot, compte: false, sens: '', toutes: false, nouvelle: null }, sub0: r.nc ? cat : r.sub, tri: !!(opts && opts.tri) };
     ouvrirVolet('secClasser', { empiler: !!empiler, titre: opts && opts.titre });
   }
   function concerneesCls() {
@@ -1149,6 +1149,12 @@
     return KC.concernees(S, st.mot, { compte: st.compte ? cls.cid : null, sens: st.sens });
   }
   const nbConcernees = () => concerneesCls().length;
+  // 2.4.0 : autres opérations qui contiennent le mot (affiché même interrupteur coupé)
+  function nbSemblables() {
+    const st = cls.st, o = trouverOp(cls.cid, cls.id);
+    if (!st.mot || !st.mot.trim()) return 0;
+    return KC.concernees(S, st.mot, { compte: st.compte ? cls.cid : null, sens: st.sens }).filter(x => x !== o).length;
+  }
   function equilibrePossible(o) {
     const c = M.compte(S, o.compte);
     return !!(window.KladCommun && c && c.role !== 'commun' && o.montant < 0);
@@ -1157,16 +1163,43 @@
     const o = cls && trouverOp(cls.cid, cls.id);
     if (!o) { $('clsCorps').innerHTML = '<p class="muted">Opération introuvable.</p>'; return; }
     const L = concerneesCls();
-    $('clsCorps').innerHTML = Vu.classer(S, o, ctx(), cls.st, L.length, { equilibre: equilibrePossible(o), tri: cls.tri && !!tri, apercu: L });
+    $('clsCorps').innerHTML = Vu.classer(S, o, ctx(), cls.st, L.length, { equilibre: equilibrePossible(o), tri: cls.tri && !!tri, apercu: L, semblables: nbSemblables() });
+    if (cls.st.nouvelle) { const i = $('clsNcNom'); if (i) i.focus(); }
   }
   function majCompte() {
     const L = concerneesCls(), n = L.length, st = cls.st;
     const ap = $('clsApercu');
     if (ap) ap.innerHTML = st.autres ? Vu.apercuRegle(S, L) : '';
-    $('clsN').textContent = st.autres ? (st.mot.trim() ? n + ' opération' + (n > 1 ? 's contiennent' : ' contient') + ' « ' + st.mot.trim() + ' »' : 'Saisissez un mot du libellé') : 'Seule cette opération sera classée';
+    $('clsN').textContent = Vu.texteSemblables(st, n, nbSemblables());
     document.querySelector('#clsCorps [data-a="go"]').textContent = 'Classer en ' + st.cat + (st.autres && n > 1 ? ' (' + n + ')' : '');
   }
-  const lireCls = () => { cls.st.sub = $('clsSub').value; cls.st.mot = $('clsMot').value; };
+  const lireCls = () => {
+    cls.st.sub = $('clsSub').value; cls.st.mot = $('clsMot').value;
+    if (cls.st.nouvelle && $('clsNcNom')) { cls.st.nouvelle.nom = $('clsNcNom').value; cls.st.nouvelle.nature = $('clsNcNature').value; }
+  };
+  function creerCatCls() {
+    lireCls();
+    const nv = cls.st.nouvelle;
+    let snap;
+    // nom déjà pris : la catégorie existante est choisie, sans rien créer
+    const dup = String(nv.nom || '').trim() && KC.listeCategories(ctx().C).find(c => KC.fold(c) === KC.fold(String(nv.nom).trim().slice(0, 40)));
+    if (dup) {
+      const old = cls.st.cat, sub = cls.st.sub.trim();
+      cls.st.cat = dup; cls.st.sub = !sub || sub === old || sub === cls.sub0 ? dup : sub; cls.st.nouvelle = null;
+      renderClasser(); toast('« ' + dup + ' » existe déjà : elle est choisie.');
+      return;
+    }
+    try { snap = KC.creerCategorie(S, nv.nom, nv.nature); } catch (e) { toast(e.message, true); return; }
+    const nom = String(nv.nom).trim().slice(0, 40), old = cls.st.cat, sub = cls.st.sub.trim();
+    cls.st.cat = nom;
+    cls.st.sub = !sub || sub === old || sub === cls.sub0 ? nom : sub;
+    cls.st.nouvelle = null;
+    cls.st.toutes = false;
+    log('info', 'Catégorie créée depuis « Classer ».');
+    changed('categories');
+    renderClasser();
+    toastAnnuler('Catégorie « ' + nom + ' » créée.', () => { KC.restaurer(S, snap); if (cls && cls.st.cat === nom) { cls.st.cat = old; cls.st.sub = old; } changed('categories'); if (cls) renderClasser(); });
+  }
   preparer.secClasser = o => { if (!o.rendu) renderClasser(); };
   $('clsCorps').addEventListener('click', ev => {
     if (!cls) return;
@@ -1181,6 +1214,10 @@
       return;
     }
     if (ev.target.closest('[data-toutes]')) { cls.st.toutes = true; lireCls(); renderClasser(); return; }
+    // 2.4.0 : nouvelle catégorie créée depuis le volet, puis choisie
+    if (ev.target.closest('[data-nouvellecat]')) { lireCls(); cls.st.nouvelle = { nom: '', nature: 'optionnelle' }; renderClasser(); return; }
+    if (ev.target.closest('[data-a="nc-non"]')) { lireCls(); cls.st.nouvelle = null; renderClasser(); return; }
+    if (ev.target.closest('[data-a="nc-oui"]')) { creerCatCls(); return; }
     if (ev.target.closest('#clsAutres')) { lireCls(); cls.st.autres = !cls.st.autres; renderClasser(); return; }
     if (ev.target.closest('[data-a="go"]')) appliquerClasser();
     if (ev.target.closest('[data-a="passer"]') && tri) { tri.i++; triSuivant(); return; }
@@ -1190,6 +1227,10 @@
     if (!cls) return;
     if (ev.target.id === 'clsMot') { cls.st.mot = ev.target.value; majCompte(); }
     if (ev.target.id === 'clsSub') cls.st.sub = ev.target.value;
+    if (ev.target.id === 'clsNcNom' && cls.st.nouvelle) cls.st.nouvelle.nom = ev.target.value;
+  });
+  $('clsCorps').addEventListener('keydown', ev => {
+    if (cls && ev.target.id === 'clsNcNom' && ev.key === 'Enter') { ev.preventDefault(); creerCatCls(); }
   });
   $('clsCorps').addEventListener('change', ev => {
     if (!cls) return;
@@ -1205,15 +1246,23 @@
     if (!o) return;
     const st = cls.st;
     if (st.autres && !st.mot.trim()) { toast('Saisissez un mot du libellé.', true); return; }
-    const n = st.autres ? nbConcernees() : 1;
+    const L = st.autres ? concerneesCls() : [o];
     const snap = KC.appliquer(S, o, { cat: st.cat, sub: st.sub || st.cat, mot: st.autres ? st.mot : null, compte: st.autres && st.compte ? cls.cid : null, sens: st.autres ? st.sens : '' });
     const vuAvant = KC.vue(S, o) ? null : KC.marquer(S, [o], true);       // comme l'ancienne version : classée = vue
-    log('info', st.autres ? 'Règle de classement créée (' + n + ' opération(s) concernée(s)).' : 'Opération classée à la main.');
     const enTri = cls.tri && tri;
     if (!enTri) fermerVolet();
     changed('classement');
     if (enTri) { tri.i++; setTimeout(triSuivant, 0); }
-    toastAnnuler(st.autres ? n + ' opération(s) classée(s) en « ' + st.cat + ' ».' : 'Opération classée en « ' + st.cat + ' ».', () => {
+    // 2.4.0 : confirmation d'après le résultat réel (avant : « classée » affiché même si la catégorie n'avait pas changé)
+    const R = KC.restees(ctx(), L, st.cat), n = L.length - R.length, cat = '« ' + st.cat + ' »';
+    const ici = R.find(x => x.o === o);
+    let msg;
+    if (ici) msg = ici.src === 'reglement' ? 'Cette opération est un règlement détaillé ailleurs (carte ou portefeuille) : elle reste interne, la catégorie n\'a pas changé.'
+      : 'La catégorie n\'a pas changé : l\'opération reste en « ' + ici.cat + ' ».';
+    else if (!st.autres) msg = 'Opération classée en ' + cat + '.';
+    else msg = n + ' opération' + (n > 1 ? 's classées' : ' classée') + ' en ' + cat + (R.length ? ' ; ' + R.length + ' reste' + (R.length > 1 ? 'nt' : '') + ' ailleurs (règle plus précise ou règlement détaillé).' : '.');
+    log(ici ? 'err' : 'info', st.autres ? 'Règle de classement créée (' + n + ' opération(s) classée(s), ' + R.length + ' restée(s) ailleurs).' : ici ? 'Classement sans effet (' + (ici.src || '?') + ').' : 'Opération classée à la main.');
+    toastAnnuler(msg, () => {
       KC.annuler(S, snap); if (vuAvant) KC.annulerVues(vuAvant); log('info', 'Classement annulé.'); changed('classement');
     });
   }
@@ -1781,7 +1830,7 @@
   window.KladApp = {
     open, close, handleReturn, log, toast, toastAnnuler, copy, confirmInline, busy, changed, synchro, montrer, ouvertures, premierPlan,
     ouvrirVolet, fermerVolet, retourVolet, preparer, rendus, rendre, redessiner, renderHaut, chrome, vue: () => vue, scope: () => scope, periode, choisirPeriode, versOps, etat: () => S, hooks: () => hooks, esc, isNative,
-    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp, trier, demoDebut, demoFin,
+    ctx, budget, extras, infoSauvegarde, infoMaj, renouveler, ouvrirOp, trouverOp, trier, demoDebut, demoFin, ouvrirClasser,
     // 2.3.0 : nombre « à vérifier » (pastille « Tout »), recalculé (widget d'écran d'accueil)
     aVerifier: () => { if (!S) return 0; try { return Vu.compteursAVerifier(S, ctx()).tout; } catch (e) { return 0; } }
   };

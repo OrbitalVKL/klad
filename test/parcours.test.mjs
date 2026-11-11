@@ -270,6 +270,9 @@ test('parcours : premier lancement, banque, synchro, reprise, accueil, opératio
     await page.waitForSelector('#clsCorps [data-a="go"]');
     await page.locator('#clsCorps [data-toutes]').click();
     await page.locator('#clsCorps [data-cat="Bars"]').click();
+    // 2.4.0 : « Classer aussi les autres » coupé d'office, activé à la main pour créer la règle
+    assert.equal(await page.locator('#clsAutres').getAttribute('aria-checked'), 'false');
+    await page.locator('#clsAutres').click();
     assert.equal(await page.locator('#clsAutres').getAttribute('aria-checked'), 'true');
     await page.fill('#clsMot', 'CAFE');
     assert.match(await page.locator('#clsN').innerText(), /1 opération contient « CAFE »/);

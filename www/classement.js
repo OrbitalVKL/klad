@@ -475,10 +475,16 @@
 
   // Classe une opération (correction ponctuelle) ou crée une règle (« Classer aussi les autres »).
   // choix : { cat, sub, mot?, compte?, sens? }. L'opération est aussi marquée vue. → instantané pour annuler.
+  // 2.4.0 : l'opération choisie prend TOUJOURS la catégorie demandée (correction), même avec « Classer aussi les autres » :
+  // avant, elle suivait la nouvelle règle, qu'une règle existante au mot plus long pouvait battre (confirmation affichée,
+  // catégorie inchangée). Avec une règle, les autres opérations concernées corrigées à la main vers une autre catégorie
+  // suivent aussi la règle (correction retirée, annulable) ; une catégorie supprimée choisie de nouveau est rétablie.
   function appliquer(S, o, choix) {
     const C = donnees(S);
-    const snap = { regles: JSON.stringify(C.regles), categories: JSON.stringify(C.categories), op: o, categorie: o.categorie, vue: o.vue };
+    const snap = { regles: JSON.stringify(C.regles), categories: JSON.stringify(C.categories), retirees: JSON.stringify(C.retirees || []),
+      op: o, categorie: o.categorie, vue: o.vue, autres: [] };
     if (!C.categories[choix.cat]) C.categories[choix.cat] = { nature: natureDe(C, choix.cat), icone: iconeDe(C, choix.cat) };
+    if (C.retirees && C.retirees.indexOf(choix.cat) >= 0) C.retirees = C.retirees.filter(x => x !== choix.cat);
     const sub = String(choix.sub || '').trim() || choix.cat;
     if (choix.mot && fold(choix.mot)) {
       const k = fold(choix.mot);
@@ -487,8 +493,13 @@
       if (choix.compte) u.compte = choix.compte;
       if (choix.sens === 'debit' || choix.sens === 'credit') u.sens = choix.sens;
       C.regles.push(u);
-      o.categorie = null;            // la règle s'applique aussi à cette opération
-    } else o.categorie = { cat: choix.cat, sub };
+      for (const x of concernees(S, choix.mot, { compte: choix.compte, sens: choix.sens })) {
+        if (x === o || !x.categorie || !x.categorie.cat || x.categorie.main || x.categorie.cat === choix.cat) continue;
+        snap.autres.push([x, x.categorie]);
+        x.categorie = null;
+      }
+    }
+    o.categorie = { cat: choix.cat, sub };
     if (!vue(S, o)) o.vue = true;
     return snap;
   }
@@ -496,8 +507,20 @@
     const C = donnees(S);
     C.regles = JSON.parse(snap.regles);
     C.categories = JSON.parse(snap.categories);
+    if (snap.retirees) C.retirees = JSON.parse(snap.retirees);
     snap.op.categorie = snap.categorie;
+    for (const [x, k] of snap.autres || []) x.categorie = k;
     if (snap.vue === undefined) delete snap.op.vue; else snap.op.vue = snap.vue;
+  }
+  // 2.4.0 : après « Classer » : opérations concernées restées dans une autre catégorie, et pourquoi (règle au mot plus
+  // long, règlement détaillé ailleurs, catégorie renommée…). → [{ o, cat, src }]
+  function restees(ctx, ops, cat) {
+    const out = [];
+    for (const x of ops) {
+      const r = classer(ctx, x);
+      if (r.cat !== cat) out.push({ o: x, cat: r.cat, src: r.src });
+    }
+    return out;
   }
 
   // ------------------------------------------------------------ carte à débit différé
@@ -655,7 +678,7 @@
   g.KladClasse = {
     V, NATURES, NOMS_NATURES, CATEGORIES, DEFAUTS, NC_JOURS, fold, motifs, estCarte, estCourant,
     nouveau, donnees, natureDe, iconeDe, typeDe, typeDeNature, listeCategories, contexte, classer,
-    aRapprocher, marquerInterne, ECART_SIGNAL, ecartDe, ecarts, ecartAVerifier, marquerEcartVu, annulerEcartVu, ecartPrevu, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, limiteNC, aVerifierOp, suggestKw, motPropose, concernees, frequentes, appliquer, annuler,
+    aRapprocher, marquerInterne, ECART_SIGNAL, ecartDe, ecarts, ecartAVerifier, marquerEcartVu, annulerEcartVu, ecartPrevu, annulerInterne, portefeuilleDe, prelevementDe, candidatsPortefeuille, candidatsBanque, rapprocherAvec, garderDepense, payeAutrement, annulerRapprochement, interneManuel, compterEnDepense, vue, initialiserVues, marquer, annulerVues, opsVisibles, attention, limiteNC, aVerifierOp, suggestKw, motPropose, concernees, restees, frequentes, appliquer, annuler,
     dateDepense, prochaine, dette, dettes, propositions,
     creerCategorie, renommerCategorie, supprimerCategorie, changerNature, ajouterRegle, retirerRegle, restaurer
   };
