@@ -1407,7 +1407,14 @@
     const s0 = S;
     log('info', 'Synchronisation (' + raison + '), ' + comptes.length + ' compte(s)');
     if (window.KladArret) window.KladArret.action('synchronisation');
-    syncP = KladSync.synchroniser(S, { client, dispo: dispoPSU, log, now: () => Date.now() }, () => S === s0)
+    // 2.4.2 : synchro planifiée (Klad fermé) : enregistrement et widget après chaque compte
+    const apresCompte = window.KLAD_FOND ? async () => {
+      if (S !== s0) return;
+      save(); saveLog();
+      if (hooks.flush) await hooks.flush();
+      if (window.KladWidget) await window.KladWidget.maj();
+    } : null;
+    syncP = KladSync.synchroniser(S, { client, dispo: dispoPSU, log, now: () => Date.now(), apresCompte }, () => S === s0)
       .then(r => {
         if (!r || S !== s0) return r;
         // 1.0.1 : banque momentanément indisponible : message neutre, sans erreur (voir KladSync.passager)

@@ -423,6 +423,18 @@
     if (pin && st.bioAvailable && (offerBio ? st.bio !== 'oui' : st.bio === 'invalidee')) await bioOffer(pin, st.bio === 'invalidee');
     await openApp();
     if (mig && mig.sessions != null) A().log('ok', 'Données du prototype reprises et chiffrées (' + mig.sessions + ' session(s)).');
+    signalerFondPerdu();
+  }
+
+  // 2.4.2 : synchro automatique coupée par le téléphone (clé d'arrière-plan disparue) : dit au journal et par un
+  // message, une fois par lancement de Klad (rien n'est gardé dans localStorage) ; Plus › Verrou l'indique jusqu'à la
+  // réactivation.
+  let perteDite = 0;
+  function signalerFondPerdu() {
+    if (!isNative || st.fond || !st.fondPerdu || perteDite === st.fondPerdu) return;
+    perteDite = st.fondPerdu;
+    A().log('err', 'Synchro automatique coupée par le téléphone le ' + heureCourte(st.fondPerdu) + ' (clé d\'arrière-plan effacée).');
+    toast('La synchro automatique s\'est coupée : réactive-la dans Plus › Verrou.', true);
   }
 
   function phraseSetup() {
@@ -769,6 +781,9 @@
       const r = RESULTATS[s.fondResultat] || s.fondResultat || '?';
       t.push('Dernier passage : ' + heureCourte(s.fondDernier) + ', ' + r + (s.fondResultat !== 'ok' && s.fondEtape ? ' (étape « ' + s.fondEtape + ' »)' : '') + '.');
     } else t.push('Aucun passage pour l\'instant.');
+    // 2.4.2 : passage démarré sans résultat, réveil reçu sans passage
+    if (s.fondDebut && s.fondDebut > (s.fondDernier || 0) + 5000) t.push('Dernier démarrage : ' + heureCourte(s.fondDebut) + ', sans résultat.');
+    if (s.fondReveil && s.fondReveil > Math.max(s.fondDernier || 0, s.fondDebut || 0) + 5000) t.push('Réveil reçu : ' + heureCourte(s.fondReveil) + ', passage pas encore démarré.');
     if (s.fondProchain) t.push('Prochain : ' + heureCourte(s.fondProchain) + ' (Android peut le décaler).');
     return t.join(' ');
   }
@@ -848,7 +863,8 @@
     $('btnBio').disabled = !bioOn && !st.bioAvailable;
     // 2.3.0 : synchro planifiée (8 h et 14 h)
     const fondOn = !!st.fond, fondPossible = isNative && !!V.activerFond;
-    $('fondState').textContent = !fondPossible ? 'Sur le téléphone seulement.' : fondOn ? 'Activée : vers 8 h et 14 h, Klad fermé.' : 'Désactivée.';
+    $('fondState').textContent = !fondPossible ? 'Sur le téléphone seulement.' : fondOn ? 'Activée : vers 8 h et 14 h, Klad fermé.'
+      : st.fondPerdu ? 'Coupée par le téléphone le ' + heureCourte(st.fondPerdu) + ' : réactive-la avec ton code.' : 'Désactivée.';
     $('btnFond').textContent = fondOn ? 'Désactiver' : 'Activer';
     $('btnFond').disabled = !fondPossible;
     // 2.3.4 : dernier et prochain passages, essai dans 1 min

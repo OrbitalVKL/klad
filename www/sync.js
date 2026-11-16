@@ -23,7 +23,11 @@
   const PASSAGER_FOIS = 3;
   const PASSAGER_MS = 24 * 3600e3;
   const MSG_PASSAGER = 'Banque momentanément indisponible, nouvel essai à la prochaine synchro.';
-  const passager = e => !!e && e.status === 400 && /ASPSP/i.test((e.code || '') + ' ' + (e.message || ''));
+  // 2.4.2 : « 408 Timeout interacting with ASPSP » (et 504) = banque trop lente à répondre : passagère aussi, avec un
+  // nouvel essai tout de suite (une fois).
+  const lenteur = e => !!e && (e.status === 408 || e.status === 504);
+  const passager = e => !!e && ((e.status === 400 && /ASPSP/i.test((e.code || '') + ' ' + (e.message || ''))) || lenteur(e));
+  const NOUVEL_ESSAI_MS = 3000;
   // → nouvel état sync du compte après une panne passagère (erreur posée seulement au-delà des seuils).
   function etatPassager(sync, now) {
     const p0 = (sync && sync.passager) || null;
@@ -65,13 +69,24 @@
           txs: await cl.transactions(c.source.uid, { dateFrom: from, headers: hh },
             (n, p) => { if (p > 1) deps.log('info', nom + ' : page ' + p + ', ' + n + ' opérations'); })
         });
+        // 2.4.2 : banque trop lente (408) : un nouvel essai après une courte pause
+        const lireBis = async hh => {
+          try { return await lire(hh); }
+          catch (e) {
+            if (!lenteur(e)) throw e;
+            deps.log('info', nom + ' : banque lente à répondre, nouvel essai.');
+            await (deps.attendre ? deps.attendre(NOUVEL_ESSAI_MS) : new Promise(res => setTimeout(res, NOUVEL_ESSAI_MS)));
+            if (!ok()) throw e;
+            return lire(hh);
+          }
+        };
         let r;
-        try { r = await lire(h); }
+        try { r = await lireBis(h); }
         catch (e) {
           if (!refusPSU(e) || !Object.keys(h).length) throw e;
           deps.log('info', nom + ' : en-têtes utilisateur refusés, nouvel essai sans.');
           h = {};
-          r = await lire(h);
+          r = await lireBis(h);
         }
         if (!ok()) return null;
         const t = deps.now ? deps.now() : Date.now();
@@ -94,12 +109,16 @@
           c.sync = etatPassager(c.sync, now);
           if (c.sync.erreur) { res.erreurs++; deps.log('err', nom + ' : ' + c.sync.erreur); }
           else { res.passagers++; deps.log('info', nom + ' : banque momentanément indisponible (' + c.sync.passager.n + '/' + PASSAGER_FOIS + '), nouvel essai à la prochaine synchro.'); }
+          if (deps.apresCompte && ok()) { try { await deps.apresCompte(c); } catch (e2) { /* enregistré à la fin */ } }
           continue;
         }
         res.erreurs++;
         c.sync = Object.assign({}, c.sync, { erreur: String(e.message || e).slice(0, 200), le: new Date(now).toISOString(), passager: null });
         deps.log('err', nom + ' : ' + (e.message || e));
       }
+      // 2.4.2 : synchro planifiée : enregistrement après chaque compte (un passage arrêté par Android garde ce qui a
+      // été lu)
+      if (deps.apresCompte && ok()) { try { await deps.apresCompte(c); } catch (e) { /* enregistré à la fin */ } }
     }
     S.modele.sync.derniere = now;
     return res;
@@ -116,5 +135,5 @@
   // Texte d'un compte en panne passagère (sans erreur), ou null.
   const passagerDe = c => c && c.sync && !c.sync.erreur && c.sync.passager ? MSG_PASSAGER : null;
 
-  g.KladSync = { AUTO_MS, entetesPSU, refusPSU, aFaire, synchroniser, nomJournal, passager, etatPassager, passagerDe, MSG_PASSAGER, PASSAGER_FOIS, PASSAGER_MS };
+  g.KladSync = { AUTO_MS, entetesPSU, refusPSU, aFaire, synchroniser, nomJournal, passager, lenteur, etatPassager, passagerDe, MSG_PASSAGER, PASSAGER_FOIS, PASSAGER_MS };
 })(typeof window !== 'undefined' ? window : globalThis);
