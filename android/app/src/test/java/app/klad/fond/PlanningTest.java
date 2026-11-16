@@ -33,4 +33,16 @@ public class PlanningTest {
         // passage à l'heure d'été (29/03/2026) : 8 h reste 8 h, heure locale
         assertEquals(t("2026-03-29T08:00+02:00[Europe/Paris]"), Planning.prochain(t("2026-03-29T01:00+01:00[Europe/Paris]"), PARIS));
     }
+
+    @Test
+    public void reprendreHeurePrevue() {
+        long now = t("2026-11-16T10:40+01:00[Europe/Paris]");
+        // report ou essai encore à venir : gardé
+        assertEquals(t("2026-11-16T11:10+01:00[Europe/Paris]"), Planning.reprendre(t("2026-11-16T11:10+01:00[Europe/Paris]"), now, PARIS));
+        // passage manqué (8 h) ou rien de prévu : prochain 8 h / 14 h
+        assertEquals(t("2026-11-16T14:00+01:00[Europe/Paris]"), Planning.reprendre(t("2026-11-16T08:00+01:00[Europe/Paris]"), now, PARIS));
+        assertEquals(t("2026-11-16T14:00+01:00[Europe/Paris]"), Planning.reprendre(0, now, PARIS));
+        // à moins d'une minute : prochain créneau
+        assertEquals(t("2026-11-16T14:00+01:00[Europe/Paris]"), Planning.reprendre(now + 30_000, now, PARIS));
+    }
 }

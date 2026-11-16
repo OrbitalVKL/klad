@@ -2,6 +2,17 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.4.2
+
+- **Synchro automatique** : Klad est maintenant réveillé à 8 h et 14 h par un réveil du téléphone, au lieu d'attendre
+  qu'Android veuille bien lancer la synchro (elle pouvait être repoussée de plusieurs heures, voire ne jamais avoir
+  lieu). Un second essai est prévu 30 min plus tard si le réveil n'arrive pas.
+- **Banque lente** (erreur 408) : Klad réessaie aussitôt ; si elle reste lente, c'est une indisponibilité passagère
+  (message neutre), plus une erreur.
+- Synchro automatique : chaque compte est enregistré dès qu'il est lu, et le widget suit.
+- Plus › Verrou : la trace dit aussi si un passage a démarré sans finir, ou si le réveil est arrivé sans passage.
+  Si le téléphone coupe la synchro automatique, Klad le dit au déverrouillage suivant.
+
 ## 2.4.1
 
 - **Opération liée** : un achat payé par PayPal (ou un autre portefeuille) et le prélèvement de la banque qui le

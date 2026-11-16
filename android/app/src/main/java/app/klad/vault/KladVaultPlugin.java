@@ -154,6 +154,11 @@ public class KladVaultPlugin extends Plugin {
         r.put("fondResultat", Passages.resultat(getContext()));
         r.put("fondEtape", Passages.etape(getContext()));
         r.put("fondProchain", vault.fondActif() ? Passages.prochain(getContext()) : 0);
+        // 2.4.2 : démarrage et réveil (un passage démarré sans résultat, un réveil sans passage se voient) ; synchro
+        // coupée par le téléphone (clé d'arrière-plan disparue)
+        r.put("fondDebut", Passages.demarre(getContext()));
+        r.put("fondReveil", Passages.reveilRecu(getContext()));
+        r.put("fondPerdu", vault.fondPerdu());
         call.resolve(r);
     }
 
@@ -263,7 +268,7 @@ public class KladVaultPlugin extends Plugin {
     public void desactiverFond(PluginCall call) {
         try {
             Planificateur.annuler(getContext());
-            vault.desactiverFond();
+            vault.desactiverFondMain();
             call.resolve(ok());
         } catch (Exception e) {
             call.resolve(fail("erreur", describe(e)));

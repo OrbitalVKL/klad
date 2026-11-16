@@ -23,8 +23,21 @@ public class FondJob extends JobService {
     private Execution ex;
     private final Handler h = new Handler(Looper.getMainLooper());
 
+    /** 2.4.2 : un passage tourne (de onStartJob à jobFinished) : ni réveil ni reprogrammation ne doivent l'arrêter. */
+    private static volatile boolean tourne;
+
+    public static boolean tourne() {
+        return tourne;
+    }
+
+    private void finir(JobParameters params) {
+        tourne = false;
+        jobFinished(params, false);
+    }
+
     @Override
     public boolean onStartJob(JobParameters params) {
+        Passages.debut(this);                     // 2.4.2 : trace du démarrage, avant tout le reste
         WidgetKlad.majTous(this);                 // heure de la dernière synchro : ambre au-delà de 12 h
         CoffreFond c = new CoffreFond(this);
         if (!c.existe() || !c.actif()) {
@@ -44,6 +57,7 @@ public class FondJob extends JobService {
                     reporter("verrou");
                     return false;
                 }
+                tourne = true;
                 new Thread(() -> {
                     boolean ok;
                     try {
@@ -56,7 +70,7 @@ public class FondJob extends JobService {
                     h.post(() -> {
                         if (verrouille && lancer(params)) return;
                         if (!verrouille) reporter("verrou");
-                        jobFinished(params, false);
+                        finir(params);
                     });
                 }, "klad-attente-verrou").start();
                 return true;
@@ -77,16 +91,18 @@ public class FondJob extends JobService {
             return false;
         }
         try {
+            tourne = true;
             ex = new Execution(this, (resultat, etape) -> {
                 FondEtat.fin();
                 Passages.noter(this, code(resultat), etape);
                 WidgetKlad.majTous(this);
-                jobFinished(params, false);
+                finir(params);
                 h.post(() -> Planificateur.planifier(this));
             });
             ex.lancer();
             return true;
         } catch (Exception e) {
+            tourne = false;
             FondEtat.fin();
             Passages.noter(this, "erreur", "lancement");
             h.post(() -> Planificateur.planifier(this));
@@ -110,6 +126,7 @@ public class FondJob extends JobService {
     @Override
     public boolean onStopJob(JobParameters params) {
         if (ex != null) ex.terminer("arret");
+        tourne = false;
         return false;
     }
 }

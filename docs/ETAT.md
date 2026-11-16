@@ -6,6 +6,14 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.4.2** — synchro automatique fiable (retour du propriétaire du 16/11 : « La maj automatique du widget ne fonctionne
+pas. Il passe en contour jaune au bout d'un moment mais sa valeur ne s'update pas » ; « erreur de synchro enable
+banking 408 » ; trace : synchro activée, « Aucun passage pour l'instant », batterie « Optimisée »). Cause probable : le travail
+JobScheduler seul (délai minimal, sans échéance) n'était jamais lancé à l'heure (veille, compartiment d'appli peu
+utilisée) : réveil AlarmManager à 8 h / 14 h qui lance un travail immédiat, travail de secours 30 min après. 408 / 504
+= panne passagère, avec un nouvel essai aussitôt. Arrière-plan : enregistrement et widget après chaque compte. Trace :
+démarrage sans résultat, réveil sans passage ; coupure de la synchro par le téléphone signalée.
+
 **2.4.1** — opération liée (retour du propriétaire du 11/11 : achat Google Pay via PayPal, il classait le prélèvement
 de la banque, compté interne, au lieu de l'achat ; « Il faudra que je puisse voir l'opération liée quand je suis sur
 l'opération en question »). Détail d'une opération : carte « Opération liée » (achat du portefeuille ↔ prélèvement de
@@ -185,6 +193,33 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   (`KC.NATURES`, « optionnelle » par défaut), `KC.creerCategorie` puis catégorie et sous-catégorie choisies ;
   création annulable. `KladApp.ouvrirClasser` exposé (tests).
 - Tests : `test/lot240.test.mjs` (règle plus précise, corrections, catégorie retirée, texte, parcours Chromium).
+
+### 2.4.2 — détails techniques
+- `Planificateur.armer(ctx, quand)` : `Passages.prochain`, réveil `AlarmManager` (`setExactAndAllowWhileIdle` si
+  Android < 12 ou `canScheduleExactAlarms()`, sinon `setAndAllowWhileIdle` ; `RTC_WAKEUP`, intention explicite vers
+  `ReveilFond`, `FLAG_IMMUTABLE`) et travail de secours JobScheduler (même `ID`, latence = quand + `SECOURS_MS` 30 min,
+  persistant). `planifier` (8 h / 14 h) et `dans` (report, essai) passent par `armer`. `maintenant` : travail immédiat
+  `setExpedited(true)` (Android 12 et plus ; refus ou quota → travail ordinaire sans latence) ; il remplace le secours
+  (même identifiant : jamais deux passages). `annuler` : travail, réveil et intention.
+- `ReveilFond` (récepteur non exporté) : réveil → `Passages.reveil`, puis `maintenant` sauf si `FondJob.tourne()` ;
+  `BOOT_COMPLETED` / `MY_PACKAGE_REPLACED` (les réveils sont effacés) → `verifier`. Rien si la synchro est désactivée.
+- `verifier` (déverrouillage, démarrage, mise à jour) : rien si un passage tourne ; sinon `armer(Planning.reprendre(
+  prochain noté, now))` : heure prévue encore à venir (report, essai) gardée, sinon prochain 8 h / 14 h. Avant, il ne
+  reprogrammait que si aucun travail n'était en attente.
+- Manifeste : `SCHEDULE_EXACT_ALARM` (`maxSdkVersion="32"`) et `USE_EXACT_ALARM` (Android 13 et plus, accordé d'office ;
+  appli hors Play Store). `FondJob.tourne` : de `onStartJob` (quand il rend true) à `finir()` / `onStopJob`.
+- Trace : `Passages.debut` (première ligne de `onStartJob`), `Passages.reveil` ; `status` renvoie `fondDebut`,
+  `fondReveil`, `fondPerdu`. Plus › Verrou : « Dernier démarrage : …, sans résultat. » si `debut` > `dernier` + 5 s ;
+  « Réveil reçu : …, passage pas encore démarré. » si `reveil` > max(`dernier`, `debut`) + 5 s.
+- Coupure : `Vault.dekFond` note `fond.perdu` (date) avant `desactiverFond` quand la clé a disparu ; effacée par
+  `activerFond` et par la désactivation à la main (`desactiverFondMain`). Au déverrouillage (`signalerFondPerdu`) :
+  journal + message une fois par coupure (`localStorage` `klad.fond.perduVu`) ; Plus › Verrou : « Coupée par le
+  téléphone le … ».
+- `KladSync` : `lenteur(e)` = 408 ou 504 ; `passager` l'inclut (mêmes seuils : 3 fois ou 24 h). `lireBis` : un nouvel
+  essai après `NOUVEL_ESSAI_MS` (3 s, `deps.attendre` dans les tests). `deps.apresCompte(c)` après chaque compte (succès,
+  passager ou erreur) ; `app.js` ne le fournit qu'en arrière-plan (`KLAD_FOND`) : `save`, `saveLog`, `hooks.flush`,
+  `KladWidget.maj`.
+- Tests : `test/lot242.test.mjs` ; `lot234` (clés de la trace, coupure notée) ; JUnit `PlanningTest.reprendreHeurePrevue`.
 
 ### 2.3.4 — détails techniques
 - `FondEtat` : `premierPlan` (posé par `KladVaultPlugin.handleOnResume` / `handleOnPause`), `decision()` → LANCER

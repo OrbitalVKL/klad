@@ -24,6 +24,24 @@ public final class Passages {
             .putString("etape", etape == null ? "" : etape).apply();
     }
 
+    /** 2.4.2 : démarrage d'un passage par Android (avant toute décision), pour voir s'il a démarré sans finir. */
+    public static void debut(Context ctx) {
+        p(ctx).edit().putLong("debut", System.currentTimeMillis()).apply();
+    }
+
+    /** 2.4.2 : réveil reçu (AlarmManager). */
+    public static void reveil(Context ctx) {
+        p(ctx).edit().putLong("reveil", System.currentTimeMillis()).apply();
+    }
+
+    public static long demarre(Context ctx) {
+        return p(ctx).getLong("debut", 0);
+    }
+
+    public static long reveilRecu(Context ctx) {
+        return p(ctx).getLong("reveil", 0);
+    }
+
     public static void prochain(Context ctx, long quand) {
         p(ctx).edit().putLong("prochain", quand).apply();
     }

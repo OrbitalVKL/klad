@@ -88,6 +88,17 @@
             android:name="app.klad.fond.FondJob"
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="false" />
+
+        <!-- 2.4.2 : réveil de la synchro planifiée à l'heure prévue ; reposé au démarrage du téléphone et après une
+             mise à jour (non exporté : intention explicite ou diffusion du système). -->
+        <receiver
+            android:name="app.klad.fond.ReveilFond"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Android 11 et plus : Grafit visible par Klad, pour contrôler son paquet et sa signature. -->
@@ -105,4 +116,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 2.3.0 : la synchro planifiée reste programmée après un redémarrage du téléphone. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 2.4.2 : réveil exact de la synchro planifiée (8 h et 14 h). Android 12 : accordé d'office ; Android 13 et
+         plus : USE_EXACT_ALARM. Sans l'un ou l'autre, réveil « autorisé en veille » (moins précis). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 </manifest>

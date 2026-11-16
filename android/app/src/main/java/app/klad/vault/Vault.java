@@ -376,13 +376,27 @@ final class Vault {
         SecretKey k = getKey(KEY_FOND);
         if (k == null) throw new GeneralSecurityException("Clé d'arrière-plan indisponible");
         put("fond", Coffre.seal(k, dek, Coffre.AAD_FOND, null));
+        p.remove("fond.perdu");
         store();
+    }
+
+    /** 2.4.2 : date de la coupure de la synchro planifiée par le téléphone (clé disparue), ou 0. */
+    synchronized long fondPerdu() {
+        return time("fond.perdu");
     }
 
     /** Désactive : enveloppe et clé supprimées. */
     synchronized void desactiverFond() throws IOException {
         deleteKey(KEY_FOND);
         if (p.remove("fond") != null) store();
+    }
+
+    /** Désactivée par l'utilisateur (Plus › Verrou) : plus de coupure à signaler. */
+    synchronized void desactiverFondMain() throws IOException {
+        p.remove("fond.perdu");
+        deleteKey(KEY_FOND);
+        p.remove("fond");
+        store();
     }
 
     /**
@@ -400,6 +414,8 @@ final class Vault {
             return null;
         }
         if (k == null) {
+            // 2.4.2 : coupure notée (date), pour que l'appli le dise au déverrouillage suivant
+            p.setProperty("fond.perdu", Long.toString(System.currentTimeMillis()));
             try { desactiverFond(); } catch (IOException ignored) { /* nouvel essai au prochain passage */ }
             return null;
         }

@@ -27,4 +27,12 @@ public final class Planning {
         }
         throw new IllegalStateException("Aucun passage trouvé");
     }
+
+    /**
+     * 2.4.2 : heure à reprendre quand le réveil est reposé (déverrouillage, démarrage du téléphone) : celle déjà
+     * prévue si elle est encore à venir (report de 30 min, essai dans 1 min), sinon le prochain 8 h / 14 h.
+     */
+    public static long reprendre(long prevu, long now, ZoneId zone) {
+        return prevu > now + MARGE_MS ? prevu : prochain(now, zone);
+    }
 }
