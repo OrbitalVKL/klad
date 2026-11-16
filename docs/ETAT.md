@@ -213,7 +213,7 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   « Réveil reçu : …, passage pas encore démarré. » si `reveil` > max(`dernier`, `debut`) + 5 s.
 - Coupure : `Vault.dekFond` note `fond.perdu` (date) avant `desactiverFond` quand la clé a disparu ; effacée par
   `activerFond` et par la désactivation à la main (`desactiverFondMain`). Au déverrouillage (`signalerFondPerdu`) :
-  journal + message une fois par coupure (`localStorage` `klad.fond.perduVu`) ; Plus › Verrou : « Coupée par le
+  journal + message une fois par lancement de Klad (en mémoire : rien dans `localStorage`) ; Plus › Verrou : « Coupée par le
   téléphone le … ».
 - `KladSync` : `lenteur(e)` = 408 ou 504 ; `passager` l'inclut (mêmes seuils : 3 fois ou 24 h). `lireBis` : un nouvel
   essai après `NOUVEL_ESSAI_MS` (3 s, `deps.attendre` dans les tests). `deps.apresCompte(c)` après chaque compte (succès,

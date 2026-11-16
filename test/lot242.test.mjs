@@ -83,7 +83,7 @@ test('réveil à l\'heure : alarme exacte (sinon autorisée en veille), travail 
   assert.equal((job.match(/jobFinished\(/g) || []).length, 1, 'fin unique par finir()');
 });
 
-test('trace : démarrage sans résultat, réveil sans passage ; coupure par le téléphone signalée une fois', () => {
+test('trace : démarrage sans résultat, réveil sans passage ; coupure par le téléphone signalée une fois par lancement', () => {
   const plug = read(JAVA + 'vault/KladVaultPlugin.java');
   for (const k of ['fondDebut', 'fondReveil', 'fondPerdu']) assert.match(plug, new RegExp('"' + k + '"'));
   assert.match(plug, /vault\.desactiverFondMain\(\)/);
@@ -94,5 +94,5 @@ test('trace : démarrage sans résultat, réveil sans passage ; coupure par le t
   assert.match(js, /Dernier démarrage : /);
   assert.match(js, /Réveil reçu : /);
   assert.match(js, /Coupée par le téléphone le /);
-  assert.match(js, /function signalerFondPerdu\(\)[\s\S]*?klad\.fond\.perduVu/);
+  assert.match(js, /function signalerFondPerdu\(\)[\s\S]*?perteDite = st\.fondPerdu/);
 });

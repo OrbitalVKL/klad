@@ -426,14 +426,13 @@
     signalerFondPerdu();
   }
 
-  // 2.4.2 : synchro automatique coupée par le téléphone (clé d'arrière-plan disparue) : dit une fois, au journal et
-  // par un message ; Plus › Verrou l'indique jusqu'à la réactivation.
+  // 2.4.2 : synchro automatique coupée par le téléphone (clé d'arrière-plan disparue) : dit au journal et par un
+  // message, une fois par lancement de Klad (rien n'est gardé dans localStorage) ; Plus › Verrou l'indique jusqu'à la
+  // réactivation.
+  let perteDite = 0;
   function signalerFondPerdu() {
-    if (!isNative || st.fond || !st.fondPerdu) return;
-    let vu = null;
-    try { vu = localStorage.getItem('klad.fond.perduVu'); } catch (e) { vu = null; }
-    if (vu === String(st.fondPerdu)) return;
-    try { localStorage.setItem('klad.fond.perduVu', String(st.fondPerdu)); } catch (e) { /* redit au prochain déverrouillage */ }
+    if (!isNative || st.fond || !st.fondPerdu || perteDite === st.fondPerdu) return;
+    perteDite = st.fondPerdu;
     A().log('err', 'Synchro automatique coupée par le téléphone le ' + heureCourte(st.fondPerdu) + ' (clé d\'arrière-plan effacée).');
     toast('La synchro automatique s\'est coupée : réactive-la dans Plus › Verrou.', true);
   }
