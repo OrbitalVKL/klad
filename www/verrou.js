@@ -784,6 +784,8 @@
     // 2.4.2 : passage démarré sans résultat, réveil reçu sans passage
     if (s.fondDebut && s.fondDebut > (s.fondDernier || 0) + 5000) t.push('Dernier démarrage : ' + heureCourte(s.fondDebut) + ', sans résultat.');
     if (s.fondReveil && s.fondReveil > Math.max(s.fondDernier || 0, s.fondDebut || 0) + 5000) t.push('Réveil reçu : ' + heureCourte(s.fondReveil) + ', passage pas encore démarré.');
+    // 2.4.3 : refus d'Android depuis le dernier passage (texte du système, recopiable)
+    if (s.fondRefus && s.fondRefusLe > (s.fondDernier || 0)) t.push('Refus d\'Android (' + heureCourte(s.fondRefusLe) + ') : ' + s.fondRefus + '.');
     if (s.fondProchain) t.push('Prochain : ' + heureCourte(s.fondProchain) + ' (Android peut le décaler).');
     return t.join(' ');
   }

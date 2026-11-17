@@ -89,6 +89,13 @@
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="false" />
 
+        <!-- 2.4.3 : passage de la synchro planifiée lancé par le réveil (service de premier plan, notification pendant
+             le passage). -->
+        <service
+            android:name="app.klad.fond.FondService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
         <!-- 2.4.2 : réveil de la synchro planifiée à l'heure prévue ; reposé au démarrage du téléphone et après une
              mise à jour (non exporté : intention explicite ou diffusion du système). -->
         <receiver
@@ -120,4 +127,8 @@
          plus : USE_EXACT_ALARM. Sans l'un ou l'autre, réveil « autorisé en veille » (moins précis). -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- 2.4.3 : service de premier plan de la synchro planifiée, et processeur tenu éveillé pendant le passage. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>

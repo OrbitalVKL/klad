@@ -6,6 +6,13 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.4.3** — synchro automatique sans JobScheduler (journal du propriétaire, 17/11 : « Klad s'est arrêté… RuntimeException
+← RemoteException, Planificateur:80 » à 11:55 le 16/11, déjà « Planificateur:40 » le 13/11 ; trace : « Réveil reçu :
+aujourd'hui 11:56, passage pas encore démarré »). `JobScheduler.schedule` lève une exception (refus côté système) pour
+Klad sur ce téléphone : aucun travail n'a jamais été programmé (« Aucun passage » depuis la 2.3.0), et la 2.4.2
+plantait au moment d'« Essayer dans 1 min ». Le réveil exact, lui, arrive : il lance désormais un service de premier
+plan (`dataSync`) qui fait le passage ; le travail ne sert plus qu'en secours et tout refus est noté.
+
 **2.4.2** — synchro automatique fiable (retour du propriétaire du 16/11 : « La maj automatique du widget ne fonctionne
 pas. Il passe en contour jaune au bout d'un moment mais sa valeur ne s'update pas » ; « erreur de synchro enable
 banking 408 » ; trace : synchro activée, « Aucun passage pour l'instant », batterie « Optimisée »). Cause probable : le travail
@@ -193,6 +200,24 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   (`KC.NATURES`, « optionnelle » par défaut), `KC.creerCategorie` puis catégorie et sous-catégorie choisies ;
   création annulable. `KladApp.ouvrirClasser` exposé (tests).
 - Tests : `test/lot240.test.mjs` (règle plus précise, corrections, catégorie retirée, texte, parcours Chromium).
+
+### 2.4.3 — détails techniques
+- `Passage` : logique d'un passage sortie de `FondJob` (décision, verrou demandé, report, `Execution`, trace,
+  reprogrammation) ; `demarrer()` (true = en cours, `Fin.fini()` appelé une fois à la fin), `arreter()`, `tourne()`,
+  `code()`. `FondJob` (secours) et `FondService` l'utilisent.
+- `FondService` : service de premier plan `foregroundServiceType="dataSync"` (permissions `FOREGROUND_SERVICE`,
+  `FOREGROUND_SERVICE_DATA_SYNC`), `startForeground` en tête de `onStartCommand` (notification « Klad synchronise… »,
+  canal `klad.fond` `IMPORTANCE_MIN`, icône `ic_w_synchro`, sans montant ni nom) ; `PARTIAL_WAKE_LOCK` 6 min
+  (`WAKE_LOCK`) ; `onTimeout` (Android 15) et `onDestroy` arrêtent le passage ; `START_NOT_STICKY`. Démarrage depuis
+  l'arrière-plan permis par le réveil exact (`setExactAndAllowWhileIdle`, `USE_EXACT_ALARM`).
+- `ReveilFond` : réveil → `FondService.lancer` ; refus (`ForegroundServiceStartNotAllowedException` ou autre) → noté,
+  puis `Planificateur.maintenant` (travail immédiat, secours).
+- `Planificateur.travail` : chaque `js.schedule` dans un `try/catch (RuntimeException)` → `Passages.refus(ctx, où, e)` ;
+  plus aucun plantage (2.4.2 : plantage d'« Essayer dans 1 min », `Planificateur:80`).
+- `Passages.refus` : « où : Classe (message) ← Cause (message) », 240 caractères au plus, texte du système seulement ;
+  `status` → `fondRefus`, `fondRefusLe` ; Plus › Verrou : « Refus d'Android (heure) : … » si plus récent que le
+  dernier passage.
+- Tests : `test/lot243.test.mjs` ; `lot234` et `lot242` adaptés (`Passage.java`, clés `refus`, `refusLe`).
 
 ### 2.4.2 — détails techniques
 - `Planificateur.armer(ctx, quand)` : `Passages.prochain`, réveil `AlarmManager` (`setExactAndAllowWhileIdle` si

@@ -13,6 +13,9 @@ import java.time.ZoneId;
 /**
  * Programmation de la synchro planifiée (2.3.0) : 8 h et 14 h.
  *
+ * 2.4.3 : le réveil lance un service de premier plan (FondService) ; le travail JobScheduler n'est plus qu'un secours
+ * (refusé par Android sur certains téléphones, voir Passages.refus).
+ *
  * 2.4.2 : un travail JobScheduler seul (délai minimal, sans échéance) pouvait être repoussé de plusieurs heures par
  * Android (veille, « appli peu utilisée »), et le passage n'avait pas lieu. Désormais :
  * - un réveil AlarmManager à l'heure prévue (exact quand Android le permet, sinon « autorisé en veille »), reçu par
@@ -70,6 +73,7 @@ public final class Planificateur {
                 if (js.schedule(j) == JobScheduler.RESULT_SUCCESS) return;
             } catch (RuntimeException e) {
                 // quota de travaux prioritaires épuisé ou refus : travail ordinaire ci-dessous
+                Passages.refus(ctx, "travail prioritaire", e);
             }
         }
         JobInfo j = new JobInfo.Builder(ID, cn)
@@ -77,7 +81,12 @@ public final class Planificateur {
             .setMinimumLatency(latence)
             .setPersisted(true)
             .build();
-        js.schedule(j);
+        // 2.4.3 : Android peut refuser (exception) : noté, jamais d'arrêt de Klad ; le réveil suffit au passage
+        try {
+            if (js.schedule(j) != JobScheduler.RESULT_SUCCESS) Passages.refus(ctx, "travail", new IllegalStateException("refusé"));
+        } catch (RuntimeException e) {
+            Passages.refus(ctx, "travail", e);
+        }
     }
 
     private static PendingIntent intention(Context ctx, int drapeaux) {

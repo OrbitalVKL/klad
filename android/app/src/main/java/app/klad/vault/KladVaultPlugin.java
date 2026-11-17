@@ -159,6 +159,9 @@ public class KladVaultPlugin extends Plugin {
         r.put("fondDebut", Passages.demarre(getContext()));
         r.put("fondReveil", Passages.reveilRecu(getContext()));
         r.put("fondPerdu", vault.fondPerdu());
+        // 2.4.3 : dernier refus d'Android (travail, service), texte du système
+        r.put("fondRefus", Passages.refusTexte(getContext()));
+        r.put("fondRefusLe", Passages.refusLe(getContext()));
         call.resolve(r);
     }
 

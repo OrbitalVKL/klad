@@ -42,6 +42,30 @@ public final class Passages {
         return p(ctx).getLong("reveil", 0);
     }
 
+    /**
+     * 2.4.3 : Android a refusé une étape (programmation du travail, démarrage du service) : où, et l'exception (noms
+     * de classes et messages du système, sans donnée de l'utilisateur), pour Plus › Verrou.
+     */
+    public static void refus(Context ctx, String ou, Throwable e) {
+        StringBuilder b = new StringBuilder(ou).append(" : ");
+        int n = 0;
+        for (Throwable t = e; t != null && n < 3; t = t.getCause(), n++) {
+            if (n > 0) b.append(" ← ");
+            b.append(t.getClass().getSimpleName());
+            if (t.getMessage() != null) b.append(" (").append(t.getMessage()).append(')');
+        }
+        String txt = b.length() > 240 ? b.substring(0, 240) : b.toString();
+        p(ctx).edit().putString("refus", txt).putLong("refusLe", System.currentTimeMillis()).apply();
+    }
+
+    public static String refusTexte(Context ctx) {
+        return p(ctx).getString("refus", "");
+    }
+
+    public static long refusLe(Context ctx) {
+        return p(ctx).getLong("refusLe", 0);
+    }
+
     public static void prochain(Context ctx, long quand) {
         p(ctx).edit().putLong("prochain", quand).apply();
     }
