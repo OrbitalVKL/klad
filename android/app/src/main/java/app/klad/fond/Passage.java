@@ -112,7 +112,9 @@ final class Passage {
                 Passages.noter(ctx, code(resultat), etape);
                 WidgetKlad.majTous(ctx);
                 finir();
-                h.post(() -> Planificateur.planifier(ctx));
+                // 2.4.4 : sans réseau, nouvel essai 30 min plus tard (jusqu'au créneau suivant)
+                final boolean sansReseau = "reseau".equals(code(resultat));
+                h.post(() -> { if (sansReseau) Planificateur.apresReseau(ctx); else Planificateur.planifier(ctx); });
             });
             ex.lancer();
             return true;

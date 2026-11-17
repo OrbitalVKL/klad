@@ -98,7 +98,8 @@
         txt = await res.text();
       } catch (e) {
         this.log('err', method + ' ' + path.split('?')[0] + ' → réseau : ' + (e.message || e));
-        throw new Error('Réseau injoignable (' + (e.message || e) + ').');
+        // 2.4.4 : marquée « réseau » (synchro planifiée sans réseau : nouvel essai 30 min plus tard)
+        throw Object.assign(new Error('Réseau injoignable (' + (e.message || e) + ').'), { reseau: true });
       }
       const ms = Date.now() - t0;
       let data = {};

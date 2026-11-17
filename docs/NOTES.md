@@ -2,6 +2,12 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.4.4
+
+- **Synchro automatique sans réseau** (dans un bâtiment, par exemple) : nouvel essai 30 min plus tard, puis encore
+  toutes les 30 min jusqu'au créneau suivant de 8 h ou 14 h. Plus › Verrou l'indique : « pas de réseau, nouvel essai
+  30 min plus tard ».
+
 ## 2.4.3
 
 - **Synchro automatique** : au réveil de 8 h et 14 h, Klad fait la synchro lui-même, sans passer par le planificateur
