@@ -72,15 +72,15 @@ test('réveil à l\'heure : alarme exacte (sinon autorisée en veille), travail 
   assert.match(pl, /Planning\.reprendre\(Passages\.prochain\(ctx\)/);
   assert.match(pl, /am\.cancel\(pi\)/);
   const rv = read(JAVA + 'fond/ReveilFond.java');
-  assert.match(rv, /if \(!FondJob\.tourne\(\)\) Planificateur\.maintenant\(ctx\)/);
+  assert.match(rv, /if \(!Passage\.tourne\(\) && !FondService\.lancer\(ctx\)\) Planificateur\.maintenant\(ctx\)/);   // 2.4.3
   assert.match(rv, /ACTION_BOOT_COMPLETED[\s\S]*ACTION_MY_PACKAGE_REPLACED[\s\S]*Planificateur\.verifier\(ctx\)/);
   const mf = read('android/app/src/main/AndroidManifest.xml');
   assert.match(mf, /<receiver\s+android:name="app\.klad\.fond\.ReveilFond"\s+android:exported="false">[\s\S]*?BOOT_COMPLETED[\s\S]*?MY_PACKAGE_REPLACED[\s\S]*?<\/receiver>/);
   assert.match(mf, /SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/);
   assert.match(mf, /USE_EXACT_ALARM"/);
-  const job = read(JAVA + 'fond/FondJob.java');
-  assert.match(job, /onStartJob\(JobParameters params\) \{\s*Passages\.debut\(this\);/);
-  assert.equal((job.match(/jobFinished\(/g) || []).length, 1, 'fin unique par finir()');
+  const pa = read(JAVA + 'fond/Passage.java');
+  assert.match(pa, /boolean demarrer\(\) \{\s*Passages\.debut\(ctx\);/);
+  assert.equal((pa.match(/fin\.fini\(\)/g) || []).length, 1, 'fin unique par finir()');
 });
 
 test('trace : démarrage sans résultat, réveil sans passage ; coupure par le téléphone signalée une fois par lancement', () => {

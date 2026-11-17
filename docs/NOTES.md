@@ -2,6 +2,14 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.4.3
+
+- **Synchro automatique** : au réveil de 8 h et 14 h, Klad fait la synchro lui-même, sans passer par le planificateur
+  d'Android, qui refusait les synchros de Klad sur certains téléphones. Une notification discrète « Klad
+  synchronise… » s'affiche le temps de la synchro (si les notifications de Klad sont autorisées).
+- Plus › Verrou : si Android refuse une étape, la trace le dit (« Refus d'Android… »). Ce refus ne fait plus planter
+  Klad (« Essayer dans 1 min » compris).
+
 ## 2.4.2
 
 - **Synchro automatique** : Klad est maintenant réveillé à 8 h et 14 h par un réveil du téléphone, au lieu d'attendre

@@ -21,7 +21,8 @@ public class ReveilFond extends BroadcastReceiver {
             if (!new CoffreFond(ctx).actif()) return;
             if (ACTION.equals(a)) {
                 Passages.reveil(ctx);
-                if (!FondJob.tourne()) Planificateur.maintenant(ctx);
+                // 2.4.3 : service de premier plan ; s'il est refusé, travail immédiat (secours)
+                if (!Passage.tourne() && !FondService.lancer(ctx)) Planificateur.maintenant(ctx);
             } else if (Intent.ACTION_BOOT_COMPLETED.equals(a) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(a)) {
                 Planificateur.verifier(ctx);
             }

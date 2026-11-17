@@ -7,10 +7,10 @@ import { read } from './charge.mjs';
 const JAVA = 'android/app/src/main/java/app/klad/';
 
 test('passage : Klad quitté verrouillé à la demande, Klad affiché reporté de 30 min, jamais sauté jusqu\'au créneau suivant', () => {
-  const job = read(JAVA + 'fond/FondJob.java');
+  const job = read(JAVA + 'fond/Passage.java');   // 2.4.3 : passage commun au service et au travail
   assert.match(job, /case VERROUILLER:[\s\S]*?KladVaultPlugin\.demanderVerrou\(\)[\s\S]*?FondEtat\.attendreVerrou\(ATTENTE_VERROU_MS\)/);
   assert.match(job, /case REPORTER:\s*reporter\("reporte"\)/);
-  assert.match(job, /Planificateur\.dans\(this, Planificateur\.REPORT_MS\)/);
+  assert.match(job, /Planificateur\.dans\(ctx, Planificateur\.REPORT_MS\)/);
   assert.match(read(JAVA + 'fond/Planificateur.java'), /REPORT_MS = 30 \* 60_000L/);
   const plug = read(JAVA + 'vault/KladVaultPlugin.java');
   assert.match(plug, /protected void handleOnResume\(\) \{\s*FondEtat\.premierPlan\(true\);/);
@@ -31,7 +31,7 @@ test('trace : dernier et prochain passages dans Plus › Verrou, essai dans 1 mi
   const p = read(JAVA + 'fond/Passages.java');
   for (const k of ['dernier', 'resultat', 'etape', 'prochain']) assert.match(p, new RegExp('"' + k + '"'));
   const cles = [...p.matchAll(/\.put(?:String|Long)\("(\w+)"/g)].map(m => m[1]).sort();
-  assert.deepEqual(cles, ['debut', 'dernier', 'etape', 'prochain', 'resultat', 'reveil'], 'seulement heures et codes (2.4.2 : debut, reveil)');
+  assert.deepEqual(cles, ['debut', 'dernier', 'etape', 'prochain', 'refus', 'refusLe', 'resultat', 'reveil'], 'seulement heures et codes (2.4.2 : debut, reveil ; 2.4.3 : refus = texte d\'exception du système)');
   const ix = read('www/index.html');
   assert.match(ix, /id="fondTrace"[^>]*aria-live="polite"/, 'trace toujours visible (pas repliée derrière un ⓘ)');
   assert.match(ix, /id="btnFondEssai"/);
