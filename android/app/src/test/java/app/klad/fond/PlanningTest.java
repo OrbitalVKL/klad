@@ -45,4 +45,11 @@ public class PlanningTest {
         // à moins d'une minute : prochain créneau
         assertEquals(t("2026-11-16T14:00+01:00[Europe/Paris]"), Planning.reprendre(now + 30_000, now, PARIS));
     }
+
+    @Test
+    public void apresReseauTrenteMinutesOuCreneau() {
+        assertEquals(t("2026-11-17T08:35+01:00[Europe/Paris]"), Planning.apresReseau(t("2026-11-17T08:05+01:00[Europe/Paris]"), PARIS));
+        // 13 h 40 + 30 min dépasse 14 h : créneau de 14 h
+        assertEquals(t("2026-11-17T14:00+01:00[Europe/Paris]"), Planning.apresReseau(t("2026-11-17T13:40+01:00[Europe/Paris]"), PARIS));
+    }
 }

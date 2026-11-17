@@ -763,7 +763,8 @@
     ok: 'réussi', erreurs: 'fait, avec des erreurs (voir le journal)', reporte: 'reporté de 30 min (Klad était affiché)',
     verrou: 'reporté de 30 min (Klad n\'a pas pu être verrouillé)', inactif: 'synchro désactivée', cle: 'clé du coffre illisible',
     coffre: 'coffre vide', ouverture: 'ouverture impossible', erreur: 'erreur', delai: 'trop long (arrêté après 4 min)',
-    moteur: 'moteur web arrêté par Android', arret: 'arrêté par Android'
+    moteur: 'moteur web arrêté par Android', arret: 'arrêté par Android',
+    reseau: 'pas de réseau, nouvel essai 30 min plus tard'
   };
   function heureCourte(ms) {
     const d = new Date(ms), auj = new Date();
@@ -839,6 +840,8 @@
       try { if (window.KladLienGrafit && window.KladLienGrafit.maj) await window.KladLienGrafit.maj(); } catch (e) { /* idem */ }
       await pause(100);
       await flush();
+      // 2.4.4 : aucun compte lu faute de réseau → « reseau » (nouvel essai 30 min plus tard, jusqu'au créneau suivant)
+      if (res && res.comptes > 0 && res.reseau === res.comptes) return fin({ raison: 'reseau', erreurs: res.erreurs });
       fin({ raison: 'ok', erreurs: res ? res.erreurs : null });
     } catch (e) {
       try { if (S) { A().log('err', 'Synchro planifiée : ' + (e.message || e)); await flush(); } } catch (e2) { /* rien */ }

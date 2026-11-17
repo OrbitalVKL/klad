@@ -6,6 +6,10 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.4.4** — synchro planifiée sans réseau : nouvel essai 30 min plus tard, jusqu'au créneau suivant (retour du
+propriétaire, 17/11 : passage de 12 h 35 sans réseau à l'intérieur d'un bâtiment, passage de 13 h 31 réussi ; « Go A »).
+Confirmé ce jour : le réveil + service de premier plan de la 2.4.3 fonctionne sur le téléphone (passage Klad fermé, comptes lus).
+
 **2.4.3** — synchro automatique sans JobScheduler (journal du propriétaire, 17/11 : « Klad s'est arrêté… RuntimeException
 ← RemoteException, Planificateur:80 » à 11:55 le 16/11, déjà « Planificateur:40 » le 13/11 ; trace : « Réveil reçu :
 aujourd'hui 11:56, passage pas encore démarré »). `JobScheduler.schedule` lève une exception (refus côté système) pour
@@ -200,6 +204,14 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   (`KC.NATURES`, « optionnelle » par défaut), `KC.creerCategorie` puis catégorie et sous-catégorie choisies ;
   création annulable. `KladApp.ouvrirClasser` exposé (tests).
 - Tests : `test/lot240.test.mjs` (règle plus précise, corrections, catégorie retirée, texte, parcours Chromium).
+
+### 2.4.4 — détails techniques
+- `KladEB` : erreur réseau (`fetch` rejeté) marquée `reseau: true` ; `KladSync` compte `res.reseau` (en plus de
+  `erreurs`). Page de fond (`verrou.js`) : `res.comptes > 0 && res.reseau === res.comptes` → `fin({ raison: 'reseau' })`.
+- `Passage` : résultat `reseau` → `Planificateur.apresReseau` (`Planning.apresReseau` : maintenant + 30 min, ou le
+  prochain 8 h / 14 h s'il vient avant, à `MARGE_MS` près) ; sinon `planifier`. Plus › Verrou : « pas de réseau,
+  nouvel essai 30 min plus tard ».
+- Tests : `test/lot244.test.mjs` ; `sync.test` (`reseau: 0`) ; JUnit `PlanningTest.apresReseauTrenteMinutesOuCreneau`.
 
 ### 2.4.3 — détails techniques
 - `Passage` : logique d'un passage sortie de `FondJob` (décision, verrou demandé, report, `Execution`, trace,

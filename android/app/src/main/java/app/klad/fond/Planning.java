@@ -32,6 +32,14 @@ public final class Planning {
      * 2.4.2 : heure à reprendre quand le réveil est reposé (déverrouillage, démarrage du téléphone) : celle déjà
      * prévue si elle est encore à venir (report de 30 min, essai dans 1 min), sinon le prochain 8 h / 14 h.
      */
+    /** 2.4.4 : nouvel essai après un passage sans réseau : 30 min plus tard, ou le prochain 8 h / 14 h s'il vient avant. */
+    public static long apresReseau(long now, ZoneId zone) {
+        long creneau = prochain(now, zone);
+        long essai = now + 30 * 60_000L;
+        return essai + MARGE_MS < creneau ? essai : creneau;
+    }
+
+    /** 2.4.2 : voir reprendre(). */
     public static long reprendre(long prevu, long now, ZoneId zone) {
         return prevu > now + MARGE_MS ? prevu : prochain(now, zone);
     }

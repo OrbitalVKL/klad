@@ -47,7 +47,7 @@
     const ok = garde || (() => true);
     // Comptes sans connexion (banque déconnectée) ou non retrouvés au renouvellement : signalés sur l'accueil, pas lus.
     const comptes = M().comptesTries(S).filter(c => c.source.type === 'eb' && !c.aReassocier && S.modele.connexions[c.source.connexion]);
-    const res = { comptes: comptes.length, erreurs: 0, passagers: 0, nouvelles: 0, fusionnees: 0, retirees: 0 };
+    const res = { comptes: comptes.length, erreurs: 0, passagers: 0, reseau: 0, nouvelles: 0, fusionnees: 0, retirees: 0 };
     if (!comptes.length) { S.modele.sync.derniere = now; return res; }
     const cl = deps.client();
     let dispo = {};
@@ -113,6 +113,7 @@
           continue;
         }
         res.erreurs++;
+        if (e && e.reseau) res.reseau++;   // 2.4.4
         c.sync = Object.assign({}, c.sync, { erreur: String(e.message || e).slice(0, 200), le: new Date(now).toISOString(), passager: null });
         deps.log('err', nom + ' : ' + (e.message || e));
       }

@@ -47,6 +47,11 @@ public final class Planificateur {
         armer(ctx, System.currentTimeMillis() + Math.max(0, delaiMs));
     }
 
+    /** 2.4.4 : passage sans réseau : nouvel essai 30 min plus tard, sauf si le créneau suivant arrive avant. */
+    public static void apresReseau(Context ctx) {
+        armer(ctx, Planning.apresReseau(System.currentTimeMillis(), ZoneId.systemDefault()));
+    }
+
     /** Réveil à l'heure « quand », travail de secours un peu après. */
     static void armer(Context ctx, long quand) {
         Passages.prochain(ctx, quand);

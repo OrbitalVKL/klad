@@ -56,7 +56,7 @@ test('synchro : incrémentale, erreur par compte sans bloquer les autres, journa
   const cl = faux({ u1: [tx('2026-10-20', -1250, 'CB BOULANGERIE'), tx('2026-10-25', 250000, 'SALAIRE FICTIF')], u2: [] }, { panne: 'u2' });
   const log = [];
   const r = await Y.synchroniser(S, { client: () => cl, dispo: DISPO, log: (k, m) => log.push(k + ' ' + m), now: () => NOW });
-  assert.deepEqual(json(r), { comptes: 3, erreurs: 2, passagers: 0, nouvelles: 2, fusionnees: 0, retirees: 0 });
+  assert.deepEqual(json(r), { comptes: 3, erreurs: 2, passagers: 0, reseau: 0, nouvelles: 2, fusionnees: 0, retirees: 0 });
   assert.equal(S.ops[a.id].length, 2);
   assert.equal(a.sync.erreur, null);
   assert.match(b.sync.erreur, /500/);
