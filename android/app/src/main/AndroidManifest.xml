@@ -116,6 +116,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 2.4.5 : exigée par Android pour un travail JobScheduler avec contrainte réseau (sans elle, SecurityException à
+         chaque programmation depuis la 2.3.0 : aucun travail n'a jamais été accepté). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Mise à jour depuis l'appli (KladUpdate) : Android demande confirmation à chaque installation. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

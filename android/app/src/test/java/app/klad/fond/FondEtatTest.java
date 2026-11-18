@@ -65,4 +65,19 @@ public class FondEtatTest {
         }).start();
         assertTrue(FondEtat.attendreVerrou(5000));
     }
+
+    @Test
+    public void quitteDepuisCinqMinutesSessionFermeeSansLaPage() {
+        FondEtat.appli(true);
+        FondEtat.premierPlan(false);                    // Klad quitté maintenant
+        long now = System.currentTimeMillis();
+        assertFalse("trop tôt", FondEtat.fermerSansPage(300_000, now + 60_000));
+        assertTrue(FondEtat.fermerSansPage(300_000, now + 301_000));
+        assertFalse(FondEtat.appliOuverte());
+        assertTrue("écritures de la page refusées", FondEtat.fermeeParFond());
+        FondEtat.appli(true);                           // déverrouillage
+        assertFalse(FondEtat.fermeeParFond());
+        FondEtat.premierPlan(true);                     // affiché : jamais fermé par la synchro
+        assertFalse(FondEtat.fermerSansPage(300_000, now + 3_600_000));
+    }
 }
