@@ -19,6 +19,9 @@ final class Passage {
 
     static final long ATTENTE_VERROU_MS = 30_000;
 
+    /** 2.4.5 : verrouillage automatique de la page (5 min, LOCK_MS de verrou.js) plus une marge. */
+    static final long PAGE_VERROUILLEE_MS = 5 * 60_000L + 15_000L;
+
     /** Appelé sur le fil principal quand un passage démarré (demarrer() a rendu true) est fini. */
     interface Fin {
         void fini();
@@ -67,6 +70,9 @@ final class Passage {
                 reporter("reporte");
                 return false;
             case VERROUILLER:
+                // 2.4.5 : quitté depuis plus de 5 min : session fermée ici (la page ne répond pas toujours en
+                // arrière-plan : passages reportés de 30 min en boucle, constaté le 18/11)
+                if (FondEtat.fermerSansPage(PAGE_VERROUILLEE_MS, System.currentTimeMillis())) return lancer();
                 // Klad déverrouillé en arrière-plan : verrouillage demandé, attente hors du fil principal
                 if (!KladVaultPlugin.demanderVerrou()) {
                     reporter("verrou");

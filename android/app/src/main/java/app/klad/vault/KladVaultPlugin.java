@@ -449,6 +449,11 @@ public class KladVaultPlugin extends Plugin {
 
     @PluginMethod
     public void writeBlob(PluginCall call) {
+        // 2.4.5 : session fermée par la synchro planifiée : la page, restée en mémoire, n'écrit plus par-dessus
+        if (FondEtat.fermeeParFond()) {
+            call.reject("Écriture refusée : Klad verrouillé pendant la synchro automatique", "VERROU");
+            return;
+        }
         try {
             vault.writeBlob(call.getString("name"), Base64.getDecoder().decode(call.getString("data", "")));
             call.resolve(ok());

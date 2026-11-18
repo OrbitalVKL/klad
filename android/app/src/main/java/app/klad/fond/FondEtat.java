@@ -14,6 +14,10 @@ public final class FondEtat {
     private static boolean appliOuverte;
     private static boolean enCours;
     private static boolean premierPlan;
+    /** 2.4.5 : heure à laquelle Klad a été quitté (0 : affiché ou jamais quitté). */
+    private static long quitteLe;
+    /** 2.4.5 : session fermée par la synchro planifiée, sans réponse de la page : écritures de la page refusées. */
+    private static boolean fermeeParFond;
     private static final Object VERROU = new Object();
 
     private FondEtat() {}
@@ -22,6 +26,7 @@ public final class FondEtat {
     public static void appli(boolean ouverte) {
         synchronized (VERROU) {
             appliOuverte = ouverte;
+            if (ouverte) fermeeParFond = false;
             VERROU.notifyAll();
         }
     }
@@ -36,6 +41,28 @@ public final class FondEtat {
     public static void premierPlan(boolean oui) {
         synchronized (VERROU) {
             premierPlan = oui;
+            quitteLe = oui ? 0 : System.currentTimeMillis();
+        }
+    }
+
+    /**
+     * 2.4.5 : Klad quitté depuis au moins delaiMs (verrouillage automatique de la page dû, mais ses minuteries ne
+     * tournent pas forcément en arrière-plan) : la session est fermée ici, sans attendre la page. Ses écritures sont
+     * refusées jusqu'au prochain déverrouillage ; à l'affichage, elle se verrouille d'elle-même (délai dépassé).
+     */
+    public static boolean fermerSansPage(long delaiMs, long now) {
+        synchronized (VERROU) {
+            if (!appliOuverte || premierPlan || quitteLe <= 0 || now - quitteLe < delaiMs) return false;
+            appliOuverte = false;
+            fermeeParFond = true;
+            VERROU.notifyAll();
+            return true;
+        }
+    }
+
+    public static boolean fermeeParFond() {
+        synchronized (VERROU) {
+            return fermeeParFond;
         }
     }
 
@@ -122,6 +149,8 @@ public final class FondEtat {
             appliOuverte = false;
             enCours = false;
             premierPlan = false;
+            quitteLe = 0;
+            fermeeParFond = false;
         }
     }
 }

@@ -6,6 +6,14 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.4.5** — trace du propriétaire, 18/11 (11 h 32) : « Refus d'Android : travail : SecurityException
+(android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity constraint) » : cause de tous les refus
+JobScheduler depuis la 2.3.0 (« RuntimeException ← RemoteException ») ; et « Dernier passage : 11:03, reporté de 30 min
+(Klad n'a pas pu être verrouillé) » : la page restée en mémoire ne répond pas toujours (minuteries d'une page cachée,
+verrouillage automatique de 5 min jamais déclenché). Correctifs : permission déclarée ; session fermée côté natif quand
+Klad est quitté depuis plus de 5 min. En attente (décisions du propriétaire, 18/11) : reste à vivre « sur salaire » et
+charges fixes prévues, nouveau mode « Argent de poche », copie du journal limitée aux dernières lignes.
+
 **2.4.4** — synchro planifiée sans réseau : nouvel essai 30 min plus tard, jusqu'au créneau suivant (retour du
 propriétaire, 17/11 : passage de 12 h 35 sans réseau à l'intérieur d'un bâtiment, passage de 13 h 31 réussi ; « Go A »).
 Confirmé ce jour : le réveil + service de premier plan de la 2.4.3 fonctionne sur le téléphone (passage Klad fermé, comptes lus).
@@ -204,6 +212,17 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   (`KC.NATURES`, « optionnelle » par défaut), `KC.creerCategorie` puis catégorie et sous-catégorie choisies ;
   création annulable. `KladApp.ouvrirClasser` exposé (tests).
 - Tests : `test/lot240.test.mjs` (règle plus précise, corrections, catégorie retirée, texte, parcours Chromium).
+
+### 2.4.5 — détails techniques
+- Manifeste : `ACCESS_NETWORK_STATE` (exigée par `JobSchedulerService` pour `setRequiredNetworkType`).
+- `FondEtat` : `quitteLe` (posé par `premierPlan(false)`, remis à 0 à l'affichage) ; `fermerSansPage(delaiMs, now)` :
+  appli ouverte, quittée depuis au moins `delaiMs` → session fermée (`appliOuverte = false`) et `fermeeParFond` ;
+  `appli(true)` (déverrouillage) l'efface. `KladVaultPlugin.writeBlob` refuse (code `VERROU`) tant que `fermeeParFond`
+  (la page restée en mémoire n'écrit pas par-dessus la synchro). À l'affichage, la page se verrouille d'elle-même
+  (`lockDue`, 5 min).
+- `Passage` : `VERROUILLER` → d'abord `fermerSansPage(PAGE_VERROUILLEE_MS = 5 min 15 s)` puis `lancer()` ; sinon
+  demande de verrouillage à la page (2.3.4).
+- Tests : `test/lot245.test.mjs` ; JUnit `FondEtatTest.quitteDepuisCinqMinutesSessionFermeeSansLaPage`.
 
 ### 2.4.4 — détails techniques
 - `KladEB` : erreur réseau (`fetch` rejeté) marquée `reseau: true` ; `KladSync` compte `res.reseau` (en plus de

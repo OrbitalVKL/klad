@@ -2,6 +2,13 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.4.5
+
+- **Synchro automatique** : Klad déclare enfin l'autorisation qu'Android exige pour programmer une synchro qui a besoin
+  du réseau ; sans elle, le planificateur d'Android refusait toutes les synchros de Klad depuis la 2.3.0.
+- Klad quitté sans le verrouiller depuis plus de 5 min : la synchro automatique le verrouille elle-même, au lieu de se
+  reporter de 30 min en boucle.
+
 ## 2.4.4
 
 - **Synchro automatique sans réseau** (dans un bâtiment, par exemple) : nouvel essai 30 min plus tard, puis encore
