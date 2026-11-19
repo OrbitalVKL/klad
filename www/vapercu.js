@@ -62,7 +62,9 @@
   // + reste à vivre ; base salaire : salaire = charges fixes prélevées + variable dépensé + reste à vivre.
   function barreArgent(x) {
     const c = x.col, comptes = x.choix === 'comptes';
+    // 2.5.0 : argent de poche : charges fixes prélevées et à venir, puis variable dépensé
     const P = comptes ? [['fix', 'charges fixes à venir', c.fixes], ['carte', 'carte à prélever', c.cartes || 0], ['var', 'budget variable restant', c.variable], ['libre', 'reste à vivre', c.reste]]
+      : x.choix === 'poche' ? [['fix', 'charges fixes prélevées', c.fixes], ['fixav', 'charges fixes à venir', c.avenir], ['var', 'variable dépensé', c.variable], ['libre', 'reste à vivre', c.reste]]
       : [['fix', 'charges fixes prélevées', c.fixes], ['var', 'variable dépensé', c.variable], ['libre', 'reste à vivre', c.reste]];
     const vis = P.filter(p => Math.abs(p[2]) > DEMI);
     const pos = vis.filter(p => p[2] > 0), tot = pos.reduce((t, p) => t + p[2], 0) || 1;

@@ -943,16 +943,20 @@
     // (un achat à la carte compte déjà dans le variable dépensé ; avant, il faisait monter cette colonne).
     const cartes = Bs ? detteCartes(B) : 0;
     const comptes = Bs ? { base: Bs.v, cartes, fixes: fixLeft, marge: Bs.v - cartes - fixLeft, variable: varLeft, reste: Bs.v - cartes - fixLeft - varLeft } : null;
-    return { budget, comptes, fin: res.per.end, base: comptes ? 'accounts' : 'budget', valeur: comptes ? comptes.reste : budget.reste };
+    // 2.5.0 : « argent de poche » : salaire − charges fixes prélevées − charges fixes encore à venir − variable dépensé
+    // (une charge fixe prévue est retirée d'avance : son prélèvement ne fait pas baisser le montant, sauf dépassement)
+    const poche = { base: sal, fixes: fixSp, avenir: fixLeft, marge: sal - fixSp - fixLeft, variable: varSp, reste: sal - fixSp - fixLeft - varSp, date: salDate };
+    return { budget, comptes, poche, fin: res.per.end, base: comptes ? 'accounts' : 'budget', valeur: comptes ? comptes.reste : budget.reste };
   }
 
   // Base affichée du reste à vivre (0.10.7) : réglage du budget `reglages.rav`, « salaire » (par défaut, colonne
   // « dernier salaire ») ou « comptes » (colonne « comptes courants »). Aucun calcul : choix d'une des deux colonnes.
-  const BASES_RAV = { salaire: 'Dernier salaire', comptes: 'Comptes courants' };
-  function baseRav(S) { const r = S && S.budget && S.budget.reglages; return r && r.rav === 'comptes' ? 'comptes' : 'salaire'; }
+  // 2.5.0 : troisième base « poche » (Argent de poche).
+  const BASES_RAV = { salaire: 'Dernier salaire', comptes: 'Comptes courants', poche: 'Argent de poche' };
+  function baseRav(S) { const r = S && S.budget && S.budget.reglages; return r && (r.rav === 'comptes' || r.rav === 'poche') ? r.rav : 'salaire'; }
   function choisirBaseRav(S, base) {
     const B = donnees(S);
-    B.reglages = Object.assign({}, isObj(B.reglages) ? B.reglages : {}, { rav: base === 'comptes' ? 'comptes' : 'salaire' });
+    B.reglages = Object.assign({}, isObj(B.reglages) ? B.reglages : {}, { rav: base === 'comptes' || base === 'poche' ? base : 'salaire' });
     return B.reglages.rav;
   }
   // → { choix ('salaire' | 'comptes'), col (colonne), autre (l'autre colonne ou null), base ('budget' | 'accounts') } ;
@@ -960,6 +964,8 @@
   function ravChoisi(rav, base) {
     if (!rav) return null;
     if (base === 'comptes' && rav.comptes) return { choix: 'comptes', col: rav.comptes, autre: rav.budget, base: 'accounts' };
+    // 2.5.0 : base « budget » pour Grafit (calcul sur le salaire ; le contrat du résumé ne connaît que budget / accounts)
+    if (base === 'poche' && rav.poche) return { choix: 'poche', col: rav.poche, autre: rav.budget, base: 'budget' };
     return { choix: 'salaire', col: rav.budget, autre: rav.comptes, base: 'budget' };
   }
 

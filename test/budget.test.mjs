@@ -360,3 +360,22 @@ test('commun : suivi au mois par défaut, ou sur le cycle de salaire', () => {
   S.budget.reglages.cycle = 'mois';
   assert.equal(KB.periode(ctx(S), 'commun', null).start, '2026-10-01');
 });
+
+test('2.5.0 : reste à vivre « argent de poche » (charges fixes prélevées et à venir retirées du salaire)', () => {
+  const { S } = etat();
+  const r = KB.suivi(ctx(S), 'perso', null).rav;
+  assert.deepEqual(json(r.poche), { base: 200000, fixes: 0, avenir: 5000, marge: 195000, variable: 12000, reste: 183000, date: '2026-10-27' });
+  assert.deepEqual(json(KB.ravChoisi(r, 'poche')), { choix: 'poche', col: json(r.poche), autre: json(r.budget), base: 'budget' });
+  // base choisie et gardée dans les réglages du budget
+  assert.equal(KB.choisirBaseRav(S, 'poche'), 'poche');
+  assert.equal(KB.baseRav(S), 'poche');
+  assert.equal(KB.BASES_RAV.poche, 'Argent de poche');
+  const h = VB.detailRav(r, 'poche'), t = h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(h, /data-ravbase="poche" aria-pressed="true"/);
+  assert.match(h, /<th class="rav-on">Argent de poche<\/th>/);
+  assert.match(t, /= Reste à vivre 1 880,00 € 1 240,00 € 1 830,00 €/);
+  assert.ok(!montantSigne(h), 'aucun montant négatif affiché');
+  // résumé Grafit : la colonne choisie, base « budget » (le contrat ne connaît que budget / accounts)
+  const g = json(R.construire(S, NOW, {}));
+  assert.deepEqual([g.month.left_to_live, g.month.left_to_live_basis], [1830, 'budget']);
+});

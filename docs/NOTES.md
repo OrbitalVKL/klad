@@ -2,6 +2,13 @@
 
 Ouvertes depuis l'appli : Plus › Aide et à propos › À propos › « Notes de version ». Aucune donnée personnelle.
 
+## 2.5.0
+
+- **Reste à vivre, nouvelle base « Argent de poche »** : le salaire moins toutes les charges fixes prévues du cycle
+  (déjà prélevées ou encore à venir) et ce qui est déjà dépensé. Une charge fixe prévue est retirée d'avance : son
+  prélèvement ne fait plus baisser le montant, sauf si elle dépasse ce qui était prévu. À choisir sous le reste à vivre
+  (Aperçu, détail du calcul) ; le widget et Grafit suivent la base choisie.
+
 ## 2.4.5
 
 - **Synchro automatique** : Klad déclare enfin l'autorisation qu'Android exige pour programmer une synchro qui a besoin

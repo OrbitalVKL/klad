@@ -110,12 +110,12 @@
   }
 
   // ------------------------------------------------------------ reste à vivre : interrupteur de la base affichée (0.10.7)
-  // base : « salaire » ou « comptes » ; sans solde connu, « Comptes courants » est désactivé.
+  // base : « salaire », « comptes » ou « poche » (2.5.0) ; sans solde connu, « Comptes courants » est désactivé.
   // valeurs (2.1, facultatif) : { salaire, comptes } en centimes, montrées sous chaque base (sans signe : « dépassé » si négatif)
   function interrupteurRav(base, avecComptes, valeurs) {
     const v = k => !valeurs || valeurs[k] == null ? '' : '<b class="num rb-v">' + esc(e0(Math.abs(valeurs[k]))) + (valeurs[k] < -50 ? ' dépassé' : '') + '</b>';
     const b = (k, t) => '<button type="button" data-ravbase="' + k + '" aria-pressed="' + (base === k) + '"' + (k === 'comptes' && !avecComptes ? ' disabled' : '') + '>' + (valeurs ? '<span>' + t + v(k) + '</span>' : t) + '</button>';
-    return '<div class="seg rav-base" role="group" aria-label="Base du reste à vivre">' + b('salaire', 'Dernier salaire') + b('comptes', 'Comptes courants') + '</div>';
+    return '<div class="seg rav-base" role="group" aria-label="Base du reste à vivre">' + b('salaire', 'Dernier salaire') + b('comptes', 'Comptes courants') + b('poche', 'Argent de poche') + '</div>';
   }
 
   // ------------------------------------------------------------ pastille de banque (initiales sur la couleur de la banque)

@@ -6,6 +6,11 @@ demandes, une version publiée par lot. Notes de version publiques : `docs/NOTES
 
 ## Statut
 
+**2.5.0** — base « Argent de poche » du reste à vivre (demande du propriétaire, 18/11 : « ajoute un mode en plus pour le
+reste à vivre Argent de poche qui déduit les charges fixes à venir en prévision puisqu'elles partent de toute
+manière » ; calcul validé le 19/11 : « Go »). « Dernier salaire » garde le calcul du Carnet (charges fixes prélevées
+seulement) ; le relevé de contrôle n'a pas de colonne « poche » (parité avec le Carnet inchangée).
+
 **2.4.5** — trace du propriétaire, 18/11 (11 h 32) : « Refus d'Android : travail : SecurityException
 (android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity constraint) » : cause de tous les refus
 JobScheduler depuis la 2.3.0 (« RuntimeException ← RemoteException ») ; et « Dernier passage : 11:03, reporté de 30 min
@@ -212,6 +217,16 @@ réelles (contrôle de l'architecte) ; 1.0.0 identique à la 0.10.11 sur les jeu
   (`KC.NATURES`, « optionnelle » par défaut), `KC.creerCategorie` puis catégorie et sous-catégorie choisies ;
   création annulable. `KladApp.ouvrirClasser` exposé (tests).
 - Tests : `test/lot240.test.mjs` (règle plus précise, corrections, catégorie retirée, texte, parcours Chromium).
+
+### 2.5.0 — détails techniques
+- `KladBudget.resteAVivre` : colonne `poche` = { base: salaire, fixes: prélevées, avenir: `T.fixe.left`, marge, variable:
+  dépensé, reste: base − fixes − avenir − variable, date }. `BASES_RAV.poche` « Argent de poche » ; `baseRav` /
+  `choisirBaseRav` acceptent `poche` ; `ravChoisi(rav, 'poche')` → { choix: 'poche', col: rav.poche, autre: rav.budget,
+  base: 'budget' } (résumé Grafit : `left_to_live_basis` reste `budget` / `accounts`).
+- Vues : `interrupteurRav` à trois boutons ; `detailRav` troisième colonne ; `barreArgent` (poche) : charges fixes
+  prélevées, à venir (`.m-fixav`), variable dépensé, reste ; `KladAccueil.reste` : « en argent de poche ». Widget :
+  colonne choisie (inchangé). Relevé de contrôle : inchangé.
+- Tests : `budget.test` (2.5.0).
 
 ### 2.4.5 — détails techniques
 - Manifeste : `ACCESS_NETWORK_STATE` (exigée par `JobSchedulerService` pour `setRequiredNetworkType`).

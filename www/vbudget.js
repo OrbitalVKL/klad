@@ -712,20 +712,22 @@
   // 1.2.0 : plus de ligne « Par jour » (le troisième paramètre, jours restants, n'est plus lu).
   function detailRav(rav, base) {
     if (!rav) return '<p class="muted">Le reste à vivre se calcule sur le cycle en cours du périmètre perso.</p>';
-    const b = rav.budget, c = rav.comptes, x = KB().ravChoisi(rav, base);
+    const b = rav.budget, c = rav.comptes, p = rav.poche, x = KB().ravChoisi(rav, base);
     const on = k => x.choix === k ? ' class="rav-on"' : '';
     const cel = x => x == null ? '<td class="muted">—</td>' : '<td class="num">' + (x < -DEMI / 2 ? '<span class="bad">' + esc(e2(-x)) + ' en dépassement</span>' : esc(e2(x))) + '</td>';
-    const L = (lab, sub, x, y, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><th>' + lab + (sub ? '<span class="subs"> ' + sub + '</span>' : '') + '</th>' + cel(x) + cel(y) + '</tr>';
+    // 2.5.0 : troisième colonne « argent de poche » (charges fixes prélevées et à venir retirées du salaire)
+    const L = (lab, sub, x, y, z, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><th>' + lab + (sub ? '<span class="subs"> ' + sub + '</span>' : '') + '</th>' + cel(x) + cel(y) + (p ? cel(z) : '') + '</tr>';
     return '<p class="rav-tete">Affiché sur l\'Accueil et dans Grafit :</p>' + U().interrupteurRav(x.choix, !!c) +
-      '<div class="tablewrap"><table class="rav-t rav-' + x.choix + '"><thead><tr><th></th><th' + on('salaire') + '>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th' + on('comptes') + '>Comptes courants</th></tr></thead><tbody>' +
-      L('Base', 'salaire / soldes des comptes courants', b.base, c && c.base, 'b') +
-      (c && c.cartes > 0 ? L('− Carte à débit différé', 'déjà comptée dans le dépensé / somme à prélever', null, c.cartes, 'b') : '') +
-      L('− Charges fixes', 'prélevées / encore à venir', b.fixes, c && c.fixes, 'b') +
-      L('= Marge', '', b.marge, c && c.marge, 'mg') + L('− Variable', 'dépensé / reste du budget', b.variable, c && c.variable, 'b') +
-      L('= Reste à vivre', '', b.reste, c && c.reste, 'rv') +
+      '<div class="tablewrap"><table class="rav-t rav-' + x.choix + '"><thead><tr><th></th><th' + on('salaire') + '>Dernier salaire' + (b.date ? ' (' + jjmm(b.date) + ')' : '') + '</th><th' + on('comptes') + '>Comptes courants</th>' + (p ? '<th' + on('poche') + '>Argent de poche</th>' : '') + '</tr></thead><tbody>' +
+      L('Base', 'salaire / soldes des comptes courants / salaire', b.base, c && c.base, p && p.base, 'b') +
+      (c && c.cartes > 0 ? L('− Carte à débit différé', 'déjà comptée dans le dépensé / somme à prélever', null, c.cartes, null, 'b') : '') +
+      L('− Charges fixes', 'prélevées / encore à venir / prélevées et à venir', b.fixes, c && c.fixes, p && p.fixes + p.avenir, 'b') +
+      L('= Marge', '', b.marge, c && c.marge, p && p.marge, 'mg') + L('− Variable', 'dépensé / reste du budget / dépensé', b.variable, c && c.variable, p && p.variable, 'b') +
+      L('= Reste à vivre', '', b.reste, c && c.reste, p && p.reste, 'rv') +
       '</tbody></table></div>' +
       '<p class="muted small">Jusqu\'au ' + esc(jjmmaa(rav.fin)) + '. Colonne « dernier salaire » : le salaire du cycle moins ce qui est déjà dépensé. ' +
-      'Colonne « comptes courants » : les soldes des comptes courants moins la somme due sur la carte à débit différé, les charges fixes pas encore prélevées et le reste du budget variable.</p>';
+      'Colonne « comptes courants » : les soldes des comptes courants moins la somme due sur la carte à débit différé, les charges fixes pas encore prélevées et le reste du budget variable.' +
+      (p ? ' Colonne « argent de poche » : le salaire du cycle moins toutes les charges fixes prévues, prélevées ou non, et ce qui est déjà dépensé.' : '') + '</p>';
   }
   // Ancienne carte « Reste à vivre » (lue par le résumé Grafit et les tests) : texte simple.
   function carteRav(rav) {
