@@ -38,7 +38,7 @@
     // appui. 1.2.0 : plus de montant « par jour » ; la barre du cycle dit « jour N/T » (un trait par jour, un trait
     // marqué au début de chaque semaine, repère sur aujourd'hui).
     const x = KB().ravChoisi(rav, base), b = x.col;
-    const surQuoi = x.choix === 'comptes' ? 'sur les comptes courants' : 'sur le dernier salaire';
+    const surQuoi = x.choix === 'comptes' ? 'sur les comptes courants' : x.choix === 'poche' ? 'en argent de poche' : 'sur le dernier salaire';
     const grand = b.reste >= 0 ? F().montant(b.reste) : F().montant(-b.reste);
     const T = res.nbJours, N = Math.min(T, Math.max(1, res.jour));
     return '<div class="ac-hero-w" data-mesure="rav"><button type="button" class="ac-hero" data-aller="rav" aria-label="' + esc('Reste à vivre jusqu\'au ' + U().jjmm(rav.fin) + ' : ' + grand +
